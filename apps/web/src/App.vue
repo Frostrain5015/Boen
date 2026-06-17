@@ -3,7 +3,7 @@ import { ref, computed, nextTick, onMounted } from 'vue';
 import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, GradeBand } from '@boen/shared';
-import { streamChat, streamAnswer, getConversations, createConversation, deleteConversation, type Conversation } from '@/services/chat';
+import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
@@ -263,9 +263,22 @@ async function handleDeleteConversation(id: string, event: Event) {
   }
 }
 
-function selectConversation(id: string) {
+async function selectConversation(id: string) {
   currentConversationId.value = id;
   items.value = [];
+  try {
+    const { conversation: conv, messages: msgs } = await getConversation(id);
+    // 把对话的学科还原到学科选择器
+    subject.value = conv.subject as Subject;
+    // 将服务端消息转成 ChatItem
+    items.value = msgs.map((m) => {
+      if (m.role === 'user') return { kind: 'user' as const, text: m.content };
+      // assistant 消息已完结
+      return { kind: 'assistant' as const, text: m.content, done: true };
+    });
+  } catch {
+    items.value = [];
+  }
 }
 
 // ── 认证相关 ──────────────────────────────
