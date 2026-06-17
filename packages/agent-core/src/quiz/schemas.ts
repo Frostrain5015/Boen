@@ -5,8 +5,11 @@ const difficulty = z.enum(['easy', 'medium', 'hard']).nullish().describe('题目
 const knowledgePoint = z.string().nullish().describe('对应考点');
 const explanation = z.string().describe('答案解析，作答后展示给学生');
 
+export const passageField = z.string().nullish().describe('阅读材料（语文/英语阅读理解题专用），在此提供文章或对话原文，前端会以特殊字体块渲染');
+
 export const multipleChoiceSchema = z.object({
   stem: z.string().describe('题干'),
+  passage: passageField,
   options: z
     .array(z.object({ key: z.string().describe('选项编号，如 A'), text: z.string() }))
     .min(2)
@@ -20,6 +23,7 @@ export const multipleChoiceSchema = z.object({
 
 export const fillBlankSchema = z.object({
   stem: z.string().describe('题干，每个空用连续四个下划线 ____ 表示'),
+  passage: passageField,
   blanks: z
     .array(z.object({ acceptedAnswers: z.array(z.string()).min(1).describe('该空的可接受答案') }))
     .min(1)
@@ -31,6 +35,7 @@ export const fillBlankSchema = z.object({
 
 export const trueFalseSchema = z.object({
   stem: z.string().describe('判断题陈述'),
+  passage: passageField,
   answer: z.boolean().describe('该陈述是否正确'),
   knowledgePoint,
   difficulty,
@@ -39,6 +44,7 @@ export const trueFalseSchema = z.object({
 
 export const shortAnswerSchema = z.object({
   stem: z.string().describe('简答题题干'),
+  passage: passageField,
   referenceAnswer: z.string().describe('参考答案'),
   keyPoints: z.array(z.string()).nullish().describe('评分要点'),
   knowledgePoint,

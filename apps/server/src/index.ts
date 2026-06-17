@@ -1,7 +1,7 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
@@ -42,6 +42,26 @@ const graph = buildBoenGraph(model);
 const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0.0.1:4000';
 const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
 const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
+
+// 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
+const userIdCache = new Map<string, { sub: string; exp: number }>();
+async function resolveUserId(c: Context): Promise<string | null> {
+  const authz = c.req.header('authorization');
+  if (!authz?.startsWith('Bearer ')) return null;
+  const token = authz.slice(7);
+  const cached = userIdCache.get(token);
+  if (cached && cached.exp > Date.now()) return cached.sub;
+  try {
+    const res = await fetch(`${FROST_ID_INTERNAL_URL}/oauth/userinfo`, { headers: { Authorization: authz } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { sub?: string };
+    if (!data.sub) return null;
+    userIdCache.set(token, { sub: data.sub, exp: Date.now() + 5 * 60_000 });
+    return data.sub;
+  } catch {
+    return null;
+  }
+}
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
 const runConfig = (threadId: string) => ({ version: 'v2' as const, configurable: { thread_id: threadId } });
@@ -129,41 +149,53 @@ app.post('/api/auth/revoke', async (c) => {
 
 // ── 对话管理 API ────────────────────────────
 
-/** GET /api/conversations - 获取用户的所有对话 */
+/** GET /api/conversations - 获取当前登录用户的所有对话 */
 app.get('/api/conversations', async (c) => {
-  const userId = c.req.header('x-user-id') ?? 'anonymous';
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const conversations = getConversations(userId);
   return c.json({ conversations });
 });
 
 /** POST /api/conversations - 创建新对话 */
 app.post('/api/conversations', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json<{ title?: string; subject?: string }>();
-  const userId = c.req.header('x-user-id') ?? 'anonymous';
   const conversation = createConversation(userId, body.title ?? '新对话', body.subject ?? 'math');
   return c.json({ conversation }, 201);
 });
 
-/** GET /api/conversations/:id - 获取单个对话 */
+/** GET /api/conversations/:id - 获取单个对话（仅限本人） */
 app.get('/api/conversations/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const id = c.req.param('id');
   const conversation = getConversation(id);
-  if (!conversation) return c.json({ error: 'Conversation not found' }, 404);
+  if (!conversation || conversation.userId !== userId) return c.json({ error: 'Conversation not found' }, 404);
   const messages = getMessages(id);
   return c.json({ conversation, messages });
 });
 
-/** PATCH /api/conversations/:id - 更新对话标题 */
+/** PATCH /api/conversations/:id - 更新对话标题（仅限本人） */
 app.patch('/api/conversations/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const id = c.req.param('id');
+  const conversation = getConversation(id);
+  if (!conversation || conversation.userId !== userId) return c.json({ error: 'Conversation not found' }, 404);
   const body = await c.req.json<{ title?: string }>();
   if (body.title) updateConversationTitle(id, body.title);
   return c.json({ success: true });
 });
 
-/** DELETE /api/conversations/:id - 删除对话 */
+/** DELETE /api/conversations/:id - 删除对话（仅限本人） */
 app.delete('/api/conversations/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const id = c.req.param('id');
+  const conversation = getConversation(id);
+  if (!conversation || conversation.userId !== userId) return c.json({ error: 'Conversation not found' }, 404);
   deleteConversation(id);
   return c.json({ success: true });
 });
@@ -172,18 +204,24 @@ app.delete('/api/conversations/:id', async (c) => {
 
 app.post('/api/chat', async (c) => {
   const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject?: string };
+  // 仅在 conversationId 属于当前登录用户时才落库，避免串写他人对话
+  const userId = await resolveUserId(c);
+  const owned =
+    !!body.conversationId && !!userId && getConversation(body.conversationId)?.userId === userId;
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
-      // 如果有 conversationId，保存用户消息
-      if (body.conversationId) {
-        addMessage(body.conversationId, 'user', body.message);
+      // 如果有归属本人的 conversationId，保存用户消息
+      if (owned) {
+        addMessage(body.conversationId!, 'user', body.message);
       }
 
       const last = await runGraph(
         {
           messages: [new HumanMessage(body.message)],
           gradeBand: body.gradeBand ?? 'middle',
+          subject: body.subject ?? 'math',
+          userName: body.userName,
           ...(body.mode ? { mode: body.mode } : {}),
         },
         body.threadId,
@@ -191,9 +229,9 @@ app.post('/api/chat', async (c) => {
       );
 
       // 保存助手回复
-      if (body.conversationId && last) {
+      if (owned && last) {
         const content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
-        addMessage(body.conversationId, 'assistant', content);
+        addMessage(body.conversationId!, 'assistant', content);
       }
 
       await emitQuestionIfAny(last, send);

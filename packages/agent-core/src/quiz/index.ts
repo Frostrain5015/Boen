@@ -23,6 +23,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
       return {
         type: 'multiple_choice',
         stem: a.stem,
+        passage: a.passage ?? undefined,
         options: a.options,
         multiSelect: a.multiSelect,
         knowledgePoint: a.knowledgePoint ?? undefined,
@@ -34,6 +35,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
       return {
         type: 'fill_blank',
         stem: a.stem,
+        passage: a.passage ?? undefined,
         blankCount: a.blanks.length,
         knowledgePoint: a.knowledgePoint ?? undefined,
         difficulty: a.difficulty ?? undefined,
@@ -44,6 +46,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
       return {
         type: 'true_false',
         stem: a.stem,
+        passage: a.passage ?? undefined,
         knowledgePoint: a.knowledgePoint ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };
@@ -53,6 +56,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
       return {
         type: 'short_answer',
         stem: a.stem,
+        passage: a.passage ?? undefined,
         knowledgePoint: a.knowledgePoint ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };

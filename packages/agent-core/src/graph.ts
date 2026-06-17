@@ -14,6 +14,8 @@ import { quizTools } from './quiz/index.js';
 export const BoenState = Annotation.Root({
   ...MessagesAnnotation.spec,
   gradeBand: Annotation<GradeBand>(),
+  subject: Annotation<string>(),
+  userName: Annotation<string>(),
   mode: Annotation<BoenMode>(),
   /** 本轮是否强制出题 */
   forceQuiz: Annotation<boolean>(),
@@ -50,7 +52,7 @@ export function buildBoenGraph(model: BaseChatModel) {
   };
 
   const qaNode = async (state: State): Promise<Partial<State>> => {
-    const system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle'));
+    const system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName));
     const last = state.messages[state.messages.length - 1];
 
     let llm;

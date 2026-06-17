@@ -19,6 +19,8 @@ export interface ChatRequest {
   message: string;
   /** 用户画像：年龄段，驱动用词/难度适配 */
   gradeBand: GradeBand;
+  /** 用户名（用于智能体个性化称呼） */
+  userName?: string;
   /** 期望模式，缺省时由 Router 自动判定 */
   mode?: BoenMode;
 }
@@ -34,6 +36,8 @@ interface BaseQuestion {
   type: QuestionType;
   /** 题干（填空题用 ____ 表示每个空） */
   stem: string;
+  /** 阅读材料（语文/英语阅读理解题专用），渲染为特殊字体块 */
+  passage?: string;
   knowledgePoint?: string;
   difficulty?: Difficulty;
 }

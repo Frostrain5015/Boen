@@ -119,6 +119,8 @@ watch(
     </div>
 
     <div class="space-y-4 px-5 py-4">
+      <!-- 阅读材料块（语文/英语阅读理解专用） -->
+      <div v-if="question.passage" class="passage-block md-body" v-html="renderMarkdown(question.passage)"></div>
       <div class="md-body font-display text-[1.02rem] font-medium leading-relaxed" v-html="renderMarkdown(question.stem)"></div>
 
       <!-- 选择题 -->

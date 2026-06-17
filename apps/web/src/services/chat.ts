@@ -43,7 +43,7 @@ async function streamSse(
 }
 
 /** 发起一轮对话 */
-export const streamChat = (req: ChatRequest & { conversationId?: string; subject?: string }, onEvent: (e: SseEvent) => void) =>
+export const streamChat = (req: ChatRequest & { conversationId?: string; subject?: string; userName?: string }, onEvent: (e: SseEvent) => void) =>
   streamSse('/api/chat', req, onEvent);
 
 /** 提交一道题的作答 */

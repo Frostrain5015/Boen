@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
-import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent } from '@boen/shared';
+import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, GradeBand } from '@boen/shared';
 import { streamChat, streamAnswer, getConversations, createConversation, deleteConversation, type Conversation } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
+import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
 import LoginView from '@/components/LoginView.vue';
@@ -16,10 +17,10 @@ type Subject = 'chinese' | 'math' | 'english' | 'science';
 
 type ChatItem =
   | { kind: 'user'; text: string }
-  | { kind: 'assistant'; text: string; chunks: string[]; done: boolean }
+  | { kind: 'assistant'; text: string; done: boolean }
   | { kind: 'question'; toolCallId: string; question: QuestionPayload; answered: boolean; grading?: GradingResult };
 
-const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, chunks: text ? [text] : [], done: false });
+const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
 
 const SUBJECT_LABELS: { value: Subject; label: string; emoji: string }[] = [
   { value: 'chinese', label: '语文', emoji: '📖' },
@@ -27,7 +28,23 @@ const SUBJECT_LABELS: { value: Subject; label: string; emoji: string }[] = [
   { value: 'english', label: '英语', emoji: '🔤' },
   { value: 'science', label: '科学', emoji: '🔬' },
 ];
-const QUICK_CHIPS = ['考我一道选择题', '出一道判断题', '讲讲三角形的面积', '帮我复习光合作用'];
+
+// ── 用户画像（名字 + 年级，localStorage 持久化）──
+const PROFILE_KEY = 'boen_user_profile';
+function loadProfile(): { name: string; gradeBand: GradeBand } | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (p.name && p.gradeBand) return p;
+  } catch { /* 忽略损坏数据 */ }
+  return null;
+}
+function saveProfile(p: { name: string; gradeBand: GradeBand }) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+}
+const userProfile = ref(loadProfile());
+const showSetupDialog = ref(false);
 
 // ── 认证状态 ──────────────────────────────
 const authChecked = ref(false);
@@ -35,8 +52,8 @@ const authenticated = ref(false);
 const currentUser = ref<FrostUser | null>(null);
 const showUserMenu = ref(false);
 
-// 检查当前路径是否是 OAuth 回调
-const isOAuthCallback = computed(() => window.location.pathname === '/auth/callback');
+// 是否处于 OAuth 回调页（用 ref，登录成功后手动切回主应用）
+const isOAuthCallback = ref(window.location.pathname === '/auth/callback');
 
 // ── 对话管理 ──────────────────────────────
 const conversations = ref<Conversation[]>([]);
@@ -58,13 +75,36 @@ const showTyping = computed(() => {
   return busy.value && last?.kind === 'assistant' && !last.text;
 });
 
+// 检测最后一个用户消息是否为出题意图，用于显示「正在出题」提示
+const QUIZ_INTENT_RE = /考我|考考|出一?[道题]|来一?[道题]|测验|测试|测一测|练习|出题|quiz|阅读|理解/i;
+const isGeneratingQuiz = computed(() => {
+  if (!busy.value) return false;
+  const last = items.value[items.value.length - 1];
+  if (last?.kind !== 'assistant' || last.text) return false;
+  for (let i = items.value.length - 2; i >= 0; i--) {
+    const prev = items.value[i];
+    if (prev.kind === 'user') return QUIZ_INTENT_RE.test(prev.text);
+  }
+  return false;
+});
+
+// 答题反馈：判分时短暂锁定 happy/surprise，确保反馈清晰可见（即使助手随后接着输出）
+const reaction = ref<MascotState | null>(null);
+let reactionTimer: ReturnType<typeof setTimeout> | undefined;
+function triggerReaction(s: MascotState) {
+  reaction.value = s;
+  clearTimeout(reactionTimer);
+  reactionTimer = setTimeout(() => { reaction.value = null; }, 2600);
+}
+
 /** 根据当前状态计算吉祥物动画 */
 const mascotState = computed<MascotState>(() => {
+  if (reaction.value) return reaction.value;
   if (busy.value && showTyping.value) return 'thinking';
   if (busy.value) return 'listening';
   const last = items.value[items.value.length - 1];
-  if (last?.kind === 'question' && last.grading) {
-    return last.grading.correct ? 'happy' : 'surprise';
+  if (last?.kind === 'question') {
+    return last.grading ? (last.grading.correct ? 'happy' : 'surprise') : 'quiz';
   }
   return 'idle';
 });
@@ -73,7 +113,11 @@ function scrollDown() {
   nextTick(() => {
     requestAnimationFrame(() => {
       const el = scroller.value;
-      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      if (!el) return;
+      // 仅当用户已在底部附近（120px 阈值）时才自动滚动，不抢已上翻看历史的视角
+      const threshold = 120;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      if (isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     });
   });
 }
@@ -88,7 +132,6 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
     }
     if (cur.kind === 'assistant') {
       cur.text += e.value;
-      cur.chunks.push(e.value);
     }
   } else if (e.type === 'question') {
     const cur = items.value[idx.value];
@@ -98,6 +141,7 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
   } else if (e.type === 'grading') {
     const q = items.value.find((it) => it.kind === 'question' && it.toolCallId === e.toolCallId);
     if (q && q.kind === 'question') q.grading = e.result;
+    triggerReaction(e.result.correct ? 'happy' : 'surprise');
   } else if (e.type === 'error') {
     items.value.push(newAssistant(`⚠️ ${e.message}`));
   }
@@ -114,6 +158,16 @@ function finalizeAssistants() {
 async function send(text: string) {
   const t = text.trim();
   if (!t || busy.value) return;
+
+  // 没有活跃对话时自动创建
+  if (!currentConversationId.value) {
+    try {
+      const { conversation } = await createConversation('新对话', subject.value);
+      conversations.value.unshift(conversation);
+      currentConversationId.value = conversation.id;
+    } catch { /* 静默 */ }
+  }
+
   input.value = '';
   busy.value = true;
   items.value.push({ kind: 'user', text: t });
@@ -122,7 +176,7 @@ async function send(text: string) {
   scrollDown();
   try {
     await streamChat(
-      { threadId, message: t, gradeBand: 'middle', subject: subject.value, conversationId: currentConversationId.value ?? undefined },
+      { threadId, message: t, gradeBand: userProfile.value?.gradeBand ?? 'middle', userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined },
       (e) => handleEvent(e, idx),
     );
   } catch (err) {
@@ -153,6 +207,10 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     send(input.value);
   }
+}
+
+function subjectLabel(val: string): { label: string; emoji: string } {
+  return SUBJECT_LABELS.find((s) => s.value === val) ?? { label: val, emoji: '📁' };
 }
 
 function formatTime(date = new Date()) {
@@ -223,11 +281,30 @@ async function checkAuth() {
 }
 
 function handleOAuthSuccess() {
+  // 还原地址栏并切回主应用（isOAuthCallback 非响应式 URL，需手动置位）
+  window.history.replaceState({}, '', '/');
+  isOAuthCallback.value = false;
   authenticated.value = true;
+  authChecked.value = true;
   getCurrentUser().then((user) => {
     currentUser.value = user;
   });
   loadConversations();
+  // 首次登录弹出画像设置
+  if (!userProfile.value) showSetupDialog.value = true;
+}
+
+function handleOAuthError() {
+  window.history.replaceState({}, '', '/');
+  isOAuthCallback.value = false;
+  authChecked.value = true;
+  authenticated.value = false;
+}
+
+function handleSaveProfile(p: { name: string; gradeBand: GradeBand }) {
+  userProfile.value = p;
+  saveProfile(p);
+  showSetupDialog.value = false;
 }
 
 function handleLogout() {
@@ -253,29 +330,38 @@ onMounted(() => {
   <OAuthCallback
     v-if="isOAuthCallback"
     @success="handleOAuthSuccess"
-    @error="() => { authChecked = true; authenticated = false; }"
+    @error="handleOAuthError"
   />
 
   <!-- 登录页面 -->
   <LoginView v-else-if="authChecked && !authenticated" />
 
+  <!-- 用户画像设置对话框 -->
+  <UserSetupDialog
+    v-if="showSetupDialog"
+    :profile="userProfile"
+    @save="handleSaveProfile"
+  />
+
   <!-- 主应用 -->
-  <div v-else class="relative flex h-full flex-col">
+  <div v-else :data-subject="subject" class="relative flex h-full flex-col">
     <div class="app-bg"></div>
     <div class="app-grain"></div>
 
     <div class="relative z-10 flex h-full">
       <!-- 侧边栏：对话列表 -->
       <aside
-        class="flex h-full flex-col border-r border-[var(--line)] bg-[var(--surface)]/80 backdrop-blur-sm transition-all duration-300"
-        :class="sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'"
+        class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
+        :class="sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
       >
+        <!-- 内层固定 256px，宽度动画时整体被裁切，内容不重排 -->
+        <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
         <!-- 侧边栏头部 -->
         <div class="flex items-center justify-between border-b border-[var(--line)] p-3">
           <h2 class="font-display text-sm font-bold text-[var(--ink)]">对话历史</h2>
           <button
             @click="handleNewConversation"
-            class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white transition-transform hover:scale-105"
+            class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_8px_18px_-8px_var(--accent-glow),inset_0_-2px_0_rgba(0,0,0,0.12),inset_0_1.5px_0_rgba(255,255,255,0.25)] transition-all hover:scale-105 hover:shadow-[0_11px_22px_-8px_var(--accent-glow)]"
             title="新建对话"
           >
             <Plus class="h-4 w-4" />
@@ -304,7 +390,10 @@ onMounted(() => {
               <MessageSquare class="h-4 w-4 shrink-0" />
               <div class="min-w-0 flex-1">
                 <p class="truncate font-medium">{{ conv.title }}</p>
-                <p class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</p>
+                <div class="flex items-center gap-1.5">
+                  <span class="subject-tag">{{ subjectLabel(conv.subject).emoji }}{{ subjectLabel(conv.subject).label }}</span>
+                  <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
+                </div>
               </div>
               <button
                 @click="(e) => handleDeleteConversation(conv.id, e)"
@@ -315,6 +404,7 @@ onMounted(() => {
               </button>
             </button>
           </div>
+        </div>
         </div>
       </aside>
 
@@ -336,7 +426,7 @@ onMounted(() => {
             <ChevronRight v-else class="h-5 w-5 text-[var(--ink-soft)]" />
           </button>
 
-          <Mascot :size="46" :state="mascotState" />
+          <Mascot :size="46" :float="false" :animated="false" />
           <div class="leading-tight">
             <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>
             <p class="text-xs font-semibold text-[var(--ink-soft)]">你的学习小伙伴</p>
@@ -346,15 +436,15 @@ onMounted(() => {
           <div class="ml-auto flex items-center gap-3">
             <div class="clay-sm relative flex bg-[var(--surface)] p-1">
               <span
-                class="absolute top-1 bottom-1 rounded-[14px] bg-accent transition-transform duration-400"
-                :style="{ width: 'calc((100% - 0.75rem) / 4)', transform: `translateX(calc(${subjectIndex} * 100%))` }"
+                class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent transition-transform duration-400"
+                :style="{ transform: `translateX(calc(${subjectIndex} * 4rem))` }"
                 style="transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
               ></span>
               <button
                 v-for="s in SUBJECT_LABELS"
                 :key="s.value"
                 @click="subject = s.value"
-                class="relative z-10 flex w-14 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors duration-300 cursor-pointer"
+                class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors duration-300 cursor-pointer"
                 :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"
               >
                 <span>{{ s.emoji }}</span>{{ s.label }}
@@ -365,7 +455,7 @@ onMounted(() => {
             <div class="user-menu relative">
               <button
                 @click="showUserMenu = !showUserMenu"
-                class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--line)] bg-[var(--surface)] transition-all hover:border-[var(--accent)]"
+                class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--line)] bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4),inset_0_1.5px_0_rgba(255,255,255,0.8)] transition-all hover:border-[var(--accent)] hover:shadow-[0_9px_22px_-8px_var(--accent-glow),inset_0_1.5px_0_rgba(255,255,255,0.8)]"
               >
                 <img
                   v-if="currentUser?.picture"
@@ -379,7 +469,7 @@ onMounted(() => {
               <!-- 下拉菜单 -->
               <div
                 v-if="showUserMenu"
-                class="absolute right-0 top-10 z-50 w-56 origin-top-right overflow-hidden rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-xl"
+                class="absolute right-0 top-10 z-50 w-56 origin-top-right overflow-hidden rounded-2xl border border-white bg-[var(--surface)] shadow-[0_22px_48px_-22px_rgba(86,64,40,0.5),0_8px_20px_-12px_rgba(86,64,40,0.3),inset_0_2px_0_rgba(255,255,255,0.9)]"
                 v-motion
                 :initial="{ opacity: 0, scale: 0.95, y: -8 }"
                 :enter="{ opacity: 1, scale: 1, y: 0, transition: { duration: 200 } }"
@@ -389,6 +479,13 @@ onMounted(() => {
                   <p class="text-xs text-[var(--ink-soft)]">{{ currentUser?.email ?? '' }}</p>
                 </div>
                 <div class="border-t border-[var(--line)]">
+                  <button
+                    @click="showSetupDialog = true; showUserMenu = false"
+                    class="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]"
+                  >
+                    <Settings class="h-4 w-4" />
+                    <span>设置</span>
+                  </button>
                   <button
                     @click="handleLogout"
                     class="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--error)] transition-colors hover:bg-[var(--error)]/5"
@@ -411,19 +508,6 @@ onMounted(() => {
               <div>
                 <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
                 <p class="mt-1.5 text-[var(--ink-soft)]">问我问题，或者说一句「考我一道题」来练习吧～</p>
-              </div>
-              <div class="flex max-w-md flex-wrap justify-center gap-2.5">
-                <button
-                  v-for="(chip, i) in QUICK_CHIPS"
-                  :key="chip"
-                  @click="send(chip)"
-                  class="clay-sm cursor-pointer bg-[var(--surface)] px-4 py-2 text-sm font-semibold transition-transform hover:-translate-y-1"
-                  v-motion
-                  :initial="{ opacity: 0, y: 14 }"
-                  :enter="{ opacity: 1, y: 0, transition: { delay: 200 + i * 90 } }"
-                >
-                  {{ chip }}
-                </button>
               </div>
             </div>
 
@@ -453,16 +537,28 @@ onMounted(() => {
                 <div v-else class="flex flex-col gap-1 anim-fadeUp">
                   <!-- 助手身份标识 -->
                   <div class="flex items-center gap-2">
-                    <Mascot :size="24" :float="false" :state="mascotState" />
+                    <Mascot :size="24" :float="false" :animated="false" />
                     <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
                   </div>
                   <!-- 内容 -->
                   <div class="pl-8">
-                    <TypingDots v-if="i === items.length - 1 && showTyping" />
-                    <div v-else-if="!m.done" class="md-body stream-text text-[15px] leading-relaxed">
-                      <span v-for="(c, ci) in m.chunks" :key="ci" class="tok">{{ c }}</span>
+                    <!-- 正在出题提示 -->
+                    <div v-if="i === items.length - 1 && isGeneratingQuiz" class="quiz-gen clay-sm">
+                      <div class="quiz-gen-inner">
+                        <span class="quiz-gen-icon">
+                          <PencilLine class="h-4 w-4" />
+                        </span>
+                        <span class="quiz-gen-label">博文正在出题</span>
+                        <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
+                      </div>
                     </div>
-                    <div v-else class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text || '…')"></div>
+                    <TypingDots v-else-if="i === items.length - 1 && showTyping" />
+                    <div
+                      v-else
+                      class="md-body text-[15px] leading-relaxed"
+                      :class="{ 'is-streaming': !m.done }"
+                      v-html="renderMarkdown(m.text || '…')"
+                    ></div>
                   </div>
                 </div>
               </template>
@@ -473,18 +569,6 @@ onMounted(() => {
         <!-- 输入区 -->
         <footer class="px-4 pb-4 pt-1">
           <div class="mx-auto w-full max-w-2xl">
-            <div v-if="hasItems" class="mb-2.5 flex gap-2 overflow-x-auto pb-1">
-              <button
-                v-for="chip in QUICK_CHIPS"
-                :key="chip"
-                @click="send(chip)"
-                :disabled="busy"
-                class="shrink-0 cursor-pointer rounded-full border border-[var(--line)] bg-[var(--surface)]/80 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink-soft)] backdrop-blur transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
-              >
-                {{ chip }}
-              </button>
-            </div>
-
             <div class="clay flex items-end gap-2 p-2">
               <textarea
                 v-model="input"
@@ -511,14 +595,14 @@ onMounted(() => {
     <!-- 常驻吉祥物（右下角浮动） -->
     <div
       v-if="hasItems"
-      class="fixed bottom-20 right-4 z-20 transition-all duration-500"
-      :class="busy ? 'opacity-100 translate-y-0' : 'opacity-60 translate-y-2'"
+      class="fixed bottom-16 right-5 z-20 transition-all duration-500"
+      :class="busy ? 'opacity-100 translate-y-0' : 'opacity-90 translate-y-1'"
     >
-      <div class="relative">
-        <Mascot :size="48" :float="true" :state="mascotState" />
+      <div class="relative drop-shadow-[0_12px_20px_rgba(86,64,40,0.28)]">
+        <Mascot :size="96" :float="true" :limbs="true" :state="mascotState" />
         <!-- 状态指示器小点 -->
         <span
-          class="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--paper)]"
+          class="absolute right-3 top-3 h-3.5 w-3.5 rounded-full border-2 border-[var(--paper)]"
           :class="busy ? 'bg-accent animate-pulse' : 'bg-[var(--success)]'"
         ></span>
       </div>

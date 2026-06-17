@@ -152,6 +152,21 @@ body {
 .btn-accent:active:not(:disabled) { transform: translateY(1px) scale(0.97); }
 .btn-accent:disabled { opacity: 0.45; }
 
+/* ── 学科标签 ────────────────────────────────── */
+.subject-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  line-height: 1.3;
+  transition: background-color 0.5s, color 0.5s;
+}
+
 /* ── 关键帧 ────────────────────────────────── */
 @keyframes blob {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -197,14 +212,124 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 0 10px transparent; }
 }
-@keyframes tokenFade {
-  from { opacity: 0; filter: blur(5px); }
-  to { opacity: 1; filter: blur(0); }
+/* 流式输出：文字以水墨晕染质感逐 token 浮现，末尾墨点同步呼吸 */
+.md-body.is-streaming {
+  animation: textBleed 2s ease-in-out infinite;
+}
+.md-body.is-streaming > :last-child {
+  position: relative;
+}
+.md-body.is-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  vertical-align: -0.2em;
+  animation: inkBloom 1.4s ease-in-out infinite;
+}
+@keyframes textBleed {
+  0%, 100% { text-shadow: 0 0 0 transparent; }
+  50% { text-shadow: 0 0 6px rgba(44,39,34,0.10); }
+}
+@keyframes inkBloom {
+  0%, 100% { opacity: 0.3; filter: blur(4px); transform: scaleY(0.5); }
+  50% { opacity: 1; filter: blur(0.5px); transform: scaleY(1); }
 }
 
-/* 逐 token 流式：每个分片淡入，减少割裂感 */
-.stream-text { white-space: pre-wrap; word-break: break-word; }
-.stream-text .tok { display: inline; animation: tokenFade 0.42s ease both; }
+/* ── 阅读材料块（语文/英语阅读理解） ───────── */
+.passage-block {
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  line-height: 1.9;
+  font-size: 1rem;
+  position: relative;
+}
+.passage-block::before {
+  content: '📄';
+  position: absolute;
+  top: -0.5rem;
+  left: -0.5rem;
+  font-size: 1rem;
+  background: var(--surface);
+  padding: 0 0.25rem;
+}
+/* 语文：楷体，暖色底 */
+[data-subject='chinese'] .passage-block {
+  font-family: 'KaiTi', 'STKaiti', 'Kaiti SC', 'Noto Serif SC', 'Noto Serif CJK SC', serif;
+  background: #fff8f0;
+  border: 1.5px solid #f0dcc0;
+  color: #5c4a32;
+}
+/* 英语：衬线印刷体，淡紫底 */
+[data-subject='english'] .passage-block {
+  font-family: 'Georgia', 'Times New Roman', 'Noto Serif', 'Source Serif Pro', serif;
+  background: #f5f0ff;
+  border: 1.5px solid #d8cce8;
+  color: #3d2e5c;
+}
+/* 其他学科：通用风格 */
+[data-subject='math'] .passage-block,
+[data-subject='science'] .passage-block {
+  font-family: var(--font-body);
+  background: var(--accent-soft);
+  border: 1.5px solid var(--line);
+  color: var(--ink);
+}
+.passage-block p { margin: 0.5em 0; text-indent: 2em; }
+.passage-block p:first-child { margin-top: 0; }
+.passage-block p:last-child { margin-bottom: 0; }
+
+/* ── 正在出题指示器 ──────────────────────────── */
+.quiz-gen {
+  display: inline-flex;
+  padding: 0.45rem 1rem 0.45rem 0.85rem;
+  background: var(--surface);
+  border: 1.5px solid var(--accent-soft);
+}
+.quiz-gen-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.quiz-gen-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  animation: quizGenPulse 2s ease-in-out infinite;
+}
+.quiz-gen-label {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.quiz-gen-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.quiz-gen-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dotJump 1.3s ease-in-out infinite;
+}
+.quiz-gen-dots span:nth-child(2) { animation-delay: 0.18s; }
+.quiz-gen-dots span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes quizGenPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { transform: scale(1.08); box-shadow: 0 0 0 6px transparent; }
+}
 
 /* 入场动画工具 */
 .anim-fadeUp { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
