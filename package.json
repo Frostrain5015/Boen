@@ -1,0 +1,19 @@
+{
+  "name": "boen",
+  "private": true,
+  "version": "0.1.0",
+  "description": "博文 Boen — 学习辅助智能体（LangGraph.js 全 TS 栈）",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @boen/server & npm run dev --workspace @boen/web",
+    "dev:server": "npm run dev --workspace @boen/server",
+    "dev:web": "npm run dev --workspace @boen/web"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

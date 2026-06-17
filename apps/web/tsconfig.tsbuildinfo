@@ -1,0 +1,1 @@
+{"root":["./src/app.vue","./src/env.d.ts","./src/main.ts","./src/components/mascot.vue","./src/components/questioncard.vue","./src/components/typingdots.vue","./src/lib/markdown.ts","./src/services/chat.ts"],"version":"5.9.3"}
