@@ -373,8 +373,11 @@ watch(
 
 /* ── MathLive 公式编辑器 ──────────────────────── */
 .mathfield {
+  display: block;
+  width: 100%;
   flex: 1;
   min-width: 0;
+  box-sizing: border-box;
   padding: 0.45rem 0.75rem;
   border-radius: 14px;
   border: 1.5px solid var(--line);

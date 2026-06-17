@@ -358,7 +358,7 @@ async function handleDeleteConversation(id: string, event: Event) {
 
 async function selectConversation(id: string) {
   currentConversationId.value = id;
-  items.value = [];
+  // 不先清空：保留旧内容直到新内容就绪，避免内容互切时闪过 Welcome 页并触发多余过渡
   try {
     const { conversation: conv, messages: msgs } = await getConversation(id);
     // 把对话的学科还原到学科选择器
@@ -658,8 +658,10 @@ onMounted(() => {
         <!-- 消息区域 -->
         <main ref="scroller" class="flex-1 overflow-y-auto px-4">
           <div class="mx-auto w-full max-w-2xl py-5">
+            <!-- 欢迎页 / 消息列表：整块淡入淡出切换，避免逐条 auto-animate 掉帧 -->
+            <Transition name="panel" mode="out-in">
             <!-- 欢迎页 -->
-            <div v-if="!hasItems" class="flex flex-col items-center gap-5 pt-[8vh] text-center anim-fadeUp">
+            <div v-if="!hasItems" key="welcome" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
               <Mascot :size="120" :state="mascotState" />
               <div>
                 <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
@@ -668,7 +670,7 @@ onMounted(() => {
             </div>
 
             <!-- 消息列表：Hermes Agent 式文字墙 -->
-            <div v-auto-animate class="flex flex-col gap-6">
+            <div v-else key="list" v-auto-animate class="flex flex-col gap-6">
               <template v-for="(m, i) in items" :key="i">
                 <!-- 题目卡片 -->
                 <QuestionCard
@@ -717,6 +719,7 @@ onMounted(() => {
                 </div>
               </template>
             </div>
+            </Transition>
           </div>
         </main>
 

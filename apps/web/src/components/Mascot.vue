@@ -228,8 +228,8 @@ g, .mouth, .pupils, .brow {
   50% { transform: translateY(-4px); }
 }
 @keyframes tasselSway {
-  0%, 100% { transform: rotate(-8deg); }
-  50% { transform: rotate(8deg); }
+  0%, 100% { transform: rotate(8deg); }
+  50% { transform: rotate(-8deg); }
 }
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
