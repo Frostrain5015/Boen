@@ -340,6 +340,20 @@ function handleSaveProfile(p: { name: string; gradeBand: GradeBand }) {
   showSetupDialog.value = false;
 }
 
+async function handleSubjectChange(newSubject: Subject) {
+  if (subject.value === newSubject) return;
+  // 当前对话已有内容时，切换学科强制建新对话
+  if (items.value.length > 0) {
+    try {
+      const { conversation } = await createConversation('新对话', newSubject);
+      conversations.value.unshift(conversation);
+      currentConversationId.value = conversation.id;
+      items.value = [];
+    } catch { /* 静默 */ }
+  }
+  subject.value = newSubject;
+}
+
 function handleLogout() {
   logout();
 }
@@ -469,14 +483,16 @@ onMounted(() => {
           <div class="ml-auto flex items-center gap-3">
             <div class="clay-sm relative flex bg-[var(--surface)] p-1">
               <span
-                class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent transition-transform duration-400"
-                :style="{ transform: `translateX(calc(${subjectIndex} * 4rem))` }"
-                style="transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1)"
+                class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent"
+                :style="{
+                  transform: `translateX(calc(${subjectIndex} * 4rem))`,
+                  transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }"
               ></span>
               <button
                 v-for="s in SUBJECT_LABELS"
                 :key="s.value"
-                @click="subject = s.value"
+                @click="handleSubjectChange(s.value)"
                 class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors duration-300 cursor-pointer"
                 :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"
               >
