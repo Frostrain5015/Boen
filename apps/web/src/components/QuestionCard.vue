@@ -43,7 +43,11 @@ const processedStem = computed(() => {
   if (props.question.type !== 'fill_blank') return stem;
   const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
   let idx = 0;
-  return stem.replace(/_{4,}/g, () => `${CIRCLED[idx] ?? `[${idx + 1}]`}____`);
+  return stem.replace(/_{4,}/g, () => {
+    const mark = CIRCLED[idx] ?? `[${idx + 1}]`;
+    idx++;
+    return `${mark}____`;
+  });
 });
 
 /** MathLive <math-field> 最小接口（规避 any，仅声明用到的成员） */
