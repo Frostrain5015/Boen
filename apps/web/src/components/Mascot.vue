@@ -97,8 +97,6 @@ const { size = 64, float = true, state = 'idle', limbs = false, animated = true 
           <polygon points="50,11 76,21 50,31 24,21" fill="#37322c" />
           <polygon points="50,13 70,21 50,29 30,21" fill="#2c2722" />
           <circle cx="50" cy="21" r="2.4" fill="currentColor" />
-          <path d="M50 21 L71 21 L71 34" stroke="#2c2722" stroke-width="1.6" fill="none" />
-          <circle cx="71" cy="35" r="2.8" fill="currentColor" class="tassel" />
         </g>
 
         <!-- 特效：思考点点 -->
@@ -145,8 +143,6 @@ g, .mouth, .pupils, .brow {
 .eyes { transform-origin: center; animation: blink 5.5s ease-in-out infinite; }
 .pupils { transform-origin: center; transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
-.tassel { transform-origin: top center; animation: tasselSway 4s ease-in-out infinite; }
-
 .arm-l { transform-origin: 100% 0%; }
 .arm-r { transform-origin: 0% 0%; }
 .foot { transform-origin: center top; }
@@ -154,7 +150,7 @@ g, .mouth, .pupils, .brow {
 .fx { opacity: 0; pointer-events: none; }
 
 /* 静态形象：左上角与回复前小图标——冻结所有动画、固定中性表情 */
-.is-static :where(.eyes, .tassel, .gfloat, .pupils, .brow) { animation: none; transform: none; }
+.is-static :where(.eyes, .gfloat, .pupils, .brow) { animation: none; transform: none; }
 .is-static .fx { display: none; }
 
 /* ── 整体状态动作（作用在根元素） ──────────────── */
@@ -226,10 +222,6 @@ g, .mouth, .pupils, .brow {
 @keyframes gfloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
-}
-@keyframes tasselSway {
-  0%, 100% { transform: rotate(8deg); }
-  50% { transform: rotate(-8deg); }
 }
 @keyframes breathe {
   0%, 100% { transform: scale(1); }
