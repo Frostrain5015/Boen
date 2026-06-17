@@ -46,12 +46,12 @@ const processedStem = computed(() => {
   return stem.replace(/_{4,}/g, () => `${CIRCLED[idx] ?? `[${idx + 1}]`}____`);
 });
 
-/** 数学公式编辑器符号库 */
+/** MathLive 公式编辑器：所见即所得，#? 为可用 Tab 跳转的占位框 */
 const MATH_SYMBOLS = [
-  { label: 'xⁿ', insert: '^{}' },
-  { label: 'xₙ', insert: '_{}' },
-  { label: 'a/b', insert: '\\frac{}{}' },
-  { label: '√', insert: '\\sqrt{}' },
+  { label: 'xⁿ', insert: '^{#?}' },
+  { label: 'xₙ', insert: '_{#?}' },
+  { label: 'a/b', insert: '\\frac{#?}{#?}' },
+  { label: '√', insert: '\\sqrt{#?}' },
   { label: 'π', insert: '\\pi' },
   { label: '±', insert: '\\pm' },
   { label: '∞', insert: '\\infty' },
@@ -65,20 +65,63 @@ const MATH_SYMBOLS = [
   { label: 'β', insert: '\\beta' },
 ];
 
-function insertMath(text: string) {
-  if (props.answered) return;
-  const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
-  if (!el || !(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
-  const start = el.selectionStart ?? 0;
-  const end = el.selectionEnd ?? 0;
-  const before = el.value.substring(0, start);
-  const after = el.value.substring(end);
-  el.value = before + text + after;
-  const pos = start + text.length;
-  el.setSelectionRange(pos, pos);
-  el.focus();
-  el.dispatchEvent(new Event('input'));
+/** MathLive <math-field> 最小接口（规避 any，仅声明用到的成员） */
+interface MathField extends HTMLElement {
+  value: string;
+  readOnly: boolean;
+  /** 智能模式：打公式走数学模式、打文字（含中文）自动切文本模式，二者混排 */
+  smartMode: boolean;
+  insert(latex: string, options?: { focus?: boolean }): void;
 }
+
+/** 初始化一个 math-field：开启智能模式 + 同步只读态 */
+function initField(mf: MathField | null) {
+  if (!mf) return;
+  mf.smartMode = true;
+  mf.readOnly = props.answered;
+}
+
+const blankFields = ref<(MathField | null)[]>([]);
+const shortField = ref<MathField | null>(null);
+const activeField = ref<MathField | null>(null);
+
+/** 是否对该题型启用 MathLive（仅数学学科） */
+const useMathField = computed(() => props.subject === 'math');
+
+function setBlankField(el: unknown, i: number) {
+  const mf = el as MathField | null;
+  blankFields.value[i] = mf;
+  initField(mf);
+}
+function setShortField(el: unknown) {
+  shortField.value = el as MathField | null;
+  initField(shortField.value);
+}
+function onMathFocus(e: FocusEvent) {
+  activeField.value = e.currentTarget as MathField;
+}
+function onBlankInput(e: Event, i: number) {
+  blanks.value[i] = (e.target as MathField).value;
+}
+function onShortInput(e: Event) {
+  shortText.value = (e.target as MathField).value;
+}
+
+/** 工具栏插入：写入当前聚焦的 math-field（无则回退到第一个） */
+function insertMath(latex: string) {
+  if (props.answered) return;
+  const mf = activeField.value ?? blankFields.value.find((f): f is MathField => !!f) ?? shortField.value;
+  mf?.insert(latex, { focus: true });
+}
+
+// 作答后锁定所有公式编辑器
+watch(
+  () => props.answered,
+  (v) => {
+    blankFields.value.forEach((f) => f && (f.readOnly = v));
+    if (shortField.value) shortField.value.readOnly = v;
+  },
+);
 
 const canSubmit = computed(() => {
   if (props.answered) return false;
@@ -207,30 +250,41 @@ watch(
       <div v-else-if="question.type === 'fill_blank'" class="space-y-2.5">
         <!-- 数学公式工具栏 -->
         <div v-if="subject === 'math' && !answered" class="math-bar">
-          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
+          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" type="button" @mousedown.prevent @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
             {{ sym.label }}
           </button>
         </div>
         <div
           v-for="(_, i) in blanks"
           :key="i"
-          class="flex items-center gap-2"
+          class="space-y-1.5"
           v-motion
           :initial="{ opacity: 0, y: 8 }"
           :enter="{ opacity: 1, y: 0, transition: { delay: 120 + i * 70 } }"
         >
-          <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">
-            {{ i + 1 }}
-          </span>
-          <input
-            v-model="blanks[i]"
-            :disabled="answered"
-            class="field"
-            :class="answered && grading?.perBlank ? (grading.perBlank[i] ? 'field-ok' : 'field-no') : ''"
-            placeholder="填写答案…"
-          />
-          <CheckCircle2 v-if="answered && grading?.perBlank?.[i]" class="h-5 w-5 shrink-0 text-[var(--success)]" />
-          <XCircle v-else-if="answered && grading?.perBlank" class="h-5 w-5 shrink-0 text-[var(--error)]" />
+          <div class="flex items-center gap-2">
+            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-bold text-accent">
+              {{ i + 1 }}
+            </span>
+            <math-field
+              v-if="useMathField"
+              :ref="(el: Element | null) => setBlankField(el, i)"
+              class="mathfield"
+              :class="answered && grading?.perBlank ? (grading.perBlank[i] ? 'mf-ok' : 'mf-no') : ''"
+              @input="onBlankInput($event, i)"
+              @focusin="onMathFocus"
+            ></math-field>
+            <input
+              v-else
+              v-model="blanks[i]"
+              :disabled="answered"
+              class="field"
+              :class="answered && grading?.perBlank ? (grading.perBlank[i] ? 'field-ok' : 'field-no') : ''"
+              placeholder="填写答案…"
+            />
+            <CheckCircle2 v-if="answered && grading?.perBlank?.[i]" class="h-5 w-5 shrink-0 text-[var(--success)]" />
+            <XCircle v-else-if="answered && grading?.perBlank" class="h-5 w-5 shrink-0 text-[var(--error)]" />
+          </div>
         </div>
       </div>
 
@@ -238,11 +292,18 @@ watch(
       <div v-else-if="question.type === 'short_answer'">
         <!-- 数学公式工具栏 -->
         <div v-if="subject === 'math' && !answered" class="math-bar">
-          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
+          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" type="button" @mousedown.prevent @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
             {{ sym.label }}
           </button>
         </div>
-        <textarea v-model="shortText" :disabled="answered" rows="4" class="field" placeholder="写下你的思路与答案…" />
+        <math-field
+          v-if="useMathField"
+          :ref="(el: Element | null) => setShortField(el)"
+          class="mathfield mathfield-area"
+          @input="onShortInput"
+          @focusin="onMathFocus"
+        ></math-field>
+        <textarea v-else v-model="shortText" :disabled="answered" rows="4" class="field" placeholder="写下你的思路与答案…" />
       </div>
 
       <!-- 提交 -->
@@ -376,4 +437,25 @@ watch(
 }
 .math-btn:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
 .math-btn:active { transform: translateY(0); }
+
+/* ── MathLive 公式编辑器 ──────────────────────── */
+.mathfield {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 14px;
+  border: 1.5px solid var(--line);
+  background: #fff;
+  font-size: 1.05rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  --caret-color: var(--accent);
+  --selection-background-color: var(--accent-soft);
+  --contains-highlight-background-color: var(--accent-soft);
+}
+.mathfield:focus-within { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mathfield[read-only] { background: #faf6ef; }
+/* 简答题：更高，内容顶部对齐 */
+.mathfield-area { min-height: 5.5rem; align-items: flex-start; }
+.mf-ok { border-color: var(--success) !important; background: #e7f7ee !important; }
+.mf-no { border-color: var(--error) !important; background: #fdeaef !important; }
 </style>

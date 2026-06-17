@@ -13,6 +13,11 @@ import '@fontsource/nunito/800.css';
 import './fonts.css';
 import 'katex/dist/katex.min.css';
 import './index.css';
+// MathLive：导入即注册 <math-field> 自定义元素
+import { MathfieldElement } from 'mathlive';
+// 字体自托管（随构建打包到 /mathlive/fonts，规避 CDN）；音效禁用
+MathfieldElement.fontsDirectory = '/mathlive/fonts';
+MathfieldElement.soundsDirectory = null;
 import App from './App.vue';
 
 createApp(App).use(MotionPlugin).use(autoAnimatePlugin).mount('#app');
