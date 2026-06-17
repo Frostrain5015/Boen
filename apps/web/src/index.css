@@ -19,30 +19,40 @@
   --success: #18a558;
   --error: #f2557a;
 
-  /* 默认 = 中学（薄荷绿） */
+  /* 默认 = 数学（薄荷绿） */
   --accent: #14b48a;
   --accent-strong: #0e9b76;
   --accent-soft: #d9f4ec;
   --accent-glow: rgba(20, 180, 138, 0.4);
   --accent-on: #ffffff;
 }
-[data-grade='primary'] {
+/* 语文：暖橙色 */
+[data-subject='chinese'] {
   --accent: #ff7a4d;
   --accent-strong: #ef5f2e;
   --accent-soft: #ffe5d7;
   --accent-glow: rgba(255, 122, 77, 0.42);
 }
-[data-grade='middle'] {
+/* 数学：薄荷绿 */
+[data-subject='math'] {
   --accent: #14b48a;
   --accent-strong: #0e9b76;
   --accent-soft: #d9f4ec;
   --accent-glow: rgba(20, 180, 138, 0.4);
 }
-[data-grade='undergrad'] {
+/* 英语：紫蓝色 */
+[data-subject='english'] {
   --accent: #6c5ce7;
   --accent-strong: #5848d6;
   --accent-soft: #e8e4ff;
   --accent-glow: rgba(108, 92, 231, 0.42);
+}
+/* 科学：天蓝色 */
+[data-subject='science'] {
+  --accent: #3498db;
+  --accent-strong: #2980b9;
+  --accent-soft: #d4e6f1;
+  --accent-glow: rgba(52, 152, 219, 0.42);
 }
 
 html,

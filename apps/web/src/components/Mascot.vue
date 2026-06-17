@@ -1,11 +1,23 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ size?: number; float?: boolean }>(), { size: 64, float: true });
+import { computed } from 'vue';
+
+export type MascotState = 'idle' | 'thinking' | 'listening' | 'happy' | 'surprise' | 'sleepy';
+
+interface Props {
+  size?: number;
+  float?: boolean;
+  state?: MascotState;
+}
+
+const { size = 64, float = true, state = 'idle' } = defineProps<Props>();
+
+const stateClass = computed(() => `state-${state}`);
 </script>
 
 <template>
   <div
     class="mascot"
-    :class="{ floaty: float }"
+    :class="[float && 'floaty', stateClass]"
     :style="{ width: size + 'px', height: size + 'px', color: 'var(--accent)' }"
     aria-hidden="true"
   >
@@ -52,11 +64,110 @@ withDefaults(defineProps<{ size?: number; float?: boolean }>(), { size: 64, floa
 </template>
 
 <style scoped>
-.mascot { display: inline-grid; place-items: center; }
+.mascot {
+  display: inline-grid;
+  place-items: center;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 .eyes {
   transform-box: fill-box;
   transform-origin: center;
   animation: blink 5.5s ease-in-out infinite;
 }
-.tassel { animation: floaty 4s ease-in-out infinite; transform-box: fill-box; transform-origin: top center; }
+
+.tassel {
+  animation: floaty 4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+/* ── 状态动画 ──────────────────────────────── */
+
+/* idle: 轻微呼吸 */
+.state-idle {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* thinking: 左右摇摆 */
+.state-thinking {
+  animation: wobble 1.2s ease-in-out infinite;
+}
+.state-thinking .eyes {
+  animation: blink 2s ease-in-out infinite;
+}
+
+/* listening: 轻微上下浮动 */
+.state-listening {
+  animation: bob 1.5s ease-in-out infinite;
+}
+
+/* happy: 弹跳 */
+.state-happy {
+  animation: bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+.state-happy .eyes {
+  animation: squint 0.6s ease-in-out infinite;
+}
+
+/* surprise: 快速缩放 */
+.state-surprise {
+  animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* sleepy: 缓慢下沉 */
+.state-sleepy {
+  animation: sink 4s ease-in-out infinite;
+}
+.state-sleepy .eyes {
+  animation: blink 8s ease-in-out infinite;
+}
+
+/* ── 关键帧 ────────────────────────────────── */
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-9px) rotate(2deg); }
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-8px) scale(1.05); }
+  60% { transform: translateY(-2px) scale(0.98); }
+}
+
+@keyframes squint {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.6); }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes sink {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
 </style>

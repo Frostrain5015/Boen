@@ -14,6 +14,16 @@ import {
   gradeAnswer,
 } from '@boen/agent-core';
 import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
+import {
+  createConversation,
+  getConversations,
+  getConversation,
+  updateConversationTitle,
+  deleteConversation,
+  addMessage,
+  getMessages,
+  getRecentMessages,
+} from './conversation.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,6 +37,11 @@ const model = getChatModel({
   baseUrl: process.env.BOEN_BASE_URL,
 });
 const graph = buildBoenGraph(model);
+
+// ── Frost ID：服务端换 token（内网直连，client_secret 只留服务端）──
+const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0.0.1:4000';
+const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
+const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
 const runConfig = (threadId: string) => ({ version: 'v2' as const, configurable: { thread_id: threadId } });
@@ -63,20 +78,124 @@ app.use('/api/*', cors());
 
 app.get('/api/health', (c) => c.json({ ok: true, provider, model: process.env.BOEN_MODEL }));
 
+// ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
+
+/** POST /api/auth/token - 用授权码换 access_token（携带 client_secret + code_verifier）*/
+app.post('/api/auth/token', async (c) => {
+  const { code, codeVerifier, redirectUri } = await c.req.json<{
+    code: string;
+    codeVerifier: string;
+    redirectUri: string;
+  }>();
+  const upstream = await fetch(`${FROST_ID_INTERNAL_URL}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: FROST_ID_CLIENT_ID,
+      client_secret: FROST_ID_CLIENT_SECRET,
+      code_verifier: codeVerifier,
+    }),
+  });
+  const text = await upstream.text();
+  return new Response(text, { status: upstream.status, headers: { 'Content-Type': 'application/json' } });
+});
+
+/** GET /api/auth/userinfo - 透传 Bearer 取用户信息 */
+app.get('/api/auth/userinfo', async (c) => {
+  const auth = c.req.header('authorization');
+  if (!auth) return c.json({ error: 'invalid_token' }, 401);
+  const upstream = await fetch(`${FROST_ID_INTERNAL_URL}/oauth/userinfo`, { headers: { Authorization: auth } });
+  const text = await upstream.text();
+  return new Response(text, { status: upstream.status, headers: { 'Content-Type': 'application/json' } });
+});
+
+/** POST /api/auth/revoke - 服务端撤销 token */
+app.post('/api/auth/revoke', async (c) => {
+  const { token } = await c.req.json<{ token: string }>();
+  await fetch(`${FROST_ID_INTERNAL_URL}/oauth/revoke`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      token,
+      client_id: FROST_ID_CLIENT_ID,
+      client_secret: FROST_ID_CLIENT_SECRET,
+    }),
+  });
+  return c.json({ success: true });
+});
+
+// ── 对话管理 API ────────────────────────────
+
+/** GET /api/conversations - 获取用户的所有对话 */
+app.get('/api/conversations', async (c) => {
+  const userId = c.req.header('x-user-id') ?? 'anonymous';
+  const conversations = getConversations(userId);
+  return c.json({ conversations });
+});
+
+/** POST /api/conversations - 创建新对话 */
+app.post('/api/conversations', async (c) => {
+  const body = await c.req.json<{ title?: string; subject?: string }>();
+  const userId = c.req.header('x-user-id') ?? 'anonymous';
+  const conversation = createConversation(userId, body.title ?? '新对话', body.subject ?? 'math');
+  return c.json({ conversation }, 201);
+});
+
+/** GET /api/conversations/:id - 获取单个对话 */
+app.get('/api/conversations/:id', async (c) => {
+  const id = c.req.param('id');
+  const conversation = getConversation(id);
+  if (!conversation) return c.json({ error: 'Conversation not found' }, 404);
+  const messages = getMessages(id);
+  return c.json({ conversation, messages });
+});
+
+/** PATCH /api/conversations/:id - 更新对话标题 */
+app.patch('/api/conversations/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json<{ title?: string }>();
+  if (body.title) updateConversationTitle(id, body.title);
+  return c.json({ success: true });
+});
+
+/** DELETE /api/conversations/:id - 删除对话 */
+app.delete('/api/conversations/:id', async (c) => {
+  const id = c.req.param('id');
+  deleteConversation(id);
+  return c.json({ success: true });
+});
+
+// ── 聊天 API ────────────────────────────────
+
 app.post('/api/chat', async (c) => {
-  const body = (await c.req.json()) as ChatRequest;
+  const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject?: string };
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
+      // 如果有 conversationId，保存用户消息
+      if (body.conversationId) {
+        addMessage(body.conversationId, 'user', body.message);
+      }
+
       const last = await runGraph(
         {
           messages: [new HumanMessage(body.message)],
-          gradeBand: body.gradeBand,
+          gradeBand: body.gradeBand ?? 'middle',
           ...(body.mode ? { mode: body.mode } : {}),
         },
         body.threadId,
         send,
       );
+
+      // 保存助手回复
+      if (body.conversationId && last) {
+        const content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
+        addMessage(body.conversationId, 'assistant', content);
+      }
+
       await emitQuestionIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {
