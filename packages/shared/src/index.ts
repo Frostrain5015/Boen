@@ -87,5 +87,6 @@ export type SseEvent =
   | { type: 'mode'; value: BoenMode }
   | { type: 'question'; toolCallId: string; question: QuestionPayload }
   | { type: 'grading'; toolCallId: string; result: GradingResult }
+  | { type: 'title_updated'; conversationId: string; title: string }
   | { type: 'done' }
   | { type: 'error'; message: string };

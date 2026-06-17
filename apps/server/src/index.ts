@@ -5,7 +5,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
-import { HumanMessage, ToolMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, ToolMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
 import {
   getChatModel,
   buildBoenGraph,
@@ -84,6 +84,27 @@ async function runGraph(
   return msgs[msgs.length - 1];
 }
 
+/** 为新对话自动生成标题（基于首轮用户消息） */
+async function autoGenerateTitle(conversationId: string, userMessage: string, onTitle: (title: string) => Promise<void>) {
+  try {
+    const result = await model.invoke([
+      new SystemMessage('用 2-8 个字概括用户提问的主题，直接输出标题，不要引号和标点。'),
+      new HumanMessage(userMessage),
+    ]);
+    let title = (typeof result.content === 'string' ? result.content : '').trim().replace(/["""']/g, '');
+    if (!title) return;
+    // 限制标题长度
+    if (title.length > 20) title = title.slice(0, 20);
+    const conv = getConversation(conversationId);
+    if (conv && conv.title === '新对话') {
+      updateConversationTitle(conversationId, title);
+      await onTitle(title);
+    }
+  } catch {
+    // 标题生成失败不影响主流程
+  }
+}
+
 /** 若最后一条消息触发了出题工具，推送 question 事件（每次只呈现第一道） */
 async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>) {
   const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
@@ -91,6 +112,16 @@ async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEve
   if (quiz?.id) {
     await send({ type: 'question', toolCallId: quiz.id, question: toQuestionPayload(quiz.name, quiz.args) });
   }
+}
+
+/** 获取出题工具调用的结果（若最后一条消息触发了出题） */
+function extractQuestionPayload(last: BaseMessage | undefined): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
+  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
+  const quiz = calls.find((c) => QUIZ_TOOL_NAMES.has(c.name));
+  if (quiz?.id) {
+    return { toolCallId: quiz.id, question: toQuestionPayload(quiz.name, quiz.args) };
+  }
+  return null;
 }
 
 const app = new Hono();
@@ -232,6 +263,18 @@ app.post('/api/chat', async (c) => {
       if (owned && last) {
         const content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
         addMessage(body.conversationId!, 'assistant', content);
+        // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
+        const qData = extractQuestionPayload(last);
+        if (qData) {
+          addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', payload: qData.question }));
+        }
+      }
+
+      // 新对话自动生成标题（不阻塞主流程）
+      if (owned && last && getConversation(body.conversationId!)?.title === '新对话') {
+        autoGenerateTitle(body.conversationId!, body.message, async (title) => {
+          await send({ type: 'title_updated', conversationId: body.conversationId!, title });
+        });
       }
 
       await emitQuestionIfAny(last, send);

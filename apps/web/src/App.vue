@@ -138,6 +138,9 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
     if (cur && cur.kind === 'assistant' && !cur.text.trim()) items.value.splice(idx.value, 1);
     items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
     idx.value = -1;
+  } else if (e.type === 'title_updated') {
+    const conv = conversations.value.find((c) => c.id === e.conversationId);
+    if (conv) conv.title = e.title;
   } else if (e.type === 'grading') {
     const q = items.value.find((it) => it.kind === 'question' && it.toolCallId === e.toolCallId);
     if (q && q.kind === 'question') q.grading = e.result;
@@ -270,12 +273,29 @@ async function selectConversation(id: string) {
     const { conversation: conv, messages: msgs } = await getConversation(id);
     // 把对话的学科还原到学科选择器
     subject.value = conv.subject as Subject;
-    // 将服务端消息转成 ChatItem
-    items.value = msgs.map((m) => {
-      if (m.role === 'user') return { kind: 'user' as const, text: m.content };
-      // assistant 消息已完结
-      return { kind: 'assistant' as const, text: m.content, done: true };
-    });
+    // 将服务端消息转成 ChatItem（含持久化的题目卡片）
+    const restored: ChatItem[] = [];
+    for (const m of msgs) {
+      if (m.role === 'user') {
+        restored.push({ kind: 'user', text: m.content });
+      } else if (m.role === 'system') {
+        try {
+          const meta = JSON.parse(m.content);
+          if (meta.__boen_type === 'question') {
+            // 从存档恢复的题目卡片——设为已作答（只读，不提交）
+            restored.push({
+              kind: 'question',
+              toolCallId: '',
+              question: meta.payload,
+              answered: true,
+            });
+          }
+        } catch { /* 非结构化 system 消息，忽略 */ }
+      } else if (m.role === 'assistant') {
+        restored.push({ kind: 'assistant', text: m.content, done: true });
+      }
+    }
+    items.value = restored;
   } catch {
     items.value = [];
   }
@@ -533,6 +553,7 @@ onMounted(() => {
                   :question="m.question"
                   :answered="m.answered"
                   :grading="m.grading"
+                  :subject="subject"
                   @submit="(a) => onAnswer(m, a)"
                 />
 
@@ -613,11 +634,6 @@ onMounted(() => {
     >
       <div class="relative drop-shadow-[0_12px_20px_rgba(86,64,40,0.28)]">
         <Mascot :size="96" :float="true" :limbs="true" :state="mascotState" />
-        <!-- 状态指示器小点 -->
-        <span
-          class="absolute right-3 top-3 h-3.5 w-3.5 rounded-full border-2 border-[var(--paper)]"
-          :class="busy ? 'bg-accent animate-pulse' : 'bg-[var(--success)]'"
-        ></span>
       </div>
     </div>
   </div>

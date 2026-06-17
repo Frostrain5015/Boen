@@ -9,6 +9,8 @@ const props = defineProps<{
   question: QuestionPayload;
   answered: boolean;
   grading?: GradingResult;
+  /** 当前学科（数学模式下显示公式编辑工具栏） */
+  subject?: string;
 }>();
 const emit = defineEmits<{ submit: [answer: AnswerPayload] }>();
 
@@ -34,6 +36,49 @@ const correctKeys = computed(() => {
   if (props.question.type !== 'multiple_choice' || !props.grading) return [];
   return props.question.options.filter((o) => props.grading!.reference.includes(`${o.key}.`)).map((o) => o.key);
 });
+
+/** 填空题干：为每个 ____ 编号，避免歧义 */
+const processedStem = computed(() => {
+  const stem = props.question.stem;
+  if (props.question.type !== 'fill_blank') return stem;
+  const CIRCLED = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+  let idx = 0;
+  return stem.replace(/_{4,}/g, () => `${CIRCLED[idx] ?? `[${idx + 1}]`}____`);
+});
+
+/** 数学公式编辑器符号库 */
+const MATH_SYMBOLS = [
+  { label: 'xⁿ', insert: '^{}' },
+  { label: 'xₙ', insert: '_{}' },
+  { label: 'a/b', insert: '\\frac{}{}' },
+  { label: '√', insert: '\\sqrt{}' },
+  { label: 'π', insert: '\\pi' },
+  { label: '±', insert: '\\pm' },
+  { label: '∞', insert: '\\infty' },
+  { label: '≥', insert: '\\ge' },
+  { label: '≤', insert: '\\le' },
+  { label: '≠', insert: '\\ne' },
+  { label: '×', insert: '\\times' },
+  { label: '÷', insert: '\\div' },
+  { label: 'θ', insert: '\\theta' },
+  { label: 'α', insert: '\\alpha' },
+  { label: 'β', insert: '\\beta' },
+];
+
+function insertMath(text: string) {
+  if (props.answered) return;
+  const el = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!el || !(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+  const start = el.selectionStart ?? 0;
+  const end = el.selectionEnd ?? 0;
+  const before = el.value.substring(0, start);
+  const after = el.value.substring(end);
+  el.value = before + text + after;
+  const pos = start + text.length;
+  el.setSelectionRange(pos, pos);
+  el.focus();
+  el.dispatchEvent(new Event('input'));
+}
 
 const canSubmit = computed(() => {
   if (props.answered) return false;
@@ -121,7 +166,7 @@ watch(
     <div class="space-y-4 px-5 py-4">
       <!-- 阅读材料块（语文/英语阅读理解专用） -->
       <div v-if="question.passage" class="passage-block md-body" v-html="renderMarkdown(question.passage)"></div>
-      <div class="md-body font-display text-[1.02rem] font-medium leading-relaxed" v-html="renderMarkdown(question.stem)"></div>
+      <div class="md-body font-display text-[1.02rem] font-medium leading-relaxed" v-html="renderMarkdown(processedStem)"></div>
 
       <!-- 选择题 -->
       <div v-if="question.type === 'multiple_choice'" class="space-y-2.5">
@@ -160,6 +205,12 @@ watch(
 
       <!-- 填空题 -->
       <div v-else-if="question.type === 'fill_blank'" class="space-y-2.5">
+        <!-- 数学公式工具栏 -->
+        <div v-if="subject === 'math' && !answered" class="math-bar">
+          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
+            {{ sym.label }}
+          </button>
+        </div>
         <div
           v-for="(_, i) in blanks"
           :key="i"
@@ -185,7 +236,13 @@ watch(
 
       <!-- 简答题 -->
       <div v-else-if="question.type === 'short_answer'">
-        <textarea v-model="shortText" :disabled="answered" rows="3" class="field" placeholder="写下你的思路与答案…" />
+        <!-- 数学公式工具栏 -->
+        <div v-if="subject === 'math' && !answered" class="math-bar">
+          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
+            {{ sym.label }}
+          </button>
+        </div>
+        <textarea v-model="shortText" :disabled="answered" rows="4" class="field" placeholder="写下你的思路与答案…" />
       </div>
 
       <!-- 提交 -->
@@ -292,4 +349,33 @@ watch(
 
 .reveal-enter-active { transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 .reveal-enter-from { opacity: 0; transform: translateY(10px); }
+
+/* ── 数学公式工具栏 ──────────────────────────── */
+.math-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.math-btn {
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 1.8rem;
+  padding: 0 0.3rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: 'Times New Roman', 'Latin Modern Math', serif;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+}
+.math-btn:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
+.math-btn:active { transform: translateY(0); }
 </style>
