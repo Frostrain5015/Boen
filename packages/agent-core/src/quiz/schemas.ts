@@ -45,11 +45,11 @@ export const trueFalseSchema = z.object({
 export const shortAnswerSchema = z.object({
   stem: z.string().describe('简答题题干'),
   passage: passageField,
-  referenceAnswer: z.string().describe('参考答案'),
+  referenceAnswer: z.string().nullish().describe('参考答案（可选，模型可后续在回复中补充）'),
   keyPoints: z.array(z.string()).nullish().describe('评分要点'),
   knowledgePoint,
   difficulty,
-  explanation,
+  explanation: z.string().nullish().describe('解析与作答点评（可选，模型可在后续回复中给出）'),
 });
 
 /** 四个出题工具（仅作结构化输出契约用于绑定；执行由服务端「人类作答」完成，故 func 为空） */

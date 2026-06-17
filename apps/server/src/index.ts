@@ -266,7 +266,7 @@ app.post('/api/chat', async (c) => {
         // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
         const qData = extractQuestionPayload(last);
         if (qData) {
-          addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', payload: qData.question }));
+          addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
         }
       }
 
@@ -304,6 +304,11 @@ app.post('/api/answer', async (c) => {
       // 判分，并把结果回灌给模型
       const { result, toolContent } = gradeAnswer(target.name, target.args, body.answer);
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
+
+      // 持久化判分结果（用于会话重载时恢复题目卡片的已答状态）
+      if (body.conversationId) {
+        addMessage(body.conversationId, 'system', JSON.stringify({ __boen_type: 'grading_result', toolCallId: body.toolCallId, result }));
+      }
 
       // 答复该 AIMessage 的全部 tool_calls，保证消息序列合法（正常只有一个）
       const toolMsgs: ToolMessage[] = calls.map((t) =>

@@ -287,7 +287,7 @@ async function onAnswer(item: Extract<ChatItem, { kind: 'question' }>, answer: A
   busy.value = true;
   const idx = { value: -1 };
   try {
-    await streamAnswer({ threadId, toolCallId: item.toolCallId, answer }, (e) => handleEvent(e, idx));
+    await streamAnswer({ threadId, toolCallId: item.toolCallId, answer, conversationId: currentConversationId.value ?? undefined }, (e) => handleEvent(e, idx));
   } catch (err) {
     items.value.push(newAssistant(`⚠️ 提交失败：${err instanceof Error ? err.message : String(err)}`));
   } finally {
@@ -364,6 +364,18 @@ async function selectConversation(id: string) {
     const { conversation: conv, messages: msgs } = await getConversation(id);
     // 把对话的学科还原到学科选择器
     subject.value = conv.subject as Subject;
+    // 收集 grading_result 供题目卡片配对
+    const gradingByToolCallId = new Map<string, GradingResult>();
+    for (const m of msgs) {
+      if (m.role === 'system') {
+        try {
+          const meta = JSON.parse(m.content);
+          if (meta.__boen_type === 'grading_result' && meta.toolCallId) {
+            gradingByToolCallId.set(meta.toolCallId, meta.result as GradingResult);
+          }
+        } catch { /* 忽略非结构化消息 */ }
+      }
+    }
     // 将服务端消息转成 ChatItem（含持久化的题目卡片）
     const restored: ChatItem[] = [];
     for (const m of msgs) {
@@ -373,14 +385,17 @@ async function selectConversation(id: string) {
         try {
           const meta = JSON.parse(m.content);
           if (meta.__boen_type === 'question') {
-            // 从存档恢复的题目卡片——设为已作答（只读，不提交）
+            const toolCallId: string = meta.toolCallId ?? '';
+            const wasAnswered = !!meta.answered || gradingByToolCallId.has(toolCallId);
             restored.push({
               kind: 'question',
-              toolCallId: '',
+              toolCallId,
               question: meta.payload,
-              answered: true,
+              answered: wasAnswered,
+              grading: wasAnswered ? (gradingByToolCallId.get(toolCallId)) : undefined,
             });
           }
+          // grading_result 本身不生成 ChatItem，已提前收集配对
         } catch { /* 非结构化 system 消息，忽略 */ }
       } else if (m.role === 'assistant') {
         restored.push({ kind: 'assistant', text: m.content, done: true });
@@ -714,7 +729,7 @@ onMounted(() => {
                 v-model="input"
                 @keydown="onKeydown"
                 rows="1"
-                placeholder="输入问题，或说「考我一道选择题」…"
+                placeholder="今天想学习什么？"
                 class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
               />
               <button

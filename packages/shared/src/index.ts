@@ -79,6 +79,8 @@ export interface AnswerRequest {
   /** 对应 question 事件里的 toolCallId */
   toolCallId: string;
   answer: AnswerPayload;
+  /** 所属对话 ID，用于持久化判分结果（可选，兼容旧客户端） */
+  conversationId?: string;
 }
 
 /** SSE 事件：服务端推送给前端的流式事件 */

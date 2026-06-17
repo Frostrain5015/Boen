@@ -108,9 +108,11 @@ export function gradeAnswer(
     };
   } else if (toolName === 'ask_short_answer' && answer.type === 'short_answer') {
     const a = shortAnswerSchema.parse(rawArgs);
-    const ref = a.keyPoints?.length ? `${a.referenceAnswer}\n要点：${a.keyPoints.join('、')}` : a.referenceAnswer;
+    const ref = a.referenceAnswer
+      ? (a.keyPoints?.length ? `${a.referenceAnswer}\n要点：${a.keyPoints.join('、')}` : a.referenceAnswer)
+      : (a.keyPoints?.length ? `要点：${a.keyPoints.join('、')}` : '（无参考答案）');
     // 简答题由模型定性评判
-    result = { correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation };
+    result = { correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation ?? '' };
   } else {
     throw new Error(`题型与答案不匹配：${toolName}`);
   }
