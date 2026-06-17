@@ -212,32 +212,57 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 0 10px transparent; }
 }
-/* 流式输出：文字以水墨晕染质感逐 token 浮现，末尾墨点同步呼吸 */
-.md-body.is-streaming {
-  animation: textBleed 2s ease-in-out infinite;
+/* ── TikZ 图形容器 ──────────────────────────── */
+.tikz-wrap {
+  margin: 1em 0;
+  display: flex;
+  justify-content: center;
 }
-.md-body.is-streaming > :last-child {
-  position: relative;
+.tikz-wrap svg { max-width: 100%; height: auto; }
+
+/* 「正在画图」占位：编译出 <svg> 后自动隐藏 */
+.tikz-wrap:has(svg) .tikz-gen { display: none; }
+.tikz-gen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1.5px solid var(--accent-soft);
 }
-.md-body.is-streaming > :last-child::after {
-  content: '';
-  display: inline-block;
-  width: 0.5em;
-  height: 1em;
-  margin-left: 3px;
-  border-radius: 2px;
+.tikz-gen-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  font-size: 0.95rem;
+  animation: quizGenPulse 2s ease-in-out infinite;
+}
+.tikz-gen-label {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.tikz-gen-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.tikz-gen-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   background: var(--accent);
-  vertical-align: -0.2em;
-  animation: inkBloom 1.4s ease-in-out infinite;
+  animation: dotJump 1.3s ease-in-out infinite;
 }
-@keyframes textBleed {
-  0%, 100% { text-shadow: 0 0 0 transparent; }
-  50% { text-shadow: 0 0 6px rgba(44,39,34,0.10); }
-}
-@keyframes inkBloom {
-  0%, 100% { opacity: 0.3; filter: blur(4px); transform: scaleY(0.5); }
-  50% { opacity: 1; filter: blur(0.5px); transform: scaleY(1); }
-}
+.tikz-gen-dots span:nth-child(2) { animation-delay: 0.18s; }
+.tikz-gen-dots span:nth-child(3) { animation-delay: 0.36s; }
+
+/* ── 流式占位（动画已取消，保留结构方便未来复用）── */
 
 /* ── 阅读材料块（语文/英语阅读理解） ───────── */
 .passage-block {

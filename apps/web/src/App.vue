@@ -114,11 +114,101 @@ function scrollDown() {
     requestAnimationFrame(() => {
       const el = scroller.value;
       if (!el) return;
-      // 仅当用户已在底部附近（120px 阈值）时才自动滚动，不抢已上翻看历史的视角
       const threshold = 120;
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
       if (isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     });
+  });
+}
+
+/**
+ * TiKZ 编译缓存：源文本 → 渲染后 SVG 容器 outerHTML，避免重复编译同一图形。
+ * 只在首次编译成功后自动填充。
+ */
+const tikzCache = new Map<string, string>();
+let tikzBusy = false;
+let tikzWarmed = false;
+
+/**
+ * 页面空闲时预加载 TiKZJax wasm + coredump（一次性 ~7s），
+ * 后续首次实际编译时省去网络下载，仅剩同步 TeX 编译（通常 <500ms），
+ * 远低于浏览器判定「页面无响应」的阈值（~10s）。
+ */
+function warmTikzJax() {
+  if (tikzWarmed) return;
+  tikzWarmed = true;
+  const idle = () => {
+    const run = (window as unknown as { process_tikz?: () => Promise<void> }).process_tikz;
+    if (typeof run !== 'function') return;
+    const d = document.createElement('div');
+    d.style.position = 'absolute';
+    d.style.left = '-9999px';
+    d.innerHTML = '<div class="tikz-wrap"><script type="text/tikz">\\begin{tikzpicture}\\end{tikzpicture}<\/script></div>';
+    document.body.appendChild(d);
+    run().catch(() => {}).finally(() => d.remove());
+  };
+  // 优先 requestIdleCallback，否则等 5s 后跑
+  (window as any).requestIdleCallback ? requestIdleCallback(idle, { timeout: 3000 }) : setTimeout(idle, 5000);
+}
+
+/**
+ * 编译页面上尚未处理的 TikZ 图形（流式结束/历史恢复后调用）。
+ *
+ * 缓存命中 → 直接替换出 SVG（0ms 无编译）；
+ * 缓存未命中 → yield 后编译，并自动填充缓存供下次复用。
+ */
+function processTikzDiagrams() {
+  nextTick(async () => {
+    const run = (window as unknown as { process_tikz?: () => Promise<void> }).process_tikz;
+    if (typeof run !== 'function' || tikzBusy) return;
+    if (!document.querySelector('script[type="text/tikz"]')) return;
+
+    // ── Phase 1：缓存命中 → 直接从缓存替换，免编译 ──
+    const hit = document.querySelectorAll<HTMLElement>('script[type="text/tikz"]');
+    let uncachedCount = 0;
+    hit.forEach((el) => {
+      const src = el.textContent ?? '';
+      const cached = tikzCache.get(src);
+      if (cached) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = cached;
+        const node = tmp.firstElementChild || tmp;
+        el.parentNode!.replaceChild(node, el);
+      } else {
+        uncachedCount++;
+      }
+    });
+    if (uncachedCount === 0) return;
+
+    // ── Phase 2：让出主线程 → 浏览器刷新 UI（显示「正在画图」）、处理用户交互 ──
+    await new Promise((r) => setTimeout(r, 100));
+
+    // ── Phase 3：编译，并记录源→SVG 映射 ──
+    // 编译前收集未缓存脚本的源文本（按 DOM 序）
+    const sources = Array.from(document.querySelectorAll<HTMLElement>('script[type="text/tikz"]')).map((el) => el.textContent ?? '');
+
+    tikzBusy = true;
+    try {
+      await run();
+      // Phase 4：把本次新编译的结果写入缓存（cached ones 有 dataset 区分）
+      const wraps = document.querySelectorAll<HTMLElement>('.tikz-wrap');
+      let srcIdx = 0;
+      wraps.forEach((wrap) => {
+        if (wrap.dataset.tikzCached) return;
+        const svg = wrap.querySelector('svg');
+        if (svg && srcIdx < sources.length) {
+          tikzCache.set(sources[srcIdx], wrap.outerHTML);
+          wrap.dataset.tikzCached = '1';
+          srcIdx++;
+        }
+      });
+    } catch (err) {
+      console.error('TikZ 渲染失败', err);
+    } finally {
+      tikzBusy = false;
+      // 编译期间若又产生新图，补跑一次
+      if (document.querySelector('script[type="text/tikz"]')) processTikzDiagrams();
+    }
   });
 }
 
@@ -156,6 +246,7 @@ function finalizeAssistants() {
   items.value.forEach((it) => {
     if (it.kind === 'assistant') it.done = true;
   });
+  processTikzDiagrams();
 }
 
 async function send(text: string) {
@@ -296,6 +387,7 @@ async function selectConversation(id: string) {
       }
     }
     items.value = restored;
+    processTikzDiagrams();
   } catch {
     items.value = [];
   }
@@ -369,6 +461,7 @@ function onClickOutside(e: MouseEvent) {
 onMounted(() => {
   checkAuth();
   document.addEventListener('click', onClickOutside);
+  warmTikzJax();
 });
 </script>
 
@@ -603,12 +696,9 @@ onMounted(() => {
                       </div>
                     </div>
                     <TypingDots v-else-if="i === items.length - 1 && showTyping" />
-                    <div
-                      v-else
-                      class="md-body text-[15px] leading-relaxed"
-                      :class="{ 'is-streaming': !m.done }"
-                      v-html="renderMarkdown(m.text || '…')"
-                    ></div>
+                    <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
+                      <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
+                    </div>
                   </div>
                 </div>
               </template>

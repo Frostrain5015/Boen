@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, XCircle, Sparkles, Lightbulb, PencilLine } from 'lucide-vue-next';
 import type { QuestionPayload, AnswerPayload, GradingResult } from '@boen/shared';
-import { renderMarkdown } from '@/lib/markdown';
+import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
 
 const props = defineProps<{
   question: QuestionPayload;
@@ -182,7 +182,7 @@ watch(
           :enter="{ opacity: 1, x: 0, transition: { delay: 120 + i * 70 } }"
         >
           <span class="opt-key">{{ opt.key }}</span>
-          <span class="flex-1 text-left">{{ opt.text }}</span>
+          <span class="md-body flex-1 text-left" v-html="renderMarkdownInline(opt.text)"></span>
           <CheckCircle2 v-if="answered && correctKeys.includes(opt.key)" class="h-5 w-5 shrink-0 text-[var(--success)]" />
           <XCircle v-else-if="answered && selectedKeys.includes(opt.key)" class="h-5 w-5 shrink-0 text-[var(--error)]" />
         </button>
@@ -266,10 +266,8 @@ watch(
               {{ grading.score }} / {{ grading.maxScore }}
             </span>
           </div>
-          <p class="mt-2 text-sm"><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span>{{ grading.reference }}</p>
-          <p v-if="grading.explanation" class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-[var(--ink-soft)]">
-            {{ grading.explanation }}
-          </p>
+          <p class="mt-2 text-sm"><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="md-body" v-html="renderMarkdownInline(grading.reference)"></span></p>
+          <div v-if="grading.explanation" class="md-body mt-1.5 text-sm leading-relaxed text-[var(--ink-soft)]" v-html="renderMarkdown(grading.explanation)"></div>
         </div>
       </Transition>
     </div>
