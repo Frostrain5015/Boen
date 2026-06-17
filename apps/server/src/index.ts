@@ -73,10 +73,19 @@ async function runGraph(
   send: (e: SseEvent) => Promise<void>,
 ): Promise<BaseMessage | undefined> {
   const events = graph.streamEvents(input, runConfig(threadId));
+  let quizSignaled = false; // 「博文正在出题」只发一次
   for await (const ev of events) {
     if (ev.event === 'on_chat_model_stream') {
-      const text = typeof ev.data?.chunk?.content === 'string' ? ev.data.chunk.content : '';
+      const chunk = ev.data?.chunk as
+        | { content?: unknown; tool_call_chunks?: Array<{ name?: string }> }
+        | undefined;
+      const text = typeof chunk?.content === 'string' ? chunk.content : '';
       if (text) await send({ type: 'token', value: text });
+      // 纯工具信号：模型一旦开始流式产出出题工具调用，立即通知前端
+      if (!quizSignaled && (chunk?.tool_call_chunks ?? []).some((t) => t.name && QUIZ_TOOL_NAMES.has(t.name))) {
+        quizSignaled = true;
+        await send({ type: 'quiz_generating' });
+      }
     }
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });
@@ -112,6 +121,20 @@ async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEve
   if (quiz?.id) {
     await send({ type: 'question', toolCallId: quiz.id, question: toQuestionPayload(quiz.name, quiz.args) });
   }
+}
+
+/**
+ * 若上一轮留下未作答的出题工具调用（AIMessage 带 tool_calls 但无 ToolMessage 响应），
+ * 生成「跳过」ToolMessage 以保持消息序列合法——否则紧跟 HumanMessage 会让模型 API 报错。
+ */
+async function pendingSkipToolMessages(threadId: string): Promise<ToolMessage[]> {
+  const state = await graph.getState({ configurable: { thread_id: threadId } });
+  const msgs = (state.values?.messages ?? []) as BaseMessage[];
+  const last = msgs[msgs.length - 1] as AIMessage | undefined;
+  const calls = (last?.tool_calls ?? []) as ToolCall[];
+  return calls
+    .filter((t) => t.id)
+    .map((t) => new ToolMessage({ content: '（用户未作答此题，已跳过）', tool_call_id: t.id! }));
 }
 
 /** 获取出题工具调用的结果（若最后一条消息触发了出题） */
@@ -247,9 +270,12 @@ app.post('/api/chat', async (c) => {
         addMessage(body.conversationId!, 'user', body.message);
       }
 
+      // 若存在未作答的题目卡片，先补「跳过」ToolMessage，避免悬空 tool_calls 触发 API 报错
+      const skipMsgs = await pendingSkipToolMessages(body.threadId);
+
       const last = await runGraph(
         {
-          messages: [new HumanMessage(body.message)],
+          messages: [...skipMsgs, new HumanMessage(body.message)],
           gradeBand: body.gradeBand ?? 'middle',
           subject: body.subject ?? 'math',
           userName: body.userName,
@@ -300,6 +326,12 @@ app.post('/api/answer', async (c) => {
       const calls = (aiMsg?.tool_calls ?? []) as ToolCall[];
       const target = calls.find((t) => t.id === body.toolCallId);
       if (!target) throw new Error('找不到对应的题目，请重新开始一轮。');
+
+      // 该题已被作答或跳过（历史里已存在对应 ToolMessage）：避免重复回灌触发 API 报错
+      const alreadyAnswered = msgs.some(
+        (m) => (m as ToolMessage).tool_call_id === body.toolCallId,
+      );
+      if (alreadyAnswered) throw new Error('这道题已经结束啦，换道新题试试～');
 
       // 判分，并把结果回灌给模型
       const { result, toolContent } = gradeAnswer(target.name, target.args, body.answer);

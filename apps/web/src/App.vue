@@ -75,18 +75,8 @@ const showTyping = computed(() => {
   return busy.value && last?.kind === 'assistant' && !last.text;
 });
 
-// 检测最后一个用户消息是否为出题意图，用于显示「正在出题」提示
-const QUIZ_INTENT_RE = /考我|考考|出一?[道题]|来一?[道题]|测验|测试|测一测|练习|出题|quiz|阅读|理解/i;
-const isGeneratingQuiz = computed(() => {
-  if (!busy.value) return false;
-  const last = items.value[items.value.length - 1];
-  if (last?.kind !== 'assistant' || last.text) return false;
-  for (let i = items.value.length - 2; i >= 0; i--) {
-    const prev = items.value[i];
-    if (prev.kind === 'user') return QUIZ_INTENT_RE.test(prev.text);
-  }
-  return false;
-});
+// 「博文正在出题」纯由后端 quiz_generating 事件驱动（模型实际调用出题工具时触发）
+const isGeneratingQuiz = ref(false);
 
 // 答题反馈：判分时短暂锁定 happy/surprise，确保反馈清晰可见（即使助手随后接着输出）
 const reaction = ref<MascotState | null>(null);
@@ -223,7 +213,10 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
     if (cur.kind === 'assistant') {
       cur.text += e.value;
     }
+  } else if (e.type === 'quiz_generating') {
+    isGeneratingQuiz.value = true;
   } else if (e.type === 'question') {
+    isGeneratingQuiz.value = false;
     const cur = items.value[idx.value];
     if (cur && cur.kind === 'assistant' && !cur.text.trim()) items.value.splice(idx.value, 1);
     items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
@@ -264,6 +257,10 @@ async function send(text: string) {
 
   input.value = '';
   busy.value = true;
+  // 未作答的题目卡片视为跳过：禁用之，避免事后再答与服务端「跳过」处理冲突
+  items.value.forEach((it) => {
+    if (it.kind === 'question' && !it.answered) it.answered = true;
+  });
   items.value.push({ kind: 'user', text: t });
   items.value.push(newAssistant());
   const idx = { value: items.value.length - 1 };
@@ -278,6 +275,7 @@ async function send(text: string) {
   } finally {
     finalizeAssistants();
     busy.value = false;
+    isGeneratingQuiz.value = false;
   }
 }
 
@@ -293,6 +291,7 @@ async function onAnswer(item: Extract<ChatItem, { kind: 'question' }>, answer: A
   } finally {
     finalizeAssistants();
     busy.value = false;
+    isGeneratingQuiz.value = false;
   }
 }
 

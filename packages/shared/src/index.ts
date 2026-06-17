@@ -87,6 +87,8 @@ export interface AnswerRequest {
 export type SseEvent =
   | { type: 'token'; value: string }
   | { type: 'mode'; value: BoenMode }
+  /** 模型开始调用出题工具（纯工具信号，前端据此显示「博文正在出题」） */
+  | { type: 'quiz_generating' }
   | { type: 'question'; toolCallId: string; question: QuestionPayload }
   | { type: 'grading'; toolCallId: string; result: GradingResult }
   | { type: 'title_updated'; conversationId: string; title: string }
