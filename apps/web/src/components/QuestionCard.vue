@@ -46,44 +46,26 @@ const processedStem = computed(() => {
   return stem.replace(/_{4,}/g, () => `${CIRCLED[idx] ?? `[${idx + 1}]`}____`);
 });
 
-/** MathLive 公式编辑器：所见即所得，#? 为可用 Tab 跳转的占位框 */
-const MATH_SYMBOLS = [
-  { label: 'xⁿ', insert: '^{#?}' },
-  { label: 'xₙ', insert: '_{#?}' },
-  { label: 'a/b', insert: '\\frac{#?}{#?}' },
-  { label: '√', insert: '\\sqrt{#?}' },
-  { label: 'π', insert: '\\pi' },
-  { label: '±', insert: '\\pm' },
-  { label: '∞', insert: '\\infty' },
-  { label: '≥', insert: '\\ge' },
-  { label: '≤', insert: '\\le' },
-  { label: '≠', insert: '\\ne' },
-  { label: '×', insert: '\\times' },
-  { label: '÷', insert: '\\div' },
-  { label: 'θ', insert: '\\theta' },
-  { label: 'α', insert: '\\alpha' },
-  { label: 'β', insert: '\\beta' },
-];
-
 /** MathLive <math-field> 最小接口（规避 any，仅声明用到的成员） */
 interface MathField extends HTMLElement {
   value: string;
   readOnly: boolean;
   /** 智能模式：打公式走数学模式、打文字（含中文）自动切文本模式，二者混排 */
   smartMode: boolean;
-  insert(latex: string, options?: { focus?: boolean }): void;
+  /** 右键/上下文菜单项；置空 [] 关闭调色、背景、变体等菜单，避免学生分心 */
+  menuItems: unknown[];
 }
 
-/** 初始化一个 math-field：开启智能模式 + 同步只读态 */
+/** 初始化一个 math-field：智能模式 + 关菜单 + 同步只读态 */
 function initField(mf: MathField | null) {
   if (!mf) return;
   mf.smartMode = true;
+  mf.menuItems = [];
   mf.readOnly = props.answered;
 }
 
 const blankFields = ref<(MathField | null)[]>([]);
 const shortField = ref<MathField | null>(null);
-const activeField = ref<MathField | null>(null);
 
 /** 是否对该题型启用 MathLive（仅数学学科） */
 const useMathField = computed(() => props.subject === 'math');
@@ -97,21 +79,11 @@ function setShortField(el: unknown) {
   shortField.value = el as MathField | null;
   initField(shortField.value);
 }
-function onMathFocus(e: FocusEvent) {
-  activeField.value = e.currentTarget as MathField;
-}
 function onBlankInput(e: Event, i: number) {
   blanks.value[i] = (e.target as MathField).value;
 }
 function onShortInput(e: Event) {
   shortText.value = (e.target as MathField).value;
-}
-
-/** 工具栏插入：写入当前聚焦的 math-field（无则回退到第一个） */
-function insertMath(latex: string) {
-  if (props.answered) return;
-  const mf = activeField.value ?? blankFields.value.find((f): f is MathField => !!f) ?? shortField.value;
-  mf?.insert(latex, { focus: true });
 }
 
 // 作答后锁定所有公式编辑器
@@ -248,12 +220,6 @@ watch(
 
       <!-- 填空题 -->
       <div v-else-if="question.type === 'fill_blank'" class="space-y-2.5">
-        <!-- 数学公式工具栏 -->
-        <div v-if="subject === 'math' && !answered" class="math-bar">
-          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" type="button" @mousedown.prevent @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
-            {{ sym.label }}
-          </button>
-        </div>
         <div
           v-for="(_, i) in blanks"
           :key="i"
@@ -272,7 +238,6 @@ watch(
               class="mathfield"
               :class="answered && grading?.perBlank ? (grading.perBlank[i] ? 'mf-ok' : 'mf-no') : ''"
               @input="onBlankInput($event, i)"
-              @focusin="onMathFocus"
             ></math-field>
             <input
               v-else
@@ -290,18 +255,11 @@ watch(
 
       <!-- 简答题 -->
       <div v-else-if="question.type === 'short_answer'">
-        <!-- 数学公式工具栏 -->
-        <div v-if="subject === 'math' && !answered" class="math-bar">
-          <button v-for="sym in MATH_SYMBOLS" :key="sym.insert" type="button" @mousedown.prevent @click="insertMath(sym.insert)" class="math-btn" :title="sym.insert">
-            {{ sym.label }}
-          </button>
-        </div>
         <math-field
           v-if="useMathField"
           :ref="(el: Element | null) => setShortField(el)"
           class="mathfield mathfield-area"
           @input="onShortInput"
-          @focusin="onMathFocus"
         ></math-field>
         <textarea v-else v-model="shortText" :disabled="answered" rows="4" class="field" placeholder="写下你的思路与答案…" />
       </div>
@@ -408,35 +366,6 @@ watch(
 
 .reveal-enter-active { transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
 .reveal-enter-from { opacity: 0; transform: translateY(10px); }
-
-/* ── 数学公式工具栏 ──────────────────────────── */
-.math-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 14px;
-  background: var(--paper);
-  border: 1px solid var(--line);
-}
-.math-btn {
-  display: grid;
-  place-items: center;
-  min-width: 2rem;
-  height: 1.8rem;
-  padding: 0 0.3rem;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: var(--surface);
-  font-size: 0.82rem;
-  font-weight: 600;
-  font-family: 'Times New Roman', 'Latin Modern Math', serif;
-  color: var(--ink);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.12s;
-}
-.math-btn:hover { background: var(--accent-soft); border-color: var(--accent); transform: translateY(-1px); }
-.math-btn:active { transform: translateY(0); }
 
 /* ── MathLive 公式编辑器 ──────────────────────── */
 .mathfield {
