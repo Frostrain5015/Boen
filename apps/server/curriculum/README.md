@@ -2,6 +2,14 @@
 
 本目录存放结构化的教材大纲源数据，`npm run seed:curriculum --workspace @boen/server` 读取后入库并计算向量。
 
+seed 后可运行：
+
+```bash
+npm run verify:curriculum --workspace @boen/server -- 7 math 一元一次方程
+```
+
+验证指定年级/学科是否已有教材、章节、知识点、向量、来源 URL，以及 LangGraph 工具用的知识点查询是否可用。
+
 ## 文件格式
 
 每个 `.json` 文件是一册教材（`TextbookSeed`）或其数组。字段见 `src/curriculum.ts` 的 `TextbookSeed`：
@@ -38,6 +46,10 @@
 ## 数据准确性
 
 **必须基于权威来源**（人教社电子课本目录 pep.com.cn / 教育部 2022 课标），逐册核对，`sourceUrl` 必填。**严禁凭记忆编造**。
+
+当前小样：
+
+- `math-g7-上册.json`：来源为人教社官方「数学 七年级上册/义务教育教科书」教材介绍页，目录条目按页面目录整理。
 
 ## 范围（当前）
 

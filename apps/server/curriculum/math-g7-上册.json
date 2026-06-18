@@ -1,0 +1,184 @@
+{
+  "subject": "math",
+  "grade": "7",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3258.html",
+  "units": [
+    {
+      "title": "第一章 有理数",
+      "kind": "chapter",
+      "knowledgePoints": ["正数和负数", "有理数的概念", "数轴", "相反数", "绝对值", "有理数的大小比较"],
+      "children": [
+        { "title": "1.1 正数和负数", "kind": "section", "knowledgePoints": ["正数和负数"] },
+        {
+          "title": "1.2 有理数及其大小比较", "kind": "section",
+          "knowledgePoints": ["有理数的概念", "数轴", "相反数", "绝对值", "有理数的大小比较"],
+          "children": [
+            { "title": "1.2.1 有理数的概念", "kind": "lesson" },
+            { "title": "1.2.2 数轴", "kind": "lesson" },
+            { "title": "1.2.3 相反数", "kind": "lesson" },
+            { "title": "1.2.4 绝对值", "kind": "lesson" },
+            { "title": "1.2.5 有理数的大小比较", "kind": "lesson" }
+          ]
+        },
+        { "title": "阅读与思考 用正负数表示允许偏差", "kind": "lesson" },
+        { "title": "图说数学史 漫漫长路识负数", "kind": "lesson" },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题1", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二章 有理数的运算",
+      "kind": "chapter",
+      "knowledgePoints": ["有理数的加法", "有理数的减法", "有理数的乘法", "有理数的除法", "乘方", "科学记数法", "近似数"],
+      "children": [
+        {
+          "title": "2.1 有理数的加法与减法", "kind": "section",
+          "knowledgePoints": ["有理数的加法", "有理数的减法"],
+          "children": [
+            { "title": "2.1.1 有理数的加法", "kind": "lesson" },
+            { "title": "2.1.2 有理数的减法", "kind": "lesson" }
+          ]
+        },
+        { "title": "阅读与思考 我国古代的正负数加减运算法则——正负术", "kind": "lesson" },
+        {
+          "title": "2.2 有理数的乘法与除法", "kind": "section",
+          "knowledgePoints": ["有理数的乘法", "有理数的除法"],
+          "children": [
+            { "title": "2.2.1 有理数的乘法", "kind": "lesson" },
+            { "title": "2.2.2 有理数的除法", "kind": "lesson" }
+          ]
+        },
+        { "title": "探究与发现 从数系扩充看有理数乘法法则", "kind": "lesson" },
+        {
+          "title": "2.3 有理数的乘方", "kind": "section",
+          "knowledgePoints": ["乘方", "科学记数法", "近似数"],
+          "children": [
+            { "title": "2.3.1 乘方", "kind": "lesson" },
+            { "title": "2.3.2 科学记数法", "kind": "lesson" },
+            { "title": "2.3.3 近似数", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题2", "kind": "lesson" },
+        { "title": "综合与实践 进位制的认识与探究", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三章 代数式",
+      "kind": "chapter",
+      "knowledgePoints": ["列代数式表示数量关系", "代数式的值"],
+      "children": [
+        { "title": "3.1 列代数式表示数量关系", "kind": "section", "knowledgePoints": ["列代数式表示数量关系"] },
+        { "title": "阅读与思考 数字1与字母X的对话", "kind": "lesson" },
+        { "title": "3.2 代数式的值", "kind": "section", "knowledgePoints": ["代数式的值"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题3", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四章 整式的加减",
+      "kind": "chapter",
+      "knowledgePoints": ["整式", "整式的加法与减法"],
+      "children": [
+        { "title": "4.1 整式", "kind": "section", "knowledgePoints": ["整式"] },
+        { "title": "4.2 整式的加法与减法", "kind": "section", "knowledgePoints": ["整式的加法与减法"] },
+        { "title": "信息技术应用 用电子表格进行数据计算", "kind": "lesson" },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题4", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五章 一元一次方程",
+      "kind": "chapter",
+      "knowledgePoints": ["从算式到方程", "等式的性质", "解一元一次方程", "实际问题与一元一次方程"],
+      "children": [
+        {
+          "title": "5.1 方程", "kind": "section",
+          "knowledgePoints": ["从算式到方程", "等式的性质"],
+          "children": [
+            { "title": "5.1.1 从算式到方程", "kind": "lesson" },
+            { "title": "5.1.2 等式的性质", "kind": "lesson" }
+          ]
+        },
+        { "title": "5.2 解一元一次方程", "kind": "section", "knowledgePoints": ["解一元一次方程"] },
+        { "title": "5.3 实际问题与一元一次方程", "kind": "section", "knowledgePoints": ["实际问题与一元一次方程"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题5", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六章 几何图形初步",
+      "kind": "chapter",
+      "knowledgePoints": ["立体图形与平面图形", "点线面体", "直线射线线段", "线段的比较与运算", "角的概念", "角的比较与运算", "余角和补角"],
+      "children": [
+        {
+          "title": "6.1 几何图形", "kind": "section",
+          "knowledgePoints": ["立体图形与平面图形", "点线面体"],
+          "children": [
+            { "title": "6.1.1 立体图形与平面图形", "kind": "lesson" },
+            { "title": "6.1.2 点、线、面、体", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "6.2 直线、射线、线段", "kind": "section",
+          "knowledgePoints": ["直线射线线段", "线段的比较与运算"],
+          "children": [
+            { "title": "6.2.1 直线、射线、线段", "kind": "lesson" },
+            { "title": "6.2.2 线段的比较与运算", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "6.3 角", "kind": "section",
+          "knowledgePoints": ["角的概念", "角的比较与运算", "余角和补角"],
+          "children": [
+            { "title": "6.3.1 角的概念", "kind": "lesson" },
+            { "title": "6.3.2 角的比较与运算", "kind": "lesson" },
+            { "title": "6.3.3 余角和补角", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题6", "kind": "lesson" },
+        { "title": "综合与实践 设计学校田径运动会比赛场地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "正数和负数", "description": "用正负数表示具有相反意义的量，理解0既不是正数也不是负数" },
+    { "title": "有理数的概念", "description": "整数和分数统称为有理数，有理数的分类" },
+    { "title": "数轴", "description": "规定了原点、正方向和单位长度的直线，数轴上的点与有理数一一对应" },
+    { "title": "相反数", "description": "只有符号不同的两个数互为相反数，0的相反数是0" },
+    { "title": "绝对值", "description": "一个数在数轴上对应点到原点的距离，正数和0的绝对值是它本身，负数的绝对值是它的相反数" },
+    { "title": "有理数的大小比较", "description": "利用数轴比较有理数大小：正数大于0大于负数，两个负数绝对值大的反而小" },
+    { "title": "有理数的加法", "description": "有理数加法法则：同号相加、异号相加、与0相加" },
+    { "title": "有理数的减法", "description": "减去一个数等于加上这个数的相反数" },
+    { "title": "有理数的乘法", "description": "有理数乘法法则：两数相乘同号得正异号得负，任何数与0相乘得0" },
+    { "title": "有理数的除法", "description": "除以一个不等于0的数等于乘这个数的倒数" },
+    { "title": "乘方", "description": "求n个相同因数的积的运算，幂的底数和指数" },
+    { "title": "科学记数法", "description": "将一个大于10的数表示成a×10ⁿ的形式（1≤a<10）" },
+    { "title": "近似数", "description": "接近实际数但存在一定误差的数，精确度与有效数字" },
+    { "title": "列代数式表示数量关系", "description": "用含有字母的式子表示数量关系，代数式的书写规范" },
+    { "title": "代数式的值", "description": "用具体数值代替代数式中的字母求出的结果" },
+    { "title": "整式", "description": "单项式与多项式统称为整式，单项式的系数和次数，多项式的项和次数" },
+    { "title": "整式的加法与减法", "description": "合并同类项和去括号法则，整式加减运算" },
+    { "title": "从算式到方程", "description": "方程是含有未知数的等式，理解方程的解的概念" },
+    { "title": "等式的性质", "description": "等式两边加/减/乘/除以同一个数（除数不为0），等式仍然成立" },
+    { "title": "解一元一次方程", "description": "利用移项、合并同类项、去括号、去分母等方法解一元一次方程" },
+    { "title": "实际问题与一元一次方程", "description": "列一元一次方程解决行程、工程、销售等实际问题" },
+    { "title": "立体图形与平面图形", "description": "从具体物体抽象出的图形，立体图形与平面图形的联系与区别" },
+    { "title": "点线面体", "description": "点是构成图形的基本元素，线动成面、面动成体" },
+    { "title": "直线射线线段", "description": "直线无端点、射线有一个端点、线段有两个端点的基本性质" },
+    { "title": "线段的比较与运算", "description": "线段的长短比较、和差计算、线段中点" },
+    { "title": "角的概念", "description": "有公共端点的两条射线组成的图形，角度制" },
+    { "title": "角的比较与运算", "description": "角的大小比较、和差计算、角平分线" },
+    { "title": "余角和补角", "description": "两个角的和为90°则互余，和为180°则互补" }
+  ]
+}

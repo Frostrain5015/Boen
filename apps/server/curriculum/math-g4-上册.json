@@ -1,0 +1,105 @@
+{
+  "subject": "math",
+  "grade": "4",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3114.html",
+  "units": [
+    {
+      "title": "第一单元 大数的认识",
+      "kind": "chapter",
+      "children": [
+        { "title": "亿以内数的认识", "kind": "lesson" },
+        { "title": "亿以内数的读法", "kind": "lesson" },
+        { "title": "亿以内数的写法", "kind": "lesson" },
+        { "title": "亿以内数的比较", "kind": "lesson" },
+        { "title": "亿以内数的改写", "kind": "lesson" },
+        { "title": "求亿以内数的近似数", "kind": "lesson" },
+        { "title": "数的产生与十进制计数法", "kind": "lesson" },
+        { "title": "亿以上数的认识", "kind": "lesson" },
+        { "title": "计算工具的认识", "kind": "lesson" },
+        { "title": "用计算器计算与探索规律", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" },
+        { "title": "1亿有多大", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 公顷和平方千米",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识公顷", "kind": "lesson" },
+        { "title": "认识平方千米", "kind": "lesson" },
+        { "title": "公顷、平方千米与平方米之间的换算", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 角的度量",
+      "kind": "chapter",
+      "children": [
+        { "title": "线段、直线、射线与角", "kind": "lesson" },
+        { "title": "角的度量", "kind": "lesson" },
+        { "title": "角的分类", "kind": "lesson" },
+        { "title": "画角", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 三位数乘两位数",
+      "kind": "chapter",
+      "children": [
+        { "title": "三位数乘两位数的笔算", "kind": "lesson" },
+        { "title": "因数中间、末尾有0的乘法", "kind": "lesson" },
+        { "title": "积的变化规律", "kind": "lesson" },
+        { "title": "常见的数量关系", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 平行四边形和梯形",
+      "kind": "chapter",
+      "children": [
+        { "title": "平行与垂直", "kind": "lesson" },
+        { "title": "画垂线与画平行线", "kind": "lesson" },
+        { "title": "点到直线的距离", "kind": "lesson" },
+        { "title": "认识平行四边形", "kind": "lesson" },
+        { "title": "认识梯形", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 除数是两位数的除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "口算除法", "kind": "lesson" },
+        { "title": "除数是整十数的除法", "kind": "lesson" },
+        { "title": "用四舍法试商", "kind": "lesson" },
+        { "title": "用五入法试商", "kind": "lesson" },
+        { "title": "灵活试商", "kind": "lesson" },
+        { "title": "商是两位数的除法", "kind": "lesson" },
+        { "title": "商的变化规律", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 条形统计图",
+      "kind": "chapter",
+      "children": [
+        { "title": "1格表示1个单位的条形统计图", "kind": "lesson" },
+        { "title": "1格表示多个单位的条形统计图", "kind": "lesson" },
+        { "title": "绘制与分析条形统计图", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 数学广角——优化",
+      "kind": "chapter",
+      "children": [
+        { "title": "沏茶问题", "kind": "lesson" },
+        { "title": "烙饼问题", "kind": "lesson" },
+        { "title": "田忌赛马问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第九单元 总复习",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

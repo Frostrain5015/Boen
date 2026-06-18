@@ -1,0 +1,137 @@
+{
+  "subject": "math",
+  "grade": "1",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3108.html",
+  "units": [
+    {
+      "title": "数学游戏",
+      "kind": "unit",
+      "knowledgePoints": [],
+      "children": [
+        { "title": "在校园里找一找", "kind": "lesson" },
+        { "title": "在操场上玩一玩", "kind": "lesson" },
+        { "title": "在教室里认一认", "kind": "lesson" },
+        { "title": "在教室里玩一玩", "kind": "lesson" },
+        { "title": "学习准备", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "一、5以内数的认识和加、减法",
+      "kind": "chapter",
+      "knowledgePoints": ["1~5的认识", "比大小", "第几", "分与合", "加法", "减法", "0的认识和加减法"],
+      "children": [
+        {
+          "title": "1. 1~5的认识", "kind": "section",
+          "knowledgePoints": ["1~5的认识", "比大小", "第几", "分与合"],
+          "children": [
+            { "title": "1~5的认识", "kind": "lesson" },
+            { "title": "比大小", "kind": "lesson" },
+            { "title": "第几", "kind": "lesson" },
+            { "title": "分与合", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "2. 1~5的加、减法", "kind": "section",
+          "knowledgePoints": ["加法", "减法"],
+          "children": [
+            { "title": "加法", "kind": "lesson" },
+            { "title": "减法", "kind": "lesson" }
+          ]
+        },
+        { "title": "3. 0的认识和加、减法", "kind": "section", "knowledgePoints": ["0的认识和加减法"] },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "二、6~10的认识和加、减法",
+      "kind": "chapter",
+      "knowledgePoints": ["6~9的认识", "6~9的加减法", "10的认识和加减法", "连加连减", "加减混合"],
+      "children": [
+        {
+          "title": "1. 6~9的认识", "kind": "section",
+          "knowledgePoints": ["6~9的认识"],
+          "children": [
+            { "title": "6~9的认识", "kind": "lesson" },
+            { "title": "比大小 第几", "kind": "lesson" },
+            { "title": "分与合", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "2. 6~9的加、减法", "kind": "section",
+          "knowledgePoints": ["6~9的加减法"],
+          "children": [
+            { "title": "6和7的加、减法", "kind": "lesson" },
+            { "title": "8和9的加、减法", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "3. 10的认识和加、减法", "kind": "section",
+          "knowledgePoints": ["10的认识和加减法", "连加连减", "加减混合"],
+          "children": [
+            { "title": "10的认识", "kind": "lesson" },
+            { "title": "10的加、减法", "kind": "lesson" },
+            { "title": "连加、连减", "kind": "lesson" },
+            { "title": "加、减混合", "kind": "lesson" }
+          ]
+        },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "三、认识立体图形",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识立体图形", "kind": "lesson" },
+        { "title": "搭一搭、拼一拼", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "四、11~20的认识",
+      "kind": "chapter",
+      "children": [
+        { "title": "10的再认识", "kind": "lesson" },
+        { "title": "11~20的认识", "kind": "lesson" },
+        { "title": "简单加、减法", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "五、20以内的进位加法",
+      "kind": "chapter",
+      "children": [
+        { "title": "9加几", "kind": "lesson" },
+        { "title": "8、7、6加几", "kind": "lesson" },
+        { "title": "5、4、3、2加几", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "六、复习与关联",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理复习", "kind": "lesson" },
+        { "title": "数与运算", "kind": "lesson" },
+        { "title": "数量关系", "kind": "lesson" },
+        { "title": "图形的认识", "kind": "lesson" },
+        { "title": "应用提升", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "1~5的认识", "description": "认识数字1-5，理解各数的含义和顺序" },
+    { "title": "比大小", "description": "用一一对应的方法比较物体的多少，认识>、<、=" },
+    { "title": "第几", "description": "理解序数的含义，能用第几描述物体的排列顺序" },
+    { "title": "分与合", "description": "一个数分成两个数，两个数合成一个数" },
+    { "title": "加法", "description": "把两个数合并成一个数的运算，认识加号和等号" },
+    { "title": "减法", "description": "从总数里去掉一部分的运算，认识减号" },
+    { "title": "0的认识和加减法", "description": "0的含义（没有和起点），0的加减法" },
+    { "title": "6~9的认识", "description": "认识数字6-9，理解各数的含义和顺序" },
+    { "title": "6~9的加减法", "description": "6-9范围内数的加减法计算" },
+    { "title": "10的认识和加减法", "description": "认识10，10的组成与分解，10以内的加减法" },
+    { "title": "连加连减", "description": "三个数连续相加或相减的计算" },
+    { "title": "加减混合", "description": "加减混合运算的顺序和计算" }
+  ]
+}

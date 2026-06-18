@@ -33,7 +33,7 @@ async function main() {
       const { units, kps } = await ingestTextbook(book);
       totalUnits += units;
       totalKps += kps;
-      console.log(`  ✓ ${file}: ${book.subject} ${book.grade}年级 ${book.volume ?? '全册'} → ${units} 章节 / ${kps} 新知识点`);
+      console.log(`  ✓ ${file}: ${book.subject} ${book.grade}年级 ${book.volume ?? '全册'} → ${units} 章节 / ${kps} 知识点`);
     }
   }
   console.log(`完成：共写入 ${totalUnits} 章节、${totalKps} 知识点，并已生成向量。`);

@@ -1,0 +1,92 @@
+{
+  "subject": "chinese",
+  "grade": "8",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3246.html",
+  "units": [
+    {
+      "title": "第一单元 活动·探究",
+      "kind": "unit",
+      "children": [
+        { "title": "任务一 新闻阅读", "kind": "section" },
+        { "title": "阅读：1 消息二则 / 毛泽东", "kind": "lesson" },
+        { "title": "阅读：2 中国人首次进入自己的空间站", "kind": "lesson" },
+        { "title": "阅读：3 首届诺贝尔奖颁发", "kind": "lesson" },
+        { "title": "阅读：4 \"飞天\"凌空 / 夏浩然 樊云芳", "kind": "lesson" },
+        { "title": "阅读：5 一着惊海天 / 蔡年迟 蒲海洋", "kind": "lesson" },
+        { "title": "阅读：6 国行公祭，为佑世界和平 / 钟声", "kind": "lesson" },
+        { "title": "任务二 新闻采访", "kind": "lesson" },
+        { "title": "任务三 新闻写作", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：7 藤野先生 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：8 回忆鲁迅先生（节选）/ 萧红", "kind": "lesson" },
+        { "title": "阅读：9* 天上有颗\"南仁东星\" / 王宏甲", "kind": "lesson" },
+        { "title": "阅读：10 美丽的颜色 / 艾芙·居里", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：学写传记", "kind": "lesson" },
+        { "title": "整本书阅读：《红星照耀中国》", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：11 三峡 / 郦道元", "kind": "lesson" },
+        { "title": "阅读：12 短文二篇（答谢中书书/记承天寺夜游）", "kind": "lesson" },
+        { "title": "阅读：13 与朱元思书 / 吴均", "kind": "lesson" },
+        { "title": "阅读：14 唐诗五首", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：学习描写景物", "kind": "lesson" },
+        { "title": "专题学习活动：人无信不立", "kind": "lesson" },
+        { "title": "课外古诗词诵读（庭中有奇树/龟虽寿/赠从弟/梁甫行）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：15 背影 / 朱自清", "kind": "lesson" },
+        { "title": "阅读：16 白杨礼赞 / 茅盾", "kind": "lesson" },
+        { "title": "阅读：17 散文二篇（永久的生命/我为什么而活着）", "kind": "lesson" },
+        { "title": "阅读：18 昆明的雨 / 汪曾祺", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：语言要连贯", "kind": "lesson" },
+        { "title": "整本书阅读：《红岩》", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：19 中国石拱桥 / 茅以昇", "kind": "lesson" },
+        { "title": "阅读：20 苏州园林 / 叶圣陶", "kind": "lesson" },
+        { "title": "阅读：21 人民英雄永垂不朽 / 周定舫", "kind": "lesson" },
+        { "title": "阅读：22 梦回繁华 / 毛宁", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：说明事物要抓住特征", "kind": "lesson" },
+        { "title": "专题学习活动：身边的文化遗产", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：23 《孟子》三章", "kind": "lesson" },
+        { "title": "阅读：24 愚公移山 /《列子》", "kind": "lesson" },
+        { "title": "阅读：25 周亚夫军细柳 / 司马迁", "kind": "lesson" },
+        { "title": "阅读：26 诗词五首（饮酒/春望/雁门太守行/赤壁/渔家傲）", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：表达要得体", "kind": "lesson" },
+        { "title": "课外古诗词诵读（浣溪沙/采桑子/相见欢/如梦令）", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

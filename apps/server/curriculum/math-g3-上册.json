@@ -1,0 +1,101 @@
+{
+  "subject": "math",
+  "grade": "3",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3112.html",
+  "units": [
+    {
+      "title": "一、观察物体",
+      "kind": "chapter",
+      "children": [
+        { "title": "观察物体（1）", "kind": "lesson" },
+        { "title": "观察物体（2）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "二、混合运算",
+      "kind": "chapter",
+      "children": [
+        { "title": "没有括号的同级混合运算", "kind": "lesson" },
+        { "title": "含有两级运算的混合运算", "kind": "lesson" },
+        { "title": "有小括号的混合运算", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "三、毫米、分米和千米",
+      "kind": "chapter",
+      "children": [
+        { "title": "毫米、分米的认识", "kind": "lesson" },
+        { "title": "千米的认识", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 曹冲称象的故事（综合实践活动）",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识质量单位", "kind": "lesson" },
+        { "title": "称重我很行", "kind": "lesson" },
+        { "title": "称重大挑战", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "四、多位数乘一位数",
+      "kind": "chapter",
+      "children": [
+        { "title": "口算乘法", "kind": "lesson" },
+        { "title": "笔算乘法", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 数字编码（综合实践活动）",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识数字编码", "kind": "lesson" },
+        { "title": "编制学号", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "五、线和角",
+      "kind": "chapter",
+      "children": [
+        { "title": "线段、射线、直线", "kind": "lesson" },
+        { "title": "角的认识", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "六、分数的初步认识",
+      "kind": "chapter",
+      "children": [
+        { "title": "初步认识分数", "kind": "lesson" },
+        { "title": "分数的简单计算", "kind": "lesson" },
+        { "title": "进一步认识分数", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "七、复习与关联",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理复习", "kind": "lesson" },
+        { "title": "数与运算", "kind": "lesson" },
+        { "title": "数量关系", "kind": "lesson" },
+        { "title": "图形的认识与测量", "kind": "lesson" },
+        { "title": "应用提升", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "数学广角：搭配问题",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

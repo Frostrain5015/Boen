@@ -1,0 +1,88 @@
+{
+  "subject": "math",
+  "grade": "1",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3109.html",
+  "units": [
+    {
+      "title": "一、认识平面图形",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识平面图形", "kind": "lesson" },
+        { "title": "平面图形的拼组", "kind": "lesson" },
+        { "title": "七巧板", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "二、20以内的退位减法",
+      "kind": "chapter",
+      "children": [
+        { "title": "十几减9", "kind": "lesson" },
+        { "title": "十几减8、7、6", "kind": "lesson" },
+        { "title": "十几减5、4、3、2", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "三、100以内数的认识",
+      "kind": "chapter",
+      "children": [
+        { "title": "数数、数的组成", "kind": "lesson" },
+        { "title": "数的顺序、比较大小", "kind": "lesson" },
+        { "title": "简单的加、减法", "kind": "lesson" },
+        { "title": "摆一摆，想一想", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "四、100以内的口算加、减法",
+      "kind": "chapter",
+      "children": [
+        { "title": "口算加法", "kind": "lesson" },
+        { "title": "口算减法", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "五、100以内的笔算加、减法",
+      "kind": "chapter",
+      "children": [
+        { "title": "笔算加法", "kind": "lesson" },
+        { "title": "笔算减法", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "六、数量间的加减关系",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 欢乐购物街",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识人民币", "kind": "lesson" },
+        { "title": "买卖我做主", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "七、复习与关联",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理复习", "kind": "lesson" },
+        { "title": "数与运算", "kind": "lesson" },
+        { "title": "数量关系", "kind": "lesson" },
+        { "title": "图形的认识", "kind": "lesson" },
+        { "title": "应用提升", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

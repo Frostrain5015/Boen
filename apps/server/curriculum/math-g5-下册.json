@@ -1,0 +1,104 @@
+{
+  "subject": "math",
+  "grade": "5",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3117.html",
+  "units": [
+    {
+      "title": "第一单元 观察物体（三）",
+      "kind": "chapter",
+      "children": [
+        { "title": "根据平面图形拼摆立体图形", "kind": "lesson" },
+        { "title": "根据三视图还原立体图形", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 因数和倍数",
+      "kind": "chapter",
+      "children": [
+        { "title": "因数和倍数", "kind": "lesson" },
+        { "title": "2、5的倍数的特征", "kind": "lesson" },
+        { "title": "3的倍数的特征", "kind": "lesson" },
+        { "title": "质数和合数", "kind": "lesson" },
+        { "title": "奇数和偶数", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 长方体和正方体",
+      "kind": "chapter",
+      "children": [
+        {
+          "title": "长方体和正方体的认识", "kind": "section",
+          "children": [
+            { "title": "长方体", "kind": "lesson" },
+            { "title": "正方体", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "长方体和正方体的表面积", "kind": "section"
+        },
+        {
+          "title": "长方体和正方体的体积", "kind": "section",
+          "children": [
+            { "title": "体积和体积单位", "kind": "lesson" },
+            { "title": "体积公式", "kind": "lesson" },
+            { "title": "体积单位间的进率", "kind": "lesson" },
+            { "title": "容积和容积单位", "kind": "lesson" }
+          ]
+        },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 分数的意义和性质",
+      "kind": "chapter",
+      "children": [
+        { "title": "分数的意义", "kind": "lesson" },
+        { "title": "分数与除法", "kind": "lesson" },
+        { "title": "真分数和假分数", "kind": "lesson" },
+        { "title": "分数的基本性质", "kind": "lesson" },
+        { "title": "约分", "kind": "lesson" },
+        { "title": "通分", "kind": "lesson" },
+        { "title": "分数和小数的互化", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 图形的运动（三）",
+      "kind": "chapter",
+      "children": [
+        { "title": "旋转", "kind": "lesson" },
+        { "title": "旋转与平移的综合运用", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 分数的加法和减法",
+      "kind": "chapter",
+      "children": [
+        { "title": "同分母分数加减法", "kind": "lesson" },
+        { "title": "异分母分数加减法", "kind": "lesson" },
+        { "title": "分数加减混合运算", "kind": "lesson" },
+        { "title": "整数加法运算律推广到分数", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 折线统计图",
+      "kind": "chapter",
+      "children": [
+        { "title": "单式折线统计图", "kind": "lesson" },
+        { "title": "复式折线统计图", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 数学广角——找次品",
+      "kind": "chapter"
+    },
+    {
+      "title": "第九单元 总复习",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

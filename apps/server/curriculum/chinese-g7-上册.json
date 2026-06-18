@@ -1,0 +1,90 @@
+{
+  "subject": "chinese",
+  "grade": "7",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3244.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：1 春 / 朱自清", "kind": "lesson" },
+        { "title": "阅读：2 济南的冬天 / 老舍", "kind": "lesson" },
+        { "title": "阅读：3* 雨的四季 / 刘湛秋", "kind": "lesson" },
+        { "title": "阅读：4 古代诗歌四首（观沧海/次北固山下/闻王昌龄左迁龙标遥有此寄/天净沙·秋思）", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：热爱写作，学会观察", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：5 秋天的怀念 / 史铁生", "kind": "lesson" },
+        { "title": "阅读：6 散步 / 莫怀戚", "kind": "lesson" },
+        { "title": "阅读：7* 散文诗二首（金色花/荷叶·母亲）", "kind": "lesson" },
+        { "title": "阅读：8 《世说新语》二则（咏雪/陈太丘与友期行）", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：学会记事", "kind": "lesson" },
+        { "title": "专题学习活动：有朋自远方来", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：9 从百草园到三味书屋 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：10 往事依依 / 于漪", "kind": "lesson" },
+        { "title": "阅读：11* 再塑生命的人 / 海伦·凯勒", "kind": "lesson" },
+        { "title": "阅读：12 《论语》十二章", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：如何突出中心", "kind": "lesson" },
+        { "title": "整本书阅读：《朝花夕拾》——精读、略读、浏览", "kind": "lesson" },
+        { "title": "课外古诗词诵读（峨眉山月歌/江南逢李龟年/行军九日思长安故园/夜上受降城闻笛）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：13 纪念白求恩 / 毛泽东", "kind": "lesson" },
+        { "title": "阅读：14 回忆我的母亲 / 朱德", "kind": "lesson" },
+        { "title": "阅读：15* 梅岭三章 / 陈毅", "kind": "lesson" },
+        { "title": "阅读：16 诫子书 / 诸葛亮", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：思路要清晰", "kind": "lesson" },
+        { "title": "专题学习活动：少年正是读书时", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 活动·探究",
+      "kind": "unit",
+      "children": [
+        { "title": "任务一 体会人与动物的关系", "kind": "section" },
+        { "title": "阅读：17 猫 / 郑振铎", "kind": "lesson" },
+        { "title": "阅读：18 我的白鸽 / 陈忠实", "kind": "lesson" },
+        { "title": "阅读：19 大雁归来 / 利奥波德", "kind": "lesson" },
+        { "title": "阅读：20 狼 / 蒲松龄", "kind": "lesson" },
+        { "title": "任务二 亲近动物，丰富生命体验", "kind": "lesson" },
+        { "title": "任务三 记叙与动物的相处", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：21 小圣施威降大圣 / 吴承恩", "kind": "lesson" },
+        { "title": "阅读：22 皇帝的新装 / 安徒生", "kind": "lesson" },
+        { "title": "阅读：23* 女娲造人 / 袁珂", "kind": "lesson" },
+        { "title": "阅读：24 寓言四则", "kind": "lesson" },
+        { "title": "阅读综合实践", "kind": "lesson" },
+        { "title": "写作：发挥联想和想象", "kind": "lesson" },
+        { "title": "整本书阅读：《西游记》", "kind": "lesson" },
+        { "title": "课外古诗词诵读（秋词/夜雨寄北/十一月四日风雨大作/潼关）", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

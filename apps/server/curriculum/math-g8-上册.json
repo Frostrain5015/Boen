@@ -1,0 +1,173 @@
+{
+  "subject": "math",
+  "grade": "8",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.pep.com.cn/xw/zt/hd/12/xjcjs/cz/202408/t20240826_1994351.html",
+  "units": [
+    {
+      "title": "第十三章 三角形",
+      "kind": "chapter",
+      "knowledgePoints": ["三角形的概念", "三角形的边", "三角形的中线角平分线和高", "三角形的内角", "三角形的外角", "多边形", "多边形的内角和"],
+      "children": [
+        {
+          "title": "13.1 三角形的概念", "kind": "section",
+          "knowledgePoints": ["三角形的概念"]
+        },
+        {
+          "title": "13.2 与三角形有关的线段", "kind": "section",
+          "knowledgePoints": ["三角形的边", "三角形的中线角平分线和高"],
+          "children": [
+            { "title": "13.2.1 三角形的边", "kind": "lesson" },
+            { "title": "13.2.2 三角形的中线、角平分线、高", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "13.3 三角形的内角与外角", "kind": "section",
+          "knowledgePoints": ["三角形的内角", "三角形的外角"],
+          "children": [
+            { "title": "13.3.1 三角形的内角", "kind": "lesson" },
+            { "title": "13.3.2 三角形的外角", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题13", "kind": "lesson" },
+        { "title": "综合与实践 确定轻质薄板（匀质薄板）的重心位置", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十四章 全等三角形",
+      "kind": "chapter",
+      "knowledgePoints": ["全等三角形及其性质", "三角形全等的判定", "角的平分线"],
+      "children": [
+        { "title": "14.1 全等三角形及其性质", "kind": "section", "knowledgePoints": ["全等三角形及其性质"] },
+        { "title": "14.2 三角形全等的判定", "kind": "section", "knowledgePoints": ["三角形全等的判定"] },
+        { "title": "14.3 角的平分线", "kind": "section", "knowledgePoints": ["角的平分线"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题14", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十五章 轴对称",
+      "kind": "chapter",
+      "knowledgePoints": ["轴对称及其性质", "线段的垂直平分线", "画轴对称的图形", "等腰三角形", "等边三角形"],
+      "children": [
+        {
+          "title": "15.1 图形的轴对称", "kind": "section",
+          "knowledgePoints": ["轴对称及其性质", "线段的垂直平分线"],
+          "children": [
+            { "title": "15.1.1 轴对称及其性质", "kind": "lesson" },
+            { "title": "15.1.2 线段的垂直平分线", "kind": "lesson" }
+          ]
+        },
+        { "title": "15.2 画轴对称的图形", "kind": "section", "knowledgePoints": ["画轴对称的图形"] },
+        {
+          "title": "15.3 等腰三角形", "kind": "section",
+          "knowledgePoints": ["等腰三角形", "等边三角形"],
+          "children": [
+            { "title": "15.3.1 等腰三角形", "kind": "lesson" },
+            { "title": "15.3.2 等边三角形", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题15", "kind": "lesson" },
+        { "title": "综合与实践 最短路径问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十六章 整式的乘法",
+      "kind": "chapter",
+      "knowledgePoints": ["同底数幂的乘法", "幂的乘方与积的乘方", "整式的乘法", "平方差公式", "完全平方公式"],
+      "children": [
+        {
+          "title": "16.1 幂的运算", "kind": "section",
+          "knowledgePoints": ["同底数幂的乘法", "幂的乘方与积的乘方"],
+          "children": [
+            { "title": "16.1.1 同底数幂的乘法", "kind": "lesson" },
+            { "title": "16.1.2 幂的乘方与积的乘方", "kind": "lesson" }
+          ]
+        },
+        { "title": "16.2 整式的乘法", "kind": "section", "knowledgePoints": ["整式的乘法"] },
+        {
+          "title": "16.3 乘法公式", "kind": "section",
+          "knowledgePoints": ["平方差公式", "完全平方公式"],
+          "children": [
+            { "title": "16.3.1 平方差公式", "kind": "lesson" },
+            { "title": "16.3.2 完全平方公式", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题16", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十七章 因式分解",
+      "kind": "chapter",
+      "knowledgePoints": ["用提公因式法分解因式", "用公式法分解因式"],
+      "children": [
+        { "title": "17.1 用提公因式法分解因式", "kind": "section", "knowledgePoints": ["用提公因式法分解因式"] },
+        { "title": "17.2 用公式法分解因式", "kind": "section", "knowledgePoints": ["用公式法分解因式"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题17", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十八章 分式",
+      "kind": "chapter",
+      "knowledgePoints": ["从分数到分式", "分式的基本性质", "分式的乘法与除法", "分式的加法与减法", "整数指数幂", "分式方程"],
+      "children": [
+        {
+          "title": "18.1 分式及其基本性质", "kind": "section",
+          "knowledgePoints": ["从分数到分式", "分式的基本性质"],
+          "children": [
+            { "title": "18.1.1 从分数到分式", "kind": "lesson" },
+            { "title": "18.1.2 分式的基本性质", "kind": "lesson" }
+          ]
+        },
+        { "title": "18.2 分式的乘法与除法", "kind": "section", "knowledgePoints": ["分式的乘法与除法"] },
+        { "title": "18.3 分式的加法与减法", "kind": "section", "knowledgePoints": ["分式的加法与减法"] },
+        { "title": "18.4 整数指数幂", "kind": "section", "knowledgePoints": ["整数指数幂"] },
+        { "title": "18.5 分式方程", "kind": "section", "knowledgePoints": ["分式方程"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题18", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "三角形的概念", "description": "由不在同一直线上的三条线段首尾顺次相接组成的图形" },
+    { "title": "三角形的边", "description": "三角形三边关系：两边之和大于第三边" },
+    { "title": "三角形的中线角平分线和高", "description": "三角形的重要线段：中线平分对边、角平分线平分内角、高垂直于对边" },
+    { "title": "三角形的内角", "description": "三角形内角和等于180°" },
+    { "title": "三角形的外角", "description": "三角形的一个外角等于与它不相邻的两个内角的和" },
+    { "title": "多边形", "description": "多边形的定义、对角线、凸多边形" },
+    { "title": "多边形的内角和", "description": "n边形的内角和等于(n-2)×180°" },
+    { "title": "全等三角形及其性质", "description": "全等三角形的对应边相等、对应角相等" },
+    { "title": "三角形全等的判定", "description": "SSS、SAS、ASA、AAS、HL五种判定方法" },
+    { "title": "角的平分线", "description": "角平分线的性质：角平分线上的点到角的两边距离相等" },
+    { "title": "轴对称及其性质", "description": "轴对称图形与两个图形成轴对称，对应点连线被对称轴垂直平分" },
+    { "title": "线段的垂直平分线", "description": "垂直平分线的性质与判定" },
+    { "title": "画轴对称的图形", "description": "利用轴对称性质作图的方法" },
+    { "title": "等腰三角形", "description": "等边对等角、三线合一，等腰三角形的判定" },
+    { "title": "等边三角形", "description": "等边三角形的性质与判定，30°直角三角形的性质" },
+    { "title": "同底数幂的乘法", "description": "同底数幂相乘底数不变指数相加" },
+    { "title": "幂的乘方与积的乘方", "description": "幂的乘方底数不变指数相乘，积的乘方等于乘方的积" },
+    { "title": "整式的乘法", "description": "单项式与单项式、单项式与多项式、多项式与多项式相乘" },
+    { "title": "平方差公式", "description": "(a+b)(a-b)=a²-b²" },
+    { "title": "完全平方公式", "description": "(a±b)²=a²±2ab+b²" },
+    { "title": "用提公因式法分解因式", "description": "找出多项式各项的公因式后提取" },
+    { "title": "用公式法分解因式", "description": "利用平方差公式和完全平方公式分解因式" },
+    { "title": "从分数到分式", "description": "形如A/B（B含字母，B≠0）的式子叫分式" },
+    { "title": "分式的基本性质", "description": "分式的分子分母同乘（或除以）同一个不为0的整式，分式值不变" },
+    { "title": "分式的乘法与除法", "description": "分式乘除法则与约分" },
+    { "title": "分式的加法与减法", "description": "同分母与异分母分式加减法则" },
+    { "title": "整数指数幂", "description": "正整数指数幂拓展到整数指数幂，科学记数法表示绝对值小于1的数" },
+    { "title": "分式方程", "description": "分式方程的解法，验根" }
+  ]
+}

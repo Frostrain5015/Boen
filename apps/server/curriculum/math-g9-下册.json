@@ -1,0 +1,99 @@
+{
+  "subject": "math",
+  "grade": "9",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/36.html",
+  "units": [
+    {
+      "title": "第二十六章 反比例函数",
+      "kind": "chapter",
+      "knowledgePoints": ["反比例函数", "反比例函数的图象和性质", "实际问题与反比例函数"],
+      "children": [
+        {
+          "title": "26.1 反比例函数", "kind": "section",
+          "knowledgePoints": ["反比例函数", "反比例函数的图象和性质"],
+          "children": [
+            { "title": "26.1.1 反比例函数", "kind": "lesson" },
+            { "title": "26.1.2 反比例函数的图象和性质", "kind": "lesson" }
+          ]
+        },
+        { "title": "26.2 实际问题与反比例函数", "kind": "section", "knowledgePoints": ["实际问题与反比例函数"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题26", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十七章 相似",
+      "kind": "chapter",
+      "knowledgePoints": ["图形的相似", "相似三角形的判定", "相似三角形的性质", "相似三角形应用举例", "位似"],
+      "children": [
+        { "title": "27.1 图形的相似", "kind": "section", "knowledgePoints": ["图形的相似"] },
+        {
+          "title": "27.2 相似三角形", "kind": "section",
+          "knowledgePoints": ["相似三角形的判定", "相似三角形的性质", "相似三角形应用举例"],
+          "children": [
+            { "title": "27.2.1 相似三角形的判定", "kind": "lesson" },
+            { "title": "27.2.2 相似三角形的性质", "kind": "lesson" },
+            { "title": "27.2.3 相似三角形应用举例", "kind": "lesson" }
+          ]
+        },
+        { "title": "27.3 位似", "kind": "section", "knowledgePoints": ["位似"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题27", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十八章 锐角三角函数",
+      "kind": "chapter",
+      "knowledgePoints": ["锐角三角函数", "解直角三角形", "解直角三角形的应用"],
+      "children": [
+        { "title": "28.1 锐角三角函数", "kind": "section", "knowledgePoints": ["锐角三角函数"] },
+        {
+          "title": "28.2 解直角三角形及其应用", "kind": "section",
+          "knowledgePoints": ["解直角三角形", "解直角三角形的应用"],
+          "children": [
+            { "title": "28.2.1 解直角三角形", "kind": "lesson" },
+            { "title": "28.2.2 应用举例", "kind": "lesson" }
+          ]
+        },
+        { "title": "阅读与思考 山坡的高度", "kind": "lesson" },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题28", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十九章 投影与视图",
+      "kind": "chapter",
+      "knowledgePoints": ["投影", "三视图", "制作立体模型"],
+      "children": [
+        { "title": "29.1 投影", "kind": "section", "knowledgePoints": ["投影"] },
+        { "title": "29.2 三视图", "kind": "section", "knowledgePoints": ["三视图"] },
+        { "title": "29.3 课题学习 制作立体模型", "kind": "section", "knowledgePoints": ["制作立体模型"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题29", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "反比例函数", "description": "形如y=k/x(k≠0)的函数，k为反比例系数" },
+    { "title": "反比例函数的图象和性质", "description": "双曲线图象，k>0时图象在一三象限，k<0时在二四象限" },
+    { "title": "实际问题与反比例函数", "description": "建立反比例函数模型解决实际问题" },
+    { "title": "图形的相似", "description": "相似图形的概念，相似比" },
+    { "title": "相似三角形的判定", "description": "平行线分线段成比例、三边成比例、两边成比例且夹角相等、两角相等" },
+    { "title": "相似三角形的性质", "description": "对应角相等、对应边成比例，周长比等于相似比、面积比等于相似比的平方" },
+    { "title": "相似三角形应用举例", "description": "利用相似三角形测量高度、距离等实际问题" },
+    { "title": "位似", "description": "位似图形的概念与性质，位似中心" },
+    { "title": "锐角三角函数", "description": "正弦sinA、余弦cosA、正切tanA的概念，特殊角的三角函数值" },
+    { "title": "解直角三角形", "description": "利用三角函数关系解直角三角形" },
+    { "title": "解直角三角形的应用", "description": "仰角俯角、方位角、坡度等实际问题的求解" },
+    { "title": "投影", "description": "平行投影与中心投影，正投影的规律" },
+    { "title": "三视图", "description": "主视图、俯视图、左视图的位置与度量规定：长对正、高平齐、宽相等" },
+    { "title": "制作立体模型", "description": "根据三视图制作实物模型" }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "subject": "math",
+  "grade": "6",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3119.html",
+  "units": [
+    {
+      "title": "第一单元 负数",
+      "kind": "chapter",
+      "children": [
+        { "title": "负数的认识和读写", "kind": "lesson" },
+        { "title": "数轴上的负数", "kind": "lesson" },
+        { "title": "负数的大小比较", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 百分数（二）",
+      "kind": "chapter",
+      "children": [
+        { "title": "折扣", "kind": "lesson" },
+        { "title": "成数", "kind": "lesson" },
+        { "title": "税率", "kind": "lesson" },
+        { "title": "利率", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 圆柱与圆锥",
+      "kind": "chapter",
+      "children": [
+        {
+          "title": "圆柱", "kind": "section",
+          "children": [
+            { "title": "圆柱的认识", "kind": "lesson" },
+            { "title": "圆柱的表面积", "kind": "lesson" },
+            { "title": "圆柱的体积", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "圆锥", "kind": "section",
+          "children": [
+            { "title": "圆锥的认识", "kind": "lesson" },
+            { "title": "圆锥的体积", "kind": "lesson" }
+          ]
+        },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 比例",
+      "kind": "chapter",
+      "children": [
+        { "title": "比例的意义和基本性质", "kind": "lesson" },
+        { "title": "正比例和反比例", "kind": "lesson" },
+        { "title": "比例的应用", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 数学广角——鸽巢问题",
+      "kind": "chapter"
+    },
+    {
+      "title": "第六单元 总复习",
+      "kind": "chapter",
+      "children": [
+        { "title": "数与代数", "kind": "section" },
+        { "title": "图形与几何", "kind": "section" },
+        { "title": "统计与概率", "kind": "section" },
+        { "title": "数学思考", "kind": "section" },
+        { "title": "综合与实践", "kind": "section" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

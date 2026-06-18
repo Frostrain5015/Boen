@@ -4,12 +4,17 @@ import {
   Annotation,
   MemorySaver,
 } from '@langchain/langgraph';
-import { SystemMessage, isToolMessage, isHumanMessage } from '@langchain/core/messages';
+import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, type AIMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
 import { systemPromptForQa } from './prompts.js';
 import { quizTools } from './quiz/index.js';
+import {
+  LOOKUP_KNOWLEDGE_POINT_TOOL,
+  lookupKnowledgePointSchema,
+  lookupKnowledgePointTool,
+} from './curriculum-tools.js';
 
 /** 全图共享状态：消息历史 + 用户画像 + 当前模式 + 出题控制 */
 export const BoenState = Annotation.Root({
@@ -34,7 +39,11 @@ type State = typeof BoenState.State;
 export interface BoenGraphDeps {
   /** RAG 检索器：按年级+学科召回课程编排与相关知识点 */
   retrieveCurriculum?: (args: { grade?: string; subject?: string; query?: string }) => Promise<string>;
+  /** LangGraph 工具执行器：查询章节/知识点详情，server 注入以保持 DB 解耦 */
+  lookupKnowledgePoint?: (args: { grade?: string; subject?: string; query: string; limit?: number }) => Promise<string>;
 }
+
+type ToolCall = { id?: string; name: string; args?: unknown };
 
 /** 从用户话语里识别「要被出题」的意图及题型 */
 function detectQuizIntent(text: string): { force: boolean; tool: string } {
@@ -52,6 +61,8 @@ function detectQuizIntent(text: string): { force: boolean; tool: string } {
  * 后续阶段在 router 后扩展 review / ai-learning 子图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
+  const qaTools = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool] : quizTools;
+
   const router = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1];
     if (last && isHumanMessage(last)) {
@@ -90,7 +101,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
         tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } },
       });
     } else if (model.bindTools) {
-      llm = model.bindTools(quizTools);
+      llm = model.bindTools(qaTools);
     } else {
       llm = model;
     }
@@ -103,14 +114,57 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     return { messages: [response] };
   };
 
+  const lookupKnowledgePointNode = async (state: State): Promise<Partial<State>> => {
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL && c.id);
+    const messages: ToolMessage[] = [];
+
+    for (const call of calls) {
+      try {
+        const args = lookupKnowledgePointSchema.parse(call.args ?? {});
+        const content = deps.lookupKnowledgePoint
+          ? await deps.lookupKnowledgePoint({
+              grade: args.grade ?? state.grade,
+              subject: args.subject ?? state.subject,
+              query: args.query,
+              limit: args.limit ?? undefined,
+            })
+          : '课程知识库查询工具尚未接入。';
+        messages.push(new ToolMessage({ content: content || '没有找到匹配的课程知识点。', tool_call_id: call.id! }));
+      } catch (err) {
+        messages.push(new ToolMessage({
+          content: `课程知识库查询失败：${err instanceof Error ? err.message : String(err)}`,
+          tool_call_id: call.id!,
+        }));
+      }
+    }
+
+    return { messages };
+  };
+
+  const routeAfterQa = (state: State) => {
+    if (!deps.lookupKnowledgePoint) return 'end';
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
+    if (calls.length > 0 && calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) {
+      return 'lookupKnowledgePoint';
+    }
+    return 'end';
+  };
+
   const graph = new StateGraph(BoenState)
     .addNode('router', router)
     .addNode('loadCurriculum', loadCurriculum)
     .addNode('qa', qaNode)
+    .addNode('lookupKnowledgePoint', lookupKnowledgePointNode)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'qa')
-    .addEdge('qa', '__end__');
+    .addConditionalEdges('qa', routeAfterQa, {
+      lookupKnowledgePoint: 'lookupKnowledgePoint',
+      end: '__end__',
+    })
+    .addEdge('lookupKnowledgePoint', 'qa');
 
   return graph.compile({ checkpointer: new MemorySaver() });
 }

@@ -1,0 +1,83 @@
+{
+  "subject": "english",
+  "grade": "7",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，新目标）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3266.html",
+  "units": [
+    {
+      "title": "Unit 1 Animal Friends",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A: Why do you like animals?", "kind": "section" },
+        { "title": "Section B: How are animals part of our lives?", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 2 No Rules, No Order",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A: What rules do we follow?", "kind": "section" },
+        { "title": "Section B: How can rules help us?", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 3 Keep Fit",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 4 Eat Well",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 5 Here and Now",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 6 Rain or Shine",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 7 A Day to Remember",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 8 Once upon a Time",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

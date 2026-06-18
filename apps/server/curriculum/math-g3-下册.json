@@ -1,0 +1,101 @@
+{
+  "subject": "math",
+  "grade": "3",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3113.html",
+  "units": [
+    {
+      "title": "第一单元 生活中的运动现象",
+      "kind": "chapter",
+      "children": [
+        { "title": "轴对称图形", "kind": "lesson" },
+        { "title": "平移和旋转", "kind": "lesson" },
+        { "title": "剪纸", "kind": "lesson" },
+        { "title": "单元整理与复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 除数是一位数的除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "口算除法", "kind": "lesson" },
+        { "title": "笔算除法", "kind": "lesson" },
+        { "title": "用估算解决问题", "kind": "lesson" },
+        { "title": "数量关系分析", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 长方形和正方形",
+      "kind": "chapter",
+      "children": [
+        { "title": "多边形认识", "kind": "lesson" },
+        { "title": "长方形和正方形的特征", "kind": "lesson" },
+        { "title": "周长", "kind": "lesson" },
+        { "title": "拼图游戏", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 图形的面积",
+      "kind": "chapter",
+      "children": [
+        { "title": "面积和面积单位", "kind": "lesson" },
+        { "title": "长方形、正方形面积的计算", "kind": "lesson" },
+        { "title": "面积单位间的进率", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 数据的收集与整理",
+      "kind": "chapter",
+      "children": [
+        { "title": "数据的收集方法", "kind": "lesson" },
+        { "title": "单式统计表与复式统计表", "kind": "lesson" },
+        { "title": "分段统计", "kind": "lesson" },
+        { "title": "数据分析与应用", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 综合与实践 年、月、日的秘密",
+      "kind": "chapter",
+      "children": [
+        { "title": "年历中的秘密", "kind": "lesson" },
+        { "title": "作息时间表中的秘密", "kind": "lesson" },
+        { "title": "年历设计师", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 小数的初步认识",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识小数", "kind": "lesson" },
+        { "title": "小数的大小比较", "kind": "lesson" },
+        { "title": "简单的小数加、减法", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 复习与关联",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理复习", "kind": "lesson" },
+        { "title": "数与运算", "kind": "lesson" },
+        { "title": "数量关系", "kind": "lesson" },
+        { "title": "图形的认识与测量", "kind": "lesson" },
+        { "title": "数据的收集、整理与表达", "kind": "lesson" },
+        { "title": "常见的量", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "数学广角：重叠问题",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

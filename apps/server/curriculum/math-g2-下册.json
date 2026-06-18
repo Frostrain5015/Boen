@@ -1,0 +1,123 @@
+{
+  "subject": "math",
+  "grade": "2",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3111.html",
+  "units": [
+    {
+      "title": "第一单元 数据收集和整理",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识简单的统计表", "kind": "lesson" },
+        { "title": "收集、整理数据", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 表内除法（一）",
+      "kind": "chapter",
+      "children": [
+        {
+          "title": "1. 除法的初步认识", "kind": "section",
+          "children": [
+            { "title": "平均分", "kind": "lesson" },
+            { "title": "除法", "kind": "lesson" }
+          ]
+        },
+        { "title": "2. 用2~6的乘法口诀求商", "kind": "section" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 图形的运动（一）",
+      "kind": "chapter",
+      "children": [
+        { "title": "轴对称图形", "kind": "lesson" },
+        { "title": "平移和旋转", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 表内除法（二）",
+      "kind": "chapter",
+      "children": [
+        { "title": "用7、8的乘法口诀求商", "kind": "lesson" },
+        { "title": "用9的乘法口诀求商", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 混合运算",
+      "kind": "chapter",
+      "children": [
+        { "title": "同级运算", "kind": "lesson" },
+        { "title": "两级运算", "kind": "lesson" },
+        { "title": "含有小括号的混合运算", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 有余数的除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识有余数的除法", "kind": "lesson" },
+        { "title": "用竖式计算有余数的除法", "kind": "lesson" },
+        { "title": "余数与除数的关系", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "★ 综合与实践 小小设计师",
+      "kind": "chapter"
+    },
+    {
+      "title": "第七单元 万以内数的认识",
+      "kind": "chapter",
+      "children": [
+        {
+          "title": "1. 1000以内数的认识", "kind": "section",
+          "children": [
+            { "title": "数的组成、读写", "kind": "lesson" },
+            { "title": "认识算盘", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "2. 10000以内数的认识", "kind": "section",
+          "children": [
+            { "title": "万以内数的认识", "kind": "lesson" },
+            { "title": "万以内数的读法和写法", "kind": "lesson" },
+            { "title": "万以内数的大小比较", "kind": "lesson" },
+            { "title": "近似数", "kind": "lesson" }
+          ]
+        },
+        { "title": "3. 简单的加、减法", "kind": "section" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 克和千克",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识克和千克", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第九单元 数学广角——推理",
+      "kind": "chapter",
+      "children": [
+        { "title": "三个事物的简单推理", "kind": "lesson" },
+        { "title": "方格中填数问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十单元 总复习",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

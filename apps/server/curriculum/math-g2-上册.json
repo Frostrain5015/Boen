@@ -1,0 +1,98 @@
+{
+  "subject": "math",
+  "grade": "2",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3110.html",
+  "units": [
+    {
+      "title": "一、分类与整理",
+      "kind": "chapter",
+      "children": [
+        { "title": "分类与整理", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "二、1~6的表内乘法",
+      "kind": "chapter",
+      "children": [
+        { "title": "1. 乘法的初步认识", "kind": "section" },
+        {
+          "title": "2. 2~6的乘法口诀", "kind": "section",
+          "children": [
+            { "title": "5的乘法口诀", "kind": "lesson" },
+            { "title": "2、3、4的乘法口诀", "kind": "lesson" },
+            { "title": "乘加、乘减", "kind": "lesson" },
+            { "title": "6的乘法口诀", "kind": "lesson" }
+          ]
+        },
+        { "title": "3. 整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "三、1~6的表内除法",
+      "kind": "chapter",
+      "children": [
+        {
+          "title": "1. 除法的初步认识", "kind": "section",
+          "children": [
+            { "title": "平均分", "kind": "lesson" },
+            { "title": "除法", "kind": "lesson" }
+          ]
+        },
+        { "title": "2. 用2~6的乘法口诀求商", "kind": "section" },
+        { "title": "3. 整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 综合实践活动 校园小导游",
+      "kind": "chapter",
+      "children": [
+        { "title": "认识东、南、西、北", "kind": "lesson" },
+        { "title": "校园小导游", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "四、厘米和米",
+      "kind": "chapter",
+      "children": [
+        { "title": "厘米和米", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "☆ 综合实践活动 身体上的尺子",
+      "kind": "chapter",
+      "children": [
+        { "title": "身体上的长度", "kind": "lesson" },
+        { "title": "身体上的尺子", "kind": "lesson" },
+        { "title": "小讲堂", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "五、7~9的表内乘、除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "7~9的乘法口诀", "kind": "lesson" },
+        { "title": "用7~9的乘法口诀求商", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "六、复习与关联",
+      "kind": "chapter",
+      "children": [
+        { "title": "整理复习", "kind": "lesson" },
+        { "title": "数与运算", "kind": "lesson" },
+        { "title": "数量关系", "kind": "lesson" },
+        { "title": "图形的位置与测量", "kind": "lesson" },
+        { "title": "数据分类", "kind": "lesson" },
+        { "title": "应用提升", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

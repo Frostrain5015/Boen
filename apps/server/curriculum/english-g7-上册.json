@@ -1,0 +1,105 @@
+{
+  "subject": "english",
+  "grade": "7",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，新目标）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3265.html",
+  "units": [
+    {
+      "title": "Starter Unit 1 Hello!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Starter Unit 2 Keep Tidy!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Starter Unit 3 Welcome!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 1 You and Me",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 2 We're Family!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 3 My School",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 4 My Favourite Subject",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 5 Fun Clubs",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 6 A Day in the Life",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 7 Happy Birthday!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" },
+        { "title": "Reflection", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

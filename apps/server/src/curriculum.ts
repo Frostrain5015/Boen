@@ -45,8 +45,13 @@ export async function ingestTextbook(seed: TextbookSeed): Promise<{ units: numbe
   if (existing) {
     const oldUnitIds = db.prepare(`SELECT id FROM curriculum_units WHERE textbook_id=?`).all(existing.id) as { id: number }[];
     const delEmb = db.prepare(`DELETE FROM curriculum_embeddings WHERE ref_type='unit' AND ref_id=?`);
-    for (const u of oldUnitIds) delEmb.run(u.id);
-    db.prepare(`DELETE FROM curriculum_textbooks WHERE id=?`).run(existing.id); // 级联删 units + map
+    const delMap = db.prepare(`DELETE FROM unit_knowledge_map WHERE unit_id=?`);
+    for (const u of oldUnitIds) {
+      delEmb.run(u.id);
+      delMap.run(u.id);
+    }
+    db.prepare(`DELETE FROM curriculum_units WHERE textbook_id=?`).run(existing.id);
+    db.prepare(`DELETE FROM curriculum_textbooks WHERE id=?`).run(existing.id);
   }
 
   // 2) 教材
@@ -57,14 +62,21 @@ export async function ingestTextbook(seed: TextbookSeed): Promise<{ units: numbe
   // 3) 知识点（按 subject+title 复用，避免重复）
   const findKp = db.prepare(`SELECT id FROM knowledge_points WHERE subject=? AND title=?`);
   const insKp = db.prepare(`INSERT INTO knowledge_points (subject, grade, code, title, description) VALUES (?,?,?,?,?)`);
+  const updKp = db.prepare(`UPDATE knowledge_points SET grade=COALESCE(grade, ?), code=COALESCE(?, code), description=COALESCE(?, description) WHERE id=?`);
   const kpIdByTitle = new Map<string, number>();
-  const newKpRows: { id: number; content: string }[] = [];
+  const kpRowsToEmbed: { id: number; content: string }[] = [];
   for (const kp of seed.knowledgePoints ?? []) {
     const hit = findKp.get(subject, kp.title) as { id: number } | undefined;
-    if (hit) { kpIdByTitle.set(kp.title, hit.id); continue; }
+    const content = kp.description ? `${kp.title}：${kp.description}` : kp.title;
+    if (hit) {
+      updKp.run(grade, kp.code ?? null, kp.description ?? null, hit.id);
+      kpIdByTitle.set(kp.title, hit.id);
+      kpRowsToEmbed.push({ id: hit.id, content });
+      continue;
+    }
     const id = Number(insKp.run(subject, grade, kp.code ?? null, kp.title, kp.description ?? null).lastInsertRowid);
     kpIdByTitle.set(kp.title, id);
-    newKpRows.push({ id, content: kp.description ? `${kp.title}：${kp.description}` : kp.title });
+    kpRowsToEmbed.push({ id, content });
   }
 
   // 4) 章节树（递归），收集 breadcrumb 作为 embedding 内容
@@ -93,12 +105,12 @@ export async function ingestTextbook(seed: TextbookSeed): Promise<{ units: numbe
   );
   const unitVecs = await embedTexts(unitRows.map((u) => u.content));
   unitRows.forEach((u, i) => insEmb.run('unit', u.id, subject, grade, u.content, vectorToBlob(unitVecs[i])));
-  if (newKpRows.length) {
-    const kpVecs = await embedTexts(newKpRows.map((k) => k.content));
-    newKpRows.forEach((k, i) => insEmb.run('kp', k.id, subject, grade, k.content, vectorToBlob(kpVecs[i])));
+  if (kpRowsToEmbed.length) {
+    const kpVecs = await embedTexts(kpRowsToEmbed.map((k) => k.content));
+    kpRowsToEmbed.forEach((k, i) => insEmb.run('kp', k.id, subject, grade, k.content, vectorToBlob(kpVecs[i])));
   }
 
-  return { units: unitRows.length, kps: newKpRows.length };
+  return { units: unitRows.length, kps: kpRowsToEmbed.length };
 }
 
 // ── 检索（供 LangGraph loadCurriculum 节点调用）──────
@@ -143,6 +155,52 @@ export async function retrieveRelated(
     .sort((a, b) => b.score - a.score)
     .slice(0, k)
     .map((r) => r.content);
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+/** LangGraph 工具：查询当前年级/学科下的相关知识点与教材章节。 */
+export async function lookupKnowledgePoint(args: {
+  grade?: string;
+  subject?: string;
+  query: string;
+  limit?: number;
+}): Promise<string> {
+  const { grade, subject } = args;
+  const query = args.query.trim();
+  const limit = Math.min(Math.max(args.limit ?? 5, 1), 10);
+  if (!grade || !subject || !/^[1-9]$/.test(grade)) return '当前年级或学科不在课程知识库范围内。';
+  if (!query) return '查询词为空，无法检索课程知识点。';
+
+  const like = `%${escapeLike(query)}%`;
+  const matches = db.prepare(
+    `SELECT title, description, code
+     FROM knowledge_points
+     WHERE subject=?
+       AND (grade=? OR grade IS NULL)
+       AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR code LIKE ? ESCAPE '\\')
+     ORDER BY title
+     LIMIT ?`,
+  ).all(subject, grade, like, like, like, limit) as { title: string; description: string | null; code: string | null }[];
+
+  const related = await retrieveRelated(grade, subject, query, limit);
+  const parts: string[] = [];
+  if (matches.length) {
+    parts.push(
+      '标题/描述匹配的知识点：\n' +
+        matches
+          .map((m) => `- ${m.code ? `[${m.code}] ` : ''}${m.title}${m.description ? `：${m.description}` : ''}`)
+          .join('\n'),
+    );
+  }
+  if (related.length) {
+    parts.push('向量召回的相关章节/知识点：\n' + related.map((r) => `- ${r}`).join('\n'));
+  }
+
+  if (parts.length === 0) return `没有在${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}课程知识库中找到「${query}」。`;
+  return parts.join('\n\n');
 }
 
 /**

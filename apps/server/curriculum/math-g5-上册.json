@@ -1,0 +1,87 @@
+{
+  "subject": "math",
+  "grade": "5",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3116.html",
+  "units": [
+    {
+      "title": "第一单元 小数乘法",
+      "kind": "chapter",
+      "children": [
+        { "title": "小数乘整数", "kind": "lesson" },
+        { "title": "小数乘小数", "kind": "lesson" },
+        { "title": "积的近似数", "kind": "lesson" },
+        { "title": "整数乘法运算定律推广到小数", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 位置",
+      "kind": "chapter",
+      "children": [
+        { "title": "用数对确定位置", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 小数除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "除数是整数的小数除法", "kind": "lesson" },
+        { "title": "一个数除以小数", "kind": "lesson" },
+        { "title": "商的近似数", "kind": "lesson" },
+        { "title": "循环小数", "kind": "lesson" },
+        { "title": "用计算器探索规律", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 可能性",
+      "kind": "chapter",
+      "children": [
+        { "title": "事件发生的可能性", "kind": "lesson" },
+        { "title": "游戏规则的公平性", "kind": "lesson" },
+        { "title": "掷一掷", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 简易方程",
+      "kind": "chapter",
+      "children": [
+        { "title": "用字母表示数", "kind": "lesson" },
+        {
+          "title": "解简易方程", "kind": "section",
+          "children": [
+            { "title": "等式的性质", "kind": "lesson" },
+            { "title": "解方程", "kind": "lesson" },
+            { "title": "实际问题与方程", "kind": "lesson" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "第六单元 多边形的面积",
+      "kind": "chapter",
+      "children": [
+        { "title": "平行四边形的面积", "kind": "lesson" },
+        { "title": "三角形的面积", "kind": "lesson" },
+        { "title": "梯形的面积", "kind": "lesson" },
+        { "title": "组合图形的面积", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 数学广角——植树问题",
+      "kind": "chapter",
+      "children": [
+        { "title": "两端都栽", "kind": "lesson" },
+        { "title": "两端不栽", "kind": "lesson" },
+        { "title": "封闭图形", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 总复习",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

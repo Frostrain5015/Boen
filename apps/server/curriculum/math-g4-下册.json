@@ -1,0 +1,93 @@
+{
+  "subject": "math",
+  "grade": "4",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3115.html",
+  "units": [
+    {
+      "title": "第一单元 四则运算",
+      "kind": "chapter",
+      "children": [
+        { "title": "加、减法的意义和各部分间的关系", "kind": "lesson" },
+        { "title": "乘、除法的意义和各部分间的关系", "kind": "lesson" },
+        { "title": "含括号的混合运算的顺序", "kind": "lesson" },
+        { "title": "解决问题", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 观察物体（二）",
+      "kind": "chapter",
+      "children": [
+        { "title": "从不同位置观察同一物体", "kind": "lesson" },
+        { "title": "从同一位置观察不同物体", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 运算律",
+      "kind": "chapter",
+      "children": [
+        { "title": "加法运算律", "kind": "lesson" },
+        { "title": "加法运算律的应用", "kind": "lesson" },
+        { "title": "乘法运算律", "kind": "lesson" },
+        { "title": "乘法运算律的应用", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 小数的意义和性质",
+      "kind": "chapter",
+      "children": [
+        { "title": "小数的意义", "kind": "lesson" },
+        { "title": "小数的读法和写法", "kind": "lesson" },
+        { "title": "小数的性质", "kind": "lesson" },
+        { "title": "小数的大小比较", "kind": "lesson" },
+        { "title": "小数点移动引起小数大小的变化", "kind": "lesson" },
+        { "title": "小数与单位换算", "kind": "lesson" },
+        { "title": "小数的近似数", "kind": "lesson" },
+        { "title": "整理和复习", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 三角形",
+      "kind": "chapter",
+      "children": [
+        { "title": "三角形的特性", "kind": "lesson" },
+        { "title": "三角形三边的关系", "kind": "lesson" },
+        { "title": "三角形的分类", "kind": "lesson" },
+        { "title": "三角形的内角和", "kind": "lesson" },
+        { "title": "四边形的内角和", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 小数的加法和减法",
+      "kind": "chapter",
+      "children": [
+        { "title": "小数加减法", "kind": "lesson" },
+        { "title": "小数加减混合运算", "kind": "lesson" },
+        { "title": "整数加法运算律推广到小数", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 图形的运动（二）",
+      "kind": "chapter",
+      "children": [
+        { "title": "轴对称", "kind": "lesson" },
+        { "title": "平移", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 平均数与条形统计图",
+      "kind": "chapter",
+      "children": [
+        { "title": "平均数", "kind": "lesson" },
+        { "title": "复式条形统计图", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第九单元 数学广角——鸡兔同笼",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

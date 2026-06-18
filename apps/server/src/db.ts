@@ -9,6 +9,7 @@ const db = new Database(join(DB_DIR, 'boen.db'));
 
 // 启用 WAL 模式提升并发性能
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 // ── 对话表 ──────────────────────────────────
 db.exec(`

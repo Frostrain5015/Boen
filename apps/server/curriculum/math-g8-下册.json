@@ -1,0 +1,146 @@
+{
+  "subject": "math",
+  "grade": "8",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3260.html",
+  "units": [
+    {
+      "title": "第十九章 二次根式",
+      "kind": "chapter",
+      "knowledgePoints": ["二次根式及其性质", "二次根式的乘法与除法", "二次根式的加法与减法"],
+      "children": [
+        { "title": "19.1 二次根式及其性质", "kind": "section", "knowledgePoints": ["二次根式及其性质"] },
+        { "title": "19.2 二次根式的乘法与除法", "kind": "section", "knowledgePoints": ["二次根式的乘法与除法"] },
+        { "title": "19.3 二次根式的加法与减法", "kind": "section", "knowledgePoints": ["二次根式的加法与减法"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题19", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十章 勾股定理",
+      "kind": "chapter",
+      "knowledgePoints": ["勾股定理及其应用", "勾股定理的逆定理及其应用"],
+      "children": [
+        { "title": "20.1 勾股定理及其应用", "kind": "section", "knowledgePoints": ["勾股定理及其应用"] },
+        { "title": "20.2 勾股定理的逆定理及其应用", "kind": "section", "knowledgePoints": ["勾股定理的逆定理及其应用"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题20", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十一章 四边形",
+      "kind": "chapter",
+      "knowledgePoints": ["四边形及其内角和", "多边形及其内角和", "平行四边形及其性质", "平行四边形的判定", "三角形的中位线", "矩形", "菱形", "正方形"],
+      "children": [
+        {
+          "title": "21.1 四边形及多边形", "kind": "section",
+          "knowledgePoints": ["四边形及其内角和", "多边形及其内角和"],
+          "children": [
+            { "title": "21.1.1 四边形及其内角和", "kind": "lesson" },
+            { "title": "21.1.2 多边形及其内角和", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "21.2 平行四边形", "kind": "section",
+          "knowledgePoints": ["平行四边形及其性质", "平行四边形的判定", "三角形的中位线"],
+          "children": [
+            { "title": "21.2.1 平行四边形及其性质", "kind": "lesson" },
+            { "title": "21.2.2 平行四边形的判定", "kind": "lesson" },
+            { "title": "21.2.3 三角形的中位线", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "21.3 特殊的平行四边形", "kind": "section",
+          "knowledgePoints": ["矩形", "菱形", "正方形"],
+          "children": [
+            { "title": "21.3.1 矩形", "kind": "lesson" },
+            { "title": "21.3.2 菱形", "kind": "lesson" },
+            { "title": "21.3.3 正方形", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题21", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十二章 函数",
+      "kind": "chapter",
+      "knowledgePoints": ["函数的概念", "函数的表示"],
+      "children": [
+        { "title": "22.1 函数的概念", "kind": "section", "knowledgePoints": ["函数的概念"] },
+        { "title": "22.2 函数的表示", "kind": "section", "knowledgePoints": ["函数的表示"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题22", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十三章 一次函数",
+      "kind": "chapter",
+      "knowledgePoints": ["一次函数的概念", "一次函数的图象和性质", "一次函数与方程不等式", "实际问题与一次函数"],
+      "children": [
+        { "title": "23.1 一次函数的概念", "kind": "section", "knowledgePoints": ["一次函数的概念"] },
+        { "title": "23.2 一次函数的图象和性质", "kind": "section", "knowledgePoints": ["一次函数的图象和性质"] },
+        { "title": "23.3 一次函数与方程（组）、不等式", "kind": "section", "knowledgePoints": ["一次函数与方程不等式"] },
+        { "title": "23.4 实际问题与一次函数", "kind": "section", "knowledgePoints": ["实际问题与一次函数"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题23", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二十四章 数据的分析",
+      "kind": "chapter",
+      "knowledgePoints": ["平均数", "中位数和众数", "数据的离散程度", "数据的四分位数", "数据的分组"],
+      "children": [
+        {
+          "title": "24.1 数据的集中趋势", "kind": "section",
+          "knowledgePoints": ["平均数", "中位数和众数"],
+          "children": [
+            { "title": "24.1.1 平均数", "kind": "lesson" },
+            { "title": "24.1.2 中位数和众数", "kind": "lesson" }
+          ]
+        },
+        { "title": "24.2 数据的离散程度", "kind": "section", "knowledgePoints": ["数据的离散程度"] },
+        { "title": "24.3 数据的四分位数", "kind": "section", "knowledgePoints": ["数据的四分位数"] },
+        { "title": "24.4 数据的分组", "kind": "section", "knowledgePoints": ["数据的分组"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题24", "kind": "lesson" },
+        { "title": "综合与实践 音乐与数学", "kind": "lesson" },
+        { "title": "综合与实践 学生体质健康调查与分析", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "二次根式及其性质", "description": "形如√a(a≥0)的式子叫二次根式，双重非负性" },
+    { "title": "二次根式的乘法与除法", "description": "√a·√b=√ab，√a/√b=√(a/b)(a≥0,b>0)" },
+    { "title": "二次根式的加法与减法", "description": "同类二次根式合并" },
+    { "title": "勾股定理及其应用", "description": "直角三角形两直角边的平方和等于斜边的平方" },
+    { "title": "勾股定理的逆定理及其应用", "description": "若三角形三边满足a²+b²=c²则为直角三角形" },
+    { "title": "四边形及其内角和", "description": "四边形的定义与内角和等于360°" },
+    { "title": "多边形及其内角和", "description": "n边形内角和(n-2)×180°，外角和360°" },
+    { "title": "平行四边形及其性质", "description": "对边平行且相等、对角相等、对角线互相平分" },
+    { "title": "平行四边形的判定", "description": "边、角、对角线三角度判定平行四边形" },
+    { "title": "三角形的中位线", "description": "三角形中位线平行于第三边且等于第三边的一半" },
+    { "title": "矩形", "description": "矩形的性质：四个角都是直角、对角线相等；矩形的判定" },
+    { "title": "菱形", "description": "菱形的性质：四条边相等、对角线互相垂直；菱形的判定" },
+    { "title": "正方形", "description": "正方形的性质与判定，矩形与菱形交集" },
+    { "title": "函数的概念", "description": "变量与常量的概念，函数的定义，自变量的取值范围" },
+    { "title": "函数的表示", "description": "解析式法、列表法、图象法表示函数" },
+    { "title": "一次函数的概念", "description": "形如y=kx+b(k≠0)的函数叫一次函数，特别地b=0时为正比例函数" },
+    { "title": "一次函数的图象和性质", "description": "一次函数图象为直线，k决定增减性，b决定与y轴交点" },
+    { "title": "一次函数与方程不等式", "description": "一次函数与一元一次方程、一元一次不等式的联系" },
+    { "title": "实际问题与一次函数", "description": "建立一次函数模型解决实际问题" },
+    { "title": "平均数", "description": "算术平均数与加权平均数的计算" },
+    { "title": "中位数和众数", "description": "中位数是一组数据排序后的中间数，众数是出现次数最多的数" },
+    { "title": "数据的离散程度", "description": "方差与标准差衡量数据的波动大小" },
+    { "title": "数据的四分位数", "description": "将数据分为四等份的三个分割点" },
+    { "title": "数据的分组", "description": "频数分布与分组统计的基本方法" }
+  ]
+}

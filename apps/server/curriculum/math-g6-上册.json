@@ -1,0 +1,83 @@
+{
+  "subject": "math",
+  "grade": "6",
+  "volume": "上册",
+  "publisher": "人教版",
+  "version": "2024年6月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3118.html",
+  "units": [
+    {
+      "title": "1. 分数乘法",
+      "kind": "chapter",
+      "children": [
+        { "title": "分数乘整数", "kind": "lesson" },
+        { "title": "分数乘分数", "kind": "lesson" },
+        { "title": "小数乘分数", "kind": "lesson" },
+        { "title": "混合运算与运算律", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "2. 位置与方向（二）",
+      "kind": "chapter",
+      "children": [
+        { "title": "用方向和距离确定位置", "kind": "lesson" },
+        { "title": "描述和绘制简单的路线图", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "3. 分数除法",
+      "kind": "chapter",
+      "children": [
+        { "title": "倒数的认识", "kind": "lesson" },
+        { "title": "分数除法", "kind": "lesson" },
+        { "title": "混合运算", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "4. 比",
+      "kind": "chapter",
+      "children": [
+        { "title": "比的意义", "kind": "lesson" },
+        { "title": "比的基本性质", "kind": "lesson" },
+        { "title": "比的应用", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "5. 圆",
+      "kind": "chapter",
+      "children": [
+        { "title": "圆的认识", "kind": "lesson" },
+        { "title": "圆的周长", "kind": "lesson" },
+        { "title": "圆的面积", "kind": "lesson" },
+        { "title": "扇形", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "6. 百分数（一）",
+      "kind": "chapter",
+      "children": [
+        { "title": "百分数的意义", "kind": "lesson" },
+        { "title": "分数、小数化成百分数", "kind": "lesson" },
+        { "title": "百分数化成分数或小数", "kind": "lesson" },
+        { "title": "百分数的应用", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "7. 扇形统计图",
+      "kind": "chapter",
+      "children": [
+        { "title": "扇形统计图的认识", "kind": "lesson" },
+        { "title": "用扇形统计图分析数据", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "8. 数学广角——数与形",
+      "kind": "chapter"
+    },
+    {
+      "title": "9. 总复习",
+      "kind": "chapter"
+    }
+  ],
+  "knowledgePoints": []
+}

@@ -14,7 +14,7 @@ import {
   gradeAnswer,
 } from '@boen/agent-core';
 import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
-import { retrieveCurriculum } from './curriculum.js';
+import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import {
   createConversation,
   getConversations,
@@ -38,7 +38,7 @@ const model = getChatModel({
   baseUrl: process.env.BOEN_BASE_URL,
 });
 // RAG 检索器注入：agent-core 的 loadCurriculum 节点据此召回课程知识库（按年级+学科）
-const graph = buildBoenGraph(model, { retrieveCurriculum });
+const graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
 
 // ── Frost ID：服务端换 token（内网直连，client_secret 只留服务端）──
 const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0.0.1:4000';

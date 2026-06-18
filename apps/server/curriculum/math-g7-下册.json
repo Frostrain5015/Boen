@@ -1,0 +1,182 @@
+{
+  "subject": "math",
+  "grade": "7",
+  "volume": "下册",
+  "publisher": "人教版",
+  "version": "2024年12月第1版（根据2022年版课程标准修订）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3259.html",
+  "units": [
+    {
+      "title": "第七章 相交线与平行线",
+      "kind": "chapter",
+      "knowledgePoints": ["两条直线相交", "两条直线垂直", "同位角内错角同旁内角", "平行线的概念", "平行线的判定", "平行线的性质", "定义命题定理", "平移"],
+      "children": [
+        {
+          "title": "7.1 相交线", "kind": "section",
+          "knowledgePoints": ["两条直线相交", "两条直线垂直", "同位角内错角同旁内角"],
+          "children": [
+            { "title": "7.1.1 两条直线相交", "kind": "lesson" },
+            { "title": "7.1.2 两条直线垂直", "kind": "lesson" },
+            { "title": "7.1.3 两条直线被第三条直线所截", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "7.2 平行线", "kind": "section",
+          "knowledgePoints": ["平行线的概念", "平行线的判定", "平行线的性质"],
+          "children": [
+            { "title": "7.2.1 平行线的概念", "kind": "lesson" },
+            { "title": "7.2.2 平行线的判定", "kind": "lesson" },
+            { "title": "7.2.3 平行线的性质", "kind": "lesson" }
+          ]
+        },
+        { "title": "7.3 定义、命题、定理", "kind": "section", "knowledgePoints": ["定义命题定理"] },
+        { "title": "7.4 平移", "kind": "section", "knowledgePoints": ["平移"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题7", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八章 实数",
+      "kind": "chapter",
+      "knowledgePoints": ["平方根", "立方根", "实数及其简单运算"],
+      "children": [
+        { "title": "8.1 平方根", "kind": "section", "knowledgePoints": ["平方根"] },
+        { "title": "8.2 立方根", "kind": "section", "knowledgePoints": ["立方根"] },
+        { "title": "8.3 实数及其简单运算", "kind": "section", "knowledgePoints": ["实数及其简单运算"] },
+        { "title": "阅读与思考 为什么√2不是有理数", "kind": "lesson" },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题8", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第九章 平面直角坐标系",
+      "kind": "chapter",
+      "knowledgePoints": ["平面直角坐标系的概念", "用坐标描述简单几何图形", "用坐标表示地理位置", "用坐标表示平移"],
+      "children": [
+        {
+          "title": "9.1 用坐标描述平面内点的位置", "kind": "section",
+          "knowledgePoints": ["平面直角坐标系的概念", "用坐标描述简单几何图形"],
+          "children": [
+            { "title": "9.1.1 平面直角坐标系的概念", "kind": "lesson" },
+            { "title": "9.1.2 用坐标描述简单几何图形", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "9.2 坐标方法的简单应用", "kind": "section",
+          "knowledgePoints": ["用坐标表示地理位置", "用坐标表示平移"],
+          "children": [
+            { "title": "9.2.1 用坐标表示地理位置", "kind": "lesson" },
+            { "title": "9.2.2 用坐标表示平移", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题9", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十章 二元一次方程组",
+      "kind": "chapter",
+      "knowledgePoints": ["二元一次方程组的概念", "代入消元法", "加减消元法", "实际问题与二元一次方程组", "三元一次方程组的解法"],
+      "children": [
+        { "title": "10.1 二元一次方程组的概念", "kind": "section", "knowledgePoints": ["二元一次方程组的概念"] },
+        {
+          "title": "10.2 消元——解二元一次方程组", "kind": "section",
+          "knowledgePoints": ["代入消元法", "加减消元法"],
+          "children": [
+            { "title": "10.2.1 代入消元法", "kind": "lesson" },
+            { "title": "10.2.2 加减消元法", "kind": "lesson" }
+          ]
+        },
+        { "title": "10.3 实际问题与二元一次方程组", "kind": "section", "knowledgePoints": ["实际问题与二元一次方程组"] },
+        { "title": "10.4 三元一次方程组的解法", "kind": "section", "knowledgePoints": ["三元一次方程组的解法"] },
+        { "title": "阅读与思考 一次方程组的古今表示及解法", "kind": "lesson" },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题10", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十一章 不等式与不等式组",
+      "kind": "chapter",
+      "knowledgePoints": ["不等式及其解集", "不等式的性质", "一元一次不等式", "一元一次不等式组"],
+      "children": [
+        {
+          "title": "11.1 不等式", "kind": "section",
+          "knowledgePoints": ["不等式及其解集", "不等式的性质"],
+          "children": [
+            { "title": "11.1.1 不等式及其解集", "kind": "lesson" },
+            { "title": "11.1.2 不等式的性质", "kind": "lesson" }
+          ]
+        },
+        { "title": "11.2 一元一次不等式", "kind": "section", "knowledgePoints": ["一元一次不等式"] },
+        { "title": "11.3 一元一次不等式组", "kind": "section", "knowledgePoints": ["一元一次不等式组"] },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题11", "kind": "lesson" },
+        { "title": "综合与实践 低碳生活", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第十二章 数据的收集、整理与描述",
+      "kind": "chapter",
+      "knowledgePoints": ["全面调查", "抽样调查", "扇形图条形图和折线图", "直方图", "趋势图"],
+      "children": [
+        {
+          "title": "12.1 统计调查", "kind": "section",
+          "knowledgePoints": ["全面调查", "抽样调查"],
+          "children": [
+            { "title": "12.1.1 全面调查", "kind": "lesson" },
+            { "title": "12.1.2 抽样调查", "kind": "lesson" }
+          ]
+        },
+        {
+          "title": "12.2 用统计图描述数据", "kind": "section",
+          "knowledgePoints": ["扇形图条形图和折线图", "直方图", "趋势图"],
+          "children": [
+            { "title": "12.2.1 扇形图、条形图和折线图", "kind": "lesson" },
+            { "title": "12.2.2 直方图", "kind": "lesson" },
+            { "title": "12.2.3 趋势图", "kind": "lesson" }
+          ]
+        },
+        { "title": "数学活动", "kind": "lesson" },
+        { "title": "小结", "kind": "lesson" },
+        { "title": "复习题12", "kind": "lesson" },
+        { "title": "综合与实践 日昼时长规律的探究", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": [
+    { "title": "两条直线相交", "description": "对顶角相等，邻补角互补" },
+    { "title": "两条直线垂直", "description": "垂直的定义与表示，垂线的性质，垂线段最短，点到直线的距离" },
+    { "title": "同位角内错角同旁内角", "description": "两条直线被第三条直线所截形成的三种角的位置关系" },
+    { "title": "平行线的概念", "description": "在同一平面内不相交的两条直线，平行公理及其推论" },
+    { "title": "平行线的判定", "description": "同位角相等、内错角相等、同旁内角互补判定两直线平行" },
+    { "title": "平行线的性质", "description": "两直线平行则同位角相等、内错角相等、同旁内角互补" },
+    { "title": "定义命题定理", "description": "定义的意义、命题的结构（题设+结论）、真命题与假命题、定理与证明" },
+    { "title": "平移", "description": "平移的概念与性质，对应点连线平行且相等" },
+    { "title": "平方根", "description": "平方根与算术平方根的概念，开平方运算" },
+    { "title": "立方根", "description": "立方根的概念与表示，开立方运算" },
+    { "title": "实数及其简单运算", "description": "无理数的概念，实数的分类与大小比较，实数的简单运算" },
+    { "title": "平面直角坐标系的概念", "description": "x轴、y轴、原点、象限，点的坐标表示" },
+    { "title": "用坐标描述简单几何图形", "description": "利用坐标在平面内描述简单几何图形及其位置关系" },
+    { "title": "用坐标表示地理位置", "description": "用坐标与方位角表示地理位置" },
+    { "title": "用坐标表示平移", "description": "点的平移与坐标变化规律，图形平移的坐标表示" },
+    { "title": "二元一次方程组的概念", "description": "二元一次方程与二元一次方程组的定义及其解" },
+    { "title": "代入消元法", "description": "将二元一次方程组中的一个方程变形后代入另一个方程消元" },
+    { "title": "加减消元法", "description": "通过两个方程相加或相减消去一个未知数" },
+    { "title": "实际问题与二元一次方程组", "description": "列二元一次方程组解决实际情境问题" },
+    { "title": "三元一次方程组的解法", "description": "三元一次方程组通过消元转化为二元一次方程组求解" },
+    { "title": "不等式及其解集", "description": "不等式的定义，不等式的解集的概念与表示" },
+    { "title": "不等式的性质", "description": "不等式的基本性质：加减乘除对不等号方向的影响" },
+    { "title": "一元一次不等式", "description": "解一元一次不等式的步骤，与解方程的异同" },
+    { "title": "一元一次不等式组", "description": "一元一次不等式组的解集取各不等式解集的公共部分" },
+    { "title": "全面调查", "description": "对所有考察对象进行全面调查的方式" },
+    { "title": "抽样调查", "description": "从总体中抽取样本进行调查以估计总体" },
+    { "title": "扇形图条形图和折线图", "description": "三种常见统计图的特征与选择" },
+    { "title": "直方图", "description": "频数分布直方图的绘制与阅读" },
+    { "title": "趋势图", "description": "用趋势图表示数据随时间的变化规律" }
+  ]
+}
