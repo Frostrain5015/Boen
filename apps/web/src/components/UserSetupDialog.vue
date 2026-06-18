@@ -20,13 +20,21 @@ const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[]
 
 const name = ref(props.profile?.name ?? '');
 const grade = ref<Grade>(props.profile?.grade ?? '8');
+const modelProvider = ref(localStorage.getItem('boen_model_provider') || 'default');
 const saved = ref(false);
 
 function handleSave() {
   const trimmed = name.value.trim();
   if (!trimmed) return;
+  localStorage.setItem('boen_model_provider', modelProvider.value);
   emit('save', { name: trimmed, grade: grade.value });
   saved.value = true;
+  // 通知服务器切换模型
+  fetch('/api/model/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider: modelProvider.value }),
+  }).catch(() => {});
 }
 </script>
 
@@ -77,6 +85,30 @@ function handleSave() {
                 <option v-for="g in grp.items" :key="g.value" :value="g.value" class="setup-option">{{ g.label }}</option>
               </template>
             </select>
+          </label>
+
+          <!-- 模型提供商 -->
+          <label class="setup-field">
+            <span class="setup-label">
+              <Sparkles class="h-3.5 w-3.5" />
+              对话模型
+            </span>
+            <div class="flex gap-2">
+              <button
+                @click="modelProvider = 'default'"
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2 font-display text-sm font-bold transition-all active:scale-[0.97]"
+                :class="modelProvider === 'default' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
+              >
+                <span>☁️ 讯飞</span>
+              </button>
+              <button
+                @click="modelProvider = 'deepseek'"
+                class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2 font-display text-sm font-bold transition-all active:scale-[0.97]"
+                :class="modelProvider === 'deepseek' ? 'border-[#4A6CF7] bg-[#e8edff] text-[#2b4ad0]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[#4A6CF7]'"
+              >
+                <span>🧠 DeepSeek</span>
+              </button>
+            </div>
           </label>
         </div>
 

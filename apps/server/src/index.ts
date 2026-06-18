@@ -38,15 +38,28 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, '../../../.env') });
 
-const provider = (process.env.BOEN_PROVIDER ?? 'openai') as 'openai' | 'anthropic';
-const model = getChatModel({
-  provider,
-  model: process.env.BOEN_MODEL ?? 'astron-code-latest',
-  apiKey: process.env.BOEN_API_KEY ?? '',
-  baseUrl: process.env.BOEN_BASE_URL,
-});
-// RAG 检索器注入：agent-core 的 loadCurriculum 节点据此召回课程知识库（按年级+学科）
-const graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
+
+function createModel(provider: string) {
+  if (provider === 'deepseek') {
+    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY });
+  }
+  return getChatModel({
+    provider: (process.env.BOEN_PROVIDER ?? 'openai') as 'openai' | 'anthropic',
+    model: process.env.BOEN_MODEL ?? 'astron-code-latest',
+    apiKey: process.env.BOEN_API_KEY ?? '',
+    baseUrl: process.env.BOEN_BASE_URL,
+  });
+}
+let model = createModel('default');
+let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
+
+/** 切换模型并重建 LangGraph 图 */
+function switchModel(provider: string) {
+  model = createModel(provider);
+  graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
+  return provider;
+}
 
 // ── Frost ID：服务端换 token（内网直连，client_secret 只留服务端）──
 const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0.0.1:4000';
@@ -176,7 +189,27 @@ function extractQuestionPayload(last: BaseMessage | undefined): { toolCallId: st
 const app = new Hono();
 app.use('/api/*', cors());
 
-app.get('/api/health', (c) => c.json({ ok: true, provider, model: process.env.BOEN_MODEL }));
+app.get('/api/health', (c) => c.json({ ok: true, provider: process.env.BOEN_PROVIDER ?? 'openai', model: process.env.BOEN_MODEL ?? 'astron-code-latest' }));
+
+// ── 模型切换 API ────────────────────────────
+/** POST /api/model/switch — 切换模型提供商 */
+app.post('/api/model/switch', async (c) => {
+  const body = await c.req.json() as { provider?: string };
+  const p = body.provider;
+  if (p !== 'deepseek' && p !== 'default') return c.json({ error: '不支持的 provider' }, 400);
+  const switched = switchModel(p);
+  return c.json({ success: true, provider: switched });
+});
+
+/** GET /api/model/status — 当前模型状态 */
+app.get('/api/model/status', (c) => {
+  const current = model as any;
+  return c.json({
+    provider: process.env.BOEN_PROVIDER ?? 'openai',
+    model: current.modelName ?? 'unknown',
+    deepseekAvailable: !!DEEPSEEK_API_KEY,
+  });
+});
 
 // ── TiKZ 渲染 API（服务端 PGF/TikZ → SVG）───
 /** POST /api/render-tikz — 接收 TikZ 源码，返回 SVG */
