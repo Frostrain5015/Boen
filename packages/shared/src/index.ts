@@ -179,6 +179,7 @@ export type SseEvent =
   | { type: 'title_updated'; conversationId: string; title: string }
   | { type: 'review_complete'; summary: string; score: number; totalQuestions: number; correctAnswers: number }
   | { type: 'exam_generating' }
+  | { type: 'exam_progress'; step: 'analyze' | 'write' | 'review'; message: string; progress: number }
   | { type: 'exam_ready'; examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }

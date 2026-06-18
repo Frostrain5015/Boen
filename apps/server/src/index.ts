@@ -390,8 +390,12 @@ app.post('/api/exam/generate', async (c) => {
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
-      await send({ type: 'exam_generating' });
-      const exam = await generateExam(model, { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes });
+      const exam = await generateExam(
+        model,
+        { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes },
+        (p) => { send({ type: 'exam_progress' as any, step: p.step, message: p.message, progress: p.progress ?? 0 }).catch(() => {}); },
+        userId ?? undefined,
+      );
       const session = createExamSession(userId, {subject:body.subject,grade:body.grade}, exam);
       const publicQuestions = exam.questions.map(q => ({
         index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,

@@ -58,6 +58,7 @@ const answers = ref<Map<number, any>>(new Map());
 const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
+const genProgress = ref({ step: 'analyze' as 'analyze' | 'write' | 'review', message: '', progress: 0 });
 
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },
@@ -149,12 +150,13 @@ async function generateExamPaper() {
         if (!line.startsWith('data: ')) continue;
         try {
           const data = JSON.parse(line.slice(6));
-          if (data.type === 'exam_ready') {
+          if (data.type === 'exam_progress') {
+            genProgress.value = { step: data.step, message: data.message, progress: data.progress ?? 0 };
+          } else if (data.type === 'exam_ready') {
             const examId = data.examId;
             session.value = { examId, title: data.title, totalQuestions: data.totalQuestions, totalScore: data.totalScore, durationMinutes: data.durationMinutes, questions: [] };
             examState.value = 'taking';
             startTimer(data.durationMinutes);
-            // 异步加载题目内容（不阻塞 SSE 读取）
             loadQuestions(examId);
           } else if (data.type === 'error') {
             throw new Error(data.message);
@@ -257,13 +259,31 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       </div>
     </div>
 
-    <!-- ═══ GENERATING ═══ -->
+    <!-- ═══ GENERATING（分步进度） ═══ -->
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
-      <div class="flex flex-col items-center gap-4" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
-        <div class="loading-mascot"><Mascot :size="90" state="thinking" /></div>
-        <h2 class="brand-text text-2xl font-bold tracking-tight">博文正在出题</h2>
-        <p class="text-sm font-medium text-[var(--ink-soft)]">请准备</p>
-        <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+      <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
+        <Mascot :size="80" state="thinking" />
+        <div class="w-72 space-y-3">
+          <div class="flex items-center gap-3" :class="genProgress.step === 'analyze' || genProgress.progress > 20 ? 'opacity-100' : 'opacity-40'">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 20 ? 'bg-[#18a558] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 20 ? '✓' : '1' }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分析知识图谱与权重</span>
+            <span v-if="genProgress.step === 'analyze'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+          </div>
+          <div class="flex items-center gap-3" :class="genProgress.step === 'write' || genProgress.progress > 85 ? 'opacity-100' : 'opacity-40'">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 85 ? 'bg-[#18a558] text-white' : genProgress.step === 'write' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 85 ? '✓' : '2' }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分步编写试题</span>
+            <span v-if="genProgress.step === 'write'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+          </div>
+          <div class="flex items-center gap-3" :class="genProgress.step === 'review' || genProgress.progress >= 100 ? 'opacity-100' : 'opacity-40'">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress >= 100 ? 'bg-[#18a558] text-white' : genProgress.step === 'review' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress >= 100 ? '✓' : '3' }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">审核格式并修复</span>
+            <span v-if="genProgress.step === 'review'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+          </div>
+        </div>
+        <div class="h-1.5 w-72 overflow-hidden rounded-full bg-[var(--line)]">
+          <div class="h-full rounded-full bg-[var(--accent)] transition-all duration-500 ease-out" :style="{ width: genProgress.progress + '%' }"></div>
+        </div>
+        <p class="text-sm font-medium text-[var(--ink-soft)]">{{ genProgress.message }}</p>
       </div>
     </div>
 
