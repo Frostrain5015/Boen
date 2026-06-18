@@ -47,7 +47,7 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，回答时用「${userName}」称呼他/她，营造亲切的一对一辅导感。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
   const xlopGuide = grade && (grade === '2' || grade === '3')
-    ? '- 列竖式计算（加减乘除）：必须用 TikZ + xlop 包的 \\opadd / \\opsub / \\opmul / \\opdiv 渲染，如 ```tikz\\begin{tikzpicture}\\node{\\opadd{698}{213}};\\end{tikzpicture}```。不要用 ASCII 字符拼竖式。\n'
+    ? '- 列竖式计算（加减乘除）：直接用 \\opadd{698}{213} 写在段落中（像 KaTeX 公式一样），前端自动渲染为竖式；不要包代码块，不要包 tikzpicture。不要用 ASCII 字符拼竖式。\n'
     : '';
   return [
     '你是「博文」(Boen)，兼具「学术导师」与「私人学习助理」双重身份的学习伙伴。',
@@ -84,7 +84,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，用「${userName}」称呼他/她。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
   const xlopGuide = grade && (grade === '2' || grade === '3')
-    ? '- 列竖式计算（加减乘除）：必须用 TikZ + xlop 包的 \\opadd / \\opsub / \\opmul / \\opdiv 渲染，如 ```tikz\\begin{tikzpicture}\\node{\\opadd{698}{213}};\\end{tikzpicture}```。不要用 ASCII 字符拼竖式。\n'
+    ? '- 列竖式计算（加减乘除）：直接用 \\opadd{698}{213} 写在段落中（像 KaTeX 公式一样），前端自动渲染为竖式；不要包代码块，不要包 tikzpicture。不要用 ASCII 字符拼竖式。\n'
     : '';
   return [
     '你是「博文」(Boen)，一位富有经验的学科教师。当前进入「复习模式」。',
