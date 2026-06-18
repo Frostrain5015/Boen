@@ -10,6 +10,7 @@ import {
   getChatModel,
   buildBoenGraph,
   QUIZ_TOOL_NAMES,
+  COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
 } from '@boen/agent-core';
@@ -100,6 +101,22 @@ async function runGraph(
   const state = await graph.getState({ configurable: { thread_id: threadId } });
   const msgs = (state.values?.messages ?? []) as BaseMessage[];
   return msgs[msgs.length - 1];
+}
+
+/** 检测并发送 review_complete 事件 */
+async function emitReviewCompleteIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>) {
+  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
+  const reviewCall = calls.find((c) => c.name === COMPLETE_REVIEW_TOOL);
+  if (reviewCall?.args) {
+    const args = reviewCall.args as Record<string, unknown>;
+    await send({
+      type: 'review_complete',
+      summary: String(args.summary ?? ''),
+      score: Number(args.overallScore ?? 0),
+      totalQuestions: Number(args.totalQuestions ?? 0),
+      correctAnswers: Number(args.correctAnswers ?? 0),
+    });
+  }
 }
 
 /** 为新对话自动生成标题（基于首轮用户消息） */
@@ -483,6 +500,7 @@ app.post('/api/chat', async (c) => {
       }
 
       await emitQuestionIfAny(last, send);
+      await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -541,6 +559,7 @@ app.post('/api/answer', async (c) => {
 
       const last = await runGraph({ messages: toolMsgs }, body.threadId, send);
       await emitQuestionIfAny(last, send);
+      await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });

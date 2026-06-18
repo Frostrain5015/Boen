@@ -487,8 +487,9 @@ onMounted(() => {
     <div class="app-grain"></div>
 
     <div class="relative z-10 flex h-full">
-      <!-- 侧边栏：对话列表 -->
+      <!-- 侧边栏：对话列表（仅在聊天模式显示） -->
       <aside
+        v-if="currentView === 'chat'"
         class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
         :class="sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
       >
@@ -548,8 +549,10 @@ onMounted(() => {
 
       <!-- 主内容区 -->
       <div class="flex flex-1 flex-col" :data-subject="subject">
-        <!-- 对话视图 -->
-        <template v-if="currentView === 'chat'">
+        <!-- 视图切换（淡入淡出过渡） -->
+        <Transition name="view-fade" mode="out-in">
+          <!-- 对话视图 -->
+          <template v-if="currentView === 'chat'" key="chat">
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
@@ -757,13 +760,14 @@ onMounted(() => {
         </template>
 
         <!-- 学习画像视图 -->
-        <KnowledgeProfile v-else-if="currentView === 'profile'" class="flex-1" />
+        <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" />
 
         <!-- 考试视图 -->
-        <div v-else-if="currentView === 'exam'" class="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <div v-else-if="currentView === 'exam'" key="exam" class="flex flex-1 flex-col items-center justify-center gap-4 p-8">
           <Mascot :size="80" state="thinking" />
           <p class="text-sm font-medium text-[var(--ink-soft)]">考试模式即将上线…</p>
         </div>
+        </Transition>
       </div>
     </div>
 

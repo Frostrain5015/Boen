@@ -5,10 +5,12 @@ import {
   MemorySaver,
 } from '@langchain/langgraph';
 import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, type AIMessage } from '@langchain/core/messages';
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
-import { systemPromptForQa } from './prompts.js';
+import { systemPromptForQa, systemPromptForReview } from './prompts.js';
 import { quizTools } from './quiz/index.js';
 import {
   LOOKUP_KNOWLEDGE_POINT_TOOL,
@@ -16,36 +18,28 @@ import {
   lookupKnowledgePointTool,
 } from './curriculum-tools.js';
 
-/** 全图共享状态：消息历史 + 用户画像 + 当前模式 + 出题控制 */
+/** 全图共享状态 */
 export const BoenState = Annotation.Root({
   ...MessagesAnnotation.spec,
   gradeBand: Annotation<GradeBand>(),
-  /** 具体年级（1–9 / high / college），用于按年级加载课程知识库 */
   grade: Annotation<Grade | undefined>(),
   subject: Annotation<string>(),
   userName: Annotation<string>(),
   mode: Annotation<BoenMode>(),
-  /** 本轮是否强制出题 */
   forceQuiz: Annotation<boolean>(),
-  /** 强制出题时使用的题型工具名 */
   quizTool: Annotation<string | undefined>(),
-  /** RAG：按年级+学科检索到的课程知识库上下文，注入 qa 系统提示 */
   curriculum: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
 
-/** 外部依赖（由 server 注入，使 agent-core 与具体存储/检索解耦） */
 export interface BoenGraphDeps {
-  /** RAG 检索器：按年级+学科召回课程编排与相关知识点 */
   retrieveCurriculum?: (args: { grade?: string; subject?: string; query?: string }) => Promise<string>;
-  /** LangGraph 工具执行器：查询章节/知识点详情，server 注入以保持 DB 解耦 */
   lookupKnowledgePoint?: (args: { grade?: string; subject?: string; query: string; limit?: number }) => Promise<string>;
 }
 
 type ToolCall = { id?: string; name: string; args?: unknown };
 
-/** 从用户话语里识别「要被出题」的意图及题型 */
 function detectQuizIntent(text: string): { force: boolean; tool: string } {
   const wantsQuiz = /考我|考考|出一?[道题]|来一?[道题]|测验|测试|测一测|练习|出题|quiz/i.test(text);
   let tool = 'ask_multiple_choice';
@@ -55,58 +49,86 @@ function detectQuizIntent(text: string): { force: boolean; tool: string } {
   return { force: wantsQuiz, tool };
 }
 
+function detectReviewIntent(text: string): boolean {
+  return /^(教我|讲(一?下)|讲解|复习|学习|仔细说说|辅导)/.test(text.trim());
+}
+
+/** 复习完成工具 */
+export const COMPLETE_REVIEW_TOOL = 'complete_review';
+
+const completeReviewSchema = z.object({
+  summary: z.string().describe('本次复习总结'),
+  overallScore: z.number().min(0).max(100).describe('综合评分(0-100)'),
+  totalQuestions: z.number().min(0).describe('复习中出的题目总数'),
+  correctAnswers: z.number().min(0).describe('回答正确的题目数'),
+  sectionsCovered: z.array(z.string()).describe('已讲解的章节列表'),
+});
+
+const completeReviewTool = tool(async () => '', {
+  name: COMPLETE_REVIEW_TOOL,
+  description: '复习结束时调用，提交总结和评分数据。',
+  schema: completeReviewSchema,
+});
+
 /**
  * 构建博文主图。
- * 阶段 0/工具层：router 判定是否出题；qa 节点据此决定绑定/强制出题工具或纯文本反馈。
- * 后续阶段在 router 后扩展 review / ai-learning 子图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
-  const qaTools = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool] : quizTools;
+  const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool] : quizTools;
+  const reviewTools: any[] = [...quizTools, completeReviewTool];
+  if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
 
   const router = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1];
     if (last && isHumanMessage(last)) {
-      const { force, tool } = detectQuizIntent(String(last.content));
-      return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: tool };
+      const text = String(last.content);
+      const { force, tool: qTool } = detectQuizIntent(text);
+      // 复习意图优先级最高
+      if (detectReviewIntent(text)) {
+        return { mode: 'review', forceQuiz: false, quizTool: undefined };
+      }
+      return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: qTool };
     }
-    // 非用户消息（如作答回灌的 ToolMessage）不触发出题
     return { mode: state.mode ?? 'qa', forceQuiz: false };
   };
 
-  // RAG 检索节点：按年级+学科召回课程知识库上下文，写入 state.curriculum
   const loadCurriculum = async (state: State): Promise<Partial<State>> => {
     if (!deps.retrieveCurriculum) return {};
-    // 用最近一条用户消息作检索 query（反馈轮没有则只取编排概览）
     const lastHuman = [...state.messages].reverse().find(isHumanMessage);
     const query = lastHuman ? String(lastHuman.content) : '';
     try {
       const curriculum = await deps.retrieveCurriculum({ grade: state.grade, subject: state.subject, query });
       return { curriculum: curriculum || undefined };
     } catch {
-      return {}; // 检索失败不阻断主流程
+      return {};
     }
   };
 
   const qaNode = async (state: State): Promise<Partial<State>> => {
-    const system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
     const last = state.messages[state.messages.length - 1];
 
-    let llm;
-    if (last && isToolMessage(last)) {
-      // 作答判分后的反馈轮：纯文本点评，不再出题
-      llm = model;
-    } else if (state.forceQuiz && model.bindTools) {
-      // 明确要被出题：强制调用指定题型工具
-      llm = model.bindTools(quizTools, {
-        tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } },
-      });
-    } else if (model.bindTools) {
-      llm = model.bindTools(qaTools);
+    let system: SystemMessage;
+    let tools: ReturnType<typeof model.bindTools> | undefined;
+
+    if (state.mode === 'review') {
+      // 复习模式：用教师提示，始终绑定工具（反馈轮也保留出题能力）
+      system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
+      if (model.bindTools) tools = model.bindTools(reviewTools as any);
     } else {
-      llm = model;
+      system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
+      if (last && isToolMessage(last)) {
+        // 反馈轮：纯文本，不出题
+        tools = undefined;
+      } else if (state.forceQuiz && model.bindTools) {
+        tools = model.bindTools(quizTools, {
+          tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } },
+        });
+      } else if (model.bindTools) {
+        tools = model.bindTools(qaTools);
+      }
     }
 
-    // RAG：把检索到的课程上下文作为附加系统消息注入
+    const llm = tools ?? model;
     const messages = state.curriculum
       ? [system, new SystemMessage(state.curriculum), ...state.messages]
       : [system, ...state.messages];
@@ -118,16 +140,13 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL && c.id);
     const messages: ToolMessage[] = [];
-
     for (const call of calls) {
       try {
         const args = lookupKnowledgePointSchema.parse(call.args ?? {});
         const content = deps.lookupKnowledgePoint
           ? await deps.lookupKnowledgePoint({
-              grade: args.grade ?? state.grade,
-              subject: args.subject ?? state.subject,
-              query: args.query,
-              limit: args.limit ?? undefined,
+              grade: args.grade ?? state.grade, subject: args.subject ?? state.subject,
+              query: args.query, limit: args.limit ?? undefined,
             })
           : '课程知识库查询工具尚未接入。';
         messages.push(new ToolMessage({ content: content || '没有找到匹配的课程知识点。', tool_call_id: call.id! }));
@@ -138,16 +157,17 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
         }));
       }
     }
-
     return { messages };
   };
 
   const routeAfterQa = (state: State) => {
-    if (!deps.lookupKnowledgePoint) return 'end';
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
-    if (calls.length > 0 && calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) {
-      return 'lookupKnowledgePoint';
+    if (calls.length > 0) {
+      // 复习完成 → 结束
+      if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL)) return 'end';
+      // 知识点查询 → 循环
+      if (calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) return 'lookupKnowledgePoint';
     }
     return 'end';
   };

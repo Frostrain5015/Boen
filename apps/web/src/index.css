@@ -474,6 +474,14 @@ body {
 *::-webkit-scrollbar-thumb { background: rgba(120, 106, 93, 0.25); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: rgba(120, 106, 93, 0.4); background-clip: content-box; }
 
+/* ── 视图切换淡入淡出 ────────────────────────── */
+.view-fade-enter-active,
+.view-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.view-fade-enter-from { opacity: 0; transform: translateY(8px); }
+.view-fade-leave-to { opacity: 0; transform: translateY(-6px); }
+
 /* ── 无障碍：尊重 reduced-motion ───────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

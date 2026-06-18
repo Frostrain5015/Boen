@@ -47,6 +47,8 @@ const expandedSections = ref<Set<string>>(new Set());
 const selectedKp = ref<KpNode & { sectionTitle: string } | null>(null);
 const animatingNumbers = ref(false);
 
+const emit = defineEmits<{ (e: 'back'): void }>();
+
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },
   { value: 'math' as const, label: '数学', emoji: '🔢' },
@@ -148,9 +150,16 @@ watch(grade, fetchOutline);
     <div v-else class="flex h-full gap-4 p-4">
       <!-- ═══ Left panel: Stats + Recommendations ═══ -->
       <div class="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
-        <!-- Subject & Grade selector -->
+        <!-- Subject selector + back button -->
         <div class="clay overflow-hidden">
           <div class="flex items-center gap-2 p-3">
+            <button
+              @click="$emit('back')"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white active:scale-90"
+              title="返回对话"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
+            </button>
             <div class="clay-sm relative flex bg-[var(--surface)] p-1">
               <span
                 class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent"
@@ -166,9 +175,6 @@ watch(grade, fetchOutline);
                 :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"
               ><span>{{ s.emoji }}</span>{{ s.label }}</button>
             </div>
-            <select v-model="grade" class="ml-auto rounded-xl border border-[var(--line)] bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] outline-none">
-              <option v-for="g in GRADES" :key="g" :value="g">{{ gradeLabel(g) }}</option>
-            </select>
           </div>
         </div>
 
