@@ -24,9 +24,10 @@ export interface ExamConfig {
   subject: string;
   grade: string;
   chapters?: string[];
-  difficulty?: string;
   totalScore?: number;
   durationMinutes?: number;
+  /** 用户备注：期望考查的教材章节、知识点或其他特殊要求 */
+  notes?: string;
 }
 
 export interface ExamSession {
@@ -124,7 +125,8 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
 
   const prompt = [
     `你是一位经验丰富的考试命题专家。请为${subjectLabel[config.subject] ?? config.subject}（${gradeLabel(config.grade)}）设计一份试卷蓝图。`,
-    `难度级别：${config.difficulty || 'medium'}。总分：${totalScore}分。`,
+    `总分：${totalScore}分。`,
+    config.notes ? `用户特殊要求：${config.notes}` : '',
     `知识点权重分布（用于决定题目分布）：\n${weightGuide}`,
     profileContext ? `\n学生学情：\n${profileContext}` : '',
     '',
@@ -192,8 +194,9 @@ async function stepWriteQuestions(
 
   const prompt = [
     `你是命题专家。请为${subjectLabel[config.subject] ?? config.subject}（${gradeLabel(config.grade)}）编写 ${qt.count} 道 ${qt.label}。`,
-    `难度：${config.difficulty || 'medium'}。每题 ${qt.pointsPer} 分。`,
+    `每题 ${qt.pointsPer} 分。`,
     qt.focusKps.length ? `重点考查知识点：${qt.focusKps.join('、')}` : '',
+    config.notes ? `用户特殊要求：${config.notes}` : '',
     `试卷标题：${blueprint.title}`,
     existingQuestions.length ? `已出的题目类型：${[...new Set(existingQuestions.map(q => q.type))].join('、')}。请避免知识点重复。` : '',
     '',
@@ -235,7 +238,7 @@ async function stepWriteQuestions(
       catch { throw new Error('JSON 解析失败'); }
     }
     return (parsed.questions || []).map((q: any, i: number) => {
-      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || config.difficulty || 'medium', explanation: q.explanation || '' };
+      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '' };
       if (base.type === 'multiple_choice') {
         const opts = (q.options || []).filter((o: any) => o?.key);
         while (opts.length < 2) opts.push({ key: String.fromCharCode(65 + opts.length), text: '选项' + String.fromCharCode(65 + opts.length) });
@@ -286,7 +289,7 @@ async function stepWriteQuestions(
       index: 0, type: qt.type, points: qt.pointsPer,
       stem: extra.stem ?? `请回答一道${subj}${qt.label}。`,
       knowledgePoint: '综合', literacies: ['综合素养'],
-      difficulty: config.difficulty || 'medium',
+      difficulty: 'medium',
       explanation: '本题为备选题目，审核阶段将重新生成。',
       ...extra,
     };

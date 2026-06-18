@@ -408,7 +408,7 @@ import { generateExam, createExamSession, getExamSession, submitExamSession, lis
 app.post('/api/exam/generate', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number };
+  const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number; notes?: string };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
@@ -416,7 +416,7 @@ app.post('/api/exam/generate', async (c) => {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
         model,
-        { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes },
+        { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes },
         (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
         userId,
       );

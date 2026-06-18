@@ -11,8 +11,8 @@ import { processTikzDiagrams } from '@/lib/tikz';
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
   grade: string;
-  difficulty: string;
   durationMinutes: number;
+  notes: string;
 }
 
 interface ExamQuestionData {
@@ -55,7 +55,7 @@ interface ExamResultsData {
 const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
 
 const examState = ref<'config' | 'generating' | 'taking' | 'grading' | 'results'>('config');
-const config = ref<ExamConfigData>({ subject: 'math', grade: '7', difficulty: 'medium', durationMinutes: 45 });
+const config = ref<ExamConfigData>({ subject: 'math', grade: '7', durationMinutes: 45, notes: '' });
 const session = ref<ExamSessionData | null>(null);
 const results = ref<ExamResultsData | null>(null);
 const answers = ref<Map<number, any>>(new Map());
@@ -71,12 +71,11 @@ const SUBJECTS = [
   { value: 'science' as const, label: '科学', emoji: '🔬' },
 ];
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const DIFFICULTIES = [
-  { value: 'easy', label: '简单', emoji: '🌱' },
-  { value: 'medium', label: '中等', emoji: '⚖️' },
-  { value: 'hard', label: '困难', emoji: '🔥' },
+const DURATIONS = [
+  { value: 15, label: '巩固自测', emoji: '📝' },
+  { value: 45, label: '单元考试', emoji: '📚' },
+  { value: 90, label: '期末考试', emoji: '🎯' },
 ];
-const DURATIONS = [20, 30, 45, 60];
 
 const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === config.value.subject));
 const answeredCount = computed(() => {
@@ -107,6 +106,19 @@ function gradeLabel(g: string): string {
 
 function masteryColor(ws: number): string {
   if (ws < 40) return '#f2557a'; if (ws < 60) return '#f59e42'; if (ws < 80) return '#e0a92e'; return '#18a558';
+}
+
+/** 生成步骤行的活跃度 class */
+function gnCls(step: string): string {
+  return genProgress.value.step === step ? '' : 'opacity-30';
+}
+/** 步骤圆点的样式 class */
+function dotCls(step: string): string {
+  return genProgress.value.step === step ? 'dot-active' : 'dot-pending';
+}
+/** 步骤圆点的图标 */
+function dotIcon(step: string): string {
+  return genProgress.value.step === step ? '●' : '●';
 }
 
 function setAnswer(qIndex: number, value: any) {
@@ -267,15 +279,13 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             </select>
           </div>
           <div>
-            <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">难度</p>
-            <div class="flex gap-2">
-              <button v-for="d in DIFFICULTIES" :key="d.value" @click="config.difficulty = d.value" class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]" :class="config.difficulty === d.value ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'">{{ d.emoji }} {{ d.label }}</button>
-            </div>
+            <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">备注 <span class="font-normal text-[var(--ink-soft)]/60">（教材章节 / 知识点 / 特殊要求）</span></p>
+            <textarea v-model="config.notes" rows="2" class="w-full resize-none rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink-soft)]/40 focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="例：人教版七年级上册第三章「一元一次方程」, 侧重实际应用题" />
           </div>
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">限时</p>
             <div class="flex gap-2">
-              <button v-for="d in DURATIONS" :key="d" @click="config.durationMinutes = d" class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]" :class="config.durationMinutes === d ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"><Clock class="h-3.5 w-3.5" />{{ d }}分钟</button>
+              <button v-for="d in DURATIONS" :key="d.value" @click="config.durationMinutes = d.value" class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]" :class="config.durationMinutes === d.value ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"><Clock class="h-3.5 w-3.5" />{{ d.emoji }} {{ d.label }}</button>
             </div>
           </div>
         </div>
@@ -289,27 +299,29 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <div class="w-72 space-y-3">
-          <div class="flex items-center gap-3" :class="genProgress.step === 'analyze' || genProgress.progress > 20 ? 'opacity-100' : 'opacity-40'">
-            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 20 ? 'bg-[#18a558] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 20 ? '✓' : '1' }}</span>
+        <div class="w-80 space-y-1">
+          <div class="step-row" :class="gnCls('analyze')">
+            <span class="step-dot" :class="dotCls('analyze')">{{ dotIcon('analyze') }}</span>
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分析知识图谱</span>
-            <span v-if="genProgress.step === 'analyze'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+            <span v-if="genProgress.step === 'analyze'" class="step-active-dot"></span>
           </div>
-          <div class="flex items-center gap-3" :class="genProgress.step === 'write' || genProgress.progress > 85 ? 'opacity-100' : 'opacity-40'">
-            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 85 ? 'bg-[#18a558] text-white' : genProgress.step === 'write' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 85 ? '✓' : '2' }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分步编写试题</span>
-            <span v-if="genProgress.step === 'write'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+          <div v-if="genProgress.step === 'analyze' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
+          <div class="step-row" :class="gnCls('write')">
+            <span class="step-dot" :class="dotCls('write')">{{ dotIcon('write') }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">编写试题</span>
+            <span v-if="genProgress.step === 'write'" class="step-active-dot"></span>
           </div>
-          <div class="flex items-center gap-3" :class="genProgress.step === 'review' || genProgress.progress >= 100 ? 'opacity-100' : 'opacity-40'">
-            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress >= 100 ? 'bg-[#18a558] text-white' : genProgress.step === 'review' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress >= 100 ? '✓' : '3' }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">再次审核试题</span>
-            <span v-if="genProgress.step === 'review'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
+          <div v-if="genProgress.step === 'write' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
+          <div class="step-row" :class="gnCls('review')">
+            <span class="step-dot" :class="dotCls('review')">{{ dotIcon('review') }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">审核试题</span>
+            <span v-if="genProgress.step === 'review'" class="step-active-dot"></span>
           </div>
+          <div v-if="genProgress.step === 'review' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
         </div>
-        <div class="h-1.5 w-72 overflow-hidden rounded-full bg-[var(--line)]">
-          <div class="h-full rounded-full bg-[var(--accent)] transition-all duration-500 ease-out" :style="{ width: genProgress.progress + '%' }"></div>
+        <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
+          <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
         </div>
-        <p class="text-sm font-medium text-[var(--ink-soft)]">{{ genProgress.message }}</p>
       </div>
     </div>
 
@@ -380,11 +392,19 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'grading'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <div class="w-72 space-y-2 text-center">
-          <p class="font-display text-lg font-bold text-[var(--ink)]">批改中…</p>
-          <p class="text-sm font-medium text-[var(--ink-soft)]">正在逐题评分并生成分析报告</p>
+        <div class="w-80 space-y-1">
+          <div class="step-row">
+            <span class="step-dot dot-active">✦</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">批改评分</span>
+            <span class="step-active-dot"></span>
+          </div>
+          <div class="step-msg">正在逐题评分</div>
+          <div class="step-row">
+            <span class="step-dot dot-pending">✦</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">生成分析报告</span>
+          </div>
         </div>
-        <div class="h-1.5 w-72 overflow-hidden rounded-full bg-[var(--line)]">
+        <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="loading-bar-inner h-full rounded-full"></div>
         </div>
       </div>
@@ -488,14 +508,32 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
 <style scoped>
 .exam-root { height: 100%; background: transparent; overflow-y: auto; }
+
+/* ── 吉祥物浮动 ── */
 .loading-mascot { animation: loadingFloat 2.4s ease-in-out infinite; }
 @keyframes loadingFloat { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.03); } }
-.loading-bar { width: 120px; height: 3px; background: var(--line); border-radius: 99px; overflow: hidden; }
+
+/* ── 进度条 ── */
 .loading-bar-inner { width: 40%; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent-soft), var(--accent), var(--accent-strong)); animation: loadingSlide 1.4s ease-in-out infinite; }
 @keyframes loadingSlide { 0% { transform: translateX(-30%); } 100% { transform: translateX(260%); } }
+.progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* ── 步骤列表 ── */
+.step-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0; transition: opacity 0.4s ease; }
+.step-dot { display: flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 999px; font-size: 0.5rem; flex-shrink: 0; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.dot-active { background: var(--accent); color: white; box-shadow: 0 0 0 4px var(--accent-soft); }
+.dot-pending { background: var(--accent-soft); color: var(--accent-strong); opacity: 0.5; }
+.step-active-dot { width: 0.375rem; height: 0.375rem; border-radius: 999px; background: var(--accent); animation: stepPulse 1.6s ease-in-out infinite; }
+@keyframes stepPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
+.step-msg { margin: -0.125rem 0 0.25rem 2rem; font-size: 0.75rem; line-height: 1.4; color: var(--ink-soft); animation: msgFadeIn 0.3s ease; }
+@keyframes msgFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── 结果展开/收起 ── */
 .reveal-enter-active { transition: all 0.25s ease; overflow: hidden; }
 .reveal-leave-active { transition: all 0.15s ease; overflow: hidden; }
 .reveal-enter-from, .reveal-leave-to { opacity: 0; max-height: 0; }
+
+/* ── 阅读材料 ── */
 .passage-block { border-radius: 14px; padding: 0.9rem 1.1rem; line-height: 1.8; font-size: 0.9rem; }
 .passage-block-chi { font-family: 'KaiTi','STKaiti',serif; background: #fff8f0; border: 1.5px solid #f0dcc0; color: #5c4a32; }
 .passage-block-eng { font-family: 'Georgia','Times New Roman',serif; background: #f5f0ff; border: 1.5px solid #d8cce8; color: #3d2e5c; }
