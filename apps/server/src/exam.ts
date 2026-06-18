@@ -17,7 +17,7 @@ import type { ShortAnswerGrader } from '@boen/agent-core';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
-import { getExamStructure, getStructureByTotalScore, type ExamStructure } from './exam-structures.js';
+import { getExamStructure, getStructureByTotalScore, getQuestionTypesForMode, type ExamStructure } from './exam-structures.js';
 
 // ── 配置类型 ─────────────────────────────────
 
@@ -117,7 +117,7 @@ function defaultBlueprint(
   return {
     title: `${subjectLabel[config.subject] ?? config.subject}${gradeLabel(config.grade)}综合试卷`,
     sections: 3, totalScore,
-    questionTypes: blueprintForTotalScore(totalScore, config.grade),
+    questionTypes: blueprintForTotalScore(totalScore, config.grade, 'exam'),
   };
 }
 
@@ -131,15 +131,14 @@ const FIXED_POINTS: Record<string, number> = {
   short_answer: 8,
 };
 
-/** 根据年级和总分返回题型配比（从知识库按需加载） */
-function blueprintForTotalScore(totalScore: number, grade?: string): Array<{ type: string; label: string; count: number; pointsPer: number; focusKps: string[] }> {
-  const struct = grade ? getExamStructure(grade) : getStructureByTotalScore(totalScore);
-  // 根据总分按比例缩放题型数量，保持结构比例
-  const ratio = totalScore / struct.totalScore;
-  return struct.questionTypes.map(qt => ({
+/** 根据年级、模式和总分返回题型配比（从知识库按需加载） */
+function blueprintForTotalScore(totalScore: number, grade?: string, mode: 'exam' | 'quiz' = 'exam'): Array<{ type: string; label: string; count: number; pointsPer: number; focusKps: string[] }> {
+  const gradeStr = grade ?? '7';
+  const { questionTypes } = getQuestionTypesForMode(gradeStr, mode, totalScore);
+  return questionTypes.map(qt => ({
     type: qt.type,
     label: qt.label,
-    count: Math.max(1, Math.round(qt.count * ratio)),
+    count: qt.count,
     pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
     focusKps: [] as string[],
   }));
@@ -166,7 +165,8 @@ export async function generateExam(
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
   // 标准化：用固定基础分值覆盖 LLM 自由分配的点数，仅保留题型数量和配比
-  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore, config.grade);
+  const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
+  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore, config.grade, mode);
   blueprint.questionTypes = blueprint.questionTypes.map((qt, i) => ({
     ...qt,
     pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
