@@ -8,67 +8,59 @@
     <link rel="stylesheet" href="/vendor/tikzjax/fonts.css?v=3">
   </head>
   <body>
-    <div id="app">
-      <!-- ═══ 纯 CSS 预加载动画（Vue 挂载前即显示，避免白屏） ═══ -->
-      <div id="boot-loader">
-        <div class="boot-inner">
-          <div class="boot-ring">
-            <svg viewBox="0 0 80 80" width="80" height="80">
-              <circle cx="40" cy="40" r="36" fill="none" stroke="#ece0cf" stroke-width="3" />
-              <circle class="boot-arc" cx="40" cy="40" r="36" fill="none" stroke="#14b48a" stroke-width="3"
-                stroke-linecap="round" stroke-dasharray="180 100" />
-            </svg>
-            <div class="boot-face">
-              <span class="boot-eye"></span>
-              <span class="boot-eye"></span>
-              <span class="boot-mouth"></span>
-            </div>
+    <!-- ═══ 纯 CSS 预加载动画（在 #app 外，Vue 挂载不替换它） ═══ -->
+    <div id="boot-loader">
+      <div class="boot-inner">
+        <div class="boot-ring">
+          <svg viewBox="0 0 80 80" width="80" height="80">
+            <circle cx="40" cy="40" r="36" fill="none" stroke="#ece0cf" stroke-width="3" />
+            <circle class="boot-arc" cx="40" cy="40" r="36" fill="none" stroke="#14b48a" stroke-width="3"
+              stroke-linecap="round" stroke-dasharray="180 100" />
+          </svg>
+          <div class="boot-face">
+            <span class="boot-eye"></span>
+            <span class="boot-eye"></span>
+            <span class="boot-mouth"></span>
           </div>
-          <h1 class="boot-title">博文 <small>Boen</small></h1>
-          <div class="boot-bar"><div class="boot-bar-inner"></div></div>
-          <p class="boot-hint">正在唤醒学习助手…</p>
         </div>
-        <style>
-          #boot-loader {
-            position: fixed; inset: 0; z-index: 99999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #fbf6ee; font-family: 'Fredoka', 'PingFang SC', sans-serif;
-          }
-          .boot-inner { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-          .boot-ring { position: relative; width: 80px; height: 80px; }
-          .boot-arc { animation: spin 1.4s ease-in-out infinite; transform-origin: 40px 40px; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .boot-face {
-            position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 6px;
-          }
-          .boot-eye {
-            width: 12px; height: 12px; border-radius: 50%; background: #2c2722;
-            animation: blink 3s ease-in-out infinite;
-          }
-          .boot-mouth {
-            width: 16px; height: 6px; border-radius: 0 0 16px 16px; background: #2c2722;
-          }
-          @keyframes blink { 0%,90%,100% { transform: scaleY(1); } 95% { transform: scaleY(0.15); } }
-          .boot-title {
-            font-size: 1.8rem; font-weight: 700; margin: 0;
-            background: linear-gradient(95deg, #0e9b76, #14b48a 55%, #ff9d5c);
-            -webkit-background-clip: text; background-clip: text; color: transparent;
-            background-size: 200% auto; animation: shimmer 6s linear infinite;
-          }
-          .boot-title small { font-size: 1rem; font-weight: 500; opacity: 0.7; }
-          .boot-bar { width: 120px; height: 3px; background: #ece0cf; border-radius: 99px; overflow: hidden; }
-          .boot-bar-inner {
-            width: 36%; height: 100%; border-radius: 99px;
-            background: linear-gradient(90deg, #d9f4ec, #14b48a, #0e9b76);
-            animation: slide 1.2s ease-in-out infinite;
-          }
-          @keyframes slide { 0% { transform: translateX(-30%); } 100% { transform: translateX(260%); } }
-          .boot-hint { margin: 0; font-size: 0.75rem; font-weight: 500; color: #786a5d; opacity: 0.6; }
-          @keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
-        </style>
+        <h1 class="boot-title">博文 <small>Boen</small></h1>
+        <div class="boot-bar"><div class="boot-bar-inner"></div></div>
+        <p class="boot-hint">正在唤醒学习助手…</p>
       </div>
+      <style>
+        #boot-loader {
+          position: fixed; inset: 0; z-index: 99999;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          background: #fbf6ee; font-family: 'Fredoka', 'PingFang SC', sans-serif;
+          transition: opacity 0.35s ease, filter 0.35s ease;
+        }
+        #boot-loader.hide { opacity: 0; filter: blur(4px); pointer-events: none; }
+        .boot-inner { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .boot-ring { position: relative; width: 80px; height: 80px; }
+        .boot-arc { animation: spin 1.4s ease-in-out infinite; transform-origin: 40px 40px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .boot-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+        .boot-eye { width: 12px; height: 12px; border-radius: 50%; background: #2c2722; animation: blink 3s ease-in-out infinite; }
+        .boot-mouth { width: 16px; height: 6px; border-radius: 0 0 16px 16px; background: #2c2722; }
+        @keyframes blink { 0%,90%,100% { transform: scaleY(1); } 95% { transform: scaleY(0.15); } }
+        .boot-title { font-size: 1.8rem; font-weight: 700; margin: 0;
+          background: linear-gradient(95deg, #0e9b76, #14b48a 55%, #ff9d5c);
+          -webkit-background-clip: text; background-clip: text; color: transparent;
+          background-size: 200% auto; animation: shimmer 6s linear infinite;
+        }
+        .boot-title small { font-size: 1rem; font-weight: 500; opacity: 0.7; }
+        .boot-bar { width: 120px; height: 3px; background: #ece0cf; border-radius: 99px; overflow: hidden; }
+        .boot-bar-inner { width: 36%; height: 100%; border-radius: 99px;
+          background: linear-gradient(90deg, #d9f4ec, #14b48a, #0e9b76);
+          animation: slide 1.2s ease-in-out infinite;
+        }
+        @keyframes slide { 0% { transform: translateX(-30%); } 100% { transform: translateX(260%); } }
+        .boot-hint { margin: 0; font-size: 0.75rem; font-weight: 500; color: #786a5d; opacity: 0.6; }
+        @keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+      </style>
     </div>
+
+    <div id="app"></div>
     <!-- ?v= 用于在 bundle 内容更新后强制绕过浏览器缓存（该文件名未做内容哈希）。每次改 bundle 须递增。 -->
     <script src="/vendor/tikzjax/tikzjax.js?v=3"></script>
     <script type="module" src="/src/main.ts"></script>

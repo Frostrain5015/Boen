@@ -479,11 +479,27 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
-  // 启动 auth 验证（完成后自动切换 LoginView 或主界面）
   checkAuth();
   document.addEventListener('click', onClickOutside);
-  // 空闲时预加载 TikZ 编译引擎
   warmTikzJax();
+
+  // ═══ 关键：等 Vue 第一帧完全渲染后再移除加载器 ═══
+  // Vue 在后台默默挂载和渲染，加载器保持可见直到一切就绪
+  nextTick().then(() => {
+    // 等 Vue 完成 DOM 更新
+    requestAnimationFrame(() => {
+      // 等浏览器完成第一帧绘制（字体、MathLive 等初始化在后台进行）
+      requestAnimationFrame(() => {
+        const loader = document.getElementById('boot-loader');
+        if (loader) {
+          loader.classList.add('hide');
+          loader.addEventListener('transitionend', () => loader.remove(), { once: true });
+          // 兜底：300ms 后强制移除
+          setTimeout(() => { if (loader.parentNode) loader.remove(); }, 400);
+        }
+      });
+    });
+  });
 });
 </script>
 
