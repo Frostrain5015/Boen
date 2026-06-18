@@ -10,7 +10,8 @@ import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
-import { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness } from './prompts.js';
+import { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness, systemPromptForPractice } from './prompts.js';
+import type { PracticeType } from './prompts.js';
 import { quizTools } from './quiz/index.js';
 import {
   LOOKUP_KNOWLEDGE_POINT_TOOL,
@@ -33,6 +34,8 @@ export const BoenState = Annotation.Root({
   reviewPhase: Annotation<string>(),
   /** 薄弱点数据（由服务端从知识画像中获取，突破模式注入） */
   weaknessData: Annotation<string | undefined>(),
+  /** 专项练习类型 */
+  practiceType: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
@@ -145,6 +148,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     } else if (state.mode === 'preview') {
       system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       tools = model.bindTools ? model.bindTools(qaTools as any) : undefined;
+    } else if (state.practiceType) {
+      system = new SystemMessage(systemPromptForPractice(state.practiceType as PracticeType, state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
+      if (model.bindTools) tools = model.bindTools(qaTools as any);
     } else if (state.mode === 'weakness') {
       system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (!model.bindTools) { /* no tool support */ }

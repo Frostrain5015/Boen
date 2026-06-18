@@ -647,6 +647,7 @@ app.post('/api/chat', async (c) => {
           subject: body.subject ?? 'math',
           userName: body.userName,
           weaknessData,
+          practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
         },
         body.threadId,

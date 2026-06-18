@@ -37,6 +37,7 @@ export interface ChatRequest {
   grade?: Grade;
   userName?: string;
   mode?: BoenMode;
+  practiceType?: string;
 }
 
 // ─────────────────────────────────────────────────────────────

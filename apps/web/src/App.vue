@@ -80,6 +80,7 @@ const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview'>('chat');
 // 侧栏手风琴：同时只展开一个二级菜单（档案无二级菜单）
 const expandedSection = ref<'chat' | 'exam' | null>('chat');
 const activeMode = ref<'none' | 'review' | 'preview' | 'weakness' | 'exam'>('none');
+const practiceType = ref<string | null>(null);
 
 const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
   chinese: { label: '语文', emoji: '📖' }, math: { label: '数学', emoji: '🔢' },
@@ -103,6 +104,37 @@ function activateMode(mode: 'review' | 'preview' | 'weakness') {
   const hints: Record<string, string> = { review: '我想学习 ', preview: '帮我预习 ', weakness: '帮我突破薄弱点 ' };
   if (activeMode.value === mode) input.value = hints[mode];
 }
+
+function startPractice(type: string, hint: string) {
+  practiceType.value = type;
+  input.value = hint;
+  activeMode.value = 'none';
+  currentView.value = 'chat';
+  focusInput();
+}
+
+/** 当前学科可用的专项练习菜单 */
+const practiceMenu = computed(() => {
+  const s = subject.value;
+  const all: Record<string, Array<{ type: string; label: string; hint: string }>> = {
+    chinese: [
+      { type: 'dictation', label: '字词听写', hint: '开始字词听写练习' },
+      { type: 'recitation', label: '课文背诵', hint: '开始课文背诵练习' },
+      { type: 'reading', label: '阅读理解', hint: '开始阅读理解练习' },
+      { type: 'writing', label: '作文指导', hint: '开始作文指导练习' },
+    ],
+    math: [
+      { type: 'mental-arithmetic', label: '口算速练', hint: '开始口算练习' },
+    ],
+    english: [
+      { type: 'vocabulary', label: '单词学习', hint: '开始单词学习' },
+    ],
+  };
+  return all[s] ?? [];
+});
+
+let _inputEl: HTMLTextAreaElement | null = null;
+function focusInput() { nextTick(() => _inputEl?.focus()); }
 
 function checkScrollOverflow() {
   nextTick(() => {
@@ -211,6 +243,8 @@ function finalizeAssistants() {
 async function send(text: string) {
   const t = text.trim();
   if (!t || busy.value) return;
+  // 发送后清除专项练习标记
+  practiceType.value = null;
 
   // 没有活跃对话时自动创建
   if (!currentConversationId.value) {
@@ -233,7 +267,7 @@ async function send(text: string) {
   scrollDown(true); // 发送消息时强制滚到底部
   try {
     await streamChat(
-      { threadId, message: t, gradeBand: userProfile.value ? gradeToBand(userProfile.value.grade) : 'middle', grade: userProfile.value?.grade, userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined },
+      { threadId, message: t, gradeBand: userProfile.value ? gradeToBand(userProfile.value.grade) : 'middle', grade: userProfile.value?.grade, userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined, practiceType: practiceType.value ?? undefined },
       (e) => handleEvent(e, idx),
     );
   } catch (err) {
@@ -905,6 +939,10 @@ onMounted(() => {
               <button @click="activateMode('review')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>学习模式</span></button>
               <button @click="activateMode('preview')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
               <button @click="activateMode('weakness')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>突破模式</span></button>
+            </div>
+            <!-- 专项练习菜单 -->
+            <div v-if="practiceMenu.length" class="mb-2 flex items-center gap-1.5 overflow-x-auto px-1">
+              <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]"><span>{{ p.label }}</span></button>
             </div>
             <div class="clay flex items-end gap-2 p-2">
               <textarea

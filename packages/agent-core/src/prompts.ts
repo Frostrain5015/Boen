@@ -192,3 +192,94 @@ export function systemPromptForWeakness(gradeBand: GradeBand, subject?: string, 
     guide,
   ].filter(Boolean).join('\n');
 }
+
+// ── 专项练习模式 ──────────────────────────────
+
+export type PracticeType = 'mental-arithmetic' | 'dictation' | 'recitation' | 'reading' | 'writing' | 'vocabulary';
+
+const PRACTICE_WORKFLOWS: Record<PracticeType, { title: string; steps: string[]; subject: string }> = {
+  'mental-arithmetic': {
+    title: '口算速练',
+    subject: 'math',
+    steps: [
+      '先确定年级和计算范围（如二年级表内除法、五年级小数乘除），只练一个小目标',
+      '出 10 道口算题（用 ask_multiple_choice 或 ask_fill_blank），控制 5-10 分钟内完成',
+      '作答后批改并标出错因标签（计算失误/进退位错/口诀不熟），不能只打对错',
+      '把同类错因安排成隔天 3 题复测，正确后再升级难度',
+    ],
+  },
+  dictation: {
+    title: '字词听写',
+    subject: 'chinese',
+    steps: [
+      '确定年级和课文单元，筛选今日要听写的词语清单（10-15 个为宜）',
+      '先带学生读一遍字音和词义，再按顺序听写',
+      '听写完毕后逐一批改，对错字进行订正指导（分析是笔画/结构/形近字哪类问题）',
+      '用 2-3 个短句练习检验学生是否能正确运用这些词语',
+    ],
+  },
+  recitation: {
+    title: '课文背诵',
+    subject: 'chinese',
+    steps: [
+      '确定要背诵的篇目（古诗/课文段落），先帮学生理解内容和脉络，不要死记硬背',
+      '把内容拆成逻辑段落，每段提取关键词或画面作为回忆线索',
+      '逐段复述检查，卡住时给线索提示而非直接念出下一句',
+      '完整背出后，隔天再做一次提取练习确认长期记忆',
+    ],
+  },
+  reading: {
+    title: '阅读理解',
+    subject: 'chinese',
+    steps: [
+      '提供一篇适龄短文（用 passage 字段），长度匹配年级',
+      '出 3-5 道题覆盖：主旨大意、细节理解、词句赏析、推理判断',
+      '学生作答后点评，重点分析「答案在原文中的依据」在哪里',
+      '最后出一道同类文章的变式题，检验方法是否迁移',
+    ],
+  },
+  writing: {
+    title: '作文指导',
+    subject: 'chinese',
+    steps: [
+      '先确定作文题目或主题，帮学生审题：文体、中心思想、写作要求',
+      '引导立意和选材：想表达什么？用什么事例来支撑？',
+      '搭建结构：开头→主体（2-3 段）→结尾，每段写什么',
+      '学生写出草稿后，从语言、逻辑、详略三个方面给出修改建议',
+      '不要代写全文，给示范段落而非整篇范文',
+    ],
+  },
+  vocabulary: {
+    title: '单词学习',
+    subject: 'english',
+    steps: [
+      '确定年级和单元，筛选 8-12 个目标单词',
+      '每个单词从音标→拼写→中文释义→例句，四个维度依次呈现',
+      '用 ask_fill_blank 或 ask_multiple_choice 出题检查拼写和语境理解',
+      '把易错单词记录下来，安排隔天复测',
+    ],
+  },
+};
+
+export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand, subject?: string, userName?: string, grade?: Grade): string {
+  const wf = PRACTICE_WORKFLOWS[type];
+  const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
+  const greeting = userName ? `\n\n当前学生名字是「${userName}」。` : '';
+  const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
+  return [
+    `你是「博文」(Boen)。当前进入「${wf.title}」专项练习。`,
+    GRADE_GUIDE[gradeBand],
+    gradeInfo,
+    greeting,
+    '',
+    `【${wf.title}工作流】`,
+    ...wf.steps.map((s, i) => `${i + 1}. ${s}`),
+    '',
+    '【原则】',
+    '- 练习量控制在 10-15 分钟内能完成',
+    '- 必须调用出题工具出题（ask_multiple_choice / ask_fill_blank / ask_short_answer），不要把题目写在文字回复里',
+    '- 每道题作答后必须标注错因，不能只打对错',
+    '- 练习结束后给出本次小结和下次复习建议',
+    guide,
+  ].filter(Boolean).join('\n');
+}
