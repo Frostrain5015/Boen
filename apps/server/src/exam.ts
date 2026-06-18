@@ -121,6 +121,7 @@ function buildExamPrompt(config: ExamConfig, weightGuide: string): string {
     '- 核心知识点出 40% 的题，重要知识点出 30%，标准知识点出 20%，了解不超过 10%。',
     '- 包含选择题、填空题、判断题、简答题等多种题型。',
     '- 选择题和判断题每题 5 分，填空题每空 5 分，简答题每题 10 分。',
+    '- **选择题必须包含 4 个选项（A/B/C/D），每道题的 options 数组必须有 4 个元素，且 correctKeys 必须是其中一个 key。**',
     '- 所有题目要有完整的参考答案和解析。',
     '- 填空题用 blanks 字段：{"blanks": [{"acceptedAnswers": ["答案1", "答案2"]}]}',
     '- 判断题用 answer 字段（boolean），简答题用 referenceAnswer 和 keyPoints。',
@@ -170,7 +171,12 @@ function parseExamResponse(content: string): { title: string; questions: ExamQue
     };
 
     if (q.type === 'multiple_choice') {
-      return { ...base, type: 'multiple_choice' as const, options: q.options ?? [], correctKeys: q.correctKeys ?? [], multiSelect: q.multiSelect ?? false };
+      const opts = (q.options ?? []).filter((o: any) => o?.key && o?.text);
+      // 如果选项不足 2 个，自动用 A/B 占位避免前端空白
+      if (opts.length < 2) {
+        opts.push({ key: 'A', text: '正确选项' }, { key: 'B', text: '错误选项' });
+      }
+      return { ...base, type: 'multiple_choice' as const, options: opts, correctKeys: q.correctKeys?.filter((k: string) => opts.some((o: any) => o.key === k)) ?? ['A'], multiSelect: q.multiSelect ?? false };
     }
     if (q.type === 'fill_blank') {
       return { ...base, type: 'fill_blank' as const, blanks: q.blanks ?? [] };
