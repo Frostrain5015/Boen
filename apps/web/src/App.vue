@@ -82,6 +82,7 @@ const expandedSection = ref<'chat' | 'exam' | null>('chat');
 const activeMode = ref<'none' | 'review' | 'preview' | 'weakness' | 'exam'>('none');
 const practiceType = ref<string | null>(null);
 const practiceMenuOpen = ref(false);
+const modeTagSent = ref(false); // 当前模式是否已发送过标记（仅第一次打标）
 
 const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
   chinese: { label: '语文', emoji: '📖' }, math: { label: '数学', emoji: '🔢' },
@@ -101,10 +102,12 @@ const hasScrollOverflow = ref(false);
 
 function activateMode(mode: 'review' | 'preview' | 'weakness') {
   activeMode.value = activeMode.value === mode ? 'none' : mode;
+  modeTagSent.value = false;
   currentView.value = 'chat';
   const hints: Record<string, string> = { review: '帮我复习巩固 ', preview: '帮我预习 ', weakness: '帮我突破薄弱点 ' };
   if (activeMode.value === mode) input.value = hints[mode];
 }
+function onModeChange() { modeTagSent.value = false; }
 
 function togglePracticeMenu() {
   practiceMenuOpen.value = !practiceMenuOpen.value;
@@ -274,7 +277,11 @@ async function send(text: string) {
   items.value.forEach((it) => {
     if (it.kind === 'question' && !it.answered) it.answered = true;
   });
-  const modeTag = practiceType.value ? '专项' : ({ review: '复习巩固', preview: '预习', weakness: '突破' } as Record<string, string>)[activeMode.value] || undefined;
+  // 仅第一次发送打标记
+  const tagMap: Record<string, string> = { review: '📚复习巩固·', preview: '📖预习·', weakness: '🎯突破·' };
+  const modeLabel = practiceType.value ? '✏️专项练习·' : (tagMap[activeMode.value] || '');
+  const modeTag = !modeTagSent.value && modeLabel ? modeLabel : undefined;
+  if (modeTag) modeTagSent.value = true;
   items.value.push({ kind: 'user', text: t, modeTag });
   items.value.push(newAssistant());
   const idx = { value: items.value.length - 1 };
@@ -906,17 +913,16 @@ onMounted(() => {
                   @submit="(a) => onAnswer(m, a)"
                 />
 
-                <!-- 用户消息：无边框文字墙风格（含模式标签） -->
+                <!-- 用户消息：无边框文字墙风格（首次消息含模式标记） -->
                 <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
                   <div class="max-w-[85%] text-right">
-                    <span v-if="m.modeTag" class="mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" :class="
-                      m.modeTag === '突破' ? 'bg-[#fdeaef] text-[#f2557a]' :
-                      m.modeTag === '复习巩固' ? 'bg-[#e7f7ee] text-[#18a558]' :
-                      m.modeTag === '预习' ? 'bg-[#e6edfa] text-[#2b5fa8]' :
-                      'bg-[var(--accent-soft)] text-[var(--accent-strong)]'
-                    ">{{ m.modeTag }}</span>
                     <p class="text-[15px] leading-relaxed text-[var(--ink)]" style="white-space: pre-wrap; word-break: break-word;">
-                      {{ m.text }}
+                      <span v-if="m.modeTag" class="font-semibold" :class="
+                        m.modeTag.includes('突破') ? 'text-[#f2557a]' :
+                        m.modeTag.includes('复习巩固') ? 'text-[#18a558]' :
+                        m.modeTag.includes('预习') ? 'text-[#2b5fa8]' :
+                        'text-[var(--accent-strong)]'
+                      ">{{ m.modeTag }}</span>{{ m.text }}
                     </p>
                     <span class="mt-1 inline-block text-[10px] text-[var(--ink-soft)]/60">{{ formatTime() }}</span>
                   </div>

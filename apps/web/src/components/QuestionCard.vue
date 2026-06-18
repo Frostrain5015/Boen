@@ -304,6 +304,19 @@ watch(
             </span>
           </div>
 
+          <!-- 熟练度变化提示 -->
+          <div v-if="(grading as any).proficiencyChanges?.length" class="mt-2 space-y-0.5">
+            <p class="text-[11px] font-medium text-[var(--ink-soft)]">知识图谱更新</p>
+            <div v-for="pc in (grading as any).proficiencyChanges" :key="pc.kp" class="flex items-center gap-1.5 text-[11px]">
+              <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
+              <span class="font-semibold" :class="pc.after >= pc.before ? 'text-[#18a558]' : 'text-[#f2557a]'">
+                {{ pc.before }}% <span v-if="pc.after > pc.before">→</span> {{ pc.after }}%
+              </span>
+              <span v-if="pc.after > pc.before" class="text-[#18a558]">↑</span>
+              <span v-else-if="pc.after < pc.before" class="text-[#f2557a]">↓</span>
+            </div>
+          </div>
+
           <p class="mt-2 text-sm"><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="md-body" v-html="renderMarkdownInline(grading.reference)"></span></p>
 
           <!-- 查看解析按钮（作答后默认折叠） -->
