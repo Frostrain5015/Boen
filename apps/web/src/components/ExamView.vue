@@ -26,6 +26,7 @@ interface ExamQuestionData {
   blankCount?: number;
   knowledgePoint?: string;
   difficulty?: string;
+  groupId?: number;
 }
 
 interface ExamSessionData {
@@ -65,6 +66,22 @@ const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'analyze' as 'analyze' | 'write' | 'review', message: '', progress: 0 });
 const scoreRevealed = ref(false);
+
+/** 将题目按 groupId 分组，无 groupId 的每题自成一组 */
+const groupedQuestions = computed(() => {
+  const qs = session.value?.questions ?? [];
+  const groups: Array<{ groupId?: number; passage?: string; questions: ExamQuestionData[] }> = [];
+  let current: { groupId: number | undefined; passage: string | undefined; questions: ExamQuestionData[] } | null = null;
+  for (const q of qs) {
+    if (current && q.groupId !== undefined && current.groupId === q.groupId) {
+      current.questions.push(q);
+    } else {
+      current = { groupId: q.groupId, passage: q.passage, questions: [q] };
+      groups.push(current);
+    }
+  }
+  return groups;
+});
 
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },

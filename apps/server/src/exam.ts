@@ -17,6 +17,7 @@ import type { ShortAnswerGrader } from '@boen/agent-core';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
+import { getExamStructure, getStructureByTotalScore, type ExamStructure } from './exam-structures.js';
 
 // ── 配置类型 ─────────────────────────────────
 
@@ -116,7 +117,7 @@ function defaultBlueprint(
   return {
     title: `${subjectLabel[config.subject] ?? config.subject}${gradeLabel(config.grade)}综合试卷`,
     sections: 3, totalScore,
-    questionTypes: blueprintForTotalScore(totalScore),
+    questionTypes: blueprintForTotalScore(totalScore, config.grade),
   };
 }
 
@@ -130,29 +131,18 @@ const FIXED_POINTS: Record<string, number> = {
   short_answer: 8,
 };
 
-/** 根据总分返回推荐的题型配比 */
-function blueprintForTotalScore(totalScore: number): Array<{ type: string; label: string; count: number; pointsPer: number; focusKps: string[] }> {
-  if (totalScore <= 20) {
-    return [
-      { type: 'multiple_choice', label: '选择题', count: 4, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
-      { type: 'fill_blank', label: '填空题', count: 2, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
-      { type: 'true_false', label: '判断题', count: 1, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
-    ];
-  }
-  if (totalScore <= 50) {
-    return [
-      { type: 'multiple_choice', label: '选择题', count: 8, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
-      { type: 'fill_blank', label: '填空题', count: 4, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
-      { type: 'true_false', label: '判断题', count: 3, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
-      { type: 'short_answer', label: '简答题', count: 1, pointsPer: FIXED_POINTS.short_answer, focusKps: [] },
-    ];
-  }
-  return [
-    { type: 'multiple_choice', label: '选择题', count: 12, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
-    { type: 'fill_blank', label: '填空题', count: 6, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
-    { type: 'true_false', label: '判断题', count: 5, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
-    { type: 'short_answer', label: '简答题', count: 3, pointsPer: FIXED_POINTS.short_answer, focusKps: [] },
-  ];
+/** 根据年级和总分返回题型配比（从知识库按需加载） */
+function blueprintForTotalScore(totalScore: number, grade?: string): Array<{ type: string; label: string; count: number; pointsPer: number; focusKps: string[] }> {
+  const struct = grade ? getExamStructure(grade) : getStructureByTotalScore(totalScore);
+  // 根据总分按比例缩放题型数量，保持结构比例
+  const ratio = totalScore / struct.totalScore;
+  return struct.questionTypes.map(qt => ({
+    type: qt.type,
+    label: qt.label,
+    count: Math.max(1, Math.round(qt.count * ratio)),
+    pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
+    focusKps: [] as string[],
+  }));
 }
 
 // ── 考试生成（三步流水线） ──────────────────
@@ -176,7 +166,7 @@ export async function generateExam(
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
   // 标准化：用固定基础分值覆盖 LLM 自由分配的点数，仅保留题型数量和配比
-  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore);
+  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore, config.grade);
   blueprint.questionTypes = blueprint.questionTypes.map((qt, i) => ({
     ...qt,
     pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
@@ -333,6 +323,7 @@ async function stepWriteQuestions(
     '',
     `一次性输出全部 ${qt.count} 道题的数组。每道题必须包含: type, stem, points, knowledgePoint, literacies, difficulty, explanation。`,
     'knowledgePoint 和 literacies 必须填写，不能为空。',
+    '分步设问：如果多题共享同一段阅读材料或同一个题干场景（如阅读理解、几何大题），给它们相同的 groupId（数字），并将共享内容写在第一题的 passage 字段中，后续同组题不再重复 passage。没有分组的题不填 groupId。',
     '排版：公式/方程一律用 KaTeX。行内用 $...$（如 $y = 3x - 5$），行间用 $$...$$ 独占一行（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。**$$ 必须成对出现**：开头 $$ + 内容 + 结尾 $$，绝不能只有结尾没有开头。**定理、定义、重要公式、推导必须用行间公式 $$...$$**。',
     '题目涉及几何图形、函数图像、受力分析、电路、坐标系、统计图等可视化内容时，',
     '在 stem（或 explanation）里用 TikZ 代码块（```tikz ... ```）画示意图，前端会编译成矢量图——直观的示意图更利于学生理解；不要用字符拼图。',
@@ -355,7 +346,7 @@ async function stepWriteQuestions(
       throw new Error('JSON 解析失败');
     }
     return (parsed.questions || []).map((q: any, i: number) => {
-      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '' };
+      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '', groupId: q.groupId ?? undefined };
       if (base.type === 'multiple_choice') {
         const opts = (q.options || []).filter((o: any) => o?.key);
         while (opts.length < 2) opts.push({ key: String.fromCharCode(65 + opts.length), text: '选项' + String.fromCharCode(65 + opts.length) });

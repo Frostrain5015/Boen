@@ -142,6 +142,8 @@ export interface ExamQuestion {
   literacies?: string[];
   difficulty?: Difficulty;
   explanation: string;
+  /** 分步设问分组 ID：同 groupId 的题目共享 passage/stem，前端合并展示 */
+  groupId?: number;
 }
 
 export interface ExamQuestionResult {
