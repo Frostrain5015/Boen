@@ -112,16 +112,47 @@ function safeParseJson(raw: string): any {
 function defaultBlueprint(
   subjectLabel: Record<string, string>, gradeLabel: (g: string) => string, config: ExamConfig,
 ) {
+  const totalScore = config.totalScore || 100;
   return {
     title: `${subjectLabel[config.subject] ?? config.subject}${gradeLabel(config.grade)}综合试卷`,
-    sections: 3, totalScore: config.totalScore || 100,
-    questionTypes: [
-      { type: 'multiple_choice', label: '选择题', count: 10, pointsPer: 4, focusKps: [] },
-      { type: 'fill_blank', label: '填空题', count: 4, pointsPer: 5, focusKps: [] },
-      { type: 'true_false', label: '判断题', count: 4, pointsPer: 5, focusKps: [] },
-      { type: 'short_answer', label: '简答题', count: 2, pointsPer: 10, focusKps: [] },
-    ],
+    sections: 3, totalScore,
+    questionTypes: blueprintForTotalScore(totalScore),
   };
+}
+
+// ── 固定题分与配比 ────────────────────────
+
+/** 各题型固定基础分值（不因总分档位变化） */
+const FIXED_POINTS: Record<string, number> = {
+  multiple_choice: 3,
+  fill_blank: 3,
+  true_false: 2,
+  short_answer: 8,
+};
+
+/** 根据总分返回推荐的题型配比 */
+function blueprintForTotalScore(totalScore: number): Array<{ type: string; label: string; count: number; pointsPer: number; focusKps: string[] }> {
+  if (totalScore <= 20) {
+    return [
+      { type: 'multiple_choice', label: '选择题', count: 4, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
+      { type: 'fill_blank', label: '填空题', count: 2, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
+      { type: 'true_false', label: '判断题', count: 1, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
+    ];
+  }
+  if (totalScore <= 50) {
+    return [
+      { type: 'multiple_choice', label: '选择题', count: 8, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
+      { type: 'fill_blank', label: '填空题', count: 4, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
+      { type: 'true_false', label: '判断题', count: 3, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
+      { type: 'short_answer', label: '简答题', count: 1, pointsPer: FIXED_POINTS.short_answer, focusKps: [] },
+    ];
+  }
+  return [
+    { type: 'multiple_choice', label: '选择题', count: 12, pointsPer: FIXED_POINTS.multiple_choice, focusKps: [] },
+    { type: 'fill_blank', label: '填空题', count: 6, pointsPer: FIXED_POINTS.fill_blank, focusKps: [] },
+    { type: 'true_false', label: '判断题', count: 5, pointsPer: FIXED_POINTS.true_false, focusKps: [] },
+    { type: 'short_answer', label: '简答题', count: 3, pointsPer: FIXED_POINTS.short_answer, focusKps: [] },
+  ];
 }
 
 // ── 考试生成（三步流水线） ──────────────────
@@ -143,6 +174,16 @@ export async function generateExam(
     const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
 
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
+
+  // 标准化：用固定基础分值覆盖 LLM 自由分配的点数，仅保留题型数量和配比
+  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore);
+  blueprint.questionTypes = blueprint.questionTypes.map((qt, i) => ({
+    ...qt,
+    pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
+    count: fixedTypes.find(t => t.type === qt.type)?.count ?? qt.count,
+  }));
+  // 重新计算总分
+  blueprint.totalScore = blueprint.questionTypes.reduce((s, qt) => s + qt.count * qt.pointsPer, 0);
 
   // ─── Step 2: 出题（并发：4 种题型同时编写） ──
   await onProgress?.({ step: 'write', message: '正在并行编写试题…', progress: 25 });
@@ -801,7 +842,7 @@ function computeKpBreakdown(results: ExamQuestionResult[]): Array<{ kp: string; 
   return Array.from(map.entries()).map(([kp, v]) => ({ kp, score: v.score, maxScore: v.maxScore, percentage: v.maxScore > 0 ? Math.round((v.score / v.maxScore) * 100) : 0 }));
 }
 
-function computeLiteracyBreakdown(results: ExamQuestionResult[]): Array<{ literacy: string; score: number; maxScore: number }> {
+function computeLiteracyBreakdown(results: ExamQuestionResult[]): Array<{ literacy: string; score: number; maxScore: number; percentage: number }> {
   const map = new Map<string, { score: number; maxScore: number }>();
   for (const r of results) {
     for (const lit of r.literacy ?? []) {
@@ -811,7 +852,7 @@ function computeLiteracyBreakdown(results: ExamQuestionResult[]): Array<{ litera
       map.set(lit, prev);
     }
   }
-  return Array.from(map.entries()).map(([lit, v]) => ({ literacy: lit, score: v.score, maxScore: v.maxScore }));
+  return Array.from(map.entries()).map(([lit, v]) => ({ literacy: lit, score: v.score, maxScore: v.maxScore, percentage: v.maxScore > 0 ? Math.round((v.score / v.maxScore) * 100) : 0 }));
 }
 
 /**

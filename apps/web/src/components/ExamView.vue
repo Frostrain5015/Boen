@@ -48,7 +48,7 @@ interface ExamResultsData {
   }>;
   tierBreakdown: Array<{ tier: string; correct: number; total: number; percentage: number }>;
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
-  literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
+  literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number; percentage: number }>;
   analysis?: string;
   proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }>;
 }
@@ -276,6 +276,16 @@ function revealResults() {
 
 /** 动画显示的分值：逐步递增 */
 const displayPct = ref(0);
+/** 把 proficiencyChanges 数组转成按 kpTitle 索引的 Map，方便模板查找 */
+const proficiencyMap = computed(() => {
+  const m: Record<string, { before: number; after: number }> = {};
+  if (results.value?.proficiencyChanges) {
+    for (const pc of results.value.proficiencyChanges) {
+      m[pc.kpTitle] = { before: pc.before, after: pc.after };
+    }
+  }
+  return m;
+});
 watch(scoreRevealed, (v) => {
   if (v && results.value) {
     displayPct.value = 0;
@@ -526,37 +536,35 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           </div>
         </div>
 
-        <!-- KP Breakdown -->
+        <!-- 知识点分析 + 熟练度变化（合并） -->
         <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
           <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">知识点分析</h3>
           <div v-for="kp in results.kpBreakdown" :key="kp.kp" class="mb-2 flex items-center gap-3 last:mb-0">
             <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
-            <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ kp.kp }}</span>
-            <div class="h-1.5 w-16 overflow-hidden rounded-full bg-[var(--line)]"><div class="h-full rounded-full" :style="{ width: kp.percentage + '%', background: masteryColor(kp.percentage) }"></div></div>
-            <span class="text-xs font-bold" :style="{ color: masteryColor(kp.percentage) }">{{ kp.percentage }}%</span>
+            <span class="flex-1 min-w-0 truncate text-xs font-medium text-[var(--ink)]">{{ kp.kp }}</span>
+            <div class="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--line)]"><div class="h-full rounded-full" :style="{ width: kp.percentage + '%', background: masteryColor(kp.percentage) }"></div></div>
+            <span class="shrink-0 text-xs font-bold" :style="{ color: masteryColor(kp.percentage) }">{{ kp.percentage }}%</span>
+            <span v-if="proficiencyMap[kp.kp]" class="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" :class="proficiencyMap[kp.kp].after >= proficiencyMap[kp.kp].before ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fdeaef] text-[#f2557a]'">
+              <span v-if="proficiencyMap[kp.kp].after > proficiencyMap[kp.kp].before">↑</span>
+              <span v-else-if="proficiencyMap[kp.kp].after < proficiencyMap[kp.kp].before">↓</span>
+              <span>{{ proficiencyMap[kp.kp].before }}→{{ proficiencyMap[kp.kp].after }}</span>
+            </span>
           </div>
         </div>
 
-        <!-- Literacy Breakdown -->
-        <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 250 } }">
-          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养</h3>
-          <div class="flex flex-wrap gap-2">
-            <span v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="inline-flex items-center gap-1.5 rounded-full bg-[#f0e7fa] px-3 py-1.5 text-xs font-semibold text-[#7c3aae]"><BrainCircuit class="h-3 w-3" />{{ lit.literacy }} <span class="opacity-60">{{ lit.score }}/{{ lit.maxScore }}</span></span>
-          </div>
-        </div>
-
-        <!-- 熟练度变化 -->
-        <div v-if="results.proficiencyChanges?.length" class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 280 } }">
-          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">知识图谱更新</h3>
-          <div class="space-y-2">
-            <div v-for="pc in results.proficiencyChanges" :key="pc.kpTitle" class="flex items-center gap-2 rounded-xl bg-[var(--surface)] px-3 py-2">
-              <span class="flex-1 truncate text-xs font-medium text-[var(--ink)]">{{ pc.kpTitle }}</span>
-              <span class="flex items-center gap-1 text-xs font-bold" :class="pc.after >= pc.before ? 'text-[#18a558]' : 'text-[#f2557a]'">
-                <span :class="pc.after >= pc.before ? '' : 'hidden'">{{ pc.before }}%</span>
-                <span v-if="pc.after > pc.before" class="text-xs">↑</span>
-                <span v-if="pc.after < pc.before" class="text-xs">↓</span>
-                <span>{{ pc.after }}%</span>
-              </span>
+        <!-- 核心素养（主指标，优先展示） -->
+        <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养 <span class="font-normal text-[var(--ink-soft)]/60">— 综合能力评价</span></h3>
+          <div class="flex flex-wrap gap-3">
+            <div v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3 min-w-[100px]">
+              <span class="text-xs font-semibold text-[var(--ink)]">{{ lit.literacy }}</span>
+              <span class="font-display text-xl font-bold" :style="{ color: masteryColor(lit.percentage) }">{{ lit.percentage }}<span class="text-xs">%</span></span>
+              <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" :class="
+                lit.percentage >= 80 ? 'bg-[#e7f7ee] text-[#18a558]' :
+                lit.percentage >= 60 ? 'bg-[#fef7e6] text-[#e0a92e]' :
+                lit.percentage >= 40 ? 'bg-[#fef3e2] text-[#f59e42]' :
+                'bg-[#fdeaef] text-[#f2557a]'
+              ">{{ lit.percentage >= 80 ? '优秀' : lit.percentage >= 60 ? '良好' : lit.percentage >= 40 ? '待加强' : '薄弱' }}</span>
             </div>
           </div>
         </div>
