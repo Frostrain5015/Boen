@@ -16,6 +16,7 @@ import {
 import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
+import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import {
   createConversation,
   getConversations,
@@ -183,6 +184,23 @@ app.get('/api/kg/unit/:unitId', (c) => {
   if (isNaN(unitId)) return c.json({ error: 'unitId 无效' }, 400);
   const context = getKgContextForUnit(unitId);
   return c.json({ unitId, context });
+});
+
+// ── 知识点权重 API ────────────────────────────
+/** GET /api/kg/weights/distribution?subject=math&grade=7 — 权重分布 */
+app.get('/api/kg/weights/distribution', (c) => {
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade');
+  const dist = getWeightDistribution(subject, grade);
+  return c.json({ subject, grade, total: dist.length, distribution: dist });
+});
+
+/** GET /api/kg/weights/guide?subject=math&grade=7 — 出题参考文本 */
+app.get('/api/kg/weights/guide', (c) => {
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade') || '7';
+  const guide = formatWeightGuide(subject, grade);
+  return c.json({ subject, grade, guide });
 });
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──

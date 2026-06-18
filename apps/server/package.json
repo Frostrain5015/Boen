@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "seed:curriculum": "tsx src/seed-curriculum.ts",
     "seed:kg": "tsx src/seed-knowledge-graph.ts",
+    "seed:weights": "tsx src/kg-weights.ts",
     "verify:curriculum": "tsx src/verify-curriculum.ts"
   },
   "dependencies": {
