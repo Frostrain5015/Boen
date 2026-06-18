@@ -41,7 +41,7 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
 
 function createModel(provider: string) {
-  if (provider === 'deepseek') {
+  if (provider === 'deepseek' || provider === 'default') {
     return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY });
   }
   return getChatModel({
