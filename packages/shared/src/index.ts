@@ -22,7 +22,7 @@ export function gradeLabel(grade: Grade): string {
 }
 
 /** 智能体工作模式 */
-export type BoenMode = 'qa' | 'review' | 'ai-learning' | 'exam';
+export type BoenMode = 'qa' | 'review' | 'preview' | 'weakness' | 'ai-learning' | 'exam';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';

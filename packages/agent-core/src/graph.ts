@@ -10,7 +10,7 @@ import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
-import { systemPromptForQa, systemPromptForReview } from './prompts.js';
+import { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness } from './prompts.js';
 import { quizTools } from './quiz/index.js';
 import {
   LOOKUP_KNOWLEDGE_POINT_TOOL,
@@ -55,6 +55,14 @@ function detectReviewIntent(text: string): boolean {
   return /^(教我|讲(一?下)|讲解|复习|学习|仔细说说|辅导)/.test(text.trim());
 }
 
+function detectPreviewIntent(text: string): boolean {
+  return /预习|提前看|先看看|准备上课|课堂准备/i.test(text.trim());
+}
+
+function detectWeaknessIntent(text: string): boolean {
+  return /薄弱|总是错|老错|总做错|反复错|突破|提分/i.test(text.trim());
+}
+
 /** 复习完成工具 */
 export const COMPLETE_REVIEW_TOOL = 'complete_review';
 
@@ -85,12 +93,18 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     if (last && isHumanMessage(last)) {
       const text = String(last.content);
       const { force, tool: qTool } = detectQuizIntent(text);
+      if (detectPreviewIntent(text)) {
+        return { mode: 'preview', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
+      }
       if (detectReviewIntent(text)) {
         return { mode: 'review', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
       }
-      // 复习模式中收到用户消息 → 切回 teaching 阶段（强制讲解，不出题）
-      if (state.mode === 'review') {
-        return { mode: 'review', reviewPhase: 'teaching', forceQuiz: false };
+      if (detectWeaknessIntent(text)) {
+        return { mode: 'weakness', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
+      }
+      // 学习模式中收到用户消息 → 切回讲解阶段
+      if (state.mode === 'review' || state.mode === 'preview' || state.mode === 'weakness') {
+        return { mode: state.mode, reviewPhase: 'teaching', forceQuiz: false };
       }
       return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: qTool };
     }
@@ -118,13 +132,23 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     if (state.mode === 'review') {
       system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (!model.bindTools) { /* no tool support */ }
-      // 交替制：ToolMessage(刚判分完)→quizzing(继续出题)
-      //          用户消息→teaching(讲解)
-      //          reviewPhase 由 router(用户消息→teaching) 和本节点(判分后→quizzing) 控制
       else if (state.reviewPhase === 'quizzing') {
         tools = model.bindTools(reviewTools as any);
       }
-      // teaching 或默认：只绑定完成+查询工具，无出题工具 → 强制讲解
+      else {
+        const teachTools: any[] = [completeReviewTool];
+        if (deps.lookupKnowledgePoint) teachTools.push(lookupKnowledgePointTool);
+        tools = model.bindTools(teachTools);
+      }
+    } else if (state.mode === 'preview') {
+      system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
+      tools = model.bindTools ? model.bindTools(qaTools as any) : undefined;
+    } else if (state.mode === 'weakness') {
+      system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
+      if (!model.bindTools) { /* no tool support */ }
+      else if (state.reviewPhase === 'quizzing') {
+        tools = model.bindTools(reviewTools as any);
+      }
       else {
         const teachTools: any[] = [completeReviewTool];
         if (deps.lookupKnowledgePoint) teachTools.push(lookupKnowledgePointTool);
@@ -150,10 +174,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
       : [system, ...state.messages];
     const response = await llm.invoke(messages);
 
-    // 复习模式阶段控制
-    if (state.mode === 'review') {
+    // 学习模式阶段控制（review/weakness 支持交替讲练）
+    if (state.mode === 'review' || state.mode === 'weakness') {
       const result: Record<string, unknown> = { messages: [response] };
-      // 判分反馈到后 → 切 quizzing，让模型可以继续出题
       if (last && isToolMessage(last)) {
         result.reviewPhase = 'quizzing';
       }
