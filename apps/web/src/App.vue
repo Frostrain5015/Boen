@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, watch, onMounted } from 'vue';
 import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams as runTikz } from '@/lib/tikz';
@@ -507,6 +507,39 @@ function handleLogout() {
   logout();
 }
 
+// ── 浏览器页签 favicon：跟随学科 accent 变色 ──────
+const ACCENT_MAP: Record<string, string> = {
+  chinese: '#ff7a4d', math: '#14b48a', english: '#6c5ce7', science: '#3498db',
+};
+function makeFaviconSvg(accent: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <circle cx="50" cy="55" r="33" fill="${accent}"/>
+    <rect x="36" y="18" width="28" height="11" rx="3" fill="#2c2722"/>
+    <polygon points="50,8 78,20 50,32 22,20" fill="#37322c"/>
+    <polygon points="50,12 72,20 50,28 28,20" fill="#2c2722"/>
+    <circle cx="50" cy="20" r="3" fill="${accent}"/>
+    <ellipse cx="40" cy="52" rx="8" ry="9" fill="#fffdf9"/>
+    <ellipse cx="60" cy="52" rx="8" ry="9" fill="#fffdf9"/>
+    <circle cx="42" cy="53" r="4" fill="#2c2722"/><circle cx="62" cy="53" r="4" fill="#2c2722"/>
+    <path d="M42 67 Q50 73 58 67" stroke="#2c2722" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+function updateFavicon(subj: string) {
+  const color = ACCENT_MAP[subj] ?? '#14b48a';
+  const svg = makeFaviconSvg(color);
+  const encoded = encodeURIComponent(svg);
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'icon';
+    document.head.appendChild(link);
+  }
+  link.href = `data:image/svg+xml,${encoded}`;
+}
+
+// 初始化 favicon 并随学科切换变色
+watch(subject, updateFavicon, { immediate: true });
+
 // 点击外部关闭用户菜单
 function onClickOutside(e: MouseEvent) {
   const target = e.target as HTMLElement;
@@ -579,8 +612,8 @@ onMounted(() => {
       >
         <!-- 内层固定 256px，宽度动画时整体被裁切，内容不重排 -->
         <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
-          <!-- 品牌 + 折叠 -->
-          <div class="flex items-center justify-between border-b border-[var(--line)] px-3 py-2.5">
+          <!-- 品牌 + 折叠（聊天模式下与 header logo 重叠，自动淡出） -->
+          <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
             <div class="flex items-center gap-2">
               <Mascot :size="28" :float="false" :animated="false" />
               <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
@@ -688,24 +721,16 @@ onMounted(() => {
         <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
       </button>
 
-      <!-- 浮动吉祥物：无对话时居中（120px），开始对话后飞到左上角（46px）并播放变色动画 -->
+      <!-- 对话模式下的左上角吉祥物（淡入，播放变色动画） -->
       <div
-        class="fixed z-30 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] pointer-events-none"
+        v-if="hasItems"
+        class="fixed z-30 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)]"
         :style="{
-          top: hasItems ? '14px' : '50%',
-          left: hasItems ? (sidebarOpen ? '276px' : '20px') : '50%',
-          transform: hasItems ? 'translate(0,0) scale(1)' : 'translate(-50%,-50%) scale(1)',
-          width: hasItems ? '46px' : '120px',
-          height: hasItems ? '46px' : '120px',
+          top: '14px',
+          left: sidebarOpen ? '276px' : '20px',
         }"
       >
-        <Mascot
-          :size="hasItems ? 46 : 120"
-          :state="mascotState"
-          :float="hasItems"
-          :animated="hasItems"
-          :class="hasItems ? 'mascot-corner-cycle' : ''"
-        />
+        <Mascot :size="46" :state="mascotState" :float="true" :animated="true" class="mascot-corner-cycle" />
       </div>
 
       <!-- 主内容区（min-h-0 + min-w-0：让内部滚动区真正裁切，页面不被内容撑高） -->
@@ -800,7 +825,7 @@ onMounted(() => {
             <Transition name="panel" mode="out-in">
             <!-- 欢迎页 -->
             <div v-if="!hasItems" key="welcome" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
-              <div style="height:120px"><!-- 占位，mascot 由浮动组件提供 --></div>
+              <Mascot :size="120" :state="mascotState" />
               <div>
                 <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
                 <p class="mt-1.5 text-[var(--ink-soft)]">问我问题，或者说一句「考我一道题」来练习吧～</p>
