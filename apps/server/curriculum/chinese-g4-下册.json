@@ -1,0 +1,108 @@
+{
+  "subject": "chinese",
+  "grade": "4",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3209.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 古诗词三首（四时田园杂兴/宿新市徐公店/清平乐村居）", "kind": "lesson" },
+        { "title": "2 乡下人家", "kind": "lesson" },
+        { "title": "3 天窗", "kind": "lesson" },
+        { "title": "4* 三月桃花水", "kind": "lesson" },
+        { "title": "口语交际：转述", "kind": "lesson" },
+        { "title": "习作：我的乐园", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 琥珀", "kind": "lesson" },
+        { "title": "6 飞向蓝天的恐龙", "kind": "lesson" },
+        { "title": "7 纳米技术就在我们身边", "kind": "lesson" },
+        { "title": "8* 千年梦圆在今朝", "kind": "lesson" },
+        { "title": "口语交际：说新闻", "kind": "lesson" },
+        { "title": "习作：我的奇思妙想", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：十万个为什么", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "9 短诗三首（繁星）", "kind": "lesson" },
+        { "title": "10 绿", "kind": "lesson" },
+        { "title": "11 白桦", "kind": "lesson" },
+        { "title": "12* 在天晴了的时候", "kind": "lesson" },
+        { "title": "综合性学习：轻叩诗歌大门", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "13 猫", "kind": "lesson" },
+        { "title": "14 母鸡", "kind": "lesson" },
+        { "title": "15 白鹅", "kind": "lesson" },
+        { "title": "习作：我的动物朋友", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 海上日出", "kind": "lesson" },
+        { "title": "17 记金华的双龙洞", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：游____", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 文言文二则（囊萤夜读/铁杵成针）", "kind": "lesson" },
+        { "title": "19 小英雄雨来（节选）", "kind": "lesson" },
+        { "title": "20* 我们家的男子汉", "kind": "lesson" },
+        { "title": "21* 芦花鞋", "kind": "lesson" },
+        { "title": "口语交际：朋友相处的秘诀", "kind": "lesson" },
+        { "title": "习作：我学会了____", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "22 古诗三首（芙蓉楼送辛渐/塞下曲/墨梅）", "kind": "lesson" },
+        { "title": "23 黄继光", "kind": "lesson" },
+        { "title": "24 诺曼底号遇难记", "kind": "lesson" },
+        { "title": "25* 挑山工", "kind": "lesson" },
+        { "title": "口语交际：自我介绍", "kind": "lesson" },
+        { "title": "习作：我的自画像", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "26 宝葫芦的秘密（节选）", "kind": "lesson" },
+        { "title": "27 巨人的花园", "kind": "lesson" },
+        { "title": "28* 海的女儿", "kind": "lesson" },
+        { "title": "习作：故事新编", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

@@ -1,0 +1,89 @@
+{
+  "subject": "chinese",
+  "grade": "6",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3211.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 北京的春节", "kind": "lesson" },
+        { "title": "2 腊八粥", "kind": "lesson" },
+        { "title": "3 古诗三首（寒食/迢迢牵牛星/十五夜望月）", "kind": "lesson" },
+        { "title": "4* 藏戏", "kind": "lesson" },
+        { "title": "口语交际：即兴发言", "kind": "lesson" },
+        { "title": "习作：家乡的风俗", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 鲁滨逊漂流记（节选）", "kind": "lesson" },
+        { "title": "6* 骑鹅旅行记（节选）", "kind": "lesson" },
+        { "title": "7* 汤姆索亚历险记（节选）", "kind": "lesson" },
+        { "title": "口语交际：同读一本书", "kind": "lesson" },
+        { "title": "习作：写作品梗概", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：漫步世界名著花园", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "8 匆匆", "kind": "lesson" },
+        { "title": "9 那个星期天", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：让真情自然流露", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "10 古诗三首（马诗/石灰吟/竹石）", "kind": "lesson" },
+        { "title": "11 十六年前的回忆", "kind": "lesson" },
+        { "title": "12 为人民服务", "kind": "lesson" },
+        { "title": "13* 董存瑞舍身炸暗堡", "kind": "lesson" },
+        { "title": "综合性学习：奋斗的历程", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元",
+      "kind": "unit",
+      "children": [
+        { "title": "14 文言文二则（学弈/两小儿辩日）", "kind": "lesson" },
+        { "title": "15 真理诞生于一百个问号之后", "kind": "lesson" },
+        { "title": "16 表里的生物", "kind": "lesson" },
+        { "title": "17* 他们那时候多有趣啊", "kind": "lesson" },
+        { "title": "口语交际：辩论", "kind": "lesson" },
+        { "title": "习作：插上科学的翅膀飞", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 综合性学习",
+      "kind": "unit",
+      "children": [
+        { "title": "难忘小学生活——回忆往事", "kind": "lesson" },
+        { "title": "难忘小学生活——依依惜别", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "古诗词诵读",
+      "kind": "unit",
+      "children": [
+        { "title": "采薇（节选）/ 送元二使安西 / 春夜喜雨 / 早春呈水部张十八员外", "kind": "lesson" },
+        { "title": "江上渔者 / 泊船瓜洲 / 游园不值 / 卜算子送鲍浩然之浙东", "kind": "lesson" },
+        { "title": "浣溪沙 / 清平乐", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

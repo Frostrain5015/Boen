@@ -1,0 +1,83 @@
+{
+  "subject": "english",
+  "grade": "8",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，新目标）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3268.html",
+  "units": [
+    {
+      "title": "Unit 1 Time to Relax",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 2 Stay Healthy",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 3 Growing Up",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 4 The Wonders of Nature",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 5 Nature's Temper",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 6 Crossing Cultures",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 7 A Good Read",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "Unit 8 Making a Difference",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" },
+        { "title": "Project", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

@@ -1,0 +1,108 @@
+{
+  "subject": "chinese",
+  "grade": "3",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3208.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 古诗三首（绝句/惠崇春江晚景/三衢道中）", "kind": "lesson" },
+        { "title": "2 燕子", "kind": "lesson" },
+        { "title": "3 荷花", "kind": "lesson" },
+        { "title": "4* 昆虫备忘录", "kind": "lesson" },
+        { "title": "口语交际：春游去哪儿玩", "kind": "lesson" },
+        { "title": "习作：我的植物朋友", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 守株待兔", "kind": "lesson" },
+        { "title": "6 陶罐和铁罐", "kind": "lesson" },
+        { "title": "7 美丽的鹿角", "kind": "lesson" },
+        { "title": "8* 池子与河流", "kind": "lesson" },
+        { "title": "口语交际：该不该实行班干部轮流制", "kind": "lesson" },
+        { "title": "习作：看图画写一写", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "9 古诗三首（元日/清明/九月九日忆山东兄弟）", "kind": "lesson" },
+        { "title": "10 纸的发明", "kind": "lesson" },
+        { "title": "11 赵州桥", "kind": "lesson" },
+        { "title": "12* 一幅名扬中外的画", "kind": "lesson" },
+        { "title": "综合性学习：中华传统节日", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "13 花钟", "kind": "lesson" },
+        { "title": "14 蜜蜂", "kind": "lesson" },
+        { "title": "15* 小虾", "kind": "lesson" },
+        { "title": "习作：我做了一项小实验", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 宇宙的另一边", "kind": "lesson" },
+        { "title": "17 我变成了一棵树", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：奇妙的想象", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 童年的水墨画", "kind": "lesson" },
+        { "title": "19 剃头大师", "kind": "lesson" },
+        { "title": "20 肥皂泡", "kind": "lesson" },
+        { "title": "21* 我不能失信", "kind": "lesson" },
+        { "title": "习作：身边那些有特点的人", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "22 我们奇妙的世界", "kind": "lesson" },
+        { "title": "23 海底世界", "kind": "lesson" },
+        { "title": "24 火烧云", "kind": "lesson" },
+        { "title": "口语交际：劝告", "kind": "lesson" },
+        { "title": "习作：国宝大熊猫", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "25 慢性子裁缝和急性子顾客", "kind": "lesson" },
+        { "title": "26* 方帽子店", "kind": "lesson" },
+        { "title": "27 漏", "kind": "lesson" },
+        { "title": "28* 枣核", "kind": "lesson" },
+        { "title": "口语交际：趣味故事会", "kind": "lesson" },
+        { "title": "习作：这样想象真有趣", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

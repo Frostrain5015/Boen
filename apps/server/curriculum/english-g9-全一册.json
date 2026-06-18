@@ -1,0 +1,123 @@
+{
+  "subject": "english",
+  "grade": "9",
+  "volume": "全一册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，新目标）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3269.html",
+  "units": [
+    {
+      "title": "Unit 1 How can we become good learners?",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 2 I think that mooncakes are delicious!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 3 Could you please tell me where the restrooms are?",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 4 I used to be afraid of the dark.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 5 What are the shirts made of?",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 6 When was it invented?",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 7 Teenagers should be allowed to choose their own clothes.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 8 It must belong to Carla.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 9 I like music that I can dance to.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 10 You're supposed to shake hands.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 11 Sad movies make me cry.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 12 Life is full of the unexpected.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 13 We're trying to save the earth!",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 14 I remember meeting all of you in Grade 7.",
+      "kind": "unit",
+      "children": [
+        { "title": "Section A", "kind": "section" },
+        { "title": "Section B", "kind": "section" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

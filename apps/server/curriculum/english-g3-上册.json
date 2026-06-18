@@ -1,0 +1,65 @@
+{
+  "subject": "english",
+  "grade": "3",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，PEP）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3260.html",
+  "units": [
+    {
+      "title": "Unit 1 Making Friends",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: How do we greet friends?", "kind": "section" },
+        { "title": "Part B: How can we be a good friend?", "kind": "section" },
+        { "title": "Part C: Project + Reading time", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 2 Different Families",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: Who lives with you?", "kind": "section" },
+        { "title": "Part B: How are families different?", "kind": "section" },
+        { "title": "Part C: Project: Make a family tree", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 3 Amazing Animals",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: What pets do you know?", "kind": "section" },
+        { "title": "Part B: What wild animals do you know?", "kind": "section" },
+        { "title": "Part C: Project", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 4 Plants Around Us",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: What do we get from plants?", "kind": "section" },
+        { "title": "Part B: How can we help plants?", "kind": "section" },
+        { "title": "Part C: Project: Make a paper garden", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 5 The Colourful World",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: What colours do you see?", "kind": "section" },
+        { "title": "Part B: How do colours help us?", "kind": "section" },
+        { "title": "Part C: Project", "kind": "section" }
+      ]
+    },
+    {
+      "title": "Unit 6 Useful Numbers",
+      "kind": "unit",
+      "children": [
+        { "title": "Part A: When do we use numbers?", "kind": "section" },
+        { "title": "Part B: How useful are numbers?", "kind": "section" },
+        { "title": "Part C: Project: Make a birthday card", "kind": "section" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

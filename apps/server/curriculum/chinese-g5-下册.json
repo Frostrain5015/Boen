@@ -1,0 +1,103 @@
+{
+  "subject": "chinese",
+  "grade": "5",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3210.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 古诗三首（四时田园杂兴其三十一/稚子弄冰/村晚）", "kind": "lesson" },
+        { "title": "2 祖父的园子 / 萧红", "kind": "lesson" },
+        { "title": "3* 月是故乡明 / 季羡林", "kind": "lesson" },
+        { "title": "4* 梅花魂 / 陈慧瑛", "kind": "lesson" },
+        { "title": "口语交际：走进他们的童年岁月", "kind": "lesson" },
+        { "title": "习作：那一刻，我长大了", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 草船借箭", "kind": "lesson" },
+        { "title": "6 景阳冈", "kind": "lesson" },
+        { "title": "7* 猴王出世", "kind": "lesson" },
+        { "title": "8* 红楼春趣", "kind": "lesson" },
+        { "title": "口语交际：怎么表演课本剧", "kind": "lesson" },
+        { "title": "习作：写读后感", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：读古典名著品百味人生", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 综合性学习",
+      "kind": "unit",
+      "children": [
+        { "title": "汉字真有趣", "kind": "lesson" },
+        { "title": "我爱你，汉字", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "9 古诗三首（从军行/秋夜将晓出篱门迎凉有感/闻官军收河南河北）", "kind": "lesson" },
+        { "title": "10 青山处处埋忠骨", "kind": "lesson" },
+        { "title": "11 军神", "kind": "lesson" },
+        { "title": "12* 清贫 / 方志敏", "kind": "lesson" },
+        { "title": "习作：他____了", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "13 人物描写一组（摔跤/他像一棵挺脱的树/两茎灯草）", "kind": "lesson" },
+        { "title": "14 刷子李 / 冯骥才", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：形形色色的人", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "15 自相矛盾", "kind": "lesson" },
+        { "title": "16 田忌赛马", "kind": "lesson" },
+        { "title": "17 跳水 / 列夫·托尔斯泰", "kind": "lesson" },
+        { "title": "习作：神奇的探险之旅", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 威尼斯的小艇", "kind": "lesson" },
+        { "title": "19 牧场之国", "kind": "lesson" },
+        { "title": "20* 金字塔", "kind": "lesson" },
+        { "title": "口语交际：我是小小讲解员", "kind": "lesson" },
+        { "title": "习作：中国的世界文化遗产", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "21 杨氏之子", "kind": "lesson" },
+        { "title": "22 手指 / 丰子恺", "kind": "lesson" },
+        { "title": "23* 童年的发现", "kind": "lesson" },
+        { "title": "口语交际：我们都来讲笑话", "kind": "lesson" },
+        { "title": "习作：漫画的启示", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}
