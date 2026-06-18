@@ -3,6 +3,12 @@ import { ref, computed, watch } from 'vue';
 import confetti from 'canvas-confetti';
 import { CheckCircle2, XCircle, Sparkles, Lightbulb, PencilLine, ChevronDown, ChevronUp, GraduationCap, BrainCircuit } from 'lucide-vue-next';
 import StarDisplay from '@/components/StarDisplay.vue';
+
+/** 判断两个分数对应的星级是否不同（仅在半星阈值变化时显示） */
+function starDiffers(before: number, after: number): boolean {
+  const s = (v: number) => { if (v < 0) return 0; return Math.round(Math.round(5 * Math.pow(v / 100, 0.7) * 2) / 2 * 2) / 2; };
+  return s(before) !== s(after);
+}
 import type { QuestionPayload, AnswerPayload, GradingResult } from '@boen/shared';
 import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
 
@@ -305,15 +311,18 @@ watch(
             </span>
           </div>
 
-                    <!-- 熟练度变化提示 -->
+                    <!-- 熟练度变化提示（仅星级越过半星阈值时显示） -->
           <div v-if="(grading as any).proficiencyChanges?.length" class="mt-2 space-y-1">
             <p class="text-[11px] font-medium text-[var(--ink-soft)]">熟练度变化</p>
             <div v-for="pc in (grading as any).proficiencyChanges" :key="pc.kp" class="flex items-center gap-2 text-[11px]">
               <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
               <span v-if="pc.before >= 0" class="inline-flex items-center gap-1">
                 <StarDisplay :score="pc.before" />
-                <svg v-if="pc.after !== pc.before" class="h-2.5 w-2.5 text-[var(--ink-soft)]" viewBox="0 0 20 20"><path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                <StarDisplay v-if="pc.after !== pc.before" :score="pc.after" />
+                <!-- 仅在星级不同时显示变化 -->
+                <template v-if="starDiffers(pc.before, pc.after)">
+                  <svg class="h-2.5 w-2.5 text-[var(--ink-soft)]" viewBox="0 0 20 20"><path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+                  <StarDisplay :score="pc.after" />
+                </template>
               </span>
               <span v-else class="font-semibold text-[var(--accent-strong)]">新</span>
             </div>
