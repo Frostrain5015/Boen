@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target } from 'lucide-vue-next';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target, PenTool } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams as runTikz } from '@/lib/tikz';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
@@ -939,10 +939,15 @@ onMounted(() => {
               <button @click="activateMode('review')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>学习模式</span></button>
               <button @click="activateMode('preview')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
               <button @click="activateMode('weakness')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>突破模式</span></button>
-            </div>
-            <!-- 专项练习菜单 -->
-            <div v-if="practiceMenu.length" class="mb-2 flex items-center gap-1.5 overflow-x-auto px-1">
-              <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]"><span>{{ p.label }}</span></button>
+              <!-- 专项练习（hover 展开二级菜单） -->
+              <div v-if="practiceMenu.length" class="relative inline-block group">
+                <button class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
+                <div class="absolute left-0 top-full z-50 mt-1 min-w-[140px] origin-top scale-95 opacity-0 transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+                  <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg">
+                    <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="clay flex items-end gap-2 p-2">
               <textarea
