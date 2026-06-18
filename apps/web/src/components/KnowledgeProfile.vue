@@ -296,12 +296,8 @@ watch(grade, fetchOutline);
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" :style="{ background: masteryBg(kp.weightedScore), color: masteryColor(kp.weightedScore) }">{{ i + 1 }}</span>
               <div class="min-w-0 flex-1">
                 <p class="truncate text-xs font-bold text-[var(--ink)]">{{ kp.title }}</p>
-                <div class="mt-1 flex items-center gap-1.5">
-                  <div class="h-1.5 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
-                    <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
-                  </div>
-                  <span class="shrink-0 text-[10px] font-bold" :style="{ color: masteryColor(kp.weightedScore) }">{{ kp.weightedScore >= 0 ? kp.weightedScore : '未练' }}</span>
-                </div>
+                <span v-if="kp.weightedScore >= 0" class="mt-0.5 inline-block"><StarDisplay :score="kp.weightedScore" /></span>
+                <span v-else class="text-[10px] text-[var(--ink-soft)]">未练</span>
               </div>
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white opacity-0 transition-opacity group-hover:opacity-100" title="开始练习">
                 <BookOpen class="h-3.5 w-3.5" />
@@ -334,12 +330,8 @@ watch(grade, fetchOutline);
               <button @click="toggleSection('ch-' + ch.title)" class="flex w-full items-center gap-2 bg-white px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-soft)]/30">
                 <component :is="expandedSections.has('ch-' + ch.title) ? ChevronDown : ChevronRight" class="h-4 w-4 shrink-0 text-[var(--ink-soft)]" />
                 <span class="flex-1 font-display text-sm font-bold text-[var(--ink)]">{{ ch.title }}</span>
-                <div class="flex items-center gap-2">
-                  <div class="h-2 w-16 overflow-hidden rounded-full" :style="{ background: masteryBg(ch.weightedScore) }">
-                    <div class="h-full rounded-full transition-all duration-700" :style="{ width: (ch.weightedScore >= 0 ? ch.weightedScore : 0) + '%', background: masteryColor(ch.weightedScore) }"></div>
-                  </div>
-                  <span class="text-[10px] font-bold" :style="{ color: masteryColor(ch.weightedScore) }">{{ ch.weightedScore >= 0 ? ch.weightedScore : '--' }}</span>
-                </div>
+                <span v-if="ch.weightedScore >= 0"><StarDisplay :score="ch.weightedScore" /></span>
+                <span v-else class="text-[10px] text-[var(--ink-soft)]">--</span>
               </button>
 
               <!-- Sections -->
@@ -349,12 +341,8 @@ watch(grade, fetchOutline);
                     <button @click="toggleSection('sec-' + sec.title)" class="flex w-full items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-white/50">
                       <component :is="expandedSections.has('sec-' + sec.title) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-[var(--ink-soft)]" />
                       <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
-                      <div v-if="sec.weightedScore < 60 && sec.weightedScore >= 0" class="flex h-5 w-5 items-center justify-center rounded-full bg-[#fdeaef]">
-                        <AlertTriangle class="h-3 w-3 text-[#f2557a]" />
-                      </div>
-                      <div class="h-1.5 w-12 overflow-hidden rounded-full" :style="{ background: masteryBg(sec.weightedScore) }">
-                        <div class="h-full rounded-full transition-all duration-700" :style="{ width: (sec.weightedScore >= 0 ? sec.weightedScore : 0) + '%', background: masteryColor(sec.weightedScore) }"></div>
-                      </div>
+                      <span v-if="sec.weightedScore >= 0"><StarDisplay :score="sec.weightedScore" /></span>
+                      <span v-else class="text-[10px] text-[var(--ink-soft)]">--</span>
                     </button>
 
                     <!-- Knowledge points -->
@@ -366,17 +354,13 @@ watch(grade, fetchOutline);
                         >
                           <GraduationCap class="h-3 w-3 shrink-0 text-[var(--accent)]" />
                           <span class="flex-1 text-[11px] font-medium text-[var(--ink)]">{{ kp.title }}</span>
-                          <div v-if="kp.weightedScore < 60 && kp.weightedScore >= 0" class="flex h-4 w-4 items-center justify-center rounded-full bg-[#fdeaef]">
-                            <AlertTriangle class="h-2.5 w-2.5 text-[#f2557a]" />
-                          </div>
                           <div class="flex gap-1">
                             <span v-for="lit in kp.literacies.slice(0, 2)" :key="lit"
                               class="inline-flex items-center gap-0.5 rounded-full bg-[#f0e7fa] px-1.5 py-0.5 text-[9px] font-semibold text-[#7c3aae]"
                             ><BrainCircuit class="h-2 w-2" />{{ lit }}</span>
                           </div>
-                          <div class="h-1.5 w-10 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
-                            <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
-                          </div>
+                          <span v-if="kp.weightedScore >= 0"><StarDisplay :score="kp.weightedScore" /></span>
+                          <span v-else class="text-[10px] text-[var(--ink-soft)]">未练</span>
                         </div>
                       </div>
                     </Transition>

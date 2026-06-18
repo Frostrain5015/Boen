@@ -672,6 +672,9 @@ app.post('/api/chat', async (c) => {
         } catch { weaknessData = undefined; }
       }
 
+      // 通知前端开始加载知识库
+      await send({ type: 'loading_knowledge_base' }).catch(() => {});
+
       const last = await runGraph(
         {
           messages: [...skipMsgs, new HumanMessage(body.message)],

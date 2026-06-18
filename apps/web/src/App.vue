@@ -167,6 +167,7 @@ const showTyping = computed(() => {
 
 // 「博文正在出题」纯由后端 quiz_generating 事件驱动（模型实际调用出题工具时触发）
 const isGeneratingQuiz = ref(false);
+const knowledgeBaseLoading = ref(false);
 
 // 答题反馈：判分时短暂锁定 happy/surprise，确保反馈清晰可见（即使助手随后接着输出）
 const reaction = ref<MascotState | null>(null);
@@ -214,6 +215,7 @@ async function processTikzDiagrams() {
 
 function handleEvent(e: SseEvent, idx: { value: number }) {
   if (e.type === 'token') {
+    knowledgeBaseLoading.value = false;
     let cur = items.value[idx.value];
     if (!cur || cur.kind !== 'assistant') {
       items.value.push(newAssistant());
@@ -226,7 +228,10 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
       // 让编译与后续输出并行，结束时直接命中缓存秒显（不必等整段流结束）
       if (e.value.includes('`')) nextTick(() => runTikz(document, { onlyComplete: true }));
     }
+  } else if (e.type === 'loading_knowledge_base') {
+    knowledgeBaseLoading.value = true;
   } else if (e.type === 'quiz_generating') {
+    knowledgeBaseLoading.value = false;
     isGeneratingQuiz.value = true;
   } else if (e.type === 'question') {
     isGeneratingQuiz.value = false;
@@ -950,6 +955,7 @@ onMounted(() => {
                         <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                       </div>
                     </div>
+                    <span v-if="i === items.length - 1 && knowledgeBaseLoading" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-strong)]">查阅知识库</span>
                     <TypingDots v-else-if="i === items.length - 1 && showTyping && !m.text" />
                   </div>
                 </div>

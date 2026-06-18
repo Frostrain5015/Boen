@@ -235,5 +235,6 @@ export type SseEvent =
   | { type: 'exam_ready'; examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }
+  | { type: 'loading_knowledge_base' }
   | { type: 'done' }
   | { type: 'error'; message: string };
