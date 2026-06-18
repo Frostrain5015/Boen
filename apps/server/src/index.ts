@@ -14,7 +14,7 @@ import {
   toQuestionPayload,
   gradeAnswer,
 } from '@boen/agent-core';
-import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
+import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
@@ -33,6 +33,18 @@ import {
   getMessages,
   getRecentMessages,
 } from './conversation.js';
+import {
+  analyzeMistake,
+  archiveMistake,
+  createMistake,
+  formatMistakePracticePrompt,
+  getMistakeAssetFile,
+  getMistakeDetail,
+  listMistakes,
+  readMistakeAsset,
+  retrieveMistakeStyleSamples,
+  updateMistake,
+} from './mistakes.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -227,6 +239,15 @@ app.get('/api/model/status', (c) => {
     deepseekAvailable: !!DEEPSEEK_API_KEY,
   });
 });
+
+function formString(form: FormData, key: string): string | undefined {
+  const value = form.get(key);
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isFormFile(value: unknown): value is { name?: string; type?: string; arrayBuffer: () => Promise<ArrayBuffer> } {
+  return !!value && typeof value === 'object' && 'arrayBuffer' in value && typeof (value as any).arrayBuffer === 'function';
+}
 
 // ── TiKZ 渲染 API（服务端 PGF/TikZ → SVG）───
 /** POST /api/render-tikz — 接收 TikZ 源码，返回 SVG */
@@ -433,6 +454,129 @@ app.post('/api/profile/seed', async (c) => {
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const { updated } = seedProficiencyFromHistory(userId);
   return c.json({ updated });
+});
+
+// ── 错题本 API ─────────────────────────────────────────────
+app.get('/api/mistakes', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  return c.json(listMistakes(userId, {
+    subject: c.req.query('subject') || undefined,
+    grade: c.req.query('grade') || undefined,
+    status: (c.req.query('status') as any) || undefined,
+    limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
+  }));
+});
+
+app.post('/api/mistakes', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const contentType = c.req.header('content-type') ?? '';
+    if (contentType.includes('multipart/form-data')) {
+      const form = await c.req.formData();
+      const file = form.get('image') ?? form.get('file');
+      const asset = isFormFile(file)
+        ? {
+            bytes: Buffer.from(await file.arrayBuffer()),
+            filename: file.name,
+            mimeType: file.type || 'application/octet-stream',
+          }
+        : undefined;
+      const mistake = createMistake(userId, {
+        sourceType: (formString(form, 'sourceType') as any) || (asset ? 'image' : 'text'),
+        subject: formString(form, 'subject') || 'math',
+        grade: formString(form, 'grade') || '7',
+        promptText: formString(form, 'promptText'),
+        studentAnswer: formString(form, 'studentAnswer'),
+        note: formString(form, 'note'),
+        asset,
+      });
+      return c.json({ mistake }, 201);
+    }
+    const body = await c.req.json<{
+      sourceType?: string;
+      subject?: string;
+      grade?: string;
+      promptText?: string;
+      studentAnswer?: string;
+      note?: string;
+    }>();
+    const mistake = createMistake(userId, {
+      sourceType: (body.sourceType as any) || 'text',
+      subject: body.subject || 'math',
+      grade: body.grade || '7',
+      promptText: body.promptText,
+      studentAnswer: body.studentAnswer,
+      note: body.note,
+    });
+    return c.json({ mistake }, 201);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+app.post('/api/mistakes/:id/analyze', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const mistakeId = c.req.param('id');
+  return streamSSE(c, async (stream) => {
+    const send = (e: AnalyzeMistakeEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    try {
+      const mistake = await analyzeMistake(mistakeId, userId, model, (p) =>
+        send({ type: 'mistake_progress', step: p.step, message: p.message, progress: p.progress }),
+      );
+      await send({ type: 'mistake_ready', mistake });
+      await send({ type: 'done' });
+    } catch (err) {
+      await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  });
+});
+
+app.get('/api/mistakes/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const detail = getMistakeDetail(c.req.param('id'), userId);
+  if (!detail) return c.json({ error: '错题不存在' }, 404);
+  return c.json(detail);
+});
+
+app.patch('/api/mistakes/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  try {
+    const body = await c.req.json<{ promptText?: string; studentAnswer?: string; correctAnswer?: string; errorReason?: string }>();
+    const mistake = updateMistake(c.req.param('id'), userId, body);
+    return c.json({ mistake });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+app.delete('/api/mistakes/:id', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const ok = archiveMistake(c.req.param('id'), userId);
+  if (!ok) return c.json({ error: '错题不存在' }, 404);
+  return c.json({ success: true });
+});
+
+app.get('/api/mistakes/:id/assets/:assetId', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const asset = getMistakeAssetFile(c.req.param('id'), Number(c.req.param('assetId')), userId);
+  if (!asset) return c.json({ error: '图片不存在' }, 404);
+  const bytes = await readMistakeAsset(asset.filePath);
+  return c.body(new Uint8Array(bytes), 200, { 'Content-Type': asset.mimeType, 'Cache-Control': 'private, max-age=3600' });
+});
+
+app.post('/api/mistakes/:id/practice', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const detail = getMistakeDetail(c.req.param('id'), userId);
+  if (!detail) return c.json({ error: '错题不存在' }, 404);
+  return c.json({ prompt: formatMistakePracticePrompt(detail.mistake) });
 });
 
 import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode } from './exam.js';
@@ -673,6 +817,15 @@ app.post('/api/chat', async (c) => {
       }
 
       // 通知前端开始加载知识库
+      let styleExamples: string | undefined;
+      if (userId && (body.mode === 'weakness' || body.practiceType || /错题|举一反三|出题|练习|测验|测试|考我|quiz/i.test(body.message))) {
+        try {
+          styleExamples = await retrieveMistakeStyleSamples(userId, body.subject ?? 'math', body.grade ?? '7', body.message, [], 3);
+        } catch {
+          styleExamples = undefined;
+        }
+      }
+
       await send({ type: 'loading_knowledge_base' }).catch(() => {});
 
       const last = await runGraph(
@@ -683,6 +836,7 @@ app.post('/api/chat', async (c) => {
           subject: body.subject ?? 'math',
           userName: body.userName,
           weaknessData,
+          styleExamples,
           practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
         },

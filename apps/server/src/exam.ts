@@ -18,6 +18,7 @@ import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
 import { getExamStructure, getStructureByTotalScore, getQuestionTypesForMode, type ExamStructure } from './exam-structures.js';
+import { retrieveMistakeStyleSamples } from './mistakes.js';
 
 // ── 配置类型 ─────────────────────────────────
 
@@ -29,6 +30,7 @@ export interface ExamConfig {
   durationMinutes?: number;
   /** 用户备注：期望考查的教材章节、知识点或其他特殊要求 */
   notes?: string;
+  styleContext?: string;
 }
 
 export interface ExamSession {
@@ -159,14 +161,16 @@ export async function generateExam(
     await onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
     const weightGuide = buildWeightGuideForPrompt(weightDist);
     const profileContext = userId ? await buildProfileContext(userId, config) : '';
+    const styleContext = userId ? await retrieveMistakeStyleSamples(userId, config.subject, config.grade, config.notes ?? '', [], 3).catch(() => '') : '';
+    const enrichedConfig: ExamConfig = { ...config, styleContext };
     await onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
-    const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
+    const blueprint = await stepAnalyze(model, enrichedConfig, weightGuide, [profileContext, styleContext].filter(Boolean).join('\n\n'));
 
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
   // 标准化：用固定基础分值覆盖 LLM 自由分配的点数，仅保留题型数量和配比
-  const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
-  const fixedTypes = blueprintForTotalScore(config.totalScore ?? blueprint.totalScore, config.grade, mode);
+  const mode = (enrichedConfig.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
+  const fixedTypes = blueprintForTotalScore(enrichedConfig.totalScore ?? blueprint.totalScore, enrichedConfig.grade, mode);
   blueprint.questionTypes = blueprint.questionTypes.map((qt, i) => ({
     ...qt,
     pointsPer: FIXED_POINTS[qt.type] ?? qt.pointsPer,
@@ -181,7 +185,7 @@ export async function generateExam(
 
   const writeResults = await Promise.allSettled(
     blueprint.questionTypes.map(qt =>
-      stepWriteQuestions(model, config, qt, blueprint, [])
+      stepWriteQuestions(model, enrichedConfig, qt, blueprint, [])
     )
   );
   for (const r of writeResults) {
@@ -193,7 +197,7 @@ export async function generateExam(
 
   // ─── Step 3: 审核 ───────────────────────────
   await onProgress?.({ step: 'review', message: '正在审核试卷格式…', progress: 88 });
-  const reviewed = await stepReview(model, allQuestions, config, blueprint, onProgress);
+  const reviewed = await stepReview(model, allQuestions, enrichedConfig, blueprint, onProgress);
 
   await onProgress?.({ step: 'review', message: `审核完成，共 ${reviewed.questions.length} 道题`, progress: 100 });
 
@@ -206,10 +210,10 @@ export async function generateExam(
       options: [{ key: 'A', text: 'A' }, { key: 'B', text: 'B' }, { key: 'C', text: 'C' }, { key: 'D', text: 'D' }],
       correctKeys: ['A'], multiSelect: false,
     }];
-    return { title: blueprint.title, questions: defaultQs, totalScore: defaultQs[0].points, durationMinutes: config.durationMinutes ?? 20 };
+    return { title: blueprint.title, questions: defaultQs, totalScore: defaultQs[0].points, durationMinutes: enrichedConfig.durationMinutes ?? 20 };
   }
 
-  const estMinutes = config.durationMinutes ?? Math.max(20, Math.min(90, Math.round(reviewed.questions.length * 1.5)));
+  const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(reviewed.questions.length * 1.5)));
   return { title: blueprint.title, questions: reviewed.questions, totalScore: reviewed.totalScore, durationMinutes: estMinutes };
   } catch (e: any) {
     console.error('生成试卷失败:', e?.message?.slice(0, 200));
@@ -310,6 +314,7 @@ async function stepWriteQuestions(
     `每题 ${qt.pointsPer} 分。`,
     qt.focusKps.length ? `重点考查知识点：${qt.focusKps.join('、')}` : '',
     config.notes ? `用户特殊要求：${config.notes}` : '',
+    config.styleContext ? `${config.styleContext}\n请只学习这些错题样本的题型结构、逻辑搭建、情境选取和干扰方式，严禁照抄原题文字、数字、学生答案或隐私信息。` : '',
     `试卷标题：${blueprint.title}`,
     existingQuestions.length ? `已出的题目类型：${[...new Set(existingQuestions.map(q => q.type))].join('、')}。请避免知识点重复。` : '',
     '⚠ 重要：各题之间的题干情景、数据、设问必须差异化。同一组数字或同一道应用题情景不能在不同题目中原样出现。',

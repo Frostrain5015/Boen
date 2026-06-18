@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target, PenTool, Mic } from 'lucide-vue-next';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target, PenTool, Mic, NotebookPen } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams as runTikz } from '@/lib/tikz';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
@@ -11,6 +11,7 @@ import QuestionCard from '@/components/QuestionCard.vue';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
 import ExamView from '@/components/ExamView.vue';
 import ExamReview from '@/components/ExamReview.vue';
+import MistakeBook from '@/components/MistakeBook.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
@@ -108,7 +109,7 @@ function handleExam(detail: { subject: Subject; grade: string; durationMinutes: 
 }
 
 // ── 视图切换 ──────────────────────────────
-const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview'>('chat');
+const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview' | 'mistakes'>('chat');
 // 侧栏手风琴：同时只展开一个二级菜单（档案无二级菜单）
 const expandedSection = ref<'chat' | 'exam' | null>('chat');
 const activeMode = ref<'none' | 'review' | 'preview' | 'weakness' | 'exam'>('none');
@@ -522,10 +523,10 @@ function examGradeLabel(g: string): string {
 }
 
 // 侧栏分区切换（手风琴）：对话/考试展开二级菜单，档案直接进入
-function selectSection(section: 'chat' | 'exam' | 'profile') {
-  if (section === 'profile') {
+function selectSection(section: 'chat' | 'exam' | 'profile' | 'mistakes') {
+  if (section === 'profile' || section === 'mistakes') {
     expandedSection.value = null;
-    currentView.value = 'profile';
+    currentView.value = section;
     return;
   }
   expandedSection.value = section;
@@ -703,6 +704,27 @@ async function handlePractice(detail: { kp?: string; subject: Subject; grade: st
   } else {
     send('帮我复习巩固 ');
   }
+}
+
+async function handleMistakePractice(detail: { prompt: string; subject: Subject; grade: string }) {
+  currentView.value = 'chat';
+  expandedSection.value = 'chat';
+  activeMode.value = 'weakness';
+  modeTagSent.value = false;
+  if (!currentConversationId.value || subject.value !== detail.subject) {
+    try {
+      const { conversation } = await createConversation('错题举一反三', detail.subject);
+      conversations.value.unshift(conversation);
+      currentConversationId.value = conversation.id;
+      items.value = [];
+    } catch { /* 静默 */ }
+  }
+  subject.value = detail.subject;
+  if (userProfile.value) {
+    userProfile.value.grade = detail.grade as Grade;
+    saveProfile(userProfile.value);
+  }
+  await send(detail.prompt);
 }
 
 async function handleSubjectChange(newSubject: Subject) {
@@ -922,6 +944,16 @@ onUnmounted(() => {
                 </button>
               </button>
             </div>
+
+            <!-- ═══ 错题本 ═══ -->
+            <button
+              @click="selectSection('mistakes')"
+              class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
+              :class="currentView === 'mistakes' ? 'bg-[#fff1d8] text-[#c76b17]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            >
+              <NotebookPen class="h-4 w-4 shrink-0" />
+              <span class="flex-1">错题本</span>
+            </button>
 
             <!-- ═══ 档案（知识图谱，无二级菜单）═══ -->
             <button
@@ -1177,6 +1209,9 @@ onUnmounted(() => {
 
         <!-- 档案（学习画像 / 知识图谱）视图 -->
         <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" @practice="handlePractice" @exam="handleExam" />
+
+        <!-- 错题本视图 -->
+        <MistakeBook v-else-if="currentView === 'mistakes'" key="mistakes" class="flex-1" @back="currentView = 'chat'" @practice="handleMistakePractice" />
 
         <!-- 考试视图（出卷 / 答题），:key 递增可重挂以开始新考试 -->
         <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" :auto-notes="pendingExamNotes ?? undefined" @back="currentView = 'chat'; pendingExamNotes = null" @refresh="loadExams" />

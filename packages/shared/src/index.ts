@@ -125,6 +125,102 @@ export interface ProfileRecommendation {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Mistake notebook
+// ─────────────────────────────────────────────────────────────
+
+export type MistakeSourceType = 'image' | 'canvas' | 'text';
+export type MistakeStatus = 'processing' | 'analyzed' | 'needs_review' | 'archived';
+export type MistakeKpRole = 'primary' | 'related' | 'prerequisite';
+
+export interface MistakeAsset {
+  id: number;
+  mistakeId: string;
+  assetKind: 'original' | 'annotated';
+  mimeType: string;
+  fileSize: number;
+  width?: number;
+  height?: number;
+  createdAt: number;
+}
+
+export interface MistakeKpMapping {
+  mistakeId: string;
+  kgNodeId: number;
+  title: string;
+  unitId?: number;
+  unitTitle?: string;
+  role: MistakeKpRole;
+  confidence: number;
+  beforeScore?: number;
+  afterScore?: number;
+  evidence?: string;
+}
+
+export interface MistakeStyleFeature {
+  id?: number;
+  mistakeId: string;
+  questionType: string;
+  difficulty: Difficulty;
+  scenarioType: string;
+  reasoningPattern: string;
+  distractorPattern?: string;
+  presentationFeatures?: Record<string, unknown>;
+  styleText: string;
+  createdAt?: number;
+}
+
+export interface MistakeItem {
+  id: string;
+  userId?: string;
+  subject: string;
+  grade: string;
+  sourceType: MistakeSourceType;
+  status: MistakeStatus;
+  title: string;
+  promptText: string;
+  originalText?: string;
+  studentAnswer?: string;
+  correctAnswer?: string;
+  explanation?: string;
+  errorType?: string;
+  errorReason?: string;
+  analysisConfidence?: number;
+  ocrProvider?: string;
+  ocrRaw?: unknown;
+  createdAt: number;
+  updatedAt: number;
+  proficiencyAppliedAt?: number;
+  assets?: MistakeAsset[];
+  mappings?: MistakeKpMapping[];
+  styleFeature?: MistakeStyleFeature;
+}
+
+export interface CreateMistakeRequest {
+  sourceType: MistakeSourceType;
+  subject: string;
+  grade: string;
+  promptText?: string;
+  studentAnswer?: string;
+  note?: string;
+}
+
+export type AnalyzeMistakeStep = 'ocr' | 'analyze' | 'map' | 'profile' | 'style' | 'complete';
+
+export type AnalyzeMistakeEvent =
+  | { type: 'mistake_progress'; step: AnalyzeMistakeStep; message: string; progress: number }
+  | { type: 'mistake_ready'; mistake: MistakeItem }
+  | { type: 'done' }
+  | { type: 'error'; message: string };
+
+export interface MistakeListResponse {
+  mistakes: MistakeItem[];
+}
+
+export interface MistakeDetailResponse {
+  mistake: MistakeItem;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 考试类型
 // ─────────────────────────────────────────────────────────────
 

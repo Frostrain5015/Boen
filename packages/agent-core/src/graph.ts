@@ -34,6 +34,7 @@ export const BoenState = Annotation.Root({
   reviewPhase: Annotation<string>(),
   /** 薄弱点数据（由服务端从知识画像中获取，突破模式注入） */
   weaknessData: Annotation<string | undefined>(),
+  styleExamples: Annotation<string | undefined>(),
   /** 专项练习类型 */
   practiceType: Annotation<string | undefined>(),
   /** LLM 发起的模式切换建议，等待用户确认 */
@@ -184,6 +185,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     // 薄弱点模式：注入知识画像数据
     if (state.mode === 'weakness' && state.weaknessData) {
       parts.push(state.weaknessData);
+    }
+    if ((state.mode === 'weakness' || state.forceQuiz || state.practiceType) && state.styleExamples) {
+      parts.push(state.styleExamples);
     }
     return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };

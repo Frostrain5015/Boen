@@ -174,4 +174,104 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_exam_user ON exam_sessions(user_id);
 `);
 
+// ── Mistake notebook ─────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mistake_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    source_type TEXT NOT NULL CHECK(source_type IN ('image', 'canvas', 'text')),
+    status TEXT NOT NULL DEFAULT 'processing' CHECK(status IN ('processing', 'analyzed', 'needs_review', 'archived')),
+    title TEXT NOT NULL DEFAULT '',
+    prompt_text TEXT NOT NULL DEFAULT '',
+    original_text TEXT,
+    student_answer TEXT,
+    correct_answer TEXT,
+    explanation TEXT,
+    error_type TEXT,
+    error_reason TEXT,
+    analysis_confidence REAL DEFAULT 0,
+    ocr_provider TEXT,
+    ocr_raw TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    proficiency_applied_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_mistakes_user_updated ON mistake_items(user_id, updated_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_mistakes_filter ON mistake_items(user_id, subject, grade, status);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mistake_assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mistake_id TEXT NOT NULL,
+    asset_kind TEXT NOT NULL DEFAULT 'original' CHECK(asset_kind IN ('original', 'annotated')),
+    mime_type TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size INTEGER NOT NULL DEFAULT 0,
+    width INTEGER,
+    height INTEGER,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    FOREIGN KEY (mistake_id) REFERENCES mistake_items(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_mistake_assets_item ON mistake_assets(mistake_id);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mistake_kp_map (
+    mistake_id TEXT NOT NULL,
+    kg_node_id INTEGER NOT NULL,
+    unit_id INTEGER,
+    role TEXT NOT NULL DEFAULT 'related' CHECK(role IN ('primary', 'related', 'prerequisite')),
+    confidence REAL NOT NULL DEFAULT 0,
+    before_score REAL,
+    after_score REAL,
+    evidence_json TEXT,
+    PRIMARY KEY (mistake_id, kg_node_id),
+    FOREIGN KEY (mistake_id) REFERENCES mistake_items(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_mistake_kp_node ON mistake_kp_map(kg_node_id);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mistake_style_features (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mistake_id TEXT NOT NULL,
+    question_type TEXT NOT NULL DEFAULT '',
+    difficulty TEXT NOT NULL DEFAULT 'medium',
+    scenario_type TEXT NOT NULL DEFAULT '',
+    reasoning_pattern TEXT NOT NULL DEFAULT '',
+    distractor_pattern TEXT,
+    presentation_features TEXT,
+    style_text TEXT NOT NULL DEFAULT '',
+    embedding BLOB,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    FOREIGN KEY (mistake_id) REFERENCES mistake_items(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_mistake_style_item ON mistake_style_features(mistake_id);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mistake_proficiency_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mistake_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    kg_node_id INTEGER NOT NULL,
+    before_score REAL,
+    after_score REAL,
+    before_correct_count REAL,
+    before_total_count REAL,
+    after_correct_count REAL,
+    after_total_count REAL,
+    role TEXT NOT NULL DEFAULT 'related',
+    confidence REAL NOT NULL DEFAULT 0,
+    applied_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    reverted_at INTEGER,
+    FOREIGN KEY (mistake_id) REFERENCES mistake_items(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_mistake_prof_user_node ON mistake_proficiency_events(user_id, kg_node_id, applied_at);
+  CREATE INDEX IF NOT EXISTS idx_mistake_prof_item ON mistake_proficiency_events(mistake_id);
+`);
+
 export default db;
