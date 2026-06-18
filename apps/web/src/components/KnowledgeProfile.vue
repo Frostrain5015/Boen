@@ -135,15 +135,15 @@ function closeKpDetail() {
   selectedKp.value = null;
 }
 
-/** 推荐练习：薄弱/未练的知识点，按掌握度从低到高，最多 6 个 */
+/** 推荐练习：仅真正练过的薄弱知识点（排除从未接触的），按掌握度升序，最多 6 个 */
 const recommendations = computed(() => {
   if (!outline.value) return [];
   return outline.value.textbooks
     .flatMap((t) => t.chapters)
     .flatMap((c) => c.children)
     .flatMap((s) => s.knowledgePoints)
-    .filter((k) => k.weightedScore < 60) // 含未练（<0）与薄弱（<60）
-    .sort((a, b) => (a.weightedScore < 0 ? 0 : a.weightedScore) - (b.weightedScore < 0 ? 0 : b.weightedScore))
+    .filter((k) => k.weightedScore >= 0 && k.weightedScore < 60)
+    .sort((a, b) => a.weightedScore - b.weightedScore)
     .slice(0, 6);
 });
 
