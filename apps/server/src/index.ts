@@ -15,6 +15,7 @@ import {
 } from '@boen/agent-core';
 import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
+import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import {
   createConversation,
   getConversations,
@@ -153,6 +154,36 @@ const app = new Hono();
 app.use('/api/*', cors());
 
 app.get('/api/health', (c) => c.json({ ok: true, provider, model: process.env.BOEN_MODEL }));
+
+// ── 知识图谱 API ────────────────────────────
+// 初始化表（幂等）
+ensureKnowledgeGraphTables();
+
+/** GET /api/kg/nodes?type=theme&subject=math — 按类型查节点 */
+app.get('/api/kg/nodes', (c) => {
+  const type = c.req.query('type') as any;
+  const subject = c.req.query('subject');
+  if (!type) return c.json({ error: 'type 参数必填' }, 400);
+  const nodes = getNodesByType(type, subject);
+  return c.json({ nodes });
+});
+
+/** GET /api/kg/neighbors/:nodeId — 查某节点的相邻节点 */
+app.get('/api/kg/neighbors/:nodeId', (c) => {
+  const nodeId = Number(c.req.param('nodeId'));
+  const edgeType = c.req.query('edgeType') as any;
+  if (isNaN(nodeId)) return c.json({ error: 'nodeId 无效' }, 400);
+  const neighbors = getNeighbors(nodeId, edgeType);
+  return c.json({ neighbors });
+});
+
+/** GET /api/kg/unit/:unitId — 查某章节的知识图谱上下文 */
+app.get('/api/kg/unit/:unitId', (c) => {
+  const unitId = Number(c.req.param('unitId'));
+  if (isNaN(unitId)) return c.json({ error: 'unitId 无效' }, 400);
+  const context = getKgContextForUnit(unitId);
+  return c.json({ unitId, context });
+});
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
 
