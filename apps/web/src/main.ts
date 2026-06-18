@@ -46,18 +46,40 @@ marks['after_mount'] = performance.now();
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     marks['first_frame'] = performance.now();
-    const log = [
-      `[perf] script→plugins: ${((marks['after_plugins'] - marks['script_start'])).toFixed(0)}ms`,
-      `plugins→mount: ${((marks['after_mount'] - marks['after_plugins'])).toFixed(0)}ms`,
-      `mount→firstframe: ${((marks['first_frame'] - marks['after_mount'])).toFixed(0)}ms`,
-      `total: ${(marks['first_frame'] - marks['script_start']).toFixed(0)}ms`,
-    ];
-    console.log(log.join('\n'));
-    // 显示在页面角落便于观察
-    const el = document.createElement('div');
-    el.id = 'perf-debug';
-    el.style.cssText = 'position:fixed;bottom:4px;right:4px;z-index:99999;background:#2c2722;color:#f5ecdd;padding:4px 8px;border-radius:8px;font:11px monospace;white-space:pre;opacity:0.7';
-    el.textContent = log.join('\n');
-    document.body.appendChild(el);
+    const jsTime = (marks['first_frame'] - marks['script_start']).toFixed(0);
+
+    // 再加一帧等布局/样式计算完成
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        marks['second_frame'] = performance.now();
+        const paintTime = (marks['second_frame'] - marks['first_frame']).toFixed(0);
+
+        const log = [
+          `[perf] JS: ${jsTime}ms`,
+          `  script→plugins: ${(marks['after_plugins'] - marks['script_start']).toFixed(0)}ms`,
+          `  plugins→mount: ${(marks['after_mount'] - marks['after_plugins']).toFixed(0)}ms`,
+          `  mount→firstFrame: ${(marks['first_frame'] - marks['after_mount']).toFixed(0)}ms`,
+          `[perf] Paint: ${paintTime}ms (布局+样式+合成)`,
+        ];
+        console.log(log.join('\n'));
+
+        // 页面角落显示
+        const el = document.createElement('div');
+        el.id = 'perf-debug';
+        el.style.cssText = 'position:fixed;bottom:4px;right:4px;z-index:99999;background:#2c2722;color:#f5ecdd;padding:4px 8px;border-radius:8px;font:11px monospace;white-space:pre;opacity:0.7';
+        el.textContent = `JS: ${jsTime}ms | Paint: ${paintTime}ms`;
+        document.body.appendChild(el);
+
+        // 额外检测 Long Tasks（>50ms 的渲染阻塞）
+        if (typeof PerformanceObserver !== 'undefined') {
+          const obs = new PerformanceObserver((list) => {
+            for (const entry of list.getEntries()) {
+              console.warn(`[perf] Long Task: ${entry.duration.toFixed(0)}ms`, entry);
+            }
+          });
+          try { obs.observe({ type: 'longtask', buffered: true }); } catch {}
+        }
+      });
+    });
   });
 });
