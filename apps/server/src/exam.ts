@@ -215,26 +215,25 @@ async function stepWriteQuestions(
     '注意：stem 是 JSON 字符串，内部的反斜杠和换行需正确转义（如 \\\\begin、\\\\draw、\\n）。',
   ].filter(Boolean).join('\n');
 
-  const response = await model.invoke([new SystemMessage(prompt)]);
-  const content = typeof response.content === 'string' ? response.content : '';
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+  try {
+    const response = await model.invoke([new SystemMessage(prompt)]);
+    const content = typeof response.content === 'string' ? response.content : '';
+    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
 
-  try {
-  let parsed: any;
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch {
-    // 兜底修复：中文引号、多余逗号、LaTeX 反斜杠
-    let fixed = jsonStr
-      .replace(/["""]/g, "'")
-      .replace(/,\s*([}\]])/g, '$1')
-      .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
-      .replace(/\\\\begin/g, '\\begin').replace(/\\\\end/g, '\\end')
-      .replace(/\\\\[{}\\]/g, (m) => m.replace('\\\\', '\\'));
-    try { parsed = JSON.parse(fixed); }
-    catch { throw new Error('JSON 解析失败'); }
-  }
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      let fixed = jsonStr
+        .replace(/["""]/g, "'")
+        .replace(/,\s*([}\]])/g, '$1')
+        .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+        .replace(/\\\\begin/g, '\\begin').replace(/\\\\end/g, '\\end')
+        .replace(/\\\\[{}\\]/g, (m) => m.replace('\\\\', '\\'));
+      try { parsed = JSON.parse(fixed); }
+      catch { throw new Error('JSON 解析失败'); }
+    }
     return (parsed.questions || []).map((q: any, i: number) => {
       const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || config.difficulty || 'medium', explanation: q.explanation || '' };
       if (base.type === 'multiple_choice') {
