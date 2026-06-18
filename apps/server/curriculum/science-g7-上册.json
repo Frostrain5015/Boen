@@ -1,0 +1,63 @@
+{
+  "subject": "science",
+  "grade": "7",
+  "volume": "上册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年6月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3300.html",
+  "units": [
+    {
+      "title": "第1章 探索自然的科学",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 科学并不神秘", "kind": "section" },
+        { "title": "第2节 科学测量", "kind": "section" },
+        { "title": "第3节 像科学家那样探究", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 丰富多彩的生命世界",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 生物体的基本单位", "kind": "section" },
+        { "title": "第2节 形形色色的植物", "kind": "section" },
+        { "title": "第3节 多姿多彩的动物", "kind": "section" },
+        { "title": "第4节 生物的分类", "kind": "section" },
+        { "title": "第5节 生物多样性", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 广袤浩瀚的宇宙",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 认识地球", "kind": "section" },
+        { "title": "第2节 太阳系的组成与结构", "kind": "section" },
+        { "title": "第3节 人类对宇宙的探索", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 多种多样的运动",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 机械运动", "kind": "section" },
+        { "title": "第2节 地球的转动", "kind": "section" },
+        { "title": "第3节 日地月的相对运动", "kind": "section" },
+        { "title": "第4节 地球板块的缓慢运动", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第5章 探索技术与工程的世界",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 认识技术与工程", "kind": "section" },
+        { "title": "第2节 像工程师那样实践", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

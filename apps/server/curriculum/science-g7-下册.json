@@ -1,0 +1,64 @@
+{
+  "subject": "science",
+  "grade": "7",
+  "volume": "下册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年12月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3301.html",
+  "units": [
+    {
+      "title": "第1章 生命的结构与生殖",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 生物体的结构层次", "kind": "section" },
+        { "title": "第2节 人和动物的生殖与发育", "kind": "section" },
+        { "title": "第3节 植物的生殖与发育", "kind": "section" },
+        { "title": "第4节 微生物的结构与生殖", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 物质的微观结构",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 走进微观世界", "kind": "section" },
+        { "title": "第2节 建构分子模型", "kind": "section" },
+        { "title": "第3节 建构原子模型", "kind": "section" },
+        { "title": "第4节 探究物质组成的奥秘", "kind": "section" },
+        { "title": "第5节 用化学式表示物质", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 物质的特性",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 质量和密度", "kind": "section" },
+        { "title": "第2节 物态变化", "kind": "section" },
+        { "title": "第3节 物质的变化与性质", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 我们生活的大地",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 探索地球表面", "kind": "section" },
+        { "title": "第2节 土壤的结构和质地", "kind": "section" },
+        { "title": "第3节 土壤与植物生长", "kind": "section" },
+        { "title": "第4节 保护土壤", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第5章 制造技术与工程",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 走进制造", "kind": "section" },
+        { "title": "第2节 我们一起来制造", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

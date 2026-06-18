@@ -1,0 +1,59 @@
+{
+  "subject": "science",
+  "grade": "9",
+  "volume": "下册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年12月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3305.html",
+  "units": [
+    {
+      "title": "第1章 演化的自然",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 人类对宇宙的认识", "kind": "section" },
+        { "title": "第2节 太阳系的形成和恒星的演化", "kind": "section" },
+        { "title": "第3节 地球的演化和生命的起源", "kind": "section" },
+        { "title": "第4节 生物的进化", "kind": "section" },
+        { "title": "第5节 遗传与进化", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 生物与环境",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 生物与环境的相互关系", "kind": "section" },
+        { "title": "第2节 种群", "kind": "section" },
+        { "title": "第3节 生物群落", "kind": "section" },
+        { "title": "第4节 生态系统的结构和功能", "kind": "section" },
+        { "title": "第5节 生态系统的稳定性", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 人的健康",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 健康", "kind": "section" },
+        { "title": "第2节 来自微生物的威胁", "kind": "section" },
+        { "title": "第3节 身体的防卫", "kind": "section" },
+        { "title": "第4节 非传染性疾病", "kind": "section" },
+        { "title": "第5节 人的运动系统和保健", "kind": "section" },
+        { "title": "第6节 健康生活", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 可持续发展",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 人类发展与环境问题", "kind": "section" },
+        { "title": "第2节 能源及其利用", "kind": "section" },
+        { "title": "第3节 低碳生活", "kind": "section" },
+        { "title": "第4节 实现可持续发展", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

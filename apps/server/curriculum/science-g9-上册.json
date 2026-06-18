@@ -1,0 +1,64 @@
+{
+  "subject": "science",
+  "grade": "9",
+  "volume": "上册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年6月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3304.html",
+  "units": [
+    {
+      "title": "第1章 物质及其变化",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 物质的变化", "kind": "section" },
+        { "title": "第2节 物质的酸碱性", "kind": "section" },
+        { "title": "第3节 常见的酸", "kind": "section" },
+        { "title": "第4节 常见的碱", "kind": "section" },
+        { "title": "第5节 酸和碱之间发生的反应", "kind": "section" },
+        { "title": "第6节 几种重要的盐", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 物质转化与材料利用",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 金属材料", "kind": "section" },
+        { "title": "第2节 金属的化学性质", "kind": "section" },
+        { "title": "第3节 有机物和有机合成材料", "kind": "section" },
+        { "title": "第4节 物质的分类", "kind": "section" },
+        { "title": "第5节 物质的转化", "kind": "section" },
+        { "title": "第6节 材料的利用与发展", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 能量的转化与守恒",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 能量及其形式", "kind": "section" },
+        { "title": "第2节 机械能", "kind": "section" },
+        { "title": "第3节 能量转化的量度", "kind": "section" },
+        { "title": "第4节 简单机械", "kind": "section" },
+        { "title": "第5节 物体的内能", "kind": "section" },
+        { "title": "第6节 电能", "kind": "section" },
+        { "title": "第7节 核能", "kind": "section" },
+        { "title": "第8节 能量的转化与守恒", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 代谢与平衡",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 食物与营养", "kind": "section" },
+        { "title": "第2节 食物的消化与吸收", "kind": "section" },
+        { "title": "第3节 体内物质的运输", "kind": "section" },
+        { "title": "第4节 能量的获得", "kind": "section" },
+        { "title": "第5节 体内物质的动态平衡", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

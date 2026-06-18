@@ -1,0 +1,67 @@
+{
+  "subject": "science",
+  "grade": "8",
+  "volume": "上册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年6月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3302.html",
+  "units": [
+    {
+      "title": "第1章 对环境的察觉",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 感觉世界", "kind": "section" },
+        { "title": "第2节 声与听觉", "kind": "section" },
+        { "title": "第3节 声音的特性与应用", "kind": "section" },
+        { "title": "第4节 光的反射和折射", "kind": "section" },
+        { "title": "第5节 透镜和视觉", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 力与空间探索",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 力", "kind": "section" },
+        { "title": "第2节 运动与相互作用", "kind": "section" },
+        { "title": "第3节 压强", "kind": "section" },
+        { "title": "第4节 空间探索", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 电路探秘",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 电荷与电流", "kind": "section" },
+        { "title": "第2节 物质的导电性", "kind": "section" },
+        { "title": "第3节 电压", "kind": "section" },
+        { "title": "第4节 欧姆定律及其应用", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 水与人类",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 人类家园中的水", "kind": "section" },
+        { "title": "第2节 生活中的水溶液", "kind": "section" },
+        { "title": "第3节 海洋的探索", "kind": "section" },
+        { "title": "第4节 水的浮力", "kind": "section" },
+        { "title": "第5节 水资源的利用和保护", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第5章 建筑结构与工程",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 建筑结构与功能", "kind": "section" },
+        { "title": "第2节 桥梁的结构与制作", "kind": "section" },
+        { "title": "第3节 搭建一座简易人行浮桥", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

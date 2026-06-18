@@ -1,0 +1,66 @@
+{
+  "subject": "science",
+  "grade": "8",
+  "volume": "下册",
+  "publisher": "浙江教育出版社",
+  "version": "2024年12月第1版（浙教版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3303.html",
+  "units": [
+    {
+      "title": "第1章 我们呼吸的空气",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 空气的成分", "kind": "section" },
+        { "title": "第2节 燃烧的奥秘", "kind": "section" },
+        { "title": "第3节 化学反应中物质质量的关系", "kind": "section" },
+        { "title": "第4节 保护我们呼吸的空气", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第2章 大气与气候变化",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 天气与气候", "kind": "section" },
+        { "title": "第2节 大气压强", "kind": "section" },
+        { "title": "第3节 大气中的二氧化碳", "kind": "section" },
+        { "title": "第4节 大气圈中氧、碳的循环", "kind": "section" },
+        { "title": "第5节 大气与气候的演变", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第3章 电磁及其应用",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 磁体的磁场", "kind": "section" },
+        { "title": "第2节 电流的磁场", "kind": "section" },
+        { "title": "第3节 电动机及其应用", "kind": "section" },
+        { "title": "第4节 电磁感应", "kind": "section" },
+        { "title": "第5节 家庭用电", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第4章 人体的系统",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 运动与保健", "kind": "section" },
+        { "title": "第2节 食物与消化", "kind": "section" },
+        { "title": "第3节 血液与循环", "kind": "section" },
+        { "title": "第4节 呼吸与排泄", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第5章 控制系统与工程",
+      "kind": "chapter",
+      "children": [
+        { "title": "第1节 自动控制系统", "kind": "section" },
+        { "title": "第2节 设计和制作控制系统", "kind": "section" },
+        { "title": "本章复习与测试", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}
