@@ -956,7 +956,7 @@ onMounted(() => {
               <div v-if="practiceMenu.length" class="relative inline-block">
                 <button @click="togglePracticeMenu" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="practiceMenuOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
                 <Transition name="fade">
-                  <div v-if="practiceMenuOpen" class="absolute left-0 top-full z-50 mt-1 min-w-[140px]">
+                  <div v-if="practiceMenuOpen" class="absolute left-0 bottom-full z-50 mb-1 min-w-[140px]">
                     <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg" @mouseleave="closePracticeMenu">
                       <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
                     </div>
