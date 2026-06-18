@@ -164,6 +164,20 @@ export async function gradeAnswer(
     throw new Error(`题型与答案不匹配：${toolName}`);
   }
 
+  // 修复常见 LaTeX 反斜杠问题（LLM 在 JSON 中漏转义 \f \n \n 等）
+  if (result.explanation) {
+    result.explanation = result.explanation
+      .replace(/(?<![\\])frac(?=[\d{])/g, '\\\\frac')
+      .replace(/(?<![\\])neq/g, '\\\\neq')
+      .replace(/(?<![\\])sqrt/g, '\\\\sqrt')
+      .replace(/(?<![\\])text\{/g, '\\\\text{');
+  }
+  if (result.reference) {
+    result.reference = result.reference
+      .replace(/(?<![\\])frac(?=[\d{])/g, '\\\\frac')
+      .replace(/(?<![\\])neq/g, '\\\\neq');
+  }
+
   const toolContent = JSON.stringify({
     userAnswer: answer,
     correct: result.correct,

@@ -738,7 +738,7 @@ app.post('/api/answer', async (c) => {
       // 判分
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
 
-      // 先更新知识画像并记录变化（从图状态获取当前学科），再发送判分结果
+      // 先更新知识画像并记录变化，再发送判分结果
       const profChanges: Array<{ kp: string; before: number; after: number }> = [];
       if (userId && result.knowledgePoints?.length) {
         const subject = (state.values as any)?.subject ?? 'math';
@@ -746,13 +746,13 @@ app.post('/api/answer', async (c) => {
           const kps = kpName.split(/[；;]/).map(s => s.trim()).filter(Boolean);
           for (const kp of kps) {
             const node = findKnowledgePointNode(kp, subject);
-            if (!node) continue;
+            if (!node) { profChanges.push({ kp, before: -1, after: -1 }); continue; }
             const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
             const before = oldRow?.weighted_score ?? -1;
             updateProficiency(userId, node.id, result.score, result.maxScore);
             const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
             const after = newRow?.weighted_score ?? -1;
-            if (before !== after) profChanges.push({ kp, before: Math.max(0, before), after });
+            profChanges.push({ kp, before: Math.max(0, before), after: Math.max(0, after) });
           }
         }
       }
