@@ -1,9 +1,13 @@
 <script setup lang="ts">
 defineProps<{ score: number }>();
 
+/** 非线性的星映射：低分段易涨、高分段难满 */
 function stars(s: number): number {
   if (s < 0) return 0;
-  return Math.round((s / 10) * 2) / 2;
+  // 用幂曲线让 0→0★, 50→~3★, 80→~4.2★, 95→~4.7★, 100→5★
+  const raw = 5 * Math.pow(s / 100, 0.7);
+  // 四舍五入到 0.5 粒度
+  return Math.round(raw * 2) / 2;
 }
 </script>
 

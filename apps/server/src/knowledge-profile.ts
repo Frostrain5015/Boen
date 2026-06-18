@@ -28,8 +28,22 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
 
 // ── CRUD ─────────────────────────────────────
 
-/** EMA 平滑因子：0.3 = 新成绩占 30%，历史占 70% */
-const PROFICIENCY_ALPHA = 0.3;
+/** EMA 基础平滑因子 */
+const BASE_ALPHA = 0.25;
+
+/** 自适应 alpha：好转时加速上升，恶化时减速下降 */
+function adaptiveAlpha(effectivePct: number, oldWeighted: number): number {
+  const diff = effectivePct - oldWeighted;
+  // 显著好转（当前表现远超历史）→ 加速吸收
+  if (diff > 15) return 0.45;
+  // 轻度好转 → 略快
+  if (diff > 5) return 0.35;
+  // 恶化 → 减速，让坏成绩影响变小
+  if (diff < -10) return 0.12;
+  if (diff < -3) return 0.18;
+  // 持平 → 基础速度
+  return BASE_ALPHA;
+}
 
 /** 各模式下熟练度权重（预习容错高、考试权重高） */
 const MODE_WEIGHTS: Record<string, number> = {
@@ -49,10 +63,12 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
   // 加权 EMA：不同模式下对熟练度的影响不同
   const modeWeight = MODE_WEIGHTS[mode ?? 'qa'] ?? 1.0;
   const weightedPct = maxScore > 0 ? ((score * modeWeight) / maxScore) * 100 : 0;
-  // 限制有效范围，防止 single-mode 极端值
   const effectivePct = Math.min(100, weightedPct);
+
+  // 自适应 alpha：进步时加速上升，退步时减速下降
+  const alpha = existing ? adaptiveAlpha(effectivePct, existing.weighted_score) : BASE_ALPHA;
   const weighted = existing
-    ? Math.round(PROFICIENCY_ALPHA * effectivePct + (1 - PROFICIENCY_ALPHA) * existing.weighted_score)
+    ? Math.round(alpha * effectivePct + (1 - alpha) * existing.weighted_score)
     : Math.round(Math.min(100, (score / maxScore) * 100));
 
   db.prepare(`
