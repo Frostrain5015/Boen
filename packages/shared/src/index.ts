@@ -18,7 +18,7 @@ export function gradeLabel(grade: Grade): string {
   if (grade === 'high') return '高中';
   if (grade === 'college') return '大学及以上';
   const n = Number(grade);
-  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初中${['七', '八', '九'][n - 7]}年级`;
+  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初${['一', '二', '三'][n - 7]}`;
 }
 
 /** 智能体工作模式 */

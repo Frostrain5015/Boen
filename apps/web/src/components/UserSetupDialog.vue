@@ -14,7 +14,7 @@ const emit = defineEmits<{
 /** 分组年级选择：小学 1–6 / 初中 7–9 细化，高中、大学为粗档 */
 const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[] = [
   { band: '小学', items: ['一', '二', '三', '四', '五', '六'].map((c, i) => ({ value: String(i + 1) as Grade, label: `${c}年级` })) },
-  { band: '初中', items: ['七', '八', '九'].map((c, i) => ({ value: String(i + 7) as Grade, label: `${c}年级` })) },
+  { band: '初中', items: ['一', '二', '三'].map((c, i) => ({ value: String(i + 7) as Grade, label: `初${c}` })) },
   { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
 ];
 
