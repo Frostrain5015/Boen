@@ -75,6 +75,55 @@ async function modelInvokeWithRetry(model: BaseChatModel, prompt: SystemMessage,
   throw lastError;
 }
 
+// ── 通用加固工具 ──────────────────────────
+
+/** 更宽容的 JSON 解析：自动修复 LLM 常见的格式问题 */
+function safeParseJson(raw: string): any {
+  // 尝试原生解析
+  try { return JSON.parse(raw); } catch { /* 继续修复 */ }
+
+  let fixed = raw
+    // 中文引号 → 英文引号
+    .replace(/["""]/g, '"')
+    // 对象 key 没加引号：{a: 1} → {"a": 1}
+    .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+    // 多余逗号：{a:1,} → {a:1}  [a, ] → [a]
+    .replace(/,\s*([}\]])/g, '$1')
+    // 单引号 → 双引号（只针对值，不破坏已存在的双引号结构）
+    .replace(/'(.*?)'(?=\s*[,}\]])/g, '"$1"')
+    // LaTeX 反斜杠修复：非转义反斜杠加倍
+    .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+    .replace(/\\\\begin/g, '\\begin').replace(/\\\\end/g, '\\end')
+    .replace(/\\\\[{}\\]/g, (m: string) => m.replace('\\\\', '\\'))
+    // 去除 \n 字面量（LLM 有时会输出字面 \n 而非真正换行）
+    .replace(/\\n/g, '\\n');
+
+  try { return JSON.parse(fixed); } catch {}
+  // 终极兜底：尝试提取最外层 {…} 或 […]
+  const braceMatch = raw.match(/\{[\s\S]*\}/) ?? raw.match(/\[[\s\S]*\]/);
+  if (braceMatch) {
+    try { return JSON.parse(braceMatch[0]); } catch {}
+    try { return JSON.parse(braceMatch[0].replace(/,\s*([}\]])/g, '$1')); } catch {}
+  }
+  throw new Error('JSON 解析失败');
+}
+
+/** 默认试卷蓝图（stepAnalyze 降级用） */
+function defaultBlueprint(
+  subjectLabel: Record<string, string>, gradeLabel: (g: string) => string, config: ExamConfig,
+) {
+  return {
+    title: `${subjectLabel[config.subject] ?? config.subject}${gradeLabel(config.grade)}综合试卷`,
+    sections: 3, totalScore: config.totalScore || 100,
+    questionTypes: [
+      { type: 'multiple_choice', label: '选择题', count: 10, pointsPer: 4, focusKps: [] },
+      { type: 'fill_blank', label: '填空题', count: 4, pointsPer: 5, focusKps: [] },
+      { type: 'true_false', label: '判断题', count: 4, pointsPer: 5, focusKps: [] },
+      { type: 'short_answer', label: '简答题', count: 2, pointsPer: 10, focusKps: [] },
+    ],
+  };
+}
+
 // ── 考试生成（三步流水线） ──────────────────
 
 export async function generateExam(
@@ -116,6 +165,18 @@ export async function generateExam(
   const reviewed = await stepReview(model, allQuestions, config, blueprint, onProgress);
 
   await onProgress?.({ step: 'review', message: `审核完成，共 ${reviewed.questions.length} 道题`, progress: 100 });
+
+  // 安全兜底：极端情况下 0 道题 → 注入一道默认题
+  if (reviewed.questions.length === 0) {
+    const defaultQs: ExamQuestion[] = [{
+      index: 0, type: 'multiple_choice', points: Math.max(reviewed.totalScore || 100, 10),
+      stem: '请选出正确答案。', knowledgePoint: '综合', literacies: ['综合素养'],
+      difficulty: 'medium', explanation: '本题为备选题目。',
+      options: [{ key: 'A', text: 'A' }, { key: 'B', text: 'B' }, { key: 'C', text: 'C' }, { key: 'D', text: 'D' }],
+      correctKeys: ['A'], multiSelect: false,
+    }];
+    return { title: blueprint.title, questions: defaultQs, totalScore: defaultQs[0].points, durationMinutes: config.durationMinutes ?? 20 };
+  }
 
   const estMinutes = config.durationMinutes ?? Math.max(20, Math.min(90, Math.round(reviewed.questions.length * 1.5)));
   return { title: blueprint.title, questions: reviewed.questions, totalScore: reviewed.totalScore, durationMinutes: estMinutes };
@@ -163,13 +224,19 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
     '排版：公式一律用 KaTeX。行内 $...$、行间 $$...$$（独占一行）。$$ 必须成对出现：开头 $$ + 内容 + 结尾 $$。定理、定义、重要公式用行间公式。',
   ].filter(Boolean).join('\n');
 
-  const response = await model.invoke([new SystemMessage(prompt)]);
+  let response;
+  try {
+    response = await model.invoke([new SystemMessage(prompt)]);
+  } catch {
+    // 模型调用失败走默认蓝图
+    return defaultBlueprint(subjectLabel, gradeLabel, config);
+  }
   const content = typeof response.content === 'string' ? response.content : '';
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
 
   try {
-    const parsed = JSON.parse(jsonStr);
+    const parsed = safeParseJson(jsonStr);
     return {
       title: parsed.title || `${subjectLabel[config.subject]}试卷`,
       sections: parsed.sections || 3,
@@ -179,17 +246,7 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
       })),
     };
   } catch {
-    // 解析失败用默认蓝图
-    return {
-      title: `${subjectLabel[config.subject]}${gradeLabel(config.grade)}综合试卷`,
-      sections: 3, totalScore: config.totalScore || 100,
-      questionTypes: [
-        { type: 'multiple_choice', label: '选择题', count: 10, pointsPer: 4, focusKps: [] },
-        { type: 'fill_blank', label: '填空题', count: 4, pointsPer: 5, focusKps: [] },
-        { type: 'true_false', label: '判断题', count: 4, pointsPer: 5, focusKps: [] },
-        { type: 'short_answer', label: '简答题', count: 2, pointsPer: 10, focusKps: [] },
-      ],
-    };
+    return defaultBlueprint(subjectLabel, gradeLabel, config);
   }
 }
 
@@ -252,16 +309,9 @@ async function stepWriteQuestions(
 
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonStr);
+      parsed = safeParseJson(jsonStr);
     } catch {
-      let fixed = jsonStr
-        .replace(/["""]/g, "'")
-        .replace(/,\s*([}\]])/g, '$1')
-        .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
-        .replace(/\\\\begin/g, '\\begin').replace(/\\\\end/g, '\\end')
-        .replace(/\\\\[{}\\]/g, (m) => m.replace('\\\\', '\\'));
-      try { parsed = JSON.parse(fixed); }
-      catch { throw new Error('JSON 解析失败'); }
+      throw new Error('JSON 解析失败');
     }
     return (parsed.questions || []).map((q: any, i: number) => {
       const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '' };
@@ -311,15 +361,21 @@ async function stepWriteQuestions(
     };
     const tpl = fallbackTemplates[qt.type];
     const extra = tpl ? tpl() : {};
-    const fallback: any = {
-      index: 0, type: qt.type, points: qt.pointsPer,
-      stem: extra.stem ?? `请回答一道${subj}${qt.label}。`,
-      knowledgePoint: '综合', literacies: ['综合素养'],
-      difficulty: 'medium',
-      explanation: '本题为备选题目，审核阶段将重新生成。',
-      ...extra,
-    };
-    return [fallback];
+    // 兜底也要出够 qt.count 道题，每道用不同情景
+    const count = Math.max(qt.count, 1);
+    return Array.from({ length: count }, (_, i) => {
+      const seeded = { ...(tpl?.() ?? {}) };
+      // 为每道兜底题生成不同的 stem（加序号以示区别）
+      if (seeded.stem) seeded.stem = `${seeded.stem.replace(/[。！？\s]$/, '')}（${i + 1}）${seeded.stem.includes('？') || seeded.stem.includes('吗') ? '' : '。'}`;
+      return {
+        index: i, type: qt.type, points: qt.pointsPer,
+        stem: seeded.stem ?? `${subj}${qt.label}题（${i + 1}）。`,
+        knowledgePoint: '综合', literacies: ['综合素养'],
+        difficulty: 'medium',
+        explanation: '本题为备选题目，审核阶段将重新生成。',
+        ...seeded,
+      };
+    });
   }
 }
 
