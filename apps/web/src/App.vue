@@ -264,6 +264,7 @@ async function onAnswer(item: Extract<ChatItem, { kind: 'question' }>, answer: A
   item.answered = true;
   busy.value = true;
   const idx = { value: -1 };
+  scrollDown(true); // 作答后滚回底部看反馈
   try {
     await streamAnswer({ threadId, toolCallId: item.toolCallId, answer, conversationId: currentConversationId.value ?? undefined }, (e) => handleEvent(e, idx));
   } catch (err) {

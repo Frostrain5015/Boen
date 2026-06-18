@@ -381,35 +381,38 @@ app.post('/api/profile/seed', async (c) => {
 
 import { generateExam, createExamSession, getExamSession, submitExamSession } from './exam.js';
 
-/** POST /api/exam/generate — 生成新试卷 */
+/** POST /api/exam/generate — 生成新试卷（非流式，传统 JSON 响应+前端 loading） */
 app.post('/api/exam/generate', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
-  return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
-    try {
-      const exam = await generateExam(
-        model,
-        { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes },
-        (p) => { send({ type: 'exam_progress' as any, step: p.step, message: p.message, progress: p.progress ?? 0 }).catch(() => {}); },
-        userId ?? undefined,
-      );
-      const session = createExamSession(userId, {subject:body.subject,grade:body.grade}, exam);
-      const publicQuestions = exam.questions.map(q => ({
-        index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
-        knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
-        options: q.type === 'multiple_choice' ? q.options : undefined,
-        multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
-        blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
-      }));
-      await send({ type: 'exam_ready', examId: session.id, title: exam.title, totalQuestions: exam.questions.length, totalScore: exam.totalScore, durationMinutes: exam.durationMinutes });
-      await send({ type: 'done' });
-    } catch (err) {
-      await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
-    }
-  });
+  try {
+    const exam = await generateExam(
+      model,
+      { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes },
+      undefined, // 进度回调暂禁用（非流式模式）
+      userId ?? undefined,
+    );
+    const session = createExamSession(userId, {subject:body.subject,grade:body.grade}, exam);
+    const publicQuestions = exam.questions.map(q => ({
+      index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
+      knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
+      options: q.type === 'multiple_choice' ? q.options : undefined,
+      multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
+      blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
+    }));
+    return c.json({
+      success: true,
+      exam: {
+        examId: session.id, title: exam.title, totalQuestions: exam.questions.length,
+        totalScore: exam.totalScore, durationMinutes: exam.durationMinutes,
+        questions: publicQuestions,
+      },
+    });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
 });
 
 /** POST /api/exam/submit — 提交考试答案 */

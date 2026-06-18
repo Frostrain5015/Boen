@@ -136,33 +136,16 @@ async function generateExamPaper() {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(config.value),
     });
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === 'exam_progress') {
-            genProgress.value = { step: data.step, message: data.message, progress: data.progress ?? 0 };
-          } else if (data.type === 'exam_ready') {
-            const examId = data.examId;
-            session.value = { examId, title: data.title, totalQuestions: data.totalQuestions, totalScore: data.totalScore, durationMinutes: data.durationMinutes, questions: [] };
-            examState.value = 'taking';
-            startTimer(data.durationMinutes);
-            loadQuestions(examId);
-          } else if (data.type === 'error') {
-            throw new Error(data.message);
-          }
-        } catch { /* skip malformed */ }
-      }
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.exam) {
+      session.value = {
+        examId: data.exam.examId, title: data.exam.title,
+        totalQuestions: data.exam.totalQuestions, totalScore: data.exam.totalScore,
+        durationMinutes: data.exam.durationMinutes, questions: data.exam.questions || [],
+      };
+      examState.value = 'taking';
+      startTimer(data.exam.durationMinutes);
     }
   } catch (err) {
     alert('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));

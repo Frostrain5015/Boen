@@ -64,6 +64,7 @@ export async function generateExam(
   onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
   const weightGuide = buildWeightGuideForPrompt(weightDist);
   const profileContext = userId ? await buildProfileContext(userId, config) : '';
+  onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
   const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
 
   onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
