@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 
-const difficulty = z.enum(['easy', 'medium', 'hard']).nullish().describe('题目难度');
+const diffMap: Record<string, string> = { '简单': 'easy', '中等': 'medium', '困难': 'hard', '容易': 'easy', '较难': 'hard' };
+const difficulty = z.preprocess(
+  (v) => typeof v === 'string' ? (diffMap[v] ?? v) : v,
+  z.enum(['easy', 'medium', 'hard']).nullish(),
+).describe('题目难度');
 const knowledgePoint = z.string().nullish().describe('对应考点（仅填主要考点标题，如"解一元一次方程"）');
 const literacies = z.array(z.string()).nullish().describe('本题考查的核心素养，如"数感""符号意识""运算能力""推理意识""模型意识""空间观念""几何直观""数据意识""应用意识""创新意识"等，选 1-3 个');
 const explanation = z.string().describe(
