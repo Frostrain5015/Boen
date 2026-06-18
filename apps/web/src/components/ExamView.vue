@@ -54,7 +54,7 @@ interface ExamResultsData {
 
 const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
 
-const examState = ref<'config' | 'generating' | 'taking' | 'grading' | 'results'>('config');
+const examState = ref<'config' | 'generating' | 'ready' | 'taking' | 'grading' | 'graded' | 'results'>('config');
 const config = ref<ExamConfigData>({ subject: 'math', grade: '7', durationMinutes: 45, notes: '' });
 const session = ref<ExamSessionData | null>(null);
 const results = ref<ExamResultsData | null>(null);
@@ -189,8 +189,8 @@ async function generateExamPaper() {
       durationMinutes: r.durationMinutes, questions: [],
     };
     await loadQuestions(r.examId);
-    examState.value = 'taking';
-    startTimer(r.durationMinutes);
+    examState.value = 'ready';
+    // 计时器在用户点击「开始考试」后才启动
     emit('refresh'); // 新试卷已入库，刷新侧栏考试列表
   } catch (err) {
     alert('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
@@ -215,7 +215,7 @@ async function submitExam() {
       body: JSON.stringify({ examId: session.value.examId, answers: answerArray }),
     });
     const data = await res.json();
-    if (data.results) { results.value = data.results; examState.value = 'results'; emit('refresh'); }
+    if (data.results) { results.value = data.results; examState.value = 'graded'; emit('refresh'); }
     else throw new Error(data.error || '提交失败');
   } catch (err) {
     alert('提交失败: ' + (err instanceof Error ? err.message : String(err)));
@@ -228,6 +228,11 @@ watch(examState, (s) => {
   if (s === 'taking') nextTick(() => processTikzDiagrams());
 });
 
+function startExam() {
+  if (!session.value) return;
+  examState.value = 'taking';
+  startTimer(session.value.durationMinutes);
+}
 function goBack() { examState.value = 'config'; if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; } }
 function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
@@ -325,6 +330,18 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       </div>
     </div>
 
+    <!-- ═══ READY（待开始考试） ═══ -->
+    <div v-if="examState === 'ready' && session" class="flex h-full flex-col items-center justify-center">
+      <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
+        <div class="loading-mascot"><Mascot :size="80" state="happy" /></div>
+        <div class="text-center">
+          <p class="mb-1 font-display text-lg font-bold text-[var(--ink)]">试卷已就绪</p>
+          <p class="text-sm text-[var(--ink-soft)]">{{ session.title }} · 共 {{ session.totalQuestions }} 题 · {{ session.totalScore }} 分 · 限时 {{ session.durationMinutes }} 分钟</p>
+        </div>
+        <button @click="startExam" class="btn-accent flex items-center gap-2 rounded-2xl px-8 py-3 font-display text-base font-bold transition-all active:scale-[0.96]"><Sparkles class="h-5 w-5" /> 开始考试</button>
+      </div>
+    </div>
+
     <!-- ═══ TAKING ═══ -->
     <div v-if="examState === 'taking' && session" class="flex h-full flex-col">
       <div class="flex items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-5 py-3">
@@ -410,6 +427,18 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       </div>
     </div>
 
+    <!-- ═══ GRADED（待查看成绩） ═══ -->
+    <div v-if="examState === 'graded' && results" class="flex h-full flex-col items-center justify-center">
+      <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
+        <div class="loading-mascot"><Mascot :size="80" state="happy" /></div>
+        <div class="text-center">
+          <p class="mb-1 font-display text-lg font-bold text-[var(--ink)]">批改完成！</p>
+          <p class="text-sm text-[var(--ink-soft)]">共 {{ results.maxScore }} 分，你获得了 {{ results.totalScore }} 分</p>
+        </div>
+        <button @click="examState = 'results'" class="btn-accent flex items-center gap-2 rounded-2xl px-8 py-3 font-display text-base font-bold transition-all active:scale-[0.96]"><BarChart3 class="h-5 w-5" /> 查看成绩</button>
+      </div>
+    </div>
+
     <!-- ═══ RESULTS ═══ -->
     <div v-if="examState === 'results' && results" class="flex h-full flex-col overflow-y-auto">
       <div class="mx-auto w-full max-w-2xl space-y-4 p-4">
@@ -485,8 +514,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <Transition name="reveal">
               <div v-if="expandedResults.has(qr.index)" class="border-t border-[var(--line)] bg-[var(--surface)] px-4 py-3">
                 <div class="space-y-2 text-xs">
-                  <p><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="text-[var(--ink)]">{{ qr.reference }}</span></p>
-                  <div v-if="qr.explanation" class="rounded-xl bg-white p-3 text-[var(--ink)]">{{ qr.explanation }}</div>
+                  <p><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="text-[var(--ink)] md-body" v-html="renderMarkdown(qr.reference)"></span></p>
+                  <div v-if="qr.explanation" class="rounded-xl bg-white p-3 text-[var(--ink)] md-body" v-html="renderMarkdown(qr.explanation)"></div>
                   <div v-if="qr.knowledgePoint" class="flex flex-wrap gap-1.5">
                     <span class="inline-flex items-center gap-1 rounded-full bg-[#e6edfa] px-2 py-0.5 text-[10px] font-semibold text-[#2b5fa8]"><GraduationCap class="h-2.5 w-2.5" />{{ qr.knowledgePoint }}</span>
                     <span v-for="lit in qr.literacy" :key="lit" class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2 py-0.5 text-[10px] font-semibold text-[#7c3aae]"><BrainCircuit class="h-2.5 w-2.5" />{{ lit }}</span>
