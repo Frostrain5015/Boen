@@ -295,11 +295,11 @@ watch(grade, fetchOutline);
           <template v-for="tb in outline.textbooks" :key="tb.volume">
             <div class="mb-3 mt-2 flex items-center gap-3 rounded-xl bg-[var(--surface)] px-3 py-2">
               <div class="flex-1">
-                <div class="flex items-center justify-between cursor-pointer" @click="emit('exam', { subject: subject, grade: grade, durationMinutes: 45, notes: tb.volume + ' 综合测试' })">
+                <div class="flex items-center justify-between">
                   <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
                   <div class="flex items-center gap-2">
-                    <span class="text-[10px] text-[var(--ink-soft)]">测试</span>
                     <StarDisplay :score="tb.weightedScore" />
+                    <span @click.stop="emit('exam', { subject, grade, durationMinutes: 45, notes: tb.volume + ' 综合测试' })" class="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]">📝 册测试</span>
                   </div>
                 </div>
               </div>
