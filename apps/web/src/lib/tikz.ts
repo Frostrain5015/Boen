@@ -9,7 +9,9 @@
  * - inFlight 去重：同一源码并发只发一次请求（流式逐 token 重渲染时尤为重要）。
  * - onlyComplete：流式输出途中只编译「已闭合」的完整代码块，避免编译半截代码。
  */
-const tikzCache = new Map<string, string>();
+/** 模块级缓存：跨组件、跨重渲染共享已编译的 SVG/HTML。markdown.ts 也引用此缓存
+ *  以在 v-html 渲染阶段直接输出 SVG，避免流式途中已渲染图被重刷新回占位态。 */
+export const tikzCache = new Map<string, string>();
 const inFlight = new Map<string, Promise<string>>();
 
 const errBox = (msg: string) =>

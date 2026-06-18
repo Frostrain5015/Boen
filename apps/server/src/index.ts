@@ -239,14 +239,9 @@ app.post('/api/render-tikz', async (c) => {
   const pdfPath = join(tmpDir, 'tikz.pdf');
   const svgPath = join(tmpDir, 'tikz.svg');
 
-  // 用 xelatex + xeCJK 编译，支持中文标签（pdflatex 无法排版 CJK/Unicode，会编译失败）
-  // 自动适配裸 xlop 命令（不在 tikzpicture 内的 \opadd / \opsub / \opmul / \opdiv）
-  // 这些命令只需一个 simple wrapper，不需要真正的 tikz 绘图环境
-  // 纯 xlop 竖式命令用普通 standalone（不带 [tikz]），否则 standalone[tikz]
-  // 会输出一整页而非内容裁剪框。[tikz] 仅当代码含 tikzpicture 环境时才启用。
-  const hasTikz = /\\begin\s*\{tikzpicture\}/.test(code);
-  const docClass = hasTikz ? '\\documentclass[tikz]{standalone}' : '\\documentclass{standalone}';
-  const tex = `${docClass}
+  // 统一用 standalone（不传 [tikz] 选项 —— \usepackage{tikz} 已在下面独立加载，两者等价）。
+  // 此前分支 standalone vs standalone[tikz] 在服务器特定 TeXLive 版本上导致裁剪异常。
+  const tex = `\\documentclass{standalone}
 \\usepackage{fontspec}
 \\usepackage{xeCJK}
 \\setCJKmainfont{Noto Sans CJK SC}

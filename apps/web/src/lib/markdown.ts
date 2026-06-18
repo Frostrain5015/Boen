@@ -1,5 +1,6 @@
 import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
+import { tikzCache } from './tikz';
 
 const md = new MarkdownIt({ breaks: true, linkify: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
@@ -133,8 +134,10 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const katexHtml = xlopToKatex(content);
     if (katexHtml) return md.render(katexHtml);
   }
-  // tikz 真正的图形 → 服务端编译
+  // tikz 真正的图形 → 服务端编译。如果缓存中已有 SVG，直接输出防止流式重渲染闪回占位态
   if (info === 'tikz' || (info === 'latex' && /\\begin\s*\{tikzpicture\}/.test(content))) {
+    const cached = tikzCache.get(content);
+    if (cached) return cached + '\n';
     const encoded = encodeURIComponent(content);
     return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">📐</span><span class="tikz-gen-label">博文正在画图</span><span class="tikz-gen-dots"><span></span><span></span><span></span></span></div></div>\n`;
   }
