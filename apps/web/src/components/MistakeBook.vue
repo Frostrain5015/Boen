@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   BookOpenCheck,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   FileImage,
   ImagePlus,
   Loader2,
@@ -18,7 +20,7 @@ import {
   WandSparkles,
   X,
 } from 'lucide-vue-next';
-import type { AnalyzeMistakeEvent, AnalyzeMistakeStep, Grade, MistakeItem, MistakeSourceType } from '@boen/shared';
+import type { AnalyzeMistakeEvent, AnalyzeMistakeStep, Grade, MistakeItem } from '@boen/shared';
 import {
   createImageMistake,
   createTextMistake,
@@ -33,6 +35,11 @@ import Mascot from '@/components/Mascot.vue';
 type Subject = 'chinese' | 'math' | 'english' | 'science';
 type IntakeMode = 'image' | 'text';
 
+const props = defineProps<{
+  grade: string;
+  initialSubject: Subject;
+}>();
+
 const emit = defineEmits<{
   (e: 'back'): void;
   (e: 'practice', detail: { prompt: string; subject: Subject; grade: string }): void;
@@ -44,7 +51,6 @@ const SUBJECTS = [
   { value: 'english' as const, label: '英语' },
   { value: 'science' as const, label: '科学' },
 ];
-const GRADES: Grade[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const STEP_META: Record<AnalyzeMistakeStep, { label: string; icon: typeof ScanText }> = {
   ocr: { label: '识别题面', icon: ScanText },
   analyze: { label: '分析错因', icon: WandSparkles },
@@ -55,8 +61,6 @@ const STEP_META: Record<AnalyzeMistakeStep, { label: string; icon: typeof ScanTe
 };
 const STEPS: AnalyzeMistakeStep[] = ['ocr', 'analyze', 'map', 'profile', 'style', 'complete'];
 
-const subject = ref<Subject>('math');
-const grade = ref<string>('7');
 const mode = ref<IntakeMode>('image');
 const textPrompt = ref('');
 const studentAnswer = ref('');
@@ -74,8 +78,9 @@ const progressMessage = ref('');
 const activeStep = ref<AnalyzeMistakeStep | null>(null);
 const completedSteps = ref<Set<AnalyzeMistakeStep>>(new Set());
 const selectedAssetObjectUrl = ref('');
+const batchMistakes = ref<MistakeItem[]>([]);
+const currentBatchIndex = ref(0);
 
-const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === subject.value));
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
 
 function revokeSelectedAssetUrl() {
@@ -95,7 +100,7 @@ function formatTime(sec: number) {
 async function refreshMistakes(selectLatest = false) {
   loadingList.value = true;
   try {
-    const data = await listMistakes({ subject: subject.value, grade: grade.value, limit: 30 });
+    const data = await listMistakes({ grade: props.grade ?? undefined, limit: 30 });
     mistakes.value = data.mistakes;
     if (selectLatest && data.mistakes[0]) selectedMistake.value = data.mistakes[0];
     else if (selectedMistake.value) selectedMistake.value = data.mistakes.find((m) => m.id === selectedMistake.value?.id) ?? selectedMistake.value;
@@ -122,7 +127,10 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     }
     completedSteps.value = next;
   } else if (event.type === 'mistake_ready') {
+    batchMistakes.value.push(event.mistake);
+    currentBatchIndex.value = batchMistakes.value.length - 1;
     selectedMistake.value = event.mistake;
+    // 更新列表
     const index = mistakes.value.findIndex((m) => m.id === event.mistake.id);
     if (index >= 0) mistakes.value[index] = event.mistake;
     else mistakes.value.unshift(event.mistake);
@@ -131,6 +139,20 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     completedSteps.value = new Set(STEPS);
   } else if (event.type === 'error') {
     error.value = event.message;
+  }
+}
+
+function prevQuestion() {
+  if (currentBatchIndex.value > 0) {
+    currentBatchIndex.value--;
+    selectedMistake.value = batchMistakes.value[currentBatchIndex.value];
+  }
+}
+
+function nextQuestion() {
+  if (currentBatchIndex.value < batchMistakes.value.length - 1) {
+    currentBatchIndex.value++;
+    selectedMistake.value = batchMistakes.value[currentBatchIndex.value];
   }
 }
 
@@ -167,6 +189,8 @@ function onDrop(event: DragEvent) {
 async function submitMistake() {
   if (busy.value) return;
   error.value = '';
+  batchMistakes.value = [];
+  currentBatchIndex.value = 0;
   busy.value = true;
   try {
     let created: { mistake: MistakeItem };
@@ -174,8 +198,8 @@ async function submitMistake() {
       if (!textPrompt.value.trim()) throw new Error('请先输入题面');
       created = await createTextMistake({
         sourceType: 'text',
-        subject: subject.value,
-        grade: grade.value,
+        subject: props.initialSubject,
+        grade: props.grade,
         promptText: textPrompt.value,
         studentAnswer: studentAnswer.value,
         note: note.value,
@@ -185,8 +209,8 @@ async function submitMistake() {
       if (!imageFile.value) throw new Error('请先上传错题图片');
       created = await createImageMistake({
         sourceType: 'image',
-        subject: subject.value,
-        grade: grade.value,
+        subject: props.initialSubject,
+        grade: props.grade,
         file: imageFile.value,
         filename: imageFile.value.name,
         studentAnswer: studentAnswer.value,
@@ -253,7 +277,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mistake-root flex h-full min-h-0 flex-col" :data-subject="subject" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 320 } }">
+  <div class="mistake-root flex h-full min-h-0 flex-col" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 320 } }">
     <header class="flex shrink-0 items-center gap-3 px-5 py-3.5">
       <button
         @click="$emit('back')"
@@ -265,15 +289,6 @@ onBeforeUnmount(() => {
       <div>
         <h1 class="font-display text-2xl font-bold text-[var(--ink)]">错题本</h1>
         <p class="text-xs font-semibold text-[var(--ink-soft)]">真实作业错题，自动归因到知识画像</p>
-      </div>
-      <div class="ml-auto hidden items-center gap-3 md:flex">
-        <div class="clay-sm relative flex bg-[var(--surface)] p-1">
-          <span class="absolute bottom-1 left-1 top-1 w-16 rounded-[14px] bg-accent" :style="{ transform: `translateX(calc(${subjectIndex} * 4rem))`, transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)' }"></span>
-          <button v-for="s in SUBJECTS" :key="s.value" @click="subject = s.value; refreshMistakes(true)" class="relative z-10 flex h-8 w-16 items-center justify-center rounded-[14px] font-display text-sm font-semibold transition-colors" :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'">{{ s.label }}</button>
-        </div>
-        <select v-model="grade" @change="refreshMistakes(true)" class="h-10 rounded-2xl border border-white bg-[var(--surface)] px-3 text-sm font-bold text-[var(--ink)] shadow-[0_8px_18px_-14px_rgba(86,64,40,0.35)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-soft)]">
-          <option v-for="g in GRADES" :key="g" :value="g">{{ gradeLabel(g) }}</option>
-        </select>
       </div>
     </header>
 
@@ -389,9 +404,18 @@ onBeforeUnmount(() => {
                   <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><NotebookPen class="h-5 w-5" /></div>
                   <div class="min-w-0 flex-1">
                     <h2 class="font-display text-xl font-bold text-[var(--ink)]">{{ selectedMistake.title || '错题详情' }}</h2>
-                    <p class="text-xs font-semibold text-[var(--ink-soft)]">{{ SUBJECTS.find(s => s.value === selectedMistake?.subject)?.label }} · {{ gradeLabel(selectedMistake.grade) }} · {{ formatTime(selectedMistake.createdAt) }}</p>
+                    <p class="text-xs font-semibold text-[var(--ink-soft)]">
+                      <template v-if="batchMistakes.length > 1">
+                        <span class="mr-2 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] text-[var(--accent-strong)]">{{ currentBatchIndex + 1 }} / {{ batchMistakes.length }}</span>
+                      </template>
+                      {{ SUBJECTS.find(s => s.value === selectedMistake?.subject)?.label }} · {{ gradeLabel(selectedMistake.grade) }} · {{ formatTime(selectedMistake.createdAt) }}
+                    </p>
                   </div>
-                  <button @click="reanalyze(selectedMistake)" :disabled="busy" class="flex h-10 items-center gap-1.5 rounded-2xl bg-white px-3 text-xs font-bold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-50"><RefreshCw class="h-3.5 w-3.5" />重分析</button>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <button v-if="batchMistakes.length > 1" @click="prevQuestion" :disabled="currentBatchIndex <= 0" class="grid h-9 w-9 place-items-center rounded-xl text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-30 disabled:hover:bg-transparent"><ChevronLeft class="h-4 w-4" /></button>
+                    <button v-if="batchMistakes.length > 1" @click="nextQuestion" :disabled="currentBatchIndex >= batchMistakes.length - 1" class="grid h-9 w-9 place-items-center rounded-xl text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-30 disabled:hover:bg-transparent"><ChevronRight class="h-4 w-4" /></button>
+                    <button @click="reanalyze(selectedMistake)" :disabled="busy" class="flex h-9 items-center gap-1 rounded-2xl bg-white px-2.5 text-xs font-bold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-50"><RefreshCw class="h-3.5 w-3.5" />重分析</button>
+                  </div>
                 </div>
 
                 <div v-if="selectedAssetObjectUrl" class="mb-4 overflow-hidden rounded-[20px] border border-white bg-white">

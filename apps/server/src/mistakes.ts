@@ -48,6 +48,7 @@ type CandidateNode = {
 };
 
 type AnalysisJson = {
+  subject?: string;
   title?: string;
   promptText?: string;
   studentAnswer?: string;
@@ -345,14 +346,16 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   recognizedText: string;
   studentAnswer?: string;
   candidates: CandidateNode[];
-}): Promise<AnalysisJson> {
+}): Promise<AnalysisJson[]> {
   const related = await retrieveRelated(params.grade, params.subject, params.recognizedText, 8).catch(() => []);
   const candidateText = params.candidates
     .slice(0, 80)
     .map((n) => `- [${n.id}] ${n.title}${n.unitTitle ? `（${n.unitTitle}）` : ''}`)
     .join('\n');
   const prompt = [
-    '你是一个教育错题分析系统。请基于真实作业/考试 OCR 文本，抽取错题信息，并映射到给定知识图谱节点。',
+    '你是一个教育错题分析系统。请基于真实作业/考试 OCR 文本，抽取其中所有可识别的题目。',
+    'OCR 文本可能包含一页上的多道题目，请逐一识别并分别分析。',
+    '输出一个 JSON 数组，每个元素对应一道题的完整分析。如果只有一道题，则输出一个元素的数组。',
     '只允许从候选知识点列表选择 kgNodeId，不要编造新 ID。若无法确定，knowledgeNodes 返回空数组。',
     '',
     `学科: ${params.subject}`,
@@ -366,8 +369,11 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
     '候选知识点:',
     candidateText || '（无候选）',
     '',
-    '请严格输出 JSON，不要 Markdown，不要解释。字段如下:',
+    `用户当前学科: ${params.subject}（AI 可根据内容修正）`,
+    '',
+    '请严格输出 JSON 数组，不要 Markdown，不要解释。每个元素的字段如下:',
     JSON.stringify({
+      subject: 'chinese | math | english | science — 根据内容判断学科，从候选知识点所在学科推断',
       title: '10字以内标题',
       promptText: '整理后的完整题面',
       studentAnswer: '学生原答案或可见错误作答',
@@ -394,7 +400,12 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
     new HumanMessage(prompt),
   ]);
   const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
-  return safeParseJson(content) as AnalysisJson;
+  const parsed = safeParseJson(content);
+  // 兼容：如果 LLM 返回单个对象而非数组，包装成数组
+  if (parsed && !Array.isArray(parsed)) {
+    return [parsed as AnalysisJson];
+  }
+  return (parsed as AnalysisJson[]) || [];
 }
 
 function loadMistakeRows(mistakeId: string, userId: string) {
@@ -648,40 +659,37 @@ function saveStyleFeature(mistakeId: string, analysis: AnalysisJson, promptText:
     });
 }
 
-export async function analyzeMistake(mistakeId: string, userId: string, model: BaseChatModel, onProgress?: (event: {
-  step: 'ocr' | 'analyze' | 'map' | 'profile' | 'style' | 'complete';
-  message: string;
-  progress: number;
-}) => void | Promise<void>): Promise<MistakeItem> {
-  const row = db.prepare(`SELECT * FROM mistake_items WHERE id=? AND user_id=?`).get(mistakeId, userId) as any;
-  if (!row) throw new Error('错题不存在');
-  if (row.status === 'archived') throw new Error('错题已归档');
+/**
+ * 将一道题的分析结果应用到指定 mistake 记录：更新 DB、映射知识点、写熟练度、存风格特征。
+ * questionIndex / totalQuestions 用于进度条计算（仅 progress 数值，不做除法）
+ */
+async function applyAnalysisToMistake(
+  mistakeId: string,
+  userId: string,
+  row: any,
+  analysis: AnalysisJson,
+  recognizedText: string,
+  candidates: CandidateNode[],
+  ocrProvider: string | null,
+  ocrRaw: unknown,
+  questionIndex: number,
+  totalQuestions: number,
+  onProgress?: (event: {
+    step: 'ocr' | 'analyze' | 'map' | 'profile' | 'style' | 'complete';
+    message: string;
+    progress: number;
+  }) => void | Promise<void>,
+): Promise<MistakeItem> {
+  // 进度范围：总进度 100%，OCR + LLM 占 ~35%，剩余 ~65% 按题目平分
+  const share = totalQuestions > 1 ? 65 / totalQuestions : 65;
+  const basePct = 32 + (questionIndex / (totalQuestions || 1)) * 65;
 
-  await onProgress?.({ step: 'ocr', message: row.source_type === 'text' ? '读取文本录入' : '调用阿里云教育 OCR 识别', progress: 8 });
-  let recognizedText = String(row.prompt_text ?? '').trim();
-  let ocrProvider: string | null = row.ocr_provider ?? null;
-  let ocrRaw: unknown = row.ocr_raw ? safeJson(row.ocr_raw, {}) : null;
-  if (row.source_type === 'image') {
-    const assetPath = getOriginalAssetPath(mistakeId);
-    if (!assetPath) throw new Error('找不到原始图片');
-    const ocr = await recognizeWithAliyunEduOcr(assetPath, row.subject, row.grade);
-    recognizedText = ocr.text || recognizedText;
-    ocrProvider = ocr.provider;
-    ocrRaw = ocr.raw;
+  function pct(offset: number) {
+    return Math.round(basePct + offset * share);
   }
-  if (!recognizedText.trim()) throw new Error('OCR 未识别到有效题目文本，请换一张更清晰的图片或使用文本补录');
 
-  await onProgress?.({ step: 'analyze', message: '分析题面、错因和解法', progress: 32 });
-  const candidates = getCandidateNodes(row.subject, row.grade, 80);
-  const analysis = await analyzeWithLlm(model, {
-    subject: row.subject,
-    grade: row.grade,
-    recognizedText,
-    studentAnswer: row.student_answer ?? undefined,
-    candidates,
-  });
-
-  await onProgress?.({ step: 'map', message: '校验章节和知识图谱节点', progress: 58 });
+  // ── 知识点映射 ──
+  await onProgress?.({ step: 'map', message: `校验章节和知识图谱节点（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.35) });
   const mappings: Array<MistakeKpMapping & { evidenceJson: string }> = [];
   for (const rawMap of analysis.knowledgeNodes ?? []) {
     const directId = Number(rawMap.kgNodeId);
@@ -712,12 +720,19 @@ export async function analyzeMistake(mistakeId: string, userId: string, model: B
   revertMistakeProficiencyEvents(mistakeId, userId);
   clearAnalysis(mistakeId);
 
+  // ── 更新错题记录 ──
+  // LLM 检测到的学科可覆盖初始学科
+  const detectedSubject = analysis.subject && ['chinese','math','english','science'].includes(analysis.subject)
+    ? analysis.subject
+    : row.subject;
+
   db.prepare(`
     UPDATE mistake_items SET
-      status=?, title=?, prompt_text=?, student_answer=?, correct_answer=?, explanation=?,
+      subject=?, status=?, title=?, prompt_text=?, student_answer=?, correct_answer=?, explanation=?,
       error_type=?, error_reason=?, analysis_confidence=?, ocr_provider=?, ocr_raw=?, updated_at=?
     WHERE id=? AND user_id=?
   `).run(
+    detectedSubject,
     status,
     (analysis.title || recognizedText.split(/\n|。|\./)[0] || '错题').slice(0, 32),
     (analysis.promptText || recognizedText).trim(),
@@ -734,7 +749,8 @@ export async function analyzeMistake(mistakeId: string, userId: string, model: B
     userId,
   );
 
-  await onProgress?.({ step: 'profile', message: status === 'analyzed' ? '写入知识画像熟练度' : '未找到可信知识点，等待人工修正', progress: 74 });
+  // ── 熟练度 ──
+  await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `写入知识画像（第 ${questionIndex + 1}/${totalQuestions} 题）` : '未找到可信知识点，等待人工修正', progress: pct(0.65) });
   let appliedAt: number | undefined;
   for (const mapping of mappings) {
     const change = applyMistakeProficiency(userId, mistakeId, mapping.kgNodeId, mapping.role, mapping.confidence);
@@ -750,15 +766,101 @@ export async function analyzeMistake(mistakeId: string, userId: string, model: B
     db.prepare(`UPDATE mistake_items SET proficiency_applied_at=?, updated_at=? WHERE id=? AND user_id=?`).run(appliedAt, appliedAt, mistakeId, userId);
   }
 
-  await onProgress?.({ step: 'style', message: '沉淀真实学校题型风格样本', progress: 90 });
+  // ── 风格特征 ──
+  await onProgress?.({ step: 'style', message: `沉淀题型风格（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
   if (status === 'analyzed') {
     await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
   }
 
-  await onProgress?.({ step: 'complete', message: status === 'analyzed' ? '错题分析完成' : '错题已保存，需补充知识点', progress: 100 });
+  await onProgress?.({ step: 'complete', message: status === 'analyzed' ? `第 ${questionIndex + 1} 题分析完成` : '错题已保存，需补充知识点', progress: pct(1) });
   const item = loadMistakeRows(mistakeId, userId);
   if (!item) throw new Error('错题分析结果读取失败');
   return item;
+}
+
+function makeMistakeId() {
+  const ts = Date.now().toString(36);
+  const rand = crypto.getRandomValues(new Uint8Array(4)).reduce((s, b) => s + b.toString(36).padStart(2, '0'), '');
+  return `mistake-${ts}-${rand}`;
+}
+
+export async function analyzeMistake(
+  mistakeId: string, userId: string, model: BaseChatModel,
+  onProgress?: (event: {
+    step: 'ocr' | 'analyze' | 'map' | 'profile' | 'style' | 'complete';
+    message: string;
+    progress: number;
+  }) => void | Promise<void>,
+  onMistake?: (mistake: MistakeItem) => void | Promise<void>,
+): Promise<void> {
+  const row = db.prepare(`SELECT * FROM mistake_items WHERE id=? AND user_id=?`).get(mistakeId, userId) as any;
+  if (!row) throw new Error('错题不存在');
+  if (row.status === 'archived') throw new Error('错题已归档');
+
+  // ── 1. OCR ──
+  await onProgress?.({ step: 'ocr', message: row.source_type === 'text' ? '读取文本录入' : '调用阿里云教育 OCR 识别', progress: 8 });
+  let recognizedText = String(row.prompt_text ?? '').trim();
+  let ocrProvider: string | null = row.ocr_provider ?? null;
+  let ocrRaw: unknown = row.ocr_raw ? safeJson(row.ocr_raw, {}) : null;
+  if (row.source_type === 'image') {
+    const assetPath = getOriginalAssetPath(mistakeId);
+    if (!assetPath) throw new Error('找不到原始图片');
+    const ocr = await recognizeWithAliyunEduOcr(assetPath, row.subject, row.grade);
+    recognizedText = ocr.text || recognizedText;
+    ocrProvider = ocr.provider;
+    ocrRaw = ocr.raw;
+  }
+  if (!recognizedText.trim()) throw new Error('OCR 未识别到有效题目文本，请换一张更清晰的图片或使用文本补录');
+
+  // ── 2. LLM 分析（返回所有题目） ──
+  await onProgress?.({ step: 'analyze', message: 'LLM 识别全部题目', progress: 30 });
+  const analyses = await analyzeWithLlm(model, {
+    subject: row.subject,
+    grade: row.grade,
+    recognizedText,
+    studentAnswer: row.student_answer ?? undefined,
+    candidates: getCandidateNodes(row.subject, row.grade, 80),
+  });
+
+  if (!analyses.length) throw new Error('LLM 未能从文本中识别出有效题目');
+
+  // 用 LLM 检测到的学科重新获取候选知识点
+  const effectiveSubject = analyses[0].subject && ['chinese','math','english','science'].includes(analyses[0].subject)
+    ? analyses[0].subject
+    : row.subject;
+  const candidates = getCandidateNodes(effectiveSubject, row.grade, 80);
+
+  // ── 3. 逐题应用分析结果 ──
+  for (let i = 0; i < analyses.length; i++) {
+    const analysis = analyses[i];
+    let targetId: string;
+    let targetRow: any;
+
+    if (i === 0) {
+      // 第一题复写原 mistake 记录（用 LLM 检测的学科覆盖）
+      targetId = mistakeId;
+      targetRow = { ...row, subject: effectiveSubject };
+    } else {
+      // 后续题创建新记录（无资产，共享 OCR 文本）
+      targetId = makeMistakeId();
+      const now = nowSec();
+      db.prepare(`
+        INSERT INTO mistake_items (id, user_id, subject, grade, source_type, status, prompt_text, student_answer, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'processing', ?, ?, ?, ?)
+      `).run(
+        targetId, userId, effectiveSubject, row.grade, row.source_type,
+        (analysis.promptText || recognizedText).slice(0, 800),
+        row.student_answer, now, now,
+      );
+      targetRow = db.prepare(`SELECT * FROM mistake_items WHERE id=?`).get(targetId) as any;
+    }
+
+    const item = await applyAnalysisToMistake(
+      targetId, userId, targetRow, analysis, recognizedText, candidates,
+      ocrProvider, ocrRaw, i, analyses.length, onProgress,
+    );
+    await onMistake?.(item);
+  }
 }
 
 export function updateMistake(mistakeId: string, userId: string, patch: {

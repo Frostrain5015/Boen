@@ -523,10 +523,10 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
   return streamSSE(c, async (stream) => {
     const send = (e: AnalyzeMistakeEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
-      const mistake = await analyzeMistake(mistakeId, userId, model, (p) =>
-        send({ type: 'mistake_progress', step: p.step, message: p.message, progress: p.progress }),
+      await analyzeMistake(mistakeId, userId, model,
+        (p) => send({ type: 'mistake_progress', step: p.step, message: p.message, progress: p.progress }),
+        (mistake) => send({ type: 'mistake_ready', mistake }),
       );
-      await send({ type: 'mistake_ready', mistake });
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });

@@ -1211,7 +1211,7 @@ onUnmounted(() => {
         <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" @practice="handlePractice" @exam="handleExam" />
 
         <!-- 错题本视图 -->
-        <MistakeBook v-else-if="currentView === 'mistakes'" key="mistakes" class="flex-1" @back="currentView = 'chat'" @practice="handleMistakePractice" />
+        <MistakeBook v-else-if="currentView === 'mistakes'" key="mistakes" class="flex-1" :grade="userProfile?.grade ?? '7'" :initial-subject="subject" @back="currentView = 'chat'" @practice="handleMistakePractice" />
 
         <!-- 考试视图（出卷 / 答题），:key 递增可重挂以开始新考试 -->
         <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" :auto-notes="pendingExamNotes ?? undefined" @back="currentView = 'chat'; pendingExamNotes = null" @refresh="loadExams" />
