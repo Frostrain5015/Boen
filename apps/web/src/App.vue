@@ -7,7 +7,6 @@ import { gradeToBand } from '@boen/shared';
 import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
-import AppLoading from '@/components/AppLoading.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
@@ -52,9 +51,6 @@ function saveProfile(p: UserProfile) {
 }
 const userProfile = ref<UserProfile | null>(loadProfile());
 const showSetupDialog = ref(false);
-
-// ── 全屏加载动画 ──────────────────────────
-const pageLoading = ref(true);
 
 // ── 认证状态 ──────────────────────────────
 const authChecked = ref(false);
@@ -483,34 +479,15 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
+  // 启动 auth 验证（完成后自动切换 LoginView 或主界面）
   checkAuth();
   document.addEventListener('click', onClickOutside);
+  // 空闲时预加载 TikZ 编译引擎
   warmTikzJax();
-  // 至少展示 800ms 加载动画，让初始化（auth / 对话列表 / TikZ 预热）有时间完成
-  const READY_TIMEOUT = 1200;
-  const started = Date.now();
-  const hideLoading = () => {
-    const elapsed = Date.now() - started;
-    const remaining = READY_TIMEOUT - elapsed;
-    if (remaining > 0) setTimeout(() => { pageLoading.value = false; }, remaining);
-    else pageLoading.value = false;
-  };
-  // auth 验证 + 对话加载完成后隐藏
-  const checkReady = setInterval(() => {
-    if (authChecked.value) {
-      clearInterval(checkReady);
-      hideLoading();
-    }
-  }, 100);
-  // 保底：6s 后无论如何隐藏
-  setTimeout(() => { pageLoading.value = false; }, 6000);
 });
 </script>
 
 <template>
-  <!-- ═══ 全屏加载动画 ═══ -->
-  <AppLoading :loading="pageLoading" />
-
   <!-- OAuth 回调页面 -->
   <OAuthCallback
     v-if="isOAuthCallback"
