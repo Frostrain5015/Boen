@@ -65,28 +65,18 @@ function handleSave() {
             />
           </label>
 
-          <!-- 年级 -->
+          <!-- 年级（下拉菜单） -->
           <label class="setup-field">
             <span class="setup-label">
               <GraduationCap class="h-3.5 w-3.5" />
               当前年级
             </span>
-            <div class="setup-grade-groups">
-              <div v-for="grp in GRADE_GROUPS" :key="grp.band" class="setup-grade-group">
-                <span class="grade-band-label">{{ grp.band }}</span>
-                <div class="setup-grades">
-                  <button
-                    v-for="g in grp.items"
-                    :key="g.value"
-                    @click="grade = g.value"
-                    class="setup-grade"
-                    :class="grade === g.value ? 'grade-on' : 'grade-off'"
-                  >
-                    <span class="grade-label">{{ g.label }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            <select v-model="grade" class="setup-select">
+              <template v-for="grp in GRADE_GROUPS" :key="grp.band">
+                <option disabled class="setup-optgroup-label">{{ grp.band }}</option>
+                <option v-for="g in grp.items" :key="g.value" :value="g.value" class="setup-option">{{ g.label }}</option>
+              </template>
+            </select>
           </label>
         </div>
 
@@ -188,52 +178,41 @@ function handleSave() {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .setup-input::placeholder { color: var(--ink-soft); opacity: 0.5; }
-.setup-grade-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-.setup-grade-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-.grade-band-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--ink-soft);
-}
-.setup-grades {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 0.4rem;
-}
-.setup-grade {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 0.3rem;
-  border-radius: 12px;
+.setup-select {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border-radius: 14px;
   border: 1.5px solid var(--line);
   background: #fff;
-  cursor: pointer;
-  transition: transform 0.15s, border-color 0.2s, background-color 0.2s;
-}
-.setup-grade:hover { transform: translateY(-2px); }
-.grade-on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-/* 「其他」组只有两项，让它们占两列宽，避免一排 6 列里挤成小方块 */
-.setup-grade-group:last-child .setup-grade { grid-column: span 3; }
-.grade-label {
   font-family: var(--font-display);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--ink);
-  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23786a5d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
 }
-.grade-on .grade-label { color: var(--accent-strong); }
+.setup-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.setup-optgroup-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--surface);
+  cursor: default;
+}
+.setup-option {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+}
 .setup-footer {
   display: flex;
   justify-content: center;
