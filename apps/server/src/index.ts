@@ -242,10 +242,10 @@ app.post('/api/render-tikz', async (c) => {
   // 用 xelatex + xeCJK 编译，支持中文标签（pdflatex 无法排版 CJK/Unicode，会编译失败）
   // 自动适配裸 xlop 命令（不在 tikzpicture 内的 \opadd / \opsub / \opmul / \opdiv）
   // 这些命令只需一个 simple wrapper，不需要真正的 tikz 绘图环境
-  const wrapXlop = /\\op(?:add|sub|mul|div)\b/.test(code) && !/\\begin\s*\{tikzpicture\}/.test(code);
-  const body = wrapXlop
-    ? `\\tikzpicture\\node{${code}};\\endtikzpicture`
-    : code;
+  // 裸 xlop 竖式命令（\opadd / \opsub 等）放在 document body 直接渲染即生成带进位/退位的
+  // 完整竖式盒。不需要 tikzpicture 包裹——\node{} 反而会把竖式盒钳成一行。
+  // 如果代码已包含 tikzpicture（如公式+竖式混合图），保持原样即可。
+  const body = code;
   const tex = `\\documentclass[tikz]{standalone}
 \\usepackage{fontspec}
 \\usepackage{xeCJK}
