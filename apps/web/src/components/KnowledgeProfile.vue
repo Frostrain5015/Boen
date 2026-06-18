@@ -91,16 +91,10 @@ function toggleSection(key: string) {
   expandedSections.value = s;
 }
 
-/** 熟练度 0-100 → 0-5 星（半星粒度） */
-function scoreToStars(ws: number): number {
+/** 非线性星映射（与 StarDisplay.vue 保持一致） */
+function starVal(ws: number): number {
   if (ws < 0) return 0;
-  return Math.round((ws / 10) * 2) / 2; // 0-10→0.5, 10-20→1.0, ..., 90-100→5.0
-}
-function starColor(ws: number): string {
-  if (ws < 30) return '#f2557a';
-  if (ws < 60) return '#f59e42';
-  if (ws < 80) return '#e0a92e';
-  return '#18a558';
+  return Math.round(5 * Math.pow(ws / 100, 0.7) * 2) / 2;
 }
 
 function masteryColor(ws: number): string {
@@ -118,17 +112,6 @@ function masteryBg(ws: number): string {
   if (ws < 80) return '#fef7e6';
   return '#e7f7ee';
 }
-
-const ringPercent = computed(() => {
-  if (!outline.value?.overall) return 0;
-  return Math.max(0, Math.min(100, outline.value.overall.weightedScore));
-});
-
-const ringDash = computed(() => {
-  const r = 54;
-  const circ = 2 * Math.PI * r;
-  return { dash: (ringPercent.value / 100) * circ, circ };
-});
 
 async function fetchOutline() {
   loading.value = true;
@@ -222,26 +205,21 @@ watch(grade, fetchOutline);
           </div>
         </div>
 
-        <!-- Overall ring -->
+        <!-- Overall big stars -->
         <div class="clay p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
           <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合熟练度</p>
-          <div class="relative mx-auto h-[120px] w-[120px]">
-            <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="8" />
-              <circle
-                cx="60" cy="60" r="54" fill="none"
-                :stroke="masteryColor(ringPercent)"
-                stroke-width="8" stroke-linecap="round"
-                :stroke-dasharray="ringDash.circ"
-                :stroke-dashoffset="ringDash.circ"
-                class="transition-all duration-1000 ease-out"
-                :class="{ '!stroke-dashoffset-0': animatingNumbers }"
-              />
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="font-display text-2xl font-bold" :style="{ color: masteryColor(ringPercent) }">{{ ringPercent }}</span>
-              <span class="text-[10px] font-medium text-[var(--ink-soft)]">分</span>
-            </div>
+          <div class="flex justify-center">
+            <span class="inline-flex gap-1">
+              <svg v-for="i in 5" :key="i" class="h-10 w-10" viewBox="0 0 24 24">
+                <defs>
+                  <clipPath :id="'ovr-star-' + i">
+                    <rect x="0" y="0" :width="24 * Math.max(0, Math.min(1, starVal(outline.overall.weightedScore) - (i - 1)))" height="24" />
+                  </clipPath>
+                </defs>
+                <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="#e0dcd3" stroke="#e0dcd3" stroke-width="0.5" />
+                <path :clip-path="'url(#ovr-star-' + i + ')'" d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="#18a558" stroke="#18a558" stroke-width="0.5" />
+              </svg>
+            </span>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2">
             <div class="rounded-xl bg-[#fdeaef] p-2">
