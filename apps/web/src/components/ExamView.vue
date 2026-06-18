@@ -63,6 +63,7 @@ const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'analyze' as 'analyze' | 'write' | 'review', message: '', progress: 0 });
+const scoreRevealed = ref(false);
 
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },
@@ -264,6 +265,28 @@ function startExam() {
   examState.value = 'taking';
   startTimer(session.value.durationMinutes);
 }
+
+function revealResults() {
+  scoreRevealed.value = false;
+  examState.value = 'results';
+  // 下一帧启动动画
+  requestAnimationFrame(() => { requestAnimationFrame(() => { scoreRevealed.value = true; }); });
+}
+
+/** 动画显示的分值：逐步递增 */
+const displayPct = ref(0);
+watch(scoreRevealed, (v) => {
+  if (v && results.value) {
+    displayPct.value = 0;
+    const target = results.value.percentage;
+    const duration = 1200; // ms
+    const step = Math.max(1, Math.floor(target / 60));
+    const interval = setInterval(() => {
+      displayPct.value = Math.min(target, displayPct.value + step);
+      if (displayPct.value >= target) clearInterval(interval);
+    }, duration / 60);
+  }
+});
 function goBack() { examState.value = 'config'; if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; } }
 function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
@@ -436,7 +459,6 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">批改评分</span>
             <span class="step-active-dot"></span>
           </div>
-          <div class="step-msg">正在逐题评分</div>
           <div class="step-row">
             <span class="step-dot dot-pending">✦</span>
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">生成分析报告</span>
@@ -452,30 +474,27 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'graded' && results" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
         <div class="loading-mascot"><Mascot :size="80" state="happy" /></div>
-        <div class="text-center">
-          <p class="mb-1 font-display text-lg font-bold text-[var(--ink)]">批改完成！</p>
-          <p class="text-sm text-[var(--ink-soft)]">共 {{ results.maxScore }} 分，你获得了 {{ results.totalScore }} 分</p>
-        </div>
-        <button @click="examState = 'results'" class="btn-accent flex items-center gap-2 rounded-2xl px-8 py-3 font-display text-base font-bold transition-all active:scale-[0.96]"><BarChart3 class="h-5 w-5" /> 查看成绩</button>
+        <p class="font-display text-lg font-bold text-[var(--ink)]">批改完成！</p>
+        <button @click="revealResults" class="btn-accent flex items-center gap-2 rounded-2xl px-8 py-3 font-display text-base font-bold transition-all active:scale-[0.96]"><BarChart3 class="h-5 w-5" /> 查看成绩</button>
       </div>
     </div>
 
     <!-- ═══ RESULTS ═══ -->
     <div v-if="examState === 'results' && results" class="flex h-full flex-col overflow-y-auto">
       <div class="mx-auto w-full max-w-2xl space-y-4 p-4">
-        <!-- Score Hero -->
-        <div class="clay p-6 text-center" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
+        <!-- Score Hero（带展开动画） -->
+        <div class="clay p-6 text-center" :class="{ 'score-reveal': scoreRevealed }" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
           <div class="relative mx-auto mb-3 h-28 w-28">
             <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="8" />
-              <circle cx="60" cy="60" r="54" fill="none" :stroke="masteryColor(results.percentage)" stroke-width="8" stroke-linecap="round" :stroke-dasharray="2 * Math.PI * 54" :stroke-dashoffset="2 * Math.PI * 54 * (1 - results.percentage / 100)" class="transition-all duration-1000 ease-out" />
+              <circle cx="60" cy="60" r="54" fill="none" :stroke="masteryColor(results.percentage)" stroke-width="8" stroke-linecap="round" :stroke-dasharray="2 * Math.PI * 54" :stroke-dashoffset="2 * Math.PI * 54 * (1 - (scoreRevealed ? results.percentage / 100 : 0))" class="circle-reveal" />
             </svg>
             <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="font-display text-3xl font-bold" :style="{ color: masteryColor(results.percentage) }">{{ results.percentage }}<span class="text-base">%</span></span>
+              <span class="font-display text-3xl font-bold" :style="{ color: masteryColor(results.percentage) }">{{ displayPct }}<span class="text-base">%</span></span>
               <span class="text-[10px] font-medium text-[var(--ink-soft)]">正确率</span>
             </div>
           </div>
-          <span class="inline-block rounded-full px-4 py-1 font-display text-sm font-bold" :class="results.grade === '优秀' ? 'bg-[#e7f7ee] text-[#18a558]' : results.grade === '良好' ? 'bg-[#fef7e6] text-[#e0a92e]' : results.grade === '及格' ? 'bg-[#fef3e2] text-[#f59e42]' : 'bg-[#fdeaef] text-[#f2557a]'">{{ results.grade }}</span>
+          <span class="grade-badge" :class="results.grade === '优秀' ? 'grade-excellent' : results.grade === '良好' ? 'grade-good' : results.grade === '及格' ? 'grade-pass' : 'grade-fail'">{{ results.grade }}</span>
           <div class="mt-3 text-xs text-[var(--ink-soft)]">{{ results.totalScore }}/{{ results.maxScore }} 分</div>
         </div>
 
@@ -576,6 +595,17 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .dot-pending { background: var(--accent-soft); color: var(--accent-strong); opacity: 0.5; }
 .step-active-dot { width: 0.375rem; height: 0.375rem; border-radius: 999px; background: var(--accent); animation: stepPulse 1.6s ease-in-out infinite; }
 @keyframes stepPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
+
+/* ── 成绩揭开动画 ── */
+.circle-reveal { transition: stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.score-reveal .grade-badge { animation: badgeSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.4s both; }
+.grade-badge { display: inline-block; border-radius: 999px; padding: 0.25rem 1rem; font-family: var(--font-display); font-size: 0.875rem; font-weight: 700; }
+.grade-excellent { background: #e7f7ee; color: #18a558; }
+.grade-good { background: #fef7e6; color: #e0a92e; }
+.grade-pass { background: #fef3e2; color: #f59e42; }
+.grade-fail { background: #fdeaef; color: #f2557a; }
+@keyframes badgeSlideIn { from { opacity: 0; transform: translateY(10px) scale(0.8); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 /* ── 结果展开/收起 ── */
 .reveal-enter-active { transition: all 0.25s ease; overflow: hidden; }
 .reveal-leave-active { transition: all 0.15s ease; overflow: hidden; }
