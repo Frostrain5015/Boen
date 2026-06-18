@@ -150,9 +150,12 @@ async function generateExamPaper() {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.type === 'exam_ready') {
-            session.value = { examId: data.examId, title: data.title, totalQuestions: data.totalQuestions, totalScore: data.totalScore, durationMinutes: data.durationMinutes, questions: [] };
+            const examId = data.examId;
+            session.value = { examId, title: data.title, totalQuestions: data.totalQuestions, totalScore: data.totalScore, durationMinutes: data.durationMinutes, questions: [] };
             examState.value = 'taking';
             startTimer(data.durationMinutes);
+            // 异步加载题目内容（不阻塞 SSE 读取）
+            loadQuestions(examId);
           } else if (data.type === 'error') {
             throw new Error(data.message);
           }
@@ -190,6 +193,16 @@ function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
   if (s.has(qIndex)) s.delete(qIndex); else s.add(qIndex);
   expandedResults.value = s;
+}
+
+async function loadQuestions(examId: string) {
+  try {
+    const res = await fetch(`/api/exam/${examId}`, { headers: authHeaders() });
+    const data = await res.json();
+    if (data.exam?.questions && session.value) {
+      session.value = { ...session.value, questions: data.exam.questions };
+    }
+  } catch {}
 }
 
 function authHeaders(): Record<string, string> {
