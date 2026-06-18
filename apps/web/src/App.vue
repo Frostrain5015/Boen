@@ -549,10 +549,11 @@ onMounted(() => {
 
       <!-- 主内容区 -->
       <div class="flex flex-1 flex-col" :data-subject="subject">
+        <!-- 对话视图（聊天模式显示） -->
+        <template v-if="currentView === 'chat'">
         <!-- 视图切换（淡入淡出过渡） -->
         <Transition name="view-fade" mode="out-in">
-          <!-- 对话视图 -->
-          <template v-if="currentView === 'chat'" key="chat">
+          <div class="flex flex-1 flex-col" key="chat-content">
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
@@ -708,6 +709,8 @@ onMounted(() => {
             </Transition>
           </div>
         </main>
+      </div>
+    </Transition>
 
         <!-- 输入区 -->
         <footer class="px-4 pb-4 pt-1">
@@ -767,7 +770,6 @@ onMounted(() => {
           <Mascot :size="80" state="thinking" />
           <p class="text-sm font-medium text-[var(--ink-soft)]">考试模式即将上线…</p>
         </div>
-        </Transition>
       </div>
     </div>
 
