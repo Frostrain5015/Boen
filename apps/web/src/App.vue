@@ -591,9 +591,6 @@ onMounted(() => {
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
-          v-motion
-          :initial="{ opacity: 0, y: -20 }"
-          :enter="{ opacity: 1, y: 0, transition: { duration: 500 } }"
         >
           <!-- 侧边栏切换 -->
           <button
