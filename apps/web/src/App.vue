@@ -118,94 +118,51 @@ function scrollDown() {
 }
 
 /**
- * TiKZ 编译缓存：源文本 → 渲染后 SVG 容器 outerHTML，避免重复编译同一图形。
- * 只在首次编译成功后自动填充。
+ * 通过服务端 API 编译 TikZ 图形（流式结束/历史恢复后调用）。
+ * 缓存已编译的 SVG 源码，避免重复请求同一图形。
  */
 const tikzCache = new Map<string, string>();
-let tikzBusy = false;
-let tikzWarmed = false;
 
-/**
- * 页面空闲时预加载 TiKZJax wasm + coredump（一次性 ~7s），
- * 后续首次实际编译时省去网络下载，仅剩同步 TeX 编译（通常 <500ms），
- * 远低于浏览器判定「页面无响应」的阈值（~10s）。
- */
-function warmTikzJax() {
-  if (tikzWarmed) return;
-  tikzWarmed = true;
-  const idle = () => {
-    const run = (window as unknown as { process_tikz?: () => Promise<void> }).process_tikz;
-    if (typeof run !== 'function') return;
-    const d = document.createElement('div');
-    d.style.position = 'absolute';
-    d.style.left = '-9999px';
-    d.innerHTML = '<div class="tikz-wrap"><script type="text/tikz">\\begin{tikzpicture}\\end{tikzpicture}<\/script></div>';
-    document.body.appendChild(d);
-    run().catch(() => {}).finally(() => d.remove());
-  };
-  // 优先 requestIdleCallback，否则等 5s 后跑
-  (window as any).requestIdleCallback ? requestIdleCallback(idle, { timeout: 3000 }) : setTimeout(idle, 5000);
-}
-
-/**
- * 编译页面上尚未处理的 TikZ 图形（流式结束/历史恢复后调用）。
- *
- * 缓存命中 → 直接替换出 SVG（0ms 无编译）；
- * 缓存未命中 → yield 后编译，并自动填充缓存供下次复用。
- */
-function processTikzDiagrams() {
-  nextTick(async () => {
-    const run = (window as unknown as { process_tikz?: () => Promise<void> }).process_tikz;
-    if (typeof run !== 'function' || tikzBusy) return;
-    if (!document.querySelector('script[type="text/tikz"]')) return;
-
-    // ── Phase 1：缓存命中 → 直接从缓存替换，免编译 ──
-    const hit = document.querySelectorAll<HTMLElement>('script[type="text/tikz"]');
-    let uncachedCount = 0;
-    hit.forEach((el) => {
-      const src = el.textContent ?? '';
-      const cached = tikzCache.get(src);
-      if (cached) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = cached;
-        const node = tmp.firstElementChild || tmp;
-        el.parentNode!.replaceChild(node, el);
-      } else {
-        uncachedCount++;
-      }
-    });
-    if (uncachedCount === 0) return;
-
-    // ── Phase 2：让出主线程 → 浏览器刷新 UI（显示「正在画图」）、处理用户交互 ──
-    await new Promise((r) => setTimeout(r, 100));
-
-    // ── Phase 3：编译，并记录源→SVG 映射 ──
-    // 编译前收集未缓存脚本的源文本（按 DOM 序）
-    const sources = Array.from(document.querySelectorAll<HTMLElement>('script[type="text/tikz"]')).map((el) => el.textContent ?? '');
-
-    tikzBusy = true;
-    try {
-      await run();
-      // Phase 4：把本次新编译的结果写入缓存（cached ones 有 dataset 区分）
-      const wraps = document.querySelectorAll<HTMLElement>('.tikz-wrap');
-      let srcIdx = 0;
-      wraps.forEach((wrap) => {
-        if (wrap.dataset.tikzCached) return;
-        const svg = wrap.querySelector('svg');
-        if (svg && srcIdx < sources.length) {
-          tikzCache.set(sources[srcIdx], wrap.outerHTML);
-          wrap.dataset.tikzCached = '1';
-          srcIdx++;
-        }
-      });
-    } catch (err) {
-      console.error('TikZ 渲染失败', err);
-    } finally {
-      tikzBusy = false;
-      // 编译期间若又产生新图，补跑一次
-      if (document.querySelector('script[type="text/tikz"]')) processTikzDiagrams();
+async function processTikzDiagrams() {
+  await nextTick();
+  // 缓存命中直接替换
+  const wraps = document.querySelectorAll<HTMLElement>('.tikz-wrap[data-tikz]');
+  const uncached: HTMLElement[] = [];
+  wraps.forEach((wrap) => {
+    const src = decodeURIComponent(wrap.dataset.tikz ?? '');
+    const cached = tikzCache.get(src);
+    if (cached) {
+      wrap.innerHTML = cached;
+    } else {
+      uncached.push(wrap);
     }
   });
+  if (uncached.length === 0) return;
+
+  // 让出主线程，显示"正在画图"
+  await new Promise((r) => setTimeout(r, 100));
+
+  // 逐个通过 API 编译
+  for (const wrap of uncached) {
+    const code = decodeURIComponent(wrap.dataset.tikz ?? '');
+    if (!code) continue;
+    try {
+      const res = await fetch('/api/render-tikz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (data.svg) {
+        wrap.innerHTML = data.svg;
+        tikzCache.set(code, data.svg);
+      } else {
+        wrap.innerHTML = `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">TikZ 编译失败</div>`;
+      }
+    } catch {
+      wrap.innerHTML = `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">TikZ 请求失败</div>`;
+    }
+  }
 }
 
 function handleEvent(e: SseEvent, idx: { value: number }) {
@@ -481,7 +438,6 @@ function onClickOutside(e: MouseEvent) {
 onMounted(() => {
   checkAuth();
   document.addEventListener('click', onClickOutside);
-  warmTikzJax();
 
   // ═══ 关键：等 Vue 第一帧完全渲染后再移除加载器 ═══
   // Vue 在后台默默挂载和渲染，加载器保持可见直到一切就绪

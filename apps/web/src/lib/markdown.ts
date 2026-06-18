@@ -5,17 +5,15 @@ const md = new MarkdownIt({ breaks: true, linkify: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
 
 /**
- * 自定义 fence 渲染：```tikz / ```latex（含 tikz 相关）→ TikZJax script 标签
+ * 自定义 fence 渲染：```tikz / ```latex（含 tikz 相关）→ 服务端 API 编译占位
  */
 const defaultFence = md.renderer.rules.fence;
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const info = tokens[idx].info.trim().toLowerCase();
   const content = tokens[idx].content;
-  // 块名是 tikz，或内容包含 tikzpicture 环境的，都交给 TikZJax
   if (info === 'tikz' || (info === 'latex' && /\\begin\s*\{tikzpicture\}/.test(content))) {
-    // tikz-gen 占位：流式刚出现 ```tikz 即显示，编译出 <svg> 后由 CSS(:has(svg)) 自动隐藏，
-    // 避免编译期（首图需下载 wasm，约 6-7s）页面空白让用户以为卡住。
-    return `<div class="tikz-wrap"><div class="tikz-gen"><span class="tikz-gen-icon">📐</span><span class="tikz-gen-label">博文正在画图</span><span class="tikz-gen-dots"><span></span><span></span><span></span></span></div><script type="text/tikz">${content}</script></div>\n`;
+    const encoded = encodeURIComponent(content);
+    return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">📐</span><span class="tikz-gen-label">博文正在画图</span><span class="tikz-gen-dots"><span></span><span></span><span></span></span></div></div>\n`;
   }
   return defaultFence!(tokens, idx, options, env, self);
 };
