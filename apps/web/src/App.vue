@@ -830,7 +830,7 @@ onMounted(() => {
               <Mascot :size="120" :state="mascotState" />
               <div>
                 <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
-                <p class="mt-1.5 text-[var(--ink-soft)]">问我问题，或者说一句「考我一道题」来练习吧～</p>
+                <p class="mt-1.5 text-[var(--ink-soft)]">有什么想学的？可以直接问我，也可以用侧边栏的「考试」来检测自己～</p>
               </div>
             </div>
 
