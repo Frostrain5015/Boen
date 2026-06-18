@@ -32,21 +32,20 @@ const SUBJECT_GUIDE: Record<string, string> = {
 \n- 公式、方程、表达式一律用 KaTeX 排版：行内公式用 $...$（如 $y = 3x - 5$、$(x_1, y_1)$），独立公式用 $$...$$（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。\
 \n- 即使是简单数字表达式也要用 $...$ 包裹，确保前端呈现专业排版效果。\
 \n- 需要画示意图（几何图形、函数图像、坐标系等）时，用 TikZ 代码块（```tikz）绘制，前端自动渲染为矢量图。不要在文本中用字符拼图代替。\
-\n- **定理、定义、重要公式、推导过程必须用 $$...$$ 独立公式行**（独占一行），不要用 $ 行内公式，这样更清晰易读。',
+\n- 定理、定义、重要公式、推导过程必须用 $$...$$ 行间公式（独占一行），不要用 $ 行内公式。注意 $$ 必须成对出现（开头 $$ + 内容 + 结尾 $$）。',
   science:
     '【科学特化】\
 \n当前对话仅限科学学科。若学生问及其他学科内容，礼貌告知「我是你的科学学习助手，这个问题超出了我的学科范围，请切换到对应学科模式」。\
 \n- 公式、化学式、物理量一律用 KaTeX 排版：行内公式用 $...$（如 $F = ma$、$E = mc^2$、$\\text{H}_2\\text{O}$），独立公式用 $$...$$。\
 \n- 物理量符号、化学计量数、单位等尽量用 LaTeX 书写，提升可读性。\
 \n- 需要画示意图（物理情景图、电路图、几何光学等）时，用 TikZ 代码块（```tikz）绘制，前端自动渲染为矢量图。不要在文本中用字符拼图代替。\
-\n- **定理、重要公式、推导过程必须用 $$...$$ 独立公式行**（独占一行）。',
+\n- 定理、重要公式、推导过程必须用 $$...$$ 行间公式（独占一行）。注意 $$ 必须成对出现。',
 };
 
 export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userName?: string, grade?: Grade): string {
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」，讲解的深度、用词与举例都要贴合该年级的课程进度，不要超纲也不要过于浅显。` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，回答时用「${userName}」称呼他/她，营造亲切的一对一辅导感。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
-  // 列竖式仅对小学低年级有效，高年级不需要
   const xlopGuide = grade && (grade === '2' || grade === '3')
     ? '- 列竖式计算（加减乘除）：必须用 TikZ + xlop 包的 \\opadd / \\opsub / \\opmul / \\opdiv 渲染，如 ```tikz\\begin{tikzpicture}\\node{\\opadd[style=text]{698}{310}};\\end{tikzpicture}```。不要用 ASCII 字符拼竖式。\n'
     : '';
@@ -67,7 +66,7 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
     '- 若问题缺乏背景（没说清是哪门课、什么前置知识），先确认再回答，不要盲目猜测。',
     '- 对作业类问题，引导思路而非直接给答案；论文/写作先定大纲和核心论点再逐步展开。',
     '- 严禁学术造假：绝不代写或提供抄袭内容，但可以给大纲、修改建议、润色和逻辑梳理。',
-    '- 公式、代码、数学表达式用 Markdown 代码块或 KaTeX（$...$ 行内 / $$...$$ 行间）呈现。**定理、定义、重要公式、推导必须用 $$...$$ 行间公式**，独占一行。',
+    '- 【KaTeX 公式规则】行内用 $...$（如 $y = 3x - 5$），行间用 $$...$$ 独立成行（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。**$$ 必须成对出现**：开头 $$ + 内容 + 结尾 $$，绝不能只有结尾标记没有开头标记。**定理、定义、重要公式、推导步骤必须用行间公式 $$...$$**。',
     '',
     '【出题规则】当学生希望被测验、练习或自我检测，或你判断用题目巩固更有效时，',
     '必须调用出题工具（ask_multiple_choice / ask_fill_blank / ask_true_false / ask_short_answer）来出题，',
@@ -84,7 +83,6 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，用「${userName}」称呼他/她。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
-  // 列竖式仅对小学低年级有效
   const xlopGuide = grade && (grade === '2' || grade === '3')
     ? '- 列竖式计算（加减乘除）：必须用 TikZ + xlop 包的 \\opadd / \\opsub / \\opmul / \\opdiv 渲染，如 ```tikz\\begin{tikzpicture}\\node{\\opadd[style=text]{698}{310}};\\end{tikzpicture}```。不要用 ASCII 字符拼竖式。\n'
     : '';
@@ -111,7 +109,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
     '',
     '【教学风格】',
     '- 讲解清晰、有条理，多用举例和类比。',
-    '- 数学公式使用 KaTeX（$...$ 行内 / $$...$$ 行间）排版。**定理、重要公式、推导用 $$...$$ 行间公式**，独占一行，更清晰可读。',
+    '- 【KaTeX 公式规则】行内用 $...$（如 $y = 3x - 5$），行间用 $$...$$ 独立成行（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。**$$ 必须成对出现**：开头 $$ + 内容 + 结尾 $$，绝不能只有结尾标记没有开头标记。**定理、定义、重要公式、推导步骤必须用行间公式 $$...$$**。',
     '- 讲解涉及图形、空间或结构关系的知识点时（几何图形、函数图像、受力分析、电路、坐标系、流程/结构示意等），适当用 TikZ 代码块（```tikz）画示意图帮助学生直观理解，前端会自动渲染为矢量图；不要用字符拼凑图形。示意图要简洁、服务于讲解，不必每节都画。',
     xlopGuide,
     '- 每一章节结束时，用「这一节的重点是...」做小结。',
