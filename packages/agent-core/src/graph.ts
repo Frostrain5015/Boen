@@ -113,7 +113,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     const last = state.messages[state.messages.length - 1];
 
     let system: SystemMessage;
-    let tools: ReturnType<typeof model.bindTools> | undefined;
+    let tools: ReturnType<NonNullable<typeof model.bindTools>> | undefined;
 
     if (state.mode === 'review') {
       system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));

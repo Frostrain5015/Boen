@@ -43,39 +43,40 @@ export interface ExamSession {
   results?: ExamResults;
 }
 
-/** 进度回调：每步执行时通知前端 */
+/** 进度回调：每步执行时通知前端（可返回 Promise 以保证 SSE 写入有序） */
 export interface ExamProgress {
   step: 'analyze' | 'write' | 'review';
   message: string;
   progress?: number; // 0-100
 }
+export type ExamProgressFn = (p: ExamProgress) => void | Promise<void>;
 
 // ── 考试生成（三步流水线） ──────────────────
 
 export async function generateExam(
   model: BaseChatModel,
   config: ExamConfig,
-  onProgress?: (p: ExamProgress) => void,
+  onProgress?: ExamProgressFn,
   userId?: string,
 ): Promise<{ title: string; questions: ExamQuestion[]; totalScore: number; durationMinutes: number }> {
   const weightDist = getWeightDistribution(config.subject, config.grade);
 
   // ─── Step 1: 规划 ───────────────────────────
-  onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
+  await onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
   const weightGuide = buildWeightGuideForPrompt(weightDist);
   const profileContext = userId ? await buildProfileContext(userId, config) : '';
-  onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
+  await onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
   const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
 
-  onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
+  await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
   // ─── Step 2: 出题 ───────────────────────────
-  onProgress?.({ step: 'write', message: '正在编写选择题…', progress: 25 });
+  await onProgress?.({ step: 'write', message: '正在编写选择题…', progress: 25 });
   const allQuestions: ExamQuestion[] = [];
 
   for (let i = 0; i < blueprint.questionTypes.length; i++) {
     const qt = blueprint.questionTypes[i];
-    onProgress?.({
+    await onProgress?.({
       step: 'write',
       message: `正在编写${qt.label}（${i + 1}/${blueprint.questionTypes.length}）…`,
       progress: 25 + Math.round((i / blueprint.questionTypes.length) * 60),
@@ -84,13 +85,13 @@ export async function generateExam(
     allQuestions.push(...questions);
   }
 
-  onProgress?.({ step: 'write', message: `已完成 ${allQuestions.length} 道题`, progress: 85 });
+  await onProgress?.({ step: 'write', message: `已完成 ${allQuestions.length} 道题`, progress: 85 });
 
   // ─── Step 3: 审核 ───────────────────────────
-  onProgress?.({ step: 'review', message: '正在审核试卷格式…', progress: 88 });
-  const reviewed = await stepReview(model, allQuestions, config);
+  await onProgress?.({ step: 'review', message: '正在审核试卷格式…', progress: 88 });
+  const reviewed = await stepReview(model, allQuestions, config, blueprint, onProgress);
 
-  onProgress?.({ step: 'review', message: `审核完成，共 ${reviewed.questions.length} 道题`, progress: 100 });
+  await onProgress?.({ step: 'review', message: `审核完成，共 ${reviewed.questions.length} 道题`, progress: 100 });
 
   const estMinutes = config.durationMinutes ?? Math.max(20, Math.min(90, Math.round(reviewed.questions.length * 1.5)));
   return { title: blueprint.title, questions: reviewed.questions, totalScore: reviewed.totalScore, durationMinutes: estMinutes };
@@ -202,6 +203,7 @@ async function stepWriteQuestions(
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
 
+  try {
   let parsed: any;
   try {
     parsed = JSON.parse(jsonStr);
@@ -246,52 +248,90 @@ async function stepWriteQuestions(
 
 // ─── 审核阶段 ────────────────────────────────
 
-async function stepReview(model: BaseChatModel, questions: ExamQuestion[], config: ExamConfig): Promise<{ questions: ExamQuestion[]; totalScore: number }> {
+const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
+
+/** 本地格式兜底：补齐必填字段、修复残缺选项 */
+function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
+  const q2 = { ...q, index: i };
+  if (q2.type === 'multiple_choice') {
+    if (!q2.options || q2.options.length < 2) {
+      q2.options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }];
+      q2.correctKeys = ['A'];
+    }
+    if (!q2.correctKeys?.length) q2.correctKeys = [q2.options[0].key];
+  }
+  if (!q2.knowledgePoint) q2.knowledgePoint = '综合';
+  if (!q2.explanation) q2.explanation = '详见参考答案。';
+  if (!q2.literacies?.length) q2.literacies = ['综合素养'];
+  return q2;
+}
+
+async function stepReview(
+  model: BaseChatModel,
+  questions: ExamQuestion[],
+  config: ExamConfig,
+  blueprint: ExamBlueprint,
+  onProgress?: ExamProgressFn,
+): Promise<{ questions: ExamQuestion[]; totalScore: number }> {
   if (questions.length === 0) return { questions, totalScore: 0 };
 
   // 先做本地格式校验并修复
-  const fixed = questions.map((q, i) => {
-    const q2 = { ...q, index: i };
-    if (q2.type === 'multiple_choice') {
-      if (!q2.options || q2.options.length < 2) {
-        q2.options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }];
-        q2.correctKeys = ['A'];
-      }
-      if (!q2.correctKeys?.length) q2.correctKeys = [q2.options[0].key];
-    }
-    if (!q2.knowledgePoint) q2.knowledgePoint = '综合';
-    if (!q2.explanation) q2.explanation = '详见参考答案。';
-    if (!q2.literacies?.length) q2.literacies = ['综合素养'];
-    return q2;
-  });
+  let fixed = questions.map((q, i) => localFormatFix(q, i));
 
-  // 将整卷发给 LLM 做最终审核（只校验不修改内容，防止幻觉）
-  const summary = fixed.map(q => `Q${q.index + 1}[${q.type}] ${q.stem?.slice(0, 30)} KP:${q.knowledgePoint}`).join('\n');
+  // 将整卷发给 LLM 做最终审核（只校验，标记需要重出的题）
+  const summary = fixed.map(q => `Q${q.index + 1}[${q.type}] ${q.stem?.slice(0, 40)} KP:${q.knowledgePoint}`).join('\n');
   const prompt = [
-    '你是一个试卷审题专家。请检查以下试卷的每道题，只检查格式问题，不修改题目内容。',
+    '你是一个试卷审题专家。请检查以下试卷的每道题是否存在格式或质量问题（如题干残缺、选项不足、答案缺失、知识点为空、与其他题重复）。',
+    '只检查，不要改写题目内容。',
     '',
     summary,
     '',
-    '如果所有题目格式正确，输出：{"ok":true}',
-    '如果有问题，输出：{"ok":false,"issues":[{"index":0,"issue":"描述问题"}]}',
+    '如果所有题目都合格，输出：{"ok":true}',
+    '如果有题目需要重新出，输出：{"ok":false,"issues":[{"index":0,"issue":"描述问题"}]}',
+    'index 从 0 开始，对应上面 Q1=0、Q2=1 …',
   ].join('\n');
 
   try {
     const response = await model.invoke([new SystemMessage(prompt)]);
     const content = typeof response.content === 'string' ? response.content : '';
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim());
+    const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
     const result = JSON.parse(jsonStr);
-    if (!result.ok && result.issues?.length) {
-      // 有格式问题则重新生成有问题的题目
-      for (const issue of result.issues) {
+
+    if (!result.ok && Array.isArray(result.issues) && result.issues.length) {
+      // 只重出有问题的题（最多 3 道，避免审核阶段无限放大耗时）
+      const issues = result.issues
+        .filter((it: any) => typeof it?.index === 'number' && it.index >= 0 && it.index < fixed.length)
+        .slice(0, 3);
+
+      for (let k = 0; k < issues.length; k++) {
+        const issue = issues[k];
         const idx = issue.index;
-        if (idx >= 0 && idx < fixed.length) {
-          console.warn(`审核发现问题 Q${idx + 1}: ${issue.issue}`);
+        const bad = fixed[idx];
+        console.warn(`审核发现问题 Q${idx + 1}: ${issue.issue}，正在重新出题…`);
+        await onProgress?.({ step: 'review', message: `重出第 ${idx + 1} 题（${k + 1}/${issues.length}）…`, progress: 92 + Math.round((k / issues.length) * 6) });
+        try {
+          const qt = {
+            type: bad.type,
+            label: TYPE_LABELS[bad.type] ?? '题目',
+            count: 1,
+            pointsPer: bad.points,
+            focusKps: bad.knowledgePoint && bad.knowledgePoint !== '综合' ? [bad.knowledgePoint] : [],
+          };
+          const others = fixed.filter((_, i) => i !== idx);
+          const regenerated = await stepWriteQuestions(model, config, qt, blueprint, others);
+          if (regenerated[0]) {
+            // 保留原分值与位置，替换题目内容
+            fixed[idx] = localFormatFix({ ...regenerated[0], points: bad.points }, idx);
+          }
+        } catch (e: any) {
+          console.warn(`Q${idx + 1} 重出失败，保留原题:`, e?.message?.slice(0, 80));
         }
       }
+      // 重出后重新编号兜底
+      fixed = fixed.map((q, i) => localFormatFix(q, i));
     }
-  } catch { /* 审核失败不阻断 */ }
+  } catch { /* 审核失败不阻断整卷生成 */ }
 
   const totalScore = fixed.reduce((s, q) => s + q.points, 0);
   return { questions: fixed, totalScore };
@@ -314,124 +354,6 @@ function buildWeightGuideForPrompt(dist: any[]): string {
   }
   lines.push('\n严格按此比例分配题目数量。核心+重要应占 70% 以上。');
   return lines.join('\n');
-}
-
-function buildExamPrompt(config: ExamConfig, weightGuide: string): string {
-  const { subject, grade, difficulty = 'medium', totalScore = 100 } = config;
-  const subjectLabel: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
-  const gradeLabel = (g: string) => {
-    const n = Number(g);
-    return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初${'一二三'[n - 7]}`;
-  };
-
-  return [
-    `你是一位经验丰富的中学教师。请为${subjectLabel[subject] ?? subject}（${gradeLabel(grade)}）生成一份标准试卷。`,
-    `试卷总分：${totalScore}分。难度级别：${difficulty}。`,
-    '',
-    weightGuide ? `知识点权重分布（用于决定题目分布）：\n${weightGuide}` : '',
-    '',
-    '你必须严格按照以下 JSON 格式输出，不要有任何其他文字：',
-    '```json',
-    '{',
-    '  "title": "试卷标题（包含学科和年级信息）",',
-    '  "totalScore": 100,',
-    '  "questions": [',
-    '    {',
-    '      "index": 0,',
-    '      "type": "multiple_choice",',
-    '      "points": 5,',
-    '      "stem": "题干",',
-    '      "options": [{"key": "A", "text": "选项A"}, {"key": "B", "text": "选项B"}, {"key": "C", "text": "选项C"}, {"key": "D", "text": "选项D"}],',
-    '      "correctKeys": ["A"],',
-    '      "multiSelect": false,',
-    '      "knowledgePoint": "所属知识点",',
-    '      "literacies": ["核心素养1", "核心素养2"],',
-    '      "difficulty": "medium",',
-    '      "explanation": "答案解析"',
-    '    }',
-    '  ]',
-    '}',
-    '```',
-    '',
-    '注意事项：',
-    '- 题目覆盖多个知识点，按照权重分布合理分配比例。',
-    '- 核心知识点出 40% 的题，重要知识点出 30%，标准知识点出 20%，了解不超过 10%。',
-    '- 包含选择题、填空题、判断题、简答题等多种题型。',
-    '- 选择题和判断题每题 5 分，填空题每空 5 分，简答题每题 10 分。',
-    '- **选择题必须包含 4 个选项（A/B/C/D），每道题的 options 数组必须有 4 个元素，且 correctKeys 必须是其中一个 key。**',
-    '- 所有题目要有完整的参考答案和解析。',
-    '- 填空题用 blanks 字段：{"blanks": [{"acceptedAnswers": ["答案1", "答案2"]}]}',
-    '- 判断题用 answer 字段（boolean），简答题用 referenceAnswer 和 keyPoints。',
-    '- knowledgePoint 和 literacies 必须填写。',
-  ].join('\n');
-}
-
-function parseExamResponse(content: string): { title: string; questions: ExamQuestion[]; totalScore: number } {
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  let jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-
-  // LLM 生成的中文 JSON 中，explanation 等字段里可能含有未转义的 "（如"设x为"，根据"规则"…"）
-  // 在解析前先转义字符串值内部的 " → 中文引号「」或直接替换
-  // 策略：将 " 替换为 “ ” 或移除，但仅限值内部
-  jsonStr = jsonStr
-    // 第一步：把键周围的 " 保护起来（已知键名不含引号问题）
-    // 第二步：对值中的中文引号对做替换
-    .replace(/(?<=: )"(?=[^"]*“)/g, '“')
-    .replace(/(?<=”[^"]*)"/g, '”')
-    // 通用兜底：替换值中任何剩余的孤立 "
-    .replace(/：(?!\s*[{\[])/g, '：'); // 确保冒号后不是结构字符
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(jsonStr);
-  } catch {
-    // 兜底：尝试将值内 ASCII " 全部替换为中文引号
-    jsonStr = jsonStr.replace(/"([^"]*?)"/g, (match) => {
-      // 如果匹配到的是 key 模式（key:），保持原样
-      if (/^\s*"[^"]+"\s*:/.test(match)) return match;
-      return '“' + match.slice(1, -1) + '”';
-    });
-    parsed = JSON.parse(jsonStr);
-  }
-
-  const questions: ExamQuestion[] = (parsed.questions ?? []).map((q: any, i: number) => {
-    const base = {
-      index: i,
-      type: q.type || 'multiple_choice',
-      points: q.points ?? 5,
-      stem: q.stem || '',
-      passage: q.passage,
-      knowledgePoint: q.knowledgePoint,
-      literacies: q.literacies ?? [],
-      difficulty: q.difficulty ?? 'medium',
-      explanation: q.explanation || '',
-    };
-
-    if (q.type === 'multiple_choice') {
-      const opts = (q.options ?? []).filter((o: any) => o?.key && o?.text);
-      // 如果选项不足 2 个，自动用 A/B 占位避免前端空白
-      if (opts.length < 2) {
-        opts.push({ key: 'A', text: '正确选项' }, { key: 'B', text: '错误选项' });
-      }
-      return { ...base, type: 'multiple_choice' as const, options: opts, correctKeys: q.correctKeys?.filter((k: string) => opts.some((o: any) => o.key === k)) ?? ['A'], multiSelect: q.multiSelect ?? false };
-    }
-    if (q.type === 'fill_blank') {
-      return { ...base, type: 'fill_blank' as const, blanks: q.blanks ?? [] };
-    }
-    if (q.type === 'true_false') {
-      return { ...base, type: 'true_false' as const, answer: q.answer ?? true };
-    }
-    if (q.type === 'short_answer') {
-      return { ...base, type: 'short_answer' as const, referenceAnswer: q.referenceAnswer, keyPoints: q.keyPoints ?? [] };
-    }
-    return { ...base, type: 'multiple_choice' as const, options: q.options ?? [], correctKeys: q.correctKeys ?? [], multiSelect: false };
-  });
-
-  return {
-    title: parsed.title || `${parsed.subject ?? ''}试卷`,
-    questions,
-    totalScore: parsed.totalScore ?? questions.reduce((s: number, q: ExamQuestion) => s + q.points, 0),
-  };
 }
 
 // ── 考试评分 ─────────────────────────────────

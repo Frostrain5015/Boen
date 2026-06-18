@@ -4,6 +4,7 @@ import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft } from 'lucide-vue-next';
 import type { QuestionType } from '@boen/shared';
 import { getToken } from '@/services/auth';
+import { streamExamGenerate } from '@/services/chat';
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -128,25 +129,34 @@ function startTimer(minutes: number) {
   }, 1000);
 }
 
+interface ExamReadyData { examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
+
 async function generateExamPaper() {
   examState.value = 'generating';
+  genProgress.value = { step: 'analyze', message: '正在准备…', progress: 0 };
+  let ready: ExamReadyData | undefined;
+  let errMsg = '';
   try {
-    const res = await fetch('/api/exam/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(config.value),
+    await streamExamGenerate(config.value, (e) => {
+      if (e.type === 'exam_progress') {
+        genProgress.value = { step: e.step, message: e.message, progress: e.progress };
+      } else if (e.type === 'exam_ready') {
+        ready = { examId: e.examId, title: e.title, totalQuestions: e.totalQuestions, totalScore: e.totalScore, durationMinutes: e.durationMinutes };
+      } else if (e.type === 'error') {
+        errMsg = e.message;
+      }
     });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    if (data.exam) {
-      session.value = {
-        examId: data.exam.examId, title: data.exam.title,
-        totalQuestions: data.exam.totalQuestions, totalScore: data.exam.totalScore,
-        durationMinutes: data.exam.durationMinutes, questions: data.exam.questions || [],
-      };
-      examState.value = 'taking';
-      startTimer(data.exam.durationMinutes);
-    }
+    if (errMsg) throw new Error(errMsg);
+    const r = ready as ExamReadyData | undefined;
+    if (!r) throw new Error('生成试卷失败：未收到试卷数据');
+    session.value = {
+      examId: r.examId, title: r.title,
+      totalQuestions: r.totalQuestions, totalScore: r.totalScore,
+      durationMinutes: r.durationMinutes, questions: [],
+    };
+    await loadQuestions(r.examId);
+    examState.value = 'taking';
+    startTimer(r.durationMinutes);
   } catch (err) {
     alert('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'config';
@@ -161,7 +171,7 @@ async function submitExam() {
   try {
     const res = await fetch('/api/exam/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ examId: session.value.examId, answers: answerArray }),
     });
     const data = await res.json();
@@ -249,7 +259,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         <div class="w-72 space-y-3">
           <div class="flex items-center gap-3" :class="genProgress.step === 'analyze' || genProgress.progress > 20 ? 'opacity-100' : 'opacity-40'">
             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 20 ? 'bg-[#18a558] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 20 ? '✓' : '1' }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分析知识图谱与权重</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分析知识图谱</span>
             <span v-if="genProgress.step === 'analyze'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
           </div>
           <div class="flex items-center gap-3" :class="genProgress.step === 'write' || genProgress.progress > 85 ? 'opacity-100' : 'opacity-40'">
@@ -259,7 +269,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           </div>
           <div class="flex items-center gap-3" :class="genProgress.step === 'review' || genProgress.progress >= 100 ? 'opacity-100' : 'opacity-40'">
             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress >= 100 ? 'bg-[#18a558] text-white' : genProgress.step === 'review' ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress >= 100 ? '✓' : '3' }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">审核格式并修复</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">再次审核试题</span>
             <span v-if="genProgress.step === 'review'" class="h-2 w-2 animate-pulse rounded-full bg-[var(--accent)]"></span>
           </div>
         </div>
