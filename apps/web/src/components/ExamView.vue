@@ -50,6 +50,7 @@ interface ExamResultsData {
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
   analysis?: string;
+  proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }>;
 }
 
 const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
@@ -541,6 +542,22 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养</h3>
           <div class="flex flex-wrap gap-2">
             <span v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="inline-flex items-center gap-1.5 rounded-full bg-[#f0e7fa] px-3 py-1.5 text-xs font-semibold text-[#7c3aae]"><BrainCircuit class="h-3 w-3" />{{ lit.literacy }} <span class="opacity-60">{{ lit.score }}/{{ lit.maxScore }}</span></span>
+          </div>
+        </div>
+
+        <!-- 熟练度变化 -->
+        <div v-if="results.proficiencyChanges?.length" class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 280 } }">
+          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">知识图谱更新</h3>
+          <div class="space-y-2">
+            <div v-for="pc in results.proficiencyChanges" :key="pc.kpTitle" class="flex items-center gap-2 rounded-xl bg-[var(--surface)] px-3 py-2">
+              <span class="flex-1 truncate text-xs font-medium text-[var(--ink)]">{{ pc.kpTitle }}</span>
+              <span class="flex items-center gap-1 text-xs font-bold" :class="pc.after >= pc.before ? 'text-[#18a558]' : 'text-[#f2557a]'">
+                <span :class="pc.after >= pc.before ? '' : 'hidden'">{{ pc.before }}%</span>
+                <span v-if="pc.after > pc.before" class="text-xs">↑</span>
+                <span v-if="pc.after < pc.before" class="text-xs">↓</span>
+                <span>{{ pc.after }}%</span>
+              </span>
+            </div>
           </div>
         </div>
 

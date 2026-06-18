@@ -155,6 +155,17 @@ export interface ExamQuestionResult {
   literacy?: string[];
 }
 
+export interface ProficiencyChange {
+  kpTitle: string;
+  /** 变化前的 EMA 值 (0-100) */
+  before: number;
+  /** 变化后的 EMA 值 (0-100) */
+  after: number;
+  /** 本条得分/满分 */
+  score: number;
+  maxScore: number;
+}
+
 export interface ExamResults {
   totalScore: number;
   maxScore: number;
@@ -166,6 +177,8 @@ export interface ExamResults {
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
   /** 博文对本次考试的综合分析总结（Markdown），包括考查知识点、答题情况、失分点与薄弱点 */
   analysis?: string;
+  /** 各知识点熟练度变化 */
+  proficiencyChanges?: ProficiencyChange[];
 }
 
 /** 考试历史列表项（概要） */

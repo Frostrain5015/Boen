@@ -920,15 +920,27 @@ export async function submitExamSession(examId: string, userId: string, answers:
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
 
-  // 更新知识画像（支持「；」分隔的多考点，每个单独匹配更新）
+  // 更新知识画像并记录变化
+  const proficiencyChanges: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }> = [];
   for (const qr of results.questionResults) {
     if (!qr.knowledgePoint) continue;
     const kps = qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean);
     for (const kp of kps) {
       const node = findKnowledgePointNode(kp, session.subject);
-      if (node) updateProficiency(userId, node.id, qr.score, qr.maxScore);
+      if (!node) continue;
+      // 记录更新前
+      const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+      const before = oldRow?.weighted_score ?? -1;
+      updateProficiency(userId, node.id, qr.score, qr.maxScore);
+      // 记录更新后
+      const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+      const after = newRow?.weighted_score ?? -1;
+      if (before !== after || before === -1) {
+        proficiencyChanges.push({ kpTitle: kp, before: Math.max(0, before), after, score: qr.score, maxScore: qr.maxScore });
+      }
     }
   }
+  if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
 
   return results;
 }
