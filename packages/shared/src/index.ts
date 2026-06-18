@@ -187,6 +187,10 @@ export interface MistakeItem {
   analysisConfidence?: number;
   ocrProvider?: string;
   ocrRaw?: unknown;
+  /** 学生答案与正确答案的匹配度 (0-1)，由后端归一化计算 */
+  answerMatchScore?: number;
+  /** 匹配度≥阈值时判定为大概率做对：前端错题列表过滤，后端题型风格仍沉淀 */
+  isCorrect?: boolean;
   createdAt: number;
   updatedAt: number;
   proficiencyAppliedAt?: number;

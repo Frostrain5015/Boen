@@ -129,6 +129,8 @@ function toMistake(row: any): MistakeItem {
     errorType: row.error_type ?? undefined,
     errorReason: row.error_reason ?? undefined,
     analysisConfidence: row.analysis_confidence ?? undefined,
+    answerMatchScore: row.answer_match_score ?? undefined,
+    isCorrect: row.is_correct ? true : row.is_correct === 0 ? false : undefined,
     ocrProvider: row.ocr_provider ?? undefined,
     ocrRaw: row.ocr_raw ? safeJson(row.ocr_raw, undefined) : undefined,
     createdAt: row.created_at,
@@ -157,6 +159,87 @@ function clampConfidence(value: unknown, fallback = 0.6) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(0, Math.min(1, n));
+}
+
+/** 答案匹配度判定阈值：达到即视为大概率做对，前端错题列表过滤但题型风格仍沉淀 */
+export const ANSWER_MATCH_THRESHOLD = 0.8;
+
+/** Levenshtein 编辑距离（字符级） */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+}
+
+/** 答案文本归一化：全角转半角、去空白标点、去常见单位量词、去选项前缀 */
+function normalizeAnswer(raw: string): string {
+  let r = raw.toLowerCase();
+  // 全角转半角
+  r = r.replace(/[\uff01-\uff5e]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
+  r = r.replace(/\u3000/g, ' ');
+  // 去空白与标点/符号
+  r = r.replace(/[\s\p{P}\p{S}]/gu, '');
+  // 去常见单位量词（数学/语文/英语答案中频繁出现，不影响语义）
+  r = r.replace(/[元个名次题分秒岁斤克米厘升毫度角只条件张本页篇段落章节课字词语句行步答案解]/g, '');
+  // 去选项前缀，如 "A." "B、" "C)"
+  r = r.replace(/^([a-z])\s*[.、)]/i, '');
+  return r;
+}
+
+/**
+ * 计算学生答案与正确答案的匹配度 (0-1)。
+ * - 任一为空返回 0（无法判定，按错题处理）
+ * - 归一化后完全相等返回 1
+ * - 否则取字符级 Levenshtein 相似度(0.6) 与 bigram Jaccard(0.4) 的加权最大值
+ */
+export function computeAnswerMatchScore(studentAnswer?: string, correctAnswer?: string): number {
+  const s = (studentAnswer ?? '').trim();
+  const c = (correctAnswer ?? '').trim();
+  if (!s || !c) return 0;
+
+  const ns = normalizeAnswer(s);
+  const nc = normalizeAnswer(c);
+  if (!ns || !nc) return 0;
+  if (ns === nc) return 1;
+
+  // 子串包含：短答案出现在长答案中，按长度比给分
+  if (ns.includes(nc) || nc.includes(ns)) {
+    const longer = Math.max(ns.length, nc.length);
+    const shorter = Math.min(ns.length, nc.length);
+    return shorter / longer;
+  }
+
+  // 字符级 Levenshtein 相似度
+  const dist = levenshtein(ns, nc);
+  const maxLen = Math.max(ns.length, nc.length) || 1;
+  const charSim = Math.max(0, 1 - dist / maxLen);
+
+  // bigram Jaccard（适配中文，2-gram 切分）
+  const bigrams = (str: string): Set<string> => {
+    const set = new Set<string>();
+    for (let i = 0; i < str.length - 1; i++) set.add(str.slice(i, i + 2));
+    return set;
+  };
+  const bs = bigrams(ns);
+  const bc = bigrams(nc);
+  let inter = 0;
+  for (const b of bs) if (bc.has(b)) inter++;
+  const union = bs.size + bc.size - inter;
+  const jaccard = union > 0 ? inter / union : 0;
+
+  return charSim * 0.6 + jaccard * 0.4;
 }
 
 function safeParseJson(raw: string): any {
@@ -457,6 +540,8 @@ export function listMistakes(userId: string, filters: {
   grade?: string;
   status?: MistakeStatus;
   limit?: number;
+  /** 是否包含做对的题（匹配度≥阈值，默认不包含，即从错题列表过滤） */
+  includeCorrect?: boolean;
 }): MistakeListResponse {
   let sql = `SELECT * FROM mistake_items WHERE user_id=?`;
   const params: unknown[] = [userId];
@@ -473,6 +558,10 @@ export function listMistakes(userId: string, filters: {
     params.push(filters.status);
   } else {
     sql += ` AND status <> 'archived'`;
+  }
+  // 默认过滤掉做对的题（前端不再作为错题展示）
+  if (!filters.includeCorrect) {
+    sql += ` AND is_correct = 0`;
   }
   sql += ` ORDER BY updated_at DESC LIMIT ?`;
   params.push(Math.min(Math.max(filters.limit ?? 30, 1), 100));
@@ -717,6 +806,15 @@ async function applyAnalysisToMistake(
 
   const status: MistakeStatus = mappings.length > 0 ? 'analyzed' : 'needs_review';
   const now = nowSec();
+
+  // ── 答案匹配度：≥阈值视为大概率做对 ──
+  // 做对的题：前端错题列表过滤、熟练度不再扣减，但题型风格仍沉淀
+  const matchScore = computeAnswerMatchScore(
+    analysis.studentAnswer?.trim() || row.student_answer || undefined,
+    analysis.correctAnswer?.trim() || undefined,
+  );
+  const isCorrect = matchScore >= ANSWER_MATCH_THRESHOLD;
+
   revertMistakeProficiencyEvents(mistakeId, userId);
   clearAnalysis(mistakeId);
 
@@ -729,7 +827,8 @@ async function applyAnalysisToMistake(
   db.prepare(`
     UPDATE mistake_items SET
       subject=?, status=?, title=?, prompt_text=?, student_answer=?, correct_answer=?, explanation=?,
-      error_type=?, error_reason=?, analysis_confidence=?, ocr_provider=?, ocr_raw=?, updated_at=?
+      error_type=?, error_reason=?, analysis_confidence=?, answer_match_score=?, is_correct=?,
+      ocr_provider=?, ocr_raw=?, updated_at=?
     WHERE id=? AND user_id=?
   `).run(
     detectedSubject,
@@ -742,6 +841,8 @@ async function applyAnalysisToMistake(
     analysis.errorType?.trim() || null,
     analysis.errorReason?.trim() || null,
     clampConfidence(analysis.confidence, status === 'analyzed' ? 0.7 : 0.3),
+    matchScore,
+    isCorrect ? 1 : 0,
     ocrProvider,
     ocrRaw ? JSON.stringify(ocrRaw) : null,
     now,
@@ -750,25 +851,31 @@ async function applyAnalysisToMistake(
   );
 
   // ── 熟练度 ──
-  await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `写入知识画像（第 ${questionIndex + 1}/${totalQuestions} 题）` : '未找到可信知识点，等待人工修正', progress: pct(0.65) });
-  let appliedAt: number | undefined;
-  for (const mapping of mappings) {
-    const change = applyMistakeProficiency(userId, mistakeId, mapping.kgNodeId, mapping.role, mapping.confidence);
-    mapping.beforeScore = change.beforeScore ?? undefined;
-    mapping.afterScore = change.afterScore;
-    appliedAt = change.appliedAt;
-    db.prepare(`
-      INSERT INTO mistake_kp_map (mistake_id, kg_node_id, unit_id, role, confidence, before_score, after_score, evidence_json)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(mistakeId, mapping.kgNodeId, mapping.unitId ?? null, mapping.role, mapping.confidence, change.beforeScore, change.afterScore, mapping.evidenceJson);
-  }
-  if (appliedAt) {
-    db.prepare(`UPDATE mistake_items SET proficiency_applied_at=?, updated_at=? WHERE id=? AND user_id=?`).run(appliedAt, appliedAt, mistakeId, userId);
+  // 做对的题不扣减熟练度，避免错误降低已掌握知识点的画像
+  if (isCorrect) {
+    await onProgress?.({ step: 'profile', message: `答案匹配度 ${Math.round(matchScore * 100)}%，判定为大概率做对，跳过画像扣减`, progress: pct(0.65) });
+  } else {
+    await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `写入知识画像（第 ${questionIndex + 1}/${totalQuestions} 题）` : '未找到可信知识点，等待人工修正', progress: pct(0.65) });
+    let appliedAt: number | undefined;
+    for (const mapping of mappings) {
+      const change = applyMistakeProficiency(userId, mistakeId, mapping.kgNodeId, mapping.role, mapping.confidence);
+      mapping.beforeScore = change.beforeScore ?? undefined;
+      mapping.afterScore = change.afterScore;
+      appliedAt = change.appliedAt;
+      db.prepare(`
+        INSERT INTO mistake_kp_map (mistake_id, kg_node_id, unit_id, role, confidence, before_score, after_score, evidence_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(mistakeId, mapping.kgNodeId, mapping.unitId ?? null, mapping.role, mapping.confidence, change.beforeScore, change.afterScore, mapping.evidenceJson);
+    }
+    if (appliedAt) {
+      db.prepare(`UPDATE mistake_items SET proficiency_applied_at=?, updated_at=? WHERE id=? AND user_id=?`).run(appliedAt, appliedAt, mistakeId, userId);
+    }
   }
 
   // ── 风格特征 ──
+  // 题型沉淀逻辑不受答案正确率判断影响：做对的题同样沉淀出题风格
   await onProgress?.({ step: 'style', message: `沉淀题型风格（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
-  if (status === 'analyzed') {
+  if (status === 'analyzed' || isCorrect) {
     await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
   }
 
@@ -923,7 +1030,7 @@ export async function retrieveMistakeStyleSamples(userId: string, subject: strin
     FROM mistake_style_features sf
     JOIN mistake_items mi ON mi.id = sf.mistake_id
     LEFT JOIN mistake_kp_map km ON km.mistake_id = sf.mistake_id
-    WHERE mi.user_id=? AND mi.subject=? AND mi.grade=? AND mi.status='analyzed'
+    WHERE mi.user_id=? AND mi.subject=? AND mi.grade=? AND (mi.status='analyzed' OR mi.is_correct=1)
     GROUP BY sf.id
     ORDER BY sf.created_at DESC
     LIMIT 40

@@ -190,12 +190,13 @@ export async function deleteExam(examId: string): Promise<void> {
 
 // ── 错题本 API ─────────────────────────────────────────────
 
-export async function listMistakes(params?: { subject?: string; grade?: string; status?: string; limit?: number }): Promise<MistakeListResponse> {
+export async function listMistakes(params?: { subject?: string; grade?: string; status?: string; limit?: number; includeCorrect?: boolean }): Promise<MistakeListResponse> {
   const query = new URLSearchParams();
   if (params?.subject) query.set('subject', params.subject);
   if (params?.grade) query.set('grade', params.grade);
   if (params?.status) query.set('status', params.status);
   if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.includeCorrect) query.set('includeCorrect', '1');
   const suffix = query.toString() ? `?${query}` : '';
   return apiFetch(`/api/mistakes${suffix}`);
 }

@@ -465,6 +465,7 @@ app.get('/api/mistakes', async (c) => {
     grade: c.req.query('grade') || undefined,
     status: (c.req.query('status') as any) || undefined,
     limit: c.req.query('limit') ? Number(c.req.query('limit')) : undefined,
+    includeCorrect: c.req.query('includeCorrect') === '1' || c.req.query('includeCorrect') === 'true',
   }));
 });
 

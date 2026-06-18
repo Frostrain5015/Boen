@@ -73,6 +73,7 @@ const selectedMistake = ref<MistakeItem | null>(null);
 const loadingList = ref(false);
 const busy = ref(false);
 const error = ref('');
+const correctNotice = ref('');
 const progress = ref(0);
 const progressMessage = ref('');
 const activeStep = ref<AnalyzeMistakeStep | null>(null);
@@ -130,10 +131,19 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     batchMistakes.value.push(event.mistake);
     currentBatchIndex.value = batchMistakes.value.length - 1;
     selectedMistake.value = event.mistake;
-    // 更新列表
-    const index = mistakes.value.findIndex((m) => m.id === event.mistake.id);
-    if (index >= 0) mistakes.value[index] = event.mistake;
-    else mistakes.value.unshift(event.mistake);
+    // 答案匹配度≥阈值：判定为大概率做对，从前端错题列表过滤
+    if (event.mistake.isCorrect) {
+      const score = Math.round((event.mistake.answerMatchScore ?? 0) * 100);
+      correctNotice.value = `该题学生答案与正确答案匹配度 ${score}%，判定为大概率做对，已自动移出错题列表。题型风格特征仍已沉淀，将融入后续出题。`;
+      // 从列表移除（重分析场景下可能已存在）
+      mistakes.value = mistakes.value.filter((m) => m.id !== event.mistake.id);
+    } else {
+      correctNotice.value = '';
+      // 更新列表
+      const index = mistakes.value.findIndex((m) => m.id === event.mistake.id);
+      if (index >= 0) mistakes.value[index] = event.mistake;
+      else mistakes.value.unshift(event.mistake);
+    }
     progress.value = 100;
     activeStep.value = 'complete';
     completedSteps.value = new Set(STEPS);
@@ -189,6 +199,7 @@ function onDrop(event: DragEvent) {
 async function submitMistake() {
   if (busy.value) return;
   error.value = '';
+  correctNotice.value = '';
   batchMistakes.value = [];
   currentBatchIndex.value = 0;
   busy.value = true;
@@ -234,6 +245,7 @@ async function reanalyze(mistake: MistakeItem) {
   if (busy.value) return;
   busy.value = true;
   error.value = '';
+  correctNotice.value = '';
   selectedMistake.value = mistake;
   try {
     await analyzeCreated(mistake.id);
@@ -260,6 +272,8 @@ onMounted(async () => {
 });
 
 watch(selectedMistake, async (mistake) => {
+  // 切换到非做对的题时清空"做对了"提示
+  if (!mistake?.isCorrect) correctNotice.value = '';
   revokeSelectedAssetUrl();
   const asset = mistake?.assets?.[0];
   if (!mistake || !asset) return;
@@ -386,6 +400,11 @@ onBeforeUnmount(() => {
               <span class="truncate">{{ STEP_META[step].label }}</span>
             </div>
           </div>
+        </div>
+
+        <div v-if="correctNotice" class="mx-5 mt-4 flex items-start gap-2 rounded-2xl bg-[#e7f7ee] px-4 py-3 text-xs font-semibold text-[#18a558]">
+          <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0" />
+          <span class="leading-relaxed">{{ correctNotice }}</span>
         </div>
 
         <div v-if="!selectedMistake" class="flex h-full min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">

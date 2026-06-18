@@ -274,4 +274,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mistake_prof_item ON mistake_proficiency_events(mistake_id);
 `);
 
-export default db;
+// ── Mistake notebook 迁移：答案匹配度与正确性标记 ──
+// 做对的题（匹配度≥0.8）前端不再作为错题展示，但题型风格仍沉淀
+{
+  const cols = db.prepare(`PRAGMA table_info(mistake_items)`).all() as Array<{ name: string }>;
+  const has = (name: string) => cols.some((c) => c.name === name);
+  if (!has('answer_match_score')) {
+    db.exec(`ALTER TABLE mistake_items ADD COLUMN answer_match_score REAL NOT NULL DEFAULT 0`);
+  }
+  if (!has('is_correct')) {
+    db.exec(`ALTER TABLE mistake_items ADD COLUMN is_correct INTEGER NOT NULL DEFAULT 0`);
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_mistakes_correct ON mistake_items(user_id, is_correct)`);
+}
