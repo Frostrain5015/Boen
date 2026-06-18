@@ -67,7 +67,7 @@ function detectPreviewIntent(text: string): boolean {
 }
 
 function detectWeaknessIntent(text: string): boolean {
-  return /薄弱|总是错|老错|总做错|反复错|突破|提分|帮我突破/i.test(text.trim());
+  return /薄弱|总是错|老错|总做错|反复错|突破|提分|集中练习|帮我练习/i.test(text.trim());
 }
 
 /** 复习完成工具 */

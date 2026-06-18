@@ -74,6 +74,14 @@ const sidebarOpen = ref(true);
 const exams = ref<ExamSummary[]>([]);
 const selectedExamId = ref<string | null>(null);
 const examViewKey = ref(0); // 递增以强制重挂 ExamView（开始新考试）
+const pendingExamNotes = ref<string | null>(null);
+
+/** 从档案发起考试（章节小测/卷册测试） */
+function handleExam(detail: { subject: Subject; grade: string; durationMinutes: number; notes: string }) {
+  pendingExamNotes.value = detail.notes;
+  subject.value = detail.subject;
+  startNewExam();
+}
 
 // ── 视图切换 ──────────────────────────────
 const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview'>('chat');
@@ -104,7 +112,7 @@ function activateMode(mode: 'review' | 'preview' | 'weakness') {
   activeMode.value = activeMode.value === mode ? 'none' : mode;
   modeTagSent.value = false;
   currentView.value = 'chat';
-  const hints: Record<string, string> = { review: '帮我复习巩固 ', preview: '帮我预习 ', weakness: '帮我突破薄弱点 ' };
+  const hints: Record<string, string> = { review: '帮我复习巩固 ', preview: '帮我预习 ', weakness: '帮我集中练习 ' };
   if (activeMode.value === mode) input.value = hints[mode];
 }
 function onModeChange() { modeTagSent.value = false; }
@@ -283,7 +291,7 @@ async function send(text: string) {
     if (it.kind === 'question' && !it.answered) it.answered = true;
   });
   // 仅第一次发送打标记
-  const tagMap: Record<string, string> = { review: '📚复习巩固·', preview: '📖预习·', weakness: '🎯突破·' };
+  const tagMap: Record<string, string> = { review: '📚复习巩固·', preview: '📖预习·', weakness: '🎯集中练习·' };
   const modeLabel = practiceType.value ? '✏️专项练习·' : (tagMap[activeMode.value] || '');
   const modeTag = !modeTagSent.value && modeLabel ? modeLabel : undefined;
   if (modeTag) modeTagSent.value = true;
@@ -537,11 +545,10 @@ function handleSaveProfile(p: UserProfile) {
 }
 
 // 从「档案」推荐练习发起：切到对话，针对该知识点出题练习
-async function handlePractice(detail: { kp?: string; subject: Subject; grade: string }) {
+async function handlePractice(detail: { kp?: string; subject: Subject; grade: string; mode?: string }) {
   currentView.value = 'chat';
   expandedSection.value = 'chat';
-  // 指定了具体知识点 → 突破模式；无指定 → 复习巩固
-  activeMode.value = detail.kp ? 'weakness' : 'review';
+  activeMode.value = (detail.mode as any) || (detail.kp ? 'weakness' : 'review');
   // 学科不同或当前无对话时，新开一个该学科的对话，避免学科串台
   if (!currentConversationId.value || subject.value !== detail.subject) {
     try {
@@ -553,7 +560,7 @@ async function handlePractice(detail: { kp?: string; subject: Subject; grade: st
   }
   subject.value = detail.subject;
   if (detail.kp) {
-    send(`帮我突破 ${detail.kp}`);
+    send(`帮我集中练习 ${detail.kp}`);
   } else {
     send('帮我复习巩固 ');
   }
@@ -923,7 +930,7 @@ onMounted(() => {
                   <div class="max-w-[85%] text-right">
                     <p class="text-[15px] leading-relaxed text-[var(--ink)]" style="white-space: pre-wrap; word-break: break-word;">
                       <span v-if="m.modeTag" class="font-semibold" :class="
-                        m.modeTag.includes('突破') ? 'text-[#f2557a]' :
+                        m.modeTag.includes('集中练习') ? 'text-[#f2557a]' :
                         m.modeTag.includes('复习巩固') ? 'text-[#18a558]' :
                         m.modeTag.includes('预习') ? 'text-[#2b5fa8]' :
                         'text-[var(--accent-strong)]'
@@ -1010,10 +1017,10 @@ onMounted(() => {
         </template>
 
         <!-- 档案（学习画像 / 知识图谱）视图 -->
-        <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" @practice="handlePractice" />
+        <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" @practice="handlePractice" @exam="handleExam" />
 
         <!-- 考试视图（出卷 / 答题），:key 递增可重挂以开始新考试 -->
-        <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" @back="currentView = 'chat'" @refresh="loadExams" />
+        <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" :auto-notes="pendingExamNotes ?? undefined" @back="currentView = 'chat'; pendingExamNotes = null" @refresh="loadExams" />
 
         <!-- 考试回顾视图 -->
         <ExamReview v-else-if="currentView === 'examReview'" key="examReview" class="flex-1" :exam-id="selectedExamId" @back="currentView = 'chat'" />

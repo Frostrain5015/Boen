@@ -66,7 +66,8 @@ async function generateReport() {
 
 const emit = defineEmits<{
   (e: 'back'): void;
-  (e: 'practice', detail: { kp?: string; subject: 'chinese' | 'math' | 'english' | 'science'; grade: string }): void;
+  (e: 'practice', detail: { kp?: string; subject: 'chinese' | 'math' | 'english' | 'science'; grade: string; mode?: string }): void;
+  (e: 'exam', detail: { subject: 'chinese' | 'math' | 'english' | 'science'; grade: string; durationMinutes: number; notes: string }): void;
 }>();
 
 const SUBJECTS = [
@@ -294,9 +295,12 @@ watch(grade, fetchOutline);
           <template v-for="tb in outline.textbooks" :key="tb.volume">
             <div class="mb-3 mt-2 flex items-center gap-3 rounded-xl bg-[var(--surface)] px-3 py-2">
               <div class="flex-1">
-                <div class="flex items-center justify-between">
+                <div class="flex items-center justify-between cursor-pointer" @click="emit('exam', { subject: subject, grade: grade, durationMinutes: 45, notes: tb.volume + ' 综合测试' })">
                   <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
-<StarDisplay :score="tb.weightedScore" />
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-[var(--ink-soft)]">测试</span>
+                    <StarDisplay :score="tb.weightedScore" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -307,6 +311,7 @@ watch(grade, fetchOutline);
                 <span class="flex-1 font-display text-sm font-bold text-[var(--ink)]">{{ ch.title }}</span>
                 <span v-if="ch.weightedScore >= 0"><StarDisplay :score="ch.weightedScore" /></span>
                 <StarDisplay :score="-1" />
+                <span @click.stop="emit('exam', { subject, grade, durationMinutes: 15, notes: ch.title + ' 章节测试' })" class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-[11px] text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]" title="章节小测">📝</span>
               </button>
 
               <!-- Sections -->
@@ -411,12 +416,14 @@ watch(grade, fetchOutline);
               <p class="text-xs font-semibold text-[var(--ink)]">{{ selectedKp.sectionTitle }}</p>
             </div>
 
-            <button @click="startPractice(selectedKp.title); closeKpDetail()"
-              class="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]"
-            >
-              <Target class="h-4 w-4" /> 针对性练习
-              <ArrowRight class="h-4 w-4" />
-            </button>
+            <div class="flex gap-2">
+              <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'review' }); closeKpDetail()"
+                class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-[var(--accent)] bg-white py-2.5 font-display text-sm font-bold text-[var(--accent)] transition-all hover:bg-[var(--accent-soft)] active:scale-[0.97]"
+              ><BookOpen class="h-4 w-4" /> 先去复习</button>
+              <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'weakness' }); closeKpDetail()"
+                class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]"
+              ><Target class="h-4 w-4" /> 直接练习</button>
+            </div>
           </div>
         </div>
       </div>

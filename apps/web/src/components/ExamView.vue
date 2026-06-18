@@ -58,6 +58,10 @@ const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
 
 const examState = ref<'config' | 'generating' | 'ready' | 'taking' | 'grading' | 'graded' | 'results'>('config');
 const config = ref<ExamConfigData>({ subject: 'math', grade: '7', durationMinutes: 45, notes: '' });
+
+// 从档案传入的考试备注（章节测试/卷册测试），组件挂载时自动填入
+const props = defineProps<{ autoNotes?: string }>();
+if (props.autoNotes) { config.value.notes = props.autoNotes; }
 const session = ref<ExamSessionData | null>(null);
 const results = ref<ExamResultsData | null>(null);
 const answers = ref<Map<number, any>>(new Map());
