@@ -970,7 +970,7 @@ export async function submitExamSession(examId: string, userId: string, answers:
     for (const node of nodesToUpdate) {
       const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
       const before = oldRow?.weighted_score ?? -1;
-      updateProficiency(userId, node.id, qr.score, qr.maxScore);
+      updateProficiency(userId, node.id, qr.score, qr.maxScore, 'exam');
       const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
       const after = newRow?.weighted_score ?? -1;
       proficiencyChanges.push({ kpTitle: node.title, before: Math.max(0, before), after: Math.max(0, after), score: qr.score, maxScore: qr.maxScore });

@@ -31,17 +31,29 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
 /** EMA 平滑因子：0.3 = 新成绩占 30%，历史占 70% */
 const PROFICIENCY_ALPHA = 0.3;
 
-export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number): KpProficiency {
+/** 各模式下熟练度权重（预习容错高、考试权重高） */
+const MODE_WEIGHTS: Record<string, number> = {
+  qa: 1.0,       // 通用对话
+  preview: 0.5,  // 预习——探索阶段，容错高
+  review: 1.0,   // 复习巩固——正常
+  weakness: 1.5, // 薄弱点突破——刻意训练，权重高
+  exam: 2.0,     // 考试——时间压力下表现更能反映真实水平
+};
+
+export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string): KpProficiency {
   const existing = db.prepare(`SELECT * FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, kgNodeId) as any;
   const correct = existing ? existing.correct_count + score : score;
   const total = existing ? existing.total_count + maxScore : maxScore;
   const now = Math.floor(Date.now() / 1000);
 
-  // 指数移动平均：新成绩权重 α，旧权重 (1-α)
-  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  // 加权 EMA：不同模式下对熟练度的影响不同
+  const modeWeight = MODE_WEIGHTS[mode ?? 'qa'] ?? 1.0;
+  const weightedPct = maxScore > 0 ? ((score * modeWeight) / maxScore) * 100 : 0;
+  // 限制有效范围，防止 single-mode 极端值
+  const effectivePct = Math.min(100, weightedPct);
   const weighted = existing
-    ? Math.round(PROFICIENCY_ALPHA * pct + (1 - PROFICIENCY_ALPHA) * existing.weighted_score)
-    : Math.round(pct);
+    ? Math.round(PROFICIENCY_ALPHA * effectivePct + (1 - PROFICIENCY_ALPHA) * existing.weighted_score)
+    : Math.round(Math.min(100, (score / maxScore) * 100));
 
   db.prepare(`
     INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, last_updated)
