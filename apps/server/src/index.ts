@@ -340,6 +340,39 @@ app.get('/api/profile/proficiency', async (c) => {
   return c.json({ proficiencies: profs });
 });
 
+/** GET /api/profile/report — LLM 生成诊断报告 */
+app.get('/api/profile/report', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade') || '7';
+  const profs = getAllProficiencies(userId, subject, grade);
+  const weak = profs.filter(p => p.weightedScore < 60).slice(0, 8);
+  const strong = profs.filter(p => p.weightedScore >= 80).slice(0, 5);
+  const literacy = getLiteracyProficiency(userId, subject);
+  const subjectLabel: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
+
+  const prompt = [
+    `你是一位经验丰富的学科教师。请根据以下学习数据，生成一份简短的学习诊断报告。`,
+    `学科：${subjectLabel[subject] ?? subject}`,
+    `年级：${grade}，掌握知识点：${profs.length} 个`,
+    weak.length ? `薄弱点（< 60%）：${weak.map(w => `${w.title}(${w.weightedScore}%)`).join('、')}` : '暂无薄弱点',
+    strong.length ? `掌握良好（≥ 80%）：${strong.map(s => `${s.title}(${s.weightedScore}%)`).join('、')}` : '',
+    literacy.length ? `核心素养：${literacy.map(l => `${l.literacy} ${l.percentage}%`).join('、')}` : '',
+    '',
+    '请用 Markdown 格式输出：',
+    '1. **总体评价** — 一两句话概括，语气鼓励',
+    '2. **需要优先突破** — 列出 2-3 个最该先抓的薄弱点及原因',
+    '3. **学习建议** — 针对每个薄弱点给具体做法',
+    '4. **下一步方向** — 下一阶段建议',
+  ].join('\n');
+  try {
+    const response = await model.invoke([new SystemMessage(prompt)]);
+    const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+    return c.json({ report: content.trim() });
+  } catch { return c.json({ error: '生成报告失败' }, 500); }
+});
+
 /** GET /api/profile/weak-points — 薄弱知识点 */
 app.get('/api/profile/weak-points', async (c) => {
   const userId = await resolveUserId(c);

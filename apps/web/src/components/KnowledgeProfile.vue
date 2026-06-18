@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import Mascot from '@/components/Mascot.vue';
-import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, RotateCcw } from 'lucide-vue-next';
+import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, FileText } from 'lucide-vue-next';
+import { renderMarkdown } from '@/lib/markdown';
 
 interface KpNode {
   title: string;
@@ -46,6 +47,19 @@ const loading = ref(true);
 const expandedSections = ref<Set<string>>(new Set());
 const selectedKp = ref<KpNode & { sectionTitle: string } | null>(null);
 const animatingNumbers = ref(false);
+const report = ref<string | null>(null);
+const reportLoading = ref(false);
+
+async function generateReport() {
+  reportLoading.value = true;
+  report.value = null;
+  try {
+    const res = await fetch(`/api/profile/report?subject=${subject.value}&grade=${grade.value}`);
+    const data = await res.json();
+    report.value = data.report || '生成失败';
+  } catch { report.value = '报告生成失败，请稍后再试。'; }
+  reportLoading.value = false;
+}
 
 const emit = defineEmits<{
   (e: 'back'): void;
@@ -230,6 +244,18 @@ watch(grade, fetchOutline);
           </div>
         </div>
 
+        <!-- 诊断报告 -->
+        <button @click="generateReport" class="clay flex w-full items-center gap-3 p-3 text-left transition-all hover:opacity-80 active:scale-[0.98]" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
+            <FileText class="h-4 w-4 text-[var(--accent-strong)]" />
+          </div>
+          <div class="flex-1">
+            <p class="text-xs font-bold text-[var(--ink)]">生成学习诊断报告</p>
+            <p class="text-[10px] text-[var(--ink-soft)]">AI 智能分析薄弱点与学习建议</p>
+          </div>
+          <BarChart3 class="h-4 w-4 text-[var(--ink-soft)]" />
+        </button>
+
         <!-- Recommendations -->
         <div class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
@@ -340,6 +366,28 @@ watch(grade, fetchOutline);
         </div>
       </div>
     </div>
+
+    <!-- ═══ 诊断报告 Modal ═══ -->
+    <Transition name="panel-scale">
+      <div v-if="report !== null || reportLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="reportLoading ? null : report = null">
+        <div class="clay mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
+          <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+            <div class="flex items-center gap-2">
+              <FileText class="h-4 w-4 text-[var(--accent)]" />
+              <span class="font-display text-sm font-bold text-[var(--ink)]">学习诊断报告</span>
+            </div>
+            <button @click="report = null" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50">&times;</button>
+          </div>
+          <div class="px-5 py-4">
+            <div v-if="reportLoading" class="flex flex-col items-center gap-3 py-8">
+              <Mascot :size="60" state="thinking" />
+              <p class="text-sm text-[var(--ink-soft)]">正在分析学习数据…</p>
+            </div>
+            <div v-else class="md-body text-sm leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(report ?? '')"></div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
     <!-- ═══ KP Detail Floating Panel ═══ -->
     <Transition name="panel-scale">
