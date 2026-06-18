@@ -130,8 +130,31 @@ function buildExamPrompt(config: ExamConfig, weightGuide: string): string {
 
 function parseExamResponse(content: string): { title: string; questions: ExamQuestion[]; totalScore: number } {
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-  const parsed = JSON.parse(jsonStr);
+  let jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+
+  // LLM 生成的中文 JSON 中，explanation 等字段里可能含有未转义的 "（如"设x为"，根据"规则"…"）
+  // 在解析前先转义字符串值内部的 " → 中文引号「」或直接替换
+  // 策略：将 " 替换为 “ ” 或移除，但仅限值内部
+  jsonStr = jsonStr
+    // 第一步：把键周围的 " 保护起来（已知键名不含引号问题）
+    // 第二步：对值中的中文引号对做替换
+    .replace(/(?<=: )"(?=[^"]*“)/g, '“')
+    .replace(/(?<=”[^"]*)"/g, '”')
+    // 通用兜底：替换值中任何剩余的孤立 "
+    .replace(/：(?!\s*[{\[])/g, '：'); // 确保冒号后不是结构字符
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    // 兜底：尝试将值内 ASCII " 全部替换为中文引号
+    jsonStr = jsonStr.replace(/"([^"]*?)"/g, (match) => {
+      // 如果匹配到的是 key 模式（key:），保持原样
+      if (/^\s*"[^"]+"\s*:/.test(match)) return match;
+      return '“' + match.slice(1, -1) + '”';
+    });
+    parsed = JSON.parse(jsonStr);
+  }
 
   const questions: ExamQuestion[] = (parsed.questions ?? []).map((q: any, i: number) => {
     const base = {
