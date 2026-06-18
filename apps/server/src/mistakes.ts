@@ -484,8 +484,8 @@ export function createMistake(userId: string, params: {
   asset?: UploadedAsset;
 }): MistakeItem {
   const sourceType = params.sourceType;
-  if ((sourceType === 'image' || sourceType === 'canvas') && !params.asset) {
-    throw new Error('图片或手写错题需要上传图片');
+  if (sourceType === 'image' && !params.asset) {
+    throw new Error('图片错题需要上传图片');
   }
   if (params.asset) {
     if (!ALLOWED_IMAGE_TYPES.has(params.asset.mimeType)) throw new Error('仅支持 jpg/png/webp 图片');
@@ -661,7 +661,7 @@ export async function analyzeMistake(mistakeId: string, userId: string, model: B
   let recognizedText = String(row.prompt_text ?? '').trim();
   let ocrProvider: string | null = row.ocr_provider ?? null;
   let ocrRaw: unknown = row.ocr_raw ? safeJson(row.ocr_raw, {}) : null;
-  if (row.source_type === 'image' || row.source_type === 'canvas') {
+  if (row.source_type === 'image') {
     const assetPath = getOriginalAssetPath(mistakeId);
     if (!assetPath) throw new Error('找不到原始图片');
     const ocr = await recognizeWithAliyunEduOcr(assetPath, row.subject, row.grade);

@@ -216,7 +216,7 @@ export async function createTextMistake(payload: {
 }
 
 export async function createImageMistake(payload: {
-  sourceType: Extract<MistakeSourceType, 'image' | 'canvas'>;
+  sourceType: 'image';
   subject: string;
   grade: string;
   file: File | Blob;

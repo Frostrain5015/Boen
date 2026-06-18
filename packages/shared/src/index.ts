@@ -128,7 +128,7 @@ export interface ProfileRecommendation {
 // Mistake notebook
 // ─────────────────────────────────────────────────────────────
 
-export type MistakeSourceType = 'image' | 'canvas' | 'text';
+export type MistakeSourceType = 'image' | 'text';
 export type MistakeStatus = 'processing' | 'analyzed' | 'needs_review' | 'archived';
 export type MistakeKpRole = 'primary' | 'related' | 'prerequisite';
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   AlertCircle,
   ArrowLeft,
@@ -9,9 +9,7 @@ import {
   ImagePlus,
   Loader2,
   NotebookPen,
-  PenLine,
   RefreshCw,
-  RotateCcw,
   ScanText,
   Sparkles,
   Target,
@@ -33,7 +31,7 @@ import {
 import Mascot from '@/components/Mascot.vue';
 
 type Subject = 'chinese' | 'math' | 'english' | 'science';
-type IntakeMode = 'image' | 'canvas' | 'text';
+type IntakeMode = 'image' | 'text';
 
 const emit = defineEmits<{
   (e: 'back'): void;
@@ -76,10 +74,6 @@ const progressMessage = ref('');
 const activeStep = ref<AnalyzeMistakeStep | null>(null);
 const completedSteps = ref<Set<AnalyzeMistakeStep>>(new Set());
 const selectedAssetObjectUrl = ref('');
-
-const canvas = ref<HTMLCanvasElement | null>(null);
-let drawing = false;
-let lastPoint: { x: number; y: number } | null = null;
 
 const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === subject.value));
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
@@ -186,7 +180,8 @@ async function submitMistake() {
         studentAnswer: studentAnswer.value,
         note: note.value,
       });
-    } else if (mode.value === 'image') {
+    } else {
+      // 'image' is the default fallback
       if (!imageFile.value) throw new Error('请先上传错题图片');
       created = await createImageMistake({
         sourceType: 'image',
@@ -197,17 +192,6 @@ async function submitMistake() {
         studentAnswer: studentAnswer.value,
         note: note.value,
       });
-    } else {
-      const blob = await canvasToBlob();
-      created = await createImageMistake({
-        sourceType: 'canvas',
-        subject: subject.value,
-        grade: grade.value,
-        file: blob,
-        filename: 'handwriting.png',
-        studentAnswer: studentAnswer.value,
-        note: note.value,
-      });
     }
     selectedMistake.value = created.mistake;
     await analyzeCreated(created.mistake.id);
@@ -215,7 +199,6 @@ async function submitMistake() {
     studentAnswer.value = '';
     note.value = '';
     clearImage();
-    clearCanvas();
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
@@ -248,90 +231,8 @@ async function startPractice(mistake: MistakeItem) {
   emit('practice', { prompt, subject: mistake.subject as Subject, grade: mistake.grade });
 }
 
-function pointFromEvent(event: PointerEvent) {
-  const el = canvas.value;
-  if (!el) return { x: 0, y: 0 };
-  const rect = el.getBoundingClientRect();
-  return {
-    x: ((event.clientX - rect.left) / rect.width) * el.width,
-    y: ((event.clientY - rect.top) / rect.height) * el.height,
-  };
-}
-
-function setupCanvas() {
-  const el = canvas.value;
-  if (!el) return;
-  const ratio = window.devicePixelRatio || 1;
-  const width = el.clientWidth || 720;
-  const height = el.clientHeight || 360;
-  el.width = Math.floor(width * ratio);
-  el.height = Math.floor(height * ratio);
-  const ctx = el.getContext('2d');
-  if (!ctx) return;
-  ctx.scale(ratio, ratio);
-  ctx.fillStyle = '#fffdf9';
-  ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = '#2c2722';
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-}
-
-function startDraw(event: PointerEvent) {
-  const el = canvas.value;
-  if (!el) return;
-  drawing = true;
-  lastPoint = pointFromEvent(event);
-  el.setPointerCapture(event.pointerId);
-}
-
-function moveDraw(event: PointerEvent) {
-  if (!drawing || !lastPoint) return;
-  const el = canvas.value;
-  const ctx = el?.getContext('2d');
-  if (!el || !ctx) return;
-  const p = pointFromEvent(event);
-  const ratio = window.devicePixelRatio || 1;
-  ctx.save();
-  ctx.scale(1 / ratio, 1 / ratio);
-  ctx.beginPath();
-  ctx.moveTo(lastPoint.x, lastPoint.y);
-  ctx.lineTo(p.x, p.y);
-  ctx.stroke();
-  ctx.restore();
-  lastPoint = p;
-}
-
-function endDraw(event: PointerEvent) {
-  drawing = false;
-  lastPoint = null;
-  try {
-    canvas.value?.releasePointerCapture(event.pointerId);
-  } catch {
-    /* ignore */
-  }
-}
-
-function clearCanvas() {
-  nextTick(setupCanvas);
-}
-
-function canvasToBlob(): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    if (!canvas.value) {
-      reject(new Error('手写板未准备好'));
-      return;
-    }
-    canvas.value.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error('手写内容导出失败'));
-    }, 'image/png');
-  });
-}
-
 onMounted(async () => {
   await refreshMistakes(true);
-  nextTick(setupCanvas);
 });
 
 watch(selectedMistake, async (mistake) => {
@@ -384,9 +285,8 @@ onBeforeUnmount(() => {
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">记录新错题</h2>
           </div>
 
-          <div class="mb-3 grid grid-cols-3 gap-1 rounded-2xl bg-[var(--paper)] p-1">
+          <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--paper)] p-1">
             <button @click="mode = 'image'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'image' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ImagePlus class="h-3.5 w-3.5" />图片</button>
-            <button @click="mode = 'canvas'; nextTick(setupCanvas)" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'canvas' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><PenLine class="h-3.5 w-3.5" />手写</button>
             <button @click="mode = 'text'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'text' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ScanText class="h-3.5 w-3.5" />文本</button>
           </div>
 
@@ -408,13 +308,6 @@ onBeforeUnmount(() => {
                 <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
               </label>
               <button v-if="imagePreview" @click="clearImage" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--paper)] px-3 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><X class="h-3.5 w-3.5" />移除图片</button>
-            </div>
-
-            <div v-else-if="mode === 'canvas'" key="canvas" class="space-y-3">
-              <div class="overflow-hidden rounded-[22px] border-2 border-[var(--line)] bg-[var(--surface)]">
-                <canvas ref="canvas" class="h-[260px] w-full touch-none cursor-crosshair" @pointerdown="startDraw" @pointermove="moveDraw" @pointerup="endDraw" @pointercancel="endDraw"></canvas>
-              </div>
-              <button @click="clearCanvas" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--paper)] px-3 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><RotateCcw class="h-3.5 w-3.5" />清空手写板</button>
             </div>
 
             <div v-else key="text" class="space-y-2">
@@ -484,7 +377,7 @@ onBeforeUnmount(() => {
           <Mascot :size="110" state="idle" />
           <div>
             <h2 class="font-display text-2xl font-bold text-[var(--ink)]">把真实错题放进来</h2>
-            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">整页试卷、作业拍照、手写补录都可以。系统会自动识别题面、定位章节和知识点，并把错题证据写入知识画像。</p>
+            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">整页试卷、作业拍照、文本录入都可以。系统会自动识别题面、定位章节和知识点，并把错题证据写入知识画像。</p>
           </div>
         </div>
 
