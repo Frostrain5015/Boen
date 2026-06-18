@@ -70,6 +70,7 @@ const sidebarOpen = ref(true);
 
 // ── 视图切换 ──────────────────────────────
 const currentView = ref<'chat' | 'profile' | 'exam'>('chat');
+const activeMode = ref<'none' | 'review' | 'exam'>('none');
 
 // ── 聊天状态 ──────────────────────────────
 const items = ref<ChatItem[]>([]);
@@ -719,22 +720,25 @@ onMounted(() => {
             <!-- 模式切换按钮（仿成熟智能体插件栏） -->
             <div class="mb-2 flex items-center gap-1.5 px-1">
               <button
-                @click="currentView = 'chat'; input = '我想学习 '"
-                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]"
+                @click="activeMode = activeMode === 'review' ? 'none' : 'review'; currentView = 'chat'; if (activeMode === 'review') input = '我想学习 '"
+                class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]"
+                :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
               >
                 <GraduationCap class="h-3.5 w-3.5" />
                 <span>学习模式</span>
               </button>
               <button
-                @click="currentView = 'exam'"
-                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[#6c5ce7] hover:bg-[#e8e4ff] hover:text-[#5848d6] active:scale-[0.96]"
+                @click="activeMode = 'exam'; currentView = 'exam'"
+                class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]"
+                :class="activeMode === 'exam' ? 'border-[#6c5ce7] bg-[#e8e4ff] text-[#5848d6]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[#6c5ce7] hover:bg-[#e8e4ff] hover:text-[#5848d6]'"
               >
                 <BarChart3 class="h-3.5 w-3.5" />
                 <span>考试模式</span>
               </button>
               <button
-                @click="currentView = 'profile'"
-                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[#14b48a] hover:bg-[#d9f4ec] hover:text-[#0e9b76] active:scale-[0.96]"
+                @click="activeMode = 'none'; currentView = 'profile'"
+                class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]"
+                :class="(currentView as string) === 'profile' ? 'border-[#14b48a] bg-[#d9f4ec] text-[#0e9b76]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[#14b48a] hover:bg-[#d9f4ec] hover:text-[#0e9b76]'"
               >
                 <BrainCircuit class="h-3.5 w-3.5" />
                 <span>学习画像</span>

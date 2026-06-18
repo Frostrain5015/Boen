@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft } from 'lucide-vue-next';
 import type { QuestionType } from '@boen/shared';
+import { getToken } from '@/services/auth';
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -131,7 +132,7 @@ async function generateExamPaper() {
   try {
     const res = await fetch('/api/exam/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(config.value),
     });
     const reader = res.body?.getReader();
@@ -189,6 +190,11 @@ function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
   if (s.has(qIndex)) s.delete(qIndex); else s.add(qIndex);
   expandedResults.value = s;
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value); });
