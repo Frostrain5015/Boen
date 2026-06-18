@@ -178,7 +178,7 @@ watch(grade, fetchOutline);
     <!-- Main layout -->
     <div v-else class="flex h-full gap-4 p-4">
       <!-- ═══ Left panel: Stats + Recommendations ═══ -->
-      <div class="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
+      <div class="panel-scroll flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
         <!-- Subject selector + back button -->
         <div class="clay overflow-hidden">
           <div class="flex items-center gap-2 p-3">
@@ -297,7 +297,7 @@ watch(grade, fetchOutline);
       </div>
 
       <!-- ═══ Right panel: Outline Tree ═══ -->
-      <div class="clay flex-1 overflow-y-auto" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
+      <div class="panel-scroll clay flex-1 overflow-y-auto" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
         <div class="border-b border-[var(--line)] px-5 py-3">
           <h2 class="font-display text-sm font-bold text-[var(--ink)]">课程大纲 · {{ SUBJECTS.find(s => s.value === subject)?.label }} {{ gradeLabel(grade) }}</h2>
         </div>
@@ -474,9 +474,13 @@ watch(grade, fetchOutline);
   50% { box-shadow: 0 0 0 6px transparent; }
 }
 
+/* 固定滚动条宽度防止容器抖动 */
+.panel-scroll { scrollbar-gutter: stable; }
+
 /* Scrollbar styling for tree */
 .clay.flex-1::-webkit-scrollbar { width: 6px; }
 .clay.flex-1::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+.panel-scroll { scrollbar-gutter: stable; overflow-y: scroll; }
 
 /* Scrollbar for recommendations */
 .flex.gap-3.overflow-x-auto::-webkit-scrollbar { height: 3px; }
