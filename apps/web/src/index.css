@@ -61,7 +61,12 @@ body,
   height: 100dvh;
 }
 
-/* ── 消息列表顶部淡出（仅溢出时启用） ───────── */
+/* ── 消息列表滚动区 ─────────────────────────── */
+/* 始终为滚动条预留右侧通道，避免出现/消失时内容左右跳动 */
+.chat-scroller {
+  scrollbar-gutter: stable;
+}
+/* 消息列表顶部淡出（仅溢出时启用）；遮罩作用于内容，让动态背景透出来 */
 .chat-scroll-fade {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 48px, black 100%);
   mask-image: linear-gradient(to bottom, transparent 0%, black 48px, black 100%);

@@ -722,13 +722,13 @@ onMounted(() => {
         <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
       </button>
 
-      <!-- 主内容区 -->
-      <div class="flex flex-1 flex-col" :data-subject="subject">
+      <!-- 主内容区（min-h-0 + min-w-0：让内部滚动区真正裁切，页面不被内容撑高） -->
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col" :data-subject="subject">
         <!-- 对话视图（聊天模式显示） -->
         <template v-if="currentView === 'chat'">
         <!-- 视图切换（淡入淡出过渡） -->
         <Transition name="view-fade" mode="out-in">
-          <div class="flex flex-1 flex-col" key="chat-content">
+          <div class="flex min-h-0 flex-1 flex-col" key="chat-content">
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
@@ -809,7 +809,7 @@ onMounted(() => {
         </header>
 
         <!-- 消息区域 -->
-        <main ref="scroller" class="flex-1 overflow-y-auto px-4" :class="{ 'chat-scroll-fade': hasScrollOverflow }">
+        <main ref="scroller" class="chat-scroller min-h-0 flex-1 overflow-y-auto px-4" :class="{ 'chat-scroll-fade': hasScrollOverflow }">
           <div class="mx-auto w-full max-w-2xl py-5">
             <!-- 欢迎页 / 消息列表：整块淡入淡出切换，避免逐条 auto-animate 掉帧 -->
             <Transition name="panel" mode="out-in">
@@ -857,8 +857,8 @@ onMounted(() => {
                     <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
                       <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
                     </div>
-                    <!-- 正在出题提示（文本之后） -->
-                    <div v-if="i === items.length - 1 && isGeneratingQuiz && m.done" class="quiz-gen clay-sm">
+                    <!-- 正在出题提示（出题信号触发即显示，无需等流结束） -->
+                    <div v-if="i === items.length - 1 && isGeneratingQuiz" class="quiz-gen clay-sm">
                       <div class="quiz-gen-inner">
                         <span class="quiz-gen-icon">
                           <PencilLine class="h-4 w-4" />

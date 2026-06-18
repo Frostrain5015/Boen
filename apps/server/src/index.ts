@@ -97,18 +97,35 @@ async function runGraph(
 ): Promise<BaseMessage | undefined> {
   const events = graph.streamEvents(input, runConfig(threadId));
   let quizSignaled = false; // 「博文正在出题」只发一次
+  let toolNameBuf = '';     // 累积可能被切分到多个 chunk 的工具名片段
+  // 出题工具名均以 ask_ 开头；前缀 + 全名双重匹配，兼容模型分片/整块返回 tool_call
+  const looksLikeQuiz = (n?: string | null): boolean => !!n && (QUIZ_TOOL_NAMES.has(n) || n.startsWith('ask_'));
+  const signalQuiz = async () => {
+    if (quizSignaled) return;
+    quizSignaled = true;
+    await send({ type: 'quiz_generating' });
+  };
   for await (const ev of events) {
     if (ev.event === 'on_chat_model_stream') {
       const chunk = ev.data?.chunk as
-        | { content?: unknown; tool_call_chunks?: Array<{ name?: string }> }
+        | { content?: unknown; tool_call_chunks?: Array<{ name?: string }>; tool_calls?: Array<{ name?: string }> }
         | undefined;
       const text = typeof chunk?.content === 'string' ? chunk.content : '';
       if (text) await send({ type: 'token', value: text });
-      // 纯工具信号：模型一旦开始流式产出出题工具调用，立即通知前端
-      if (!quizSignaled && (chunk?.tool_call_chunks ?? []).some((t) => t.name && QUIZ_TOOL_NAMES.has(t.name))) {
-        quizSignaled = true;
-        await send({ type: 'quiz_generating' });
+      // 模型一旦开始产出出题工具调用就立即通知前端（名字可能被分片，累积后匹配）
+      if (!quizSignaled) {
+        for (const tc of chunk?.tool_call_chunks ?? []) if (tc.name) toolNameBuf += tc.name;
+        const names = [
+          ...(chunk?.tool_call_chunks ?? []).map((t) => t.name),
+          ...(chunk?.tool_calls ?? []).map((t) => t.name),
+          toolNameBuf,
+        ];
+        if (names.some(looksLikeQuiz)) await signalQuiz();
       }
+    } else if (ev.event === 'on_chat_model_end' && !quizSignaled) {
+      // 兜底：模型不分片流式输出 tool_call 时，turn 结束从完整输出里识别
+      const out = ev.data?.output as { tool_calls?: Array<{ name?: string }> } | undefined;
+      if ((out?.tool_calls ?? []).some((t) => looksLikeQuiz(t.name))) await signalQuiz();
     }
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });
