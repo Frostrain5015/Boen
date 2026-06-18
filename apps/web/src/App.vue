@@ -4,7 +4,7 @@ import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft,
 import { renderMarkdown } from '@/lib/markdown';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
 import { gradeToBand } from '@boen/shared';
-import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, listExams, type Conversation, type ConversationMessage } from '@/services/chat';
+import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, listExams, deleteExam, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
@@ -367,6 +367,22 @@ function openExamReview(examId: string) {
   expandedSection.value = 'exam';
 }
 
+async function handleDeleteExam(examId: string, event: Event) {
+  event.stopPropagation();
+  if (!confirm('确定要删除这场考试吗？删除后无法恢复。')) return;
+  try {
+    await deleteExam(examId);
+    exams.value = exams.value.filter((e) => e.examId !== examId);
+    // 若正在回顾被删的考试，退回聊天视图
+    if (selectedExamId.value === examId) {
+      selectedExamId.value = null;
+      if (currentView.value === 'examReview') currentView.value = 'chat';
+    }
+  } catch {
+    // 忽略删除失败
+  }
+}
+
 async function handleNewConversation() {
   try {
     const { conversation } = await createConversation('新对话', subject.value);
@@ -485,6 +501,25 @@ function handleSaveProfile(p: UserProfile) {
   userProfile.value = p;
   saveProfile(p);
   showSetupDialog.value = false;
+}
+
+// 从「档案」推荐练习发起：切到对话，针对该知识点出题练习
+async function handlePractice(detail: { kp?: string; subject: Subject; grade: string }) {
+  currentView.value = 'chat';
+  expandedSection.value = 'chat';
+  activeMode.value = 'review';
+  // 学科不同或当前无对话时，新开一个该学科的对话，避免学科串台
+  if (!currentConversationId.value || subject.value !== detail.subject) {
+    try {
+      const { conversation } = await createConversation('新对话', detail.subject);
+      conversations.value.unshift(conversation);
+      currentConversationId.value = conversation.id;
+      items.value = [];
+    } catch { /* 静默 */ }
+  }
+  subject.value = detail.subject;
+  const topic = detail.kp ? `「${detail.kp}」` : '这个学科';
+  send(`我想练习${topic}，先考我几道题吧`);
 }
 
 async function handleSubjectChange(newSubject: Subject) {
@@ -645,7 +680,7 @@ onMounted(() => {
               <button
                 v-for="ex in exams" :key="ex.examId"
                 @click="ex.status === 'completed' ? openExamReview(ex.examId) : startNewExam()"
-                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
+                class="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
                 :class="currentView === 'examReview' && selectedExamId === ex.examId ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
               >
                 <span class="shrink-0 text-base">{{ subjectMeta(ex.subject).emoji }}</span>
@@ -656,8 +691,11 @@ onMounted(() => {
                     <span>{{ formatDate(ex.submittedAt ?? ex.createdAt) }}</span>
                   </div>
                 </div>
-                <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6]">{{ ex.result.percentage }}</span>
-                <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42]">未完成</span>
+                <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] group-hover:hidden">{{ ex.result.percentage }}</span>
+                <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">未完成</span>
+                <button @click="(e) => handleDeleteExam(ex.examId, e)" class="hidden shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:block" title="删除考试">
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
               </button>
             </div>
 
@@ -877,7 +915,7 @@ onMounted(() => {
         </template>
 
         <!-- 档案（学习画像 / 知识图谱）视图 -->
-        <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" />
+        <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" @practice="handlePractice" />
 
         <!-- 考试视图（出卷 / 答题），:key 递增可重挂以开始新考试 -->
         <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" @back="currentView = 'chat'" @refresh="loadExams" />

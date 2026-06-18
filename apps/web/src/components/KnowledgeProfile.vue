@@ -47,7 +47,10 @@ const expandedSections = ref<Set<string>>(new Set());
 const selectedKp = ref<KpNode & { sectionTitle: string } | null>(null);
 const animatingNumbers = ref(false);
 
-const emit = defineEmits<{ (e: 'back'): void }>();
+const emit = defineEmits<{
+  (e: 'back'): void;
+  (e: 'practice', detail: { kp?: string; subject: 'chinese' | 'math' | 'english' | 'science'; grade: string }): void;
+}>();
 
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },
@@ -118,9 +121,21 @@ function closeKpDetail() {
   selectedKp.value = null;
 }
 
+/** 推荐练习：薄弱/未练的知识点，按掌握度从低到高，最多 6 个 */
+const recommendations = computed(() => {
+  if (!outline.value) return [];
+  return outline.value.textbooks
+    .flatMap((t) => t.chapters)
+    .flatMap((c) => c.children)
+    .flatMap((s) => s.knowledgePoints)
+    .filter((k) => k.weightedScore < 60) // 含未练（<0）与薄弱（<60）
+    .sort((a, b) => (a.weightedScore < 0 ? 0 : a.weightedScore) - (b.weightedScore < 0 ? 0 : b.weightedScore))
+    .slice(0, 6);
+});
+
 function startPractice(kpTitle?: string) {
-  // 跳转到对话模式，传入主题
-  window.dispatchEvent(new CustomEvent('boen-practice', { detail: { kp: kpTitle, subject: subject.value, grade: grade.value } }));
+  // 交由 App：切到对话视图，针对该知识点开始练习
+  emit('practice', { kp: kpTitle, subject: subject.value, grade: grade.value });
 }
 
 onMounted(fetchOutline);
@@ -220,33 +235,37 @@ watch(grade, fetchOutline);
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
             <Target class="h-4 w-4 text-[var(--accent)]" />
             <span class="font-display text-xs font-bold text-[var(--ink)]">推荐练习</span>
+            <span v-if="recommendations.length" class="ml-auto rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--accent-strong)]">{{ recommendations.length }}</span>
           </div>
-          <div class="flex gap-3 overflow-x-auto px-4 py-3" style="scroll-snap-type: x mandatory;">
-            <div v-if="outline.textbooks.every(t=>t.chapters.every(c=>c.children.every(s=>s.knowledgePoints.every(k=>k.weightedScore>=0)))) && outline.overall.totalKps > 0 && outline.overall.weakCount === 0" class="flex w-full flex-col items-center gap-2 py-4 text-center">
-              <Sparkles class="h-8 w-8 text-[var(--accent)] opacity-50" />
-              <p class="text-xs text-[var(--ink-soft)]">暂无推荐，继续加油！✨</p>
-            </div>
-            <div
-              v-for="kp in outline.textbooks.flatMap(t => t.chapters).flatMap(c => c.children).flatMap(s => s.knowledgePoints).filter(k => k.weightedScore < 0 || k.weightedScore < 60).sort((a, b) => (a.weightedScore < 0 ? 0 : a.weightedScore) - (b.weightedScore < 0 ? 0 : b.weightedScore)).slice(0, 5)"
-              :key="kp.title"
-              class="flex w-48 shrink-0 flex-col gap-2 rounded-2xl border border-[var(--line)] bg-white p-3.5"
-              style="scroll-snap-align: start;"
-              v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { duration: 300 } }"
+
+          <!-- 无薄弱点 -->
+          <div v-if="recommendations.length === 0" class="flex flex-col items-center gap-2 px-4 py-7 text-center">
+            <Sparkles class="h-8 w-8 text-[var(--accent)] opacity-50" />
+            <p class="text-xs text-[var(--ink-soft)]">暂无薄弱知识点，继续加油！✨</p>
+          </div>
+
+          <!-- 薄弱点竖向列表，整行点击即开始针对练习 -->
+          <div v-else class="p-2">
+            <button
+              v-for="(kp, i) in recommendations" :key="kp.title"
+              @click="startPractice(kp.title)"
+              class="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-all hover:bg-[var(--accent-soft)] active:scale-[0.99]"
+              v-motion :initial="{ opacity: 0, x: -8 }" :enter="{ opacity: 1, x: 0, transition: { delay: 250 + i * 40 } }"
             >
-              <div class="flex items-center gap-1.5">
-                <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
-                <span class="truncate text-xs font-bold text-[var(--ink)]">{{ kp.title }}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="h-1.5 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
-                  <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold" :style="{ background: masteryBg(kp.weightedScore), color: masteryColor(kp.weightedScore) }">{{ i + 1 }}</span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-xs font-bold text-[var(--ink)]">{{ kp.title }}</p>
+                <div class="mt-1 flex items-center gap-1.5">
+                  <div class="h-1.5 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
+                    <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
+                  </div>
+                  <span class="shrink-0 text-[10px] font-bold" :style="{ color: masteryColor(kp.weightedScore) }">{{ kp.weightedScore >= 0 ? kp.weightedScore : '未练' }}</span>
                 </div>
-                <span class="text-[10px] font-bold" :style="{ color: masteryColor(kp.weightedScore) }">{{ kp.weightedScore >= 0 ? kp.weightedScore : '--' }}</span>
               </div>
-              <button @click="startPractice(kp.title)" class="mt-1 flex items-center justify-center gap-1 rounded-xl bg-[var(--accent)] py-1.5 text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95">
-                <BookOpen class="h-3 w-3" /> 开始练习
-              </button>
-            </div>
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white opacity-0 transition-opacity group-hover:opacity-100" title="开始练习">
+                <BookOpen class="h-3.5 w-3.5" />
+              </span>
+            </button>
           </div>
         </div>
       </div>

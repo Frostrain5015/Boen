@@ -135,3 +135,8 @@ export async function listExams(): Promise<{ exams: ExamSummary[] }> {
 export async function getExamReview(examId: string): Promise<{ exam: ExamReviewDetail }> {
   return apiFetch(`/api/exam/${examId}`);
 }
+
+/** 删除一场考试（任意状态） */
+export async function deleteExam(examId: string): Promise<void> {
+  await apiFetch(`/api/exam/${examId}`, { method: 'DELETE' });
+}

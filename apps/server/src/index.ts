@@ -379,7 +379,7 @@ app.post('/api/profile/seed', async (c) => {
   return c.json({ updated });
 });
 
-import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions } from './exam.js';
+import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession } from './exam.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
@@ -434,6 +434,15 @@ app.get('/api/exams', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   return c.json({ exams: listExamSessions(userId) });
+});
+
+/** DELETE /api/exam/:examId — 删除一场考试（任意状态，仅限本人） */
+app.delete('/api/exam/:examId', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const ok = deleteExamSession(c.req.param('examId'), userId);
+  if (!ok) return c.json({ error: '考试未找到' }, 404);
+  return c.json({ success: true });
 });
 
 /** GET /api/exam/:examId — 获取考试详情和结果

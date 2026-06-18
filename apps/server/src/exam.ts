@@ -486,6 +486,12 @@ export function getExamSession(examId: string, userId: string): ExamSession | nu
   };
 }
 
+/** 删除一场考试（任意状态，仅限本人）。返回是否删除成功 */
+export function deleteExamSession(examId: string, userId: string): boolean {
+  const info = db.prepare(`DELETE FROM exam_sessions WHERE id=? AND user_id=?`).run(examId, userId);
+  return info.changes > 0;
+}
+
 /** 列出用户的全部考试（概要），按创建时间倒序，供「考试历史」页回顾 */
 export function listExamSessions(userId: string): ExamSummary[] {
   const rows = db.prepare(
