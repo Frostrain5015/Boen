@@ -678,15 +678,35 @@ onMounted(() => {
         </div>
       </aside>
 
-      <!-- 折叠态下的展开把手 -->
+      <!-- 折叠态下的展开把手（左下角，避免与博文 logo 冲突） -->
       <button
         v-if="!sidebarOpen"
         @click="sidebarOpen = true"
-        class="absolute left-2 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)]"
+        class="absolute bottom-3 left-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)]"
         title="展开侧栏"
       >
         <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
       </button>
+
+      <!-- 浮动吉祥物：无对话时居中（120px），开始对话后飞到左上角（46px）并播放变色动画 -->
+      <div
+        class="fixed z-30 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] pointer-events-none"
+        :style="{
+          top: hasItems ? '14px' : '50%',
+          left: hasItems ? (sidebarOpen ? '276px' : '20px') : '50%',
+          transform: hasItems ? 'translate(0,0) scale(1)' : 'translate(-50%,-50%) scale(1)',
+          width: hasItems ? '46px' : '120px',
+          height: hasItems ? '46px' : '120px',
+        }"
+      >
+        <Mascot
+          :size="hasItems ? 46 : 120"
+          :state="mascotState"
+          :float="hasItems"
+          :animated="hasItems"
+          :class="hasItems ? 'mascot-corner-cycle' : ''"
+        />
+      </div>
 
       <!-- 主内容区（min-h-0 + min-w-0：让内部滚动区真正裁切，页面不被内容撑高） -->
       <div class="flex min-h-0 min-w-0 flex-1 flex-col" :data-subject="subject">
@@ -699,7 +719,6 @@ onMounted(() => {
         <header
           class="flex items-center gap-3 px-5 py-3.5"
         >
-          <Mascot :size="46" :float="false" :animated="false" />
           <div class="leading-tight">
             <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>
             <p class="text-xs font-semibold text-[var(--ink-soft)]">你的学习小伙伴</p>
@@ -781,7 +800,7 @@ onMounted(() => {
             <Transition name="panel" mode="out-in">
             <!-- 欢迎页 -->
             <div v-if="!hasItems" key="welcome" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
-              <Mascot :size="120" :state="mascotState" />
+              <div style="height:120px"><!-- 占位，mascot 由浮动组件提供 --></div>
               <div>
                 <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
                 <p class="mt-1.5 text-[var(--ink-soft)]">问我问题，或者说一句「考我一道题」来练习吧～</p>
