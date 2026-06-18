@@ -311,18 +311,14 @@ watch(
             </span>
           </div>
 
-                    <!-- 熟练度变化提示（仅星级越过半星阈值时显示） -->
+                    <!-- 熟练度变化提示（动画过渡星级变化） -->
           <div v-if="(grading as any).proficiencyChanges?.length" class="mt-2 space-y-1">
             <p class="text-[11px] font-medium text-[var(--ink-soft)]">熟练度变化</p>
             <div v-for="pc in (grading as any).proficiencyChanges" :key="pc.kp" class="flex items-center gap-2 text-[11px]">
               <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
               <span v-if="pc.before >= 0" class="inline-flex items-center gap-1">
-                <StarDisplay :score="pc.before" />
-                <!-- 仅在星级不同时显示变化 -->
-                <template v-if="starDiffers(pc.before, pc.after)">
-                  <svg class="h-2.5 w-2.5 text-[var(--ink-soft)]" viewBox="0 0 20 20"><path d="M7 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-                  <StarDisplay :score="pc.after" />
-                </template>
+                <StarDisplay v-if="starDiffers(pc.before, pc.after)" :score="pc.after" :animateFrom="pc.before" />
+                <StarDisplay v-else :score="pc.before" />
               </span>
               <span v-else class="font-semibold text-[var(--accent-strong)]">新</span>
             </div>
