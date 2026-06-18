@@ -917,10 +917,12 @@ export async function submitExamSession(examId: string, userId: string, answers:
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
 
-  // 更新知识画像（用模糊匹配处理 LLM 输出与入库标题的细微差异）
+  // 更新知识画像（支持「；」分隔的多考点，每个单独匹配更新）
   for (const qr of results.questionResults) {
-    if (qr.knowledgePoint) {
-      const node = findKnowledgePointNode(qr.knowledgePoint);
+    if (!qr.knowledgePoint) continue;
+    const kps = qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean);
+    for (const kp of kps) {
+      const node = findKnowledgePointNode(kp);
       if (node) updateProficiency(userId, node.id, qr.score, qr.maxScore);
     }
   }

@@ -689,12 +689,13 @@ app.post('/api/answer', async (c) => {
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
-      // 更新知识画像（如果用户已认证；用模糊匹配处理 LLM 输出与入库标题的差异）
+      // 更新知识画像（支持「；」分隔的多考点，每个单独匹配更新）
       if (userId && result.knowledgePoints?.length) {
         for (const kpName of result.knowledgePoints) {
-          const node = findKnowledgePointNode(kpName);
-          if (node) {
-            updateProficiency(userId, node.id, result.score, result.maxScore);
+          const kps = kpName.split(/[；;]/).map(s => s.trim()).filter(Boolean);
+          for (const kp of kps) {
+            const node = findKnowledgePointNode(kp);
+            if (node) updateProficiency(userId, node.id, result.score, result.maxScore);
           }
         }
       }
