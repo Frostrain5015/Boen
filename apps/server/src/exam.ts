@@ -62,14 +62,15 @@ export async function generateExam(
   onProgress?: ExamProgressFn,
   userId?: string,
 ): Promise<{ title: string; questions: ExamQuestion[]; totalScore: number; durationMinutes: number }> {
-  const weightDist = getWeightDistribution(config.subject, config.grade);
+  try {
+    const weightDist = getWeightDistribution(config.subject, config.grade);
 
-  // ─── Step 1: 规划 ───────────────────────────
-  await onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
-  const weightGuide = buildWeightGuideForPrompt(weightDist);
-  const profileContext = userId ? await buildProfileContext(userId, config) : '';
-  await onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
-  const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
+    // ─── Step 1: 规划 ───────────────────────────
+    await onProgress?.({ step: 'analyze', message: '正在分析知识图谱与权重分布…', progress: 5 });
+    const weightGuide = buildWeightGuideForPrompt(weightDist);
+    const profileContext = userId ? await buildProfileContext(userId, config) : '';
+    await onProgress?.({ step: 'analyze', message: '正在生成试卷蓝图…', progress: 10 });
+    const blueprint = await stepAnalyze(model, config, weightGuide, profileContext);
 
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
@@ -98,6 +99,10 @@ export async function generateExam(
 
   const estMinutes = config.durationMinutes ?? Math.max(20, Math.min(90, Math.round(reviewed.questions.length * 1.5)));
   return { title: blueprint.title, questions: reviewed.questions, totalScore: reviewed.totalScore, durationMinutes: estMinutes };
+  } catch (e: any) {
+    console.error('生成试卷失败:', e?.message?.slice(0, 200));
+    throw new Error(`生成试卷失败：${e?.message || '未知错误'}`);
+  }
 }
 
 // ─── 规划阶段 ────────────────────────────────
@@ -199,6 +204,7 @@ async function stepWriteQuestions(
     config.notes ? `用户特殊要求：${config.notes}` : '',
     `试卷标题：${blueprint.title}`,
     existingQuestions.length ? `已出的题目类型：${[...new Set(existingQuestions.map(q => q.type))].join('、')}。请避免知识点重复。` : '',
+    '⚠ 重要：各题之间的题干情景、数据、设问必须差异化。同一组数字或同一道应用题情景不能在不同题目中原样出现。',
     '',
     typeInstructions[qt.type] || '',
     '',
@@ -368,7 +374,7 @@ async function stepReview(
   const questionDetails = fixed.map((q) => {
     const lines: string[] = [];
     lines.push(`Q${q.index + 1} | ${TYPE_LABELS[q.type] ?? q.type} | ${q.points}分 | 难度:${q.difficulty} | 考点:${q.knowledgePoint}`);
-    lines.push(`  题干: ${q.stem?.slice(0, 120)}`);
+    lines.push(`  题干: ${q.stem?.slice(0, 200)}`);
     if (q.type === 'multiple_choice' && q.options) {
       for (const o of q.options) {
         const correct = q.correctKeys?.includes(o.key) ? ' ✓' : '';
@@ -392,7 +398,7 @@ async function stepReview(
   const currentPoints = fixed.reduce((s, q) => s + q.points, 0);
   const expectedTotal = config.totalScore ?? 100;
   const prompt = [
-    '你是一位经验丰富的试卷审核专家。以下是刚刚生成的一套试卷，请逐题严格审核。',
+    '你是一位经验丰富的试卷审核专家。以下是刚刚生成的一套试卷，请逐题审核。',
     '',
     '=== 试卷蓝图（考查要求）===',
     blueprintSummary,
@@ -405,23 +411,25 @@ async function stepReview(
     '',
     '### 审核维度',
     '1. **内容正确性** — 参考答案/解析是否有知识性错误、解法漏洞或逻辑矛盾？',
-    '2. **蓝图匹配度** — 题目是否真的考查了 blueprint 指定的知识点？难度是否匹配？',
-    '3. **格式完整性** — 题干是否有实质性内容？选择题选项有无明显凑数？题干/解析中的 KaTeX/TikZ/\\op 语法是否正确闭合？',
-    '4. **区分度** — 题目是否太 trivial（如选项有常识性送分答案）或超纲？',
+    '2. **题目间相似性** — 各题之间题干情景、数据、设问方式是否雷同？比如同一组数字在选择题出现后又原封不动出现在填空题里。不同题型的题目可以考查同一知识点，但情景和数据必须差异化。',
+    '3. **蓝图匹配度** — 题目是否真的考查了 blueprint 指定的知识点？难度是否匹配？',
+    '4. **格式完整性** — 题干是否有实质性内容？选择题选项有无明显凑数？题干/解析中的 KaTeX/TikZ/\\op 语法是否正确闭合？',
+    '5. **区分度** — 题目是否太 trivial（如选项有常识性送分答案）或超纲？',
     '',
     '### 输出格式',
     '输出 JSON（不要 markdown 代码块）：',
     '{',
     '  "ok": true/false,   // true = 全部合格；false = 有题需要修正',
-    '  "issues": [         // ok=true 时可为空数组',
-    '    { "index": 0, "severity": "error|warn", "issue": "具体问题描述，说明为什么需要重出" }',
+    '  "issues": [         // 有问题的题目列表，ok=true 时可为空',
+    '    { "index": 0, "severity": "error|warn", "issue": "问题描述" }',
     '  ]',
     '}',
     '',
     '注意：',
-    '- **轻微问题（severity=warn）可以不重出**，仅在 issue 中说明，试卷仍可发布',
-    '- **只标记 error 级别的题**才会触发重出（内容错误、严重偏离考点、无效题干）',
-    '- 不要为了"证明自己审核过"而强行挑刺——合格的题直接放过',
+    '- **绝大多数情况下试卷都是合格的，ok: true 是预期结果**',
+    '- 轻微问题（severity=warn）仅在 issues 中说明，不触发重出',
+    '- 只有内容/答案有实质性错误才标 error 触发重出',
+    '- 不要为了证明自己审核过而挑刺——合格的题直接放过',
   ].join('\n');
 
   try {
@@ -431,10 +439,9 @@ async function stepReview(
     const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
     const result = JSON.parse(jsonStr);
 
-    // 只重出 error 级别的题（warn 放过），最多 3 道
+    // 只重出 error 级别的题（warn 不放），最多重出全部而非硬编码 3 道
     const errorIssues = (result.issues ?? [])
-      .filter((it: any) => it?.severity === 'error' && typeof it.index === 'number' && it.index >= 0 && it.index < fixed.length)
-      .slice(0, 3);
+      .filter((it: any) => it?.severity === 'error' && typeof it.index === 'number' && it.index >= 0 && it.index < fixed.length);
 
     const warnMessages = (result.issues ?? [])
       .filter((it: any) => it?.severity === 'warn')
