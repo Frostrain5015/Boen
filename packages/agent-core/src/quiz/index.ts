@@ -74,13 +74,22 @@ export function gradeAnswer(
 ): { result: GradingResult; toolContent: string } {
   let result: GradingResult;
 
+  const commonResult = (base: GradingResult): GradingResult => {
+    const args = rawArgs as Record<string, unknown>;
+    return {
+      ...base,
+      knowledgePoints: args.knowledgePoint ? [String(args.knowledgePoint)] : undefined,
+      literacies: Array.isArray(args.literacies) ? (args.literacies as string[]) : undefined,
+    };
+  };
+
   if (toolName === 'ask_multiple_choice' && answer.type === 'multiple_choice') {
     const a = multipleChoiceSchema.parse(rawArgs);
     const correct = setEq(answer.selectedKeys, a.correctKeys);
     const refText = a.correctKeys
       .map((k) => `${k}. ${a.options.find((o) => o.key === k)?.text ?? ''}`.trim())
       .join('；');
-    result = { correct, score: correct ? 1 : 0, maxScore: 1, reference: refText, explanation: a.explanation };
+    result = commonResult({ correct, score: correct ? 1 : 0, maxScore: 1, reference: refText, explanation: a.explanation });
   } else if (toolName === 'ask_fill_blank' && answer.type === 'fill_blank') {
     const a = fillBlankSchema.parse(rawArgs);
     const perBlank = a.blanks.map((b, i) =>
@@ -88,31 +97,31 @@ export function gradeAnswer(
     );
     const score = perBlank.filter(Boolean).length;
     const reference = a.blanks.map((b, i) => `空${i + 1}：${b.acceptedAnswers.join(' / ')}`).join('；');
-    result = {
+    result = commonResult({
       correct: perBlank.every(Boolean),
       score,
       maxScore: a.blanks.length,
       reference,
       explanation: a.explanation,
       perBlank,
-    };
+    });
   } else if (toolName === 'ask_true_false' && answer.type === 'true_false') {
     const a = trueFalseSchema.parse(rawArgs);
     const correct = answer.value === a.answer;
-    result = {
+    result = commonResult({
       correct,
       score: correct ? 1 : 0,
       maxScore: 1,
       reference: a.answer ? '正确' : '错误',
       explanation: a.explanation,
-    };
+    });
   } else if (toolName === 'ask_short_answer' && answer.type === 'short_answer') {
     const a = shortAnswerSchema.parse(rawArgs);
     const ref = a.referenceAnswer
       ? (a.keyPoints?.length ? `${a.referenceAnswer}\n要点：${a.keyPoints.join('、')}` : a.referenceAnswer)
       : (a.keyPoints?.length ? `要点：${a.keyPoints.join('、')}` : '（无参考答案）');
     // 简答题由模型定性评判
-    result = { correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation ?? '' };
+    result = commonResult({ correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation ?? '' });
   } else {
     throw new Error(`题型与答案不匹配：${toolName}`);
   }

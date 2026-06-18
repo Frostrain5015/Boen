@@ -2,8 +2,19 @@ import { z } from 'zod';
 import { tool } from '@langchain/core/tools';
 
 const difficulty = z.enum(['easy', 'medium', 'hard']).nullish().describe('题目难度');
-const knowledgePoint = z.string().nullish().describe('对应考点');
-const explanation = z.string().describe('答案解析，作答后展示给学生');
+const knowledgePoint = z.string().nullish().describe('对应考点（仅填主要考点标题，如"解一元一次方程"）');
+const literacies = z.array(z.string()).nullish().describe('本题考查的核心素养，如"数感""符号意识""运算能力""推理意识""模型意识""空间观念""几何直观""数据意识""应用意识""创新意识"等，选 1-3 个');
+const explanation = z.string().describe(
+  '答案解析。请用以下结构（Markdown 格式）：\n' +
+  '### 📖 解析\n' +
+  '本题的完整解析过程，必要时用 $$ LaTeX $$ 排版公式。\n' +
+  '### 💡 涉及的学科知识与核心素养\n' +
+  '- 知识点：...\n' +
+  '- 核心素养：...\n' +
+  '- 难度层级：...\n' +
+  '### 📝 易错点提醒\n' +
+  '学生常见错误与注意事项。'
+);
 
 export const passageField = z.string().nullish().describe('阅读材料（语文/英语阅读理解题专用），在此提供文章或对话原文，前端会以特殊字体块渲染');
 
@@ -17,6 +28,7 @@ export const multipleChoiceSchema = z.object({
   correctKeys: z.array(z.string()).min(1).describe('正确选项的 key；多选时填多个'),
   multiSelect: z.boolean().describe('是否为多选题'),
   knowledgePoint,
+  literacies,
   difficulty,
   explanation,
 });
@@ -38,6 +50,7 @@ export const trueFalseSchema = z.object({
   passage: passageField,
   answer: z.boolean().describe('该陈述是否正确'),
   knowledgePoint,
+  literacies,
   difficulty,
   explanation,
 });

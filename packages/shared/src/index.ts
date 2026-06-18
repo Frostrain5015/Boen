@@ -91,6 +91,10 @@ export interface GradingResult {
   explanation: string;
   /** 填空题逐空对错 */
   perBlank?: boolean[];
+  /** 本题考查的知识点列表 */
+  knowledgePoints?: string[];
+  /** 本题考查的核心素养 */
+  literacies?: string[];
 }
 
 /** POST /api/answer 请求体 */

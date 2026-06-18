@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import confetti from 'canvas-confetti';
-import { CheckCircle2, XCircle, Sparkles, Lightbulb, PencilLine } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, Sparkles, Lightbulb, PencilLine, ChevronDown, ChevronUp, GraduationCap, BrainCircuit } from 'lucide-vue-next';
 import type { QuestionPayload, AnswerPayload, GradingResult } from '@boen/shared';
 import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
 
@@ -30,6 +30,9 @@ const blanks = ref<string[]>(
 );
 const tfValue = ref<boolean | null>(null);
 const shortText = ref('');
+
+/** 解析折叠控制 */
+const showExplanation = ref(false);
 
 // 从 reference 反推正确选项 key（作答后才用于高亮）
 const correctKeys = computed(() => {
@@ -289,8 +292,34 @@ watch(
               {{ grading.score }} / {{ grading.maxScore }}
             </span>
           </div>
+
+          <!-- 知识点 & 素养标签 -->
+          <div v-if="grading.knowledgePoints?.length || grading.literacies?.length" class="mt-3 flex flex-wrap gap-1.5">
+            <span v-for="kp in grading.knowledgePoints" :key="kp" class="kg-badge kg-badge-kp">
+              <GraduationCap class="h-3 w-3 shrink-0" /> {{ kp }}
+            </span>
+            <span v-for="lit in grading.literacies" :key="lit" class="kg-badge kg-badge-lit">
+              <BrainCircuit class="h-3 w-3 shrink-0" /> {{ lit }}
+            </span>
+          </div>
+
           <p class="mt-2 text-sm"><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="md-body" v-html="renderMarkdownInline(grading.reference)"></span></p>
-          <div v-if="grading.explanation" class="md-body mt-1.5 text-sm leading-relaxed text-[var(--ink-soft)]" v-html="renderMarkdown(grading.explanation)"></div>
+
+          <!-- 查看解析按钮（作答后默认折叠） -->
+          <button
+            v-if="grading.explanation"
+            @click="showExplanation = !showExplanation"
+            class="mt-2 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors duration-150"
+            :class="showExplanation ? 'bg-accent-soft text-accent' : 'bg-black/5 text-[var(--ink-soft)] hover:bg-black/10'"
+          >
+            <template v-if="showExplanation"><ChevronUp class="h-3.5 w-3.5" /> 收起解析</template>
+            <template v-else><ChevronDown class="h-3.5 w-3.5" /> 查看解析</template>
+          </button>
+
+          <!-- 解析内容（折叠展开） -->
+          <Transition name="reveal">
+            <div v-if="showExplanation && grading.explanation" class="md-body mt-2.5 rounded-2xl border border-[var(--line)] bg-white/80 p-4 text-sm leading-relaxed" v-html="renderMarkdown(grading.explanation)"></div>
+          </Transition>
         </div>
       </Transition>
     </div>
@@ -394,4 +423,26 @@ watch(
 .mathfield-area { min-height: 5.5rem; align-items: flex-start; }
 .mf-ok { border-color: var(--success) !important; background: #e7f7ee !important; }
 .mf-no { border-color: var(--error) !important; background: #fdeaef !important; }
+
+/* ── 知识点 / 素养标签 ────────────────────── */
+.kg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kg-badge-kp {
+  background: #e6edfa;
+  color: #2b5fa8;
+  border: 1px solid #c5d8f0;
+}
+.kg-badge-lit {
+  background: #f0e7fa;
+  color: #7c3aae;
+  border: 1px solid #dcccf0;
+}
 </style>
