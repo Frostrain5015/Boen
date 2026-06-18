@@ -463,6 +463,10 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <span class="step-dot dot-pending">✦</span>
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">生成分析报告</span>
           </div>
+          <div class="step-row">
+            <span class="step-dot dot-pending">✦</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">写入知识图谱</span>
+          </div>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="loading-bar-inner h-full rounded-full"></div>
