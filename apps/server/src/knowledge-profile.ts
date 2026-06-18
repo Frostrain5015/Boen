@@ -269,7 +269,7 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
 
   function enrichUnit(unitId: number, title: string): any {
     const kps = db.prepare(`
-      SELECT n.id, n.title FROM curriculum_kg_map m
+      SELECT n.id, n.title, n.weight FROM curriculum_kg_map m
       JOIN kg_nodes n ON n.id = m.node_id
       WHERE m.unit_id=? AND n.type='knowledge_point'
     `).all(unitId) as any[];
@@ -291,12 +291,12 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
         level: ws >= 0 ? getProficiencyLevel(ws) : undefined,
         correctCount: prof?.correctCount ?? 0,
         totalCount: prof?.totalCount ?? 0,
+        weight: kp.weight ?? 0.5,
         literacies: lits.map((l: any) => l.title),
         prerequisites: prereqs.map((p: any) => p.title),
       };
     });
 
-    // 聚合统计
     for (const kp of kpNodes) {
       if (kp.weightedScore >= 0) {
         overallSum += kp.weightedScore;
@@ -310,6 +310,15 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
     return { title, knowledgePoints: kpNodes };
   }
 
+  // 加权平均函数：按 weight 字段加权
+  function weightedAvg(kps: any[]): number {
+    const valid = kps.filter((k: any) => k.weightedScore >= 0);
+    if (!valid.length) return -1;
+    const totalWeight = valid.reduce((s: number, k: any) => s + k.weight, 0);
+    if (totalWeight <= 0) return Math.round(valid.reduce((s: number, k: any) => s + k.weightedScore, 0) / valid.length);
+    return Math.round(valid.reduce((s: number, k: any) => s + k.weightedScore * k.weight, 0) / totalWeight);
+  }
+
   for (const tb of tbs) {
     const chapters = db.prepare(
       `SELECT id, title FROM curriculum_units WHERE textbook_id=? AND parent_id IS NULL ORDER BY seq`
@@ -321,8 +330,7 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
       ).all(ch.id) as any[];
       const sectionNodes = sections.map((sec: any) => enrichUnit(sec.id, sec.title));
       const chKps = sectionNodes.flatMap((s: any) => s.knowledgePoints);
-      const chWs = chKps.filter((k: any) => k.weightedScore >= 0).map((k: any) => k.weightedScore);
-      const chAvg = chWs.length ? Math.round(chWs.reduce((a: number, b: number) => a + b, 0) / chWs.length) : -1;
+      const chAvg = weightedAvg(chKps);
       return {
         title: ch.title,
         weightedScore: chAvg,
@@ -331,7 +339,15 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
       };
     });
 
-    textbookNodes.push({ volume: tb.volume, chapters: chapterNodes });
+    // 每册的综合进度
+    const tbKps = chapterNodes.flatMap((c: any) => c.children.flatMap((s: any) => s.knowledgePoints));
+    const tbAvg = weightedAvg(tbKps);
+    textbookNodes.push({
+      volume: tb.volume,
+      weightedScore: tbAvg,
+      level: tbAvg >= 0 ? getProficiencyLevel(tbAvg) : undefined,
+      chapters: chapterNodes,
+    });
   }
 
   return {

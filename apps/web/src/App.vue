@@ -21,7 +21,7 @@ import type { MascotState } from '@/components/Mascot.vue';
 type Subject = 'chinese' | 'math' | 'english' | 'science';
 
 type ChatItem =
-  | { kind: 'user'; text: string }
+  | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
   | { kind: 'question'; toolCallId: string; question: QuestionPayload; answered: boolean; grading?: GradingResult };
 
@@ -274,7 +274,8 @@ async function send(text: string) {
   items.value.forEach((it) => {
     if (it.kind === 'question' && !it.answered) it.answered = true;
   });
-  items.value.push({ kind: 'user', text: t });
+  const modeTag = practiceType.value ? '专项' : ({ review: '复习巩固', preview: '预习', weakness: '突破' } as Record<string, string>)[activeMode.value] || undefined;
+  items.value.push({ kind: 'user', text: t, modeTag });
   items.value.push(newAssistant());
   const idx = { value: items.value.length - 1 };
   scrollDown(true); // 发送消息时强制滚到底部
@@ -905,9 +906,15 @@ onMounted(() => {
                   @submit="(a) => onAnswer(m, a)"
                 />
 
-                <!-- 用户消息：无边框文字墙风格 -->
+                <!-- 用户消息：无边框文字墙风格（含模式标签） -->
                 <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
                   <div class="max-w-[85%] text-right">
+                    <span v-if="m.modeTag" class="mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" :class="
+                      m.modeTag === '突破' ? 'bg-[#fdeaef] text-[#f2557a]' :
+                      m.modeTag === '复习巩固' ? 'bg-[#e7f7ee] text-[#18a558]' :
+                      m.modeTag === '预习' ? 'bg-[#e6edfa] text-[#2b5fa8]' :
+                      'bg-[var(--accent-soft)] text-[var(--accent-strong)]'
+                    ">{{ m.modeTag }}</span>
                     <p class="text-[15px] leading-relaxed text-[var(--ink)]" style="white-space: pre-wrap; word-break: break-word;">
                       {{ m.text }}
                     </p>

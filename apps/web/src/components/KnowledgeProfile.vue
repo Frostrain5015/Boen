@@ -30,6 +30,8 @@ interface ChapterNode {
 
 interface TextbookNode {
   volume: string;
+  weightedScore: number;
+  level?: string;
   chapters: ChapterNode[];
 }
 
@@ -303,9 +305,17 @@ watch(grade, fetchOutline);
         </div>
         <div class="p-3">
           <template v-for="tb in outline.textbooks" :key="tb.volume">
-            <div class="mb-2 flex items-center gap-2 px-2 py-1.5">
-              <BookOpen class="h-4 w-4 text-[var(--accent)]" />
-              <span class="font-display text-xs font-bold text-[var(--ink-soft)]">{{ tb.volume }}</span>
+            <div class="mb-3 mt-2 flex items-center gap-3 rounded-xl bg-[var(--surface)] px-3 py-2">
+              <svg class="h-9 w-9 shrink-0 -rotate-90" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--line)" stroke-width="3" />
+                <circle cx="20" cy="20" r="16" fill="none" :stroke="masteryColor(tb.weightedScore)" stroke-width="3" stroke-linecap="round" :stroke-dasharray="2 * Math.PI * 16" :stroke-dashoffset="2 * Math.PI * 16 * (1 - (tb.weightedScore >= 0 ? tb.weightedScore / 100 : 0))" class="transition-all duration-700" />
+              </svg>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
+                  <span class="text-xs font-bold" :style="{ color: masteryColor(tb.weightedScore) }">{{ tb.weightedScore >= 0 ? tb.weightedScore + '%' : '--' }}</span>
+                </div>
+              </div>
             </div>
             <div v-for="ch in tb.chapters" :key="ch.title" class="mb-1 overflow-hidden rounded-2xl border border-[var(--line)]">
               <!-- Chapter header -->
