@@ -81,6 +81,7 @@ const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview'>('chat');
 const expandedSection = ref<'chat' | 'exam' | null>('chat');
 const activeMode = ref<'none' | 'review' | 'preview' | 'weakness' | 'exam'>('none');
 const practiceType = ref<string | null>(null);
+const practiceMenuOpen = ref(false);
 
 const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
   chinese: { label: '语文', emoji: '📖' }, math: { label: '数学', emoji: '🔢' },
@@ -105,10 +106,22 @@ function activateMode(mode: 'review' | 'preview' | 'weakness') {
   if (activeMode.value === mode) input.value = hints[mode];
 }
 
+function togglePracticeMenu() {
+  practiceMenuOpen.value = !practiceMenuOpen.value;
+  if (!practiceMenuOpen.value) return;
+  // 关掉其他模式
+  activeMode.value = 'none';
+}
+
+function closePracticeMenu() {
+  practiceMenuOpen.value = false;
+}
+
 function startPractice(type: string, hint: string) {
   practiceType.value = type;
   input.value = hint;
   activeMode.value = 'none';
+  practiceMenuOpen.value = false;
   currentView.value = 'chat';
   focusInput();
 }
@@ -939,14 +952,16 @@ onMounted(() => {
               <button @click="activateMode('review')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>学习模式</span></button>
               <button @click="activateMode('preview')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
               <button @click="activateMode('weakness')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>突破模式</span></button>
-              <!-- 专项练习（hover 展开二级菜单） -->
-              <div v-if="practiceMenu.length" class="relative inline-block group">
-                <button class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
-                <div class="absolute left-0 bottom-full z-50 mb-1 min-w-[140px] origin-bottom scale-95 opacity-0 transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
-                  <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg">
-                    <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
+              <!-- 专项练习（点击展开/收起二级菜单） -->
+              <div v-if="practiceMenu.length" class="relative inline-block">
+                <button @click="togglePracticeMenu" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="practiceMenuOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
+                <Transition name="fade">
+                  <div v-if="practiceMenuOpen" class="absolute left-0 top-full z-50 mt-1 min-w-[140px]">
+                    <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg" @mouseleave="closePracticeMenu">
+                      <button v-for="p in practiceMenu" :key="p.type" @click="startPractice(p.type, p.hint)" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
+                    </div>
                   </div>
-                </div>
+                </Transition>
               </div>
             </div>
             <div class="clay flex items-end gap-2 p-2">
