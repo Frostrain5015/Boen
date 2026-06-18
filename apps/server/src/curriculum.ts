@@ -1,0 +1,164 @@
+import db from './db.js';
+import { embedTexts, embedQuery, cosineSim, vectorToBlob, blobToVector } from './embeddings.js';
+
+// ── 入库数据格式（seed JSON）──────────────────
+export interface UnitNode {
+  title: string;
+  kind?: string;                  // unit | chapter | lesson | section
+  children?: UnitNode[];
+  knowledgePoints?: string[];     // 关联知识点（按 title 引用）
+}
+export interface KnowledgePointSeed {
+  title: string;
+  description?: string;
+  code?: string;
+}
+export interface TextbookSeed {
+  subject: string;                // chinese | math | english | science
+  grade: string;                  // '1'..'9'
+  volume?: string;                // 上册 | 下册 | 全册
+  publisher?: string;
+  version?: string;
+  sourceUrl?: string;
+  units: UnitNode[];
+  knowledgePoints?: KnowledgePointSeed[];
+}
+
+const SUBJECT_LABEL: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
+function gradeCn(grade: string): string {
+  const n = Number(grade);
+  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初中${['七', '八', '九'][n - 7] ?? grade}`;
+}
+
+// ── 入库（idempotent：同一册重灌会先清后写）──────
+/** 灌入一册教材：写表 + 计算并存 embedding。返回该册写入的 unit / kp 数量。 */
+export async function ingestTextbook(seed: TextbookSeed): Promise<{ units: number; kps: number }> {
+  const subject = seed.subject;
+  const grade = seed.grade;
+  const volume = seed.volume ?? '全册';
+  const publisher = seed.publisher ?? '人教版';
+
+  // 1) 清理旧数据（按唯一键定位旧 textbook，连带其 units 的 embedding）
+  const existing = db.prepare(
+    `SELECT id FROM curriculum_textbooks WHERE subject=? AND grade=? AND volume=? AND publisher=?`,
+  ).get(subject, grade, volume, publisher) as { id: number } | undefined;
+  if (existing) {
+    const oldUnitIds = db.prepare(`SELECT id FROM curriculum_units WHERE textbook_id=?`).all(existing.id) as { id: number }[];
+    const delEmb = db.prepare(`DELETE FROM curriculum_embeddings WHERE ref_type='unit' AND ref_id=?`);
+    for (const u of oldUnitIds) delEmb.run(u.id);
+    db.prepare(`DELETE FROM curriculum_textbooks WHERE id=?`).run(existing.id); // 级联删 units + map
+  }
+
+  // 2) 教材
+  const tbId = Number(db.prepare(
+    `INSERT INTO curriculum_textbooks (subject, grade, volume, publisher, version, source_url) VALUES (?,?,?,?,?,?)`,
+  ).run(subject, grade, volume, publisher, seed.version ?? null, seed.sourceUrl ?? null).lastInsertRowid);
+
+  // 3) 知识点（按 subject+title 复用，避免重复）
+  const findKp = db.prepare(`SELECT id FROM knowledge_points WHERE subject=? AND title=?`);
+  const insKp = db.prepare(`INSERT INTO knowledge_points (subject, grade, code, title, description) VALUES (?,?,?,?,?)`);
+  const kpIdByTitle = new Map<string, number>();
+  const newKpRows: { id: number; content: string }[] = [];
+  for (const kp of seed.knowledgePoints ?? []) {
+    const hit = findKp.get(subject, kp.title) as { id: number } | undefined;
+    if (hit) { kpIdByTitle.set(kp.title, hit.id); continue; }
+    const id = Number(insKp.run(subject, grade, kp.code ?? null, kp.title, kp.description ?? null).lastInsertRowid);
+    kpIdByTitle.set(kp.title, id);
+    newKpRows.push({ id, content: kp.description ? `${kp.title}：${kp.description}` : kp.title });
+  }
+
+  // 4) 章节树（递归），收集 breadcrumb 作为 embedding 内容
+  const insUnit = db.prepare(`INSERT INTO curriculum_units (textbook_id, parent_id, seq, title, kind) VALUES (?,?,?,?,?)`);
+  const insMap = db.prepare(`INSERT OR IGNORE INTO unit_knowledge_map (unit_id, knowledge_point_id) VALUES (?,?)`);
+  const head = `${SUBJECT_LABEL[subject] ?? subject}·${gradeCn(grade)}${volume}`;
+  const unitRows: { id: number; content: string }[] = [];
+
+  function walk(nodes: UnitNode[], parentId: number | null, trail: string[]) {
+    nodes.forEach((node, i) => {
+      const uid = Number(insUnit.run(tbId, parentId, i, node.title, node.kind ?? 'unit').lastInsertRowid);
+      const crumb = [...trail, node.title];
+      unitRows.push({ id: uid, content: `${head} / ${crumb.join(' / ')}` });
+      for (const kpTitle of node.knowledgePoints ?? []) {
+        const kpId = kpIdByTitle.get(kpTitle);
+        if (kpId) insMap.run(uid, kpId);
+      }
+      if (node.children?.length) walk(node.children, uid, crumb);
+    });
+  }
+  walk(seed.units, null, []);
+
+  // 5) 批量计算 embedding 并存（unit 用 breadcrumb，kp 用 标题：描述）
+  const insEmb = db.prepare(
+    `INSERT OR REPLACE INTO curriculum_embeddings (ref_type, ref_id, subject, grade, content, embedding) VALUES (?,?,?,?,?,?)`,
+  );
+  const unitVecs = await embedTexts(unitRows.map((u) => u.content));
+  unitRows.forEach((u, i) => insEmb.run('unit', u.id, subject, grade, u.content, vectorToBlob(unitVecs[i])));
+  if (newKpRows.length) {
+    const kpVecs = await embedTexts(newKpRows.map((k) => k.content));
+    newKpRows.forEach((k, i) => insEmb.run('kp', k.id, subject, grade, k.content, vectorToBlob(kpVecs[i])));
+  }
+
+  return { units: unitRows.length, kps: newKpRows.length };
+}
+
+// ── 检索（供 LangGraph loadCurriculum 节点调用）──────
+/** 该年级该学科的教材编排顺序（章节树，缩进文本） */
+export function getOutline(grade: string, subject: string): string {
+  const books = db.prepare(
+    `SELECT id, volume FROM curriculum_textbooks WHERE grade=? AND subject=? ORDER BY volume`,
+  ).all(grade, subject) as { id: number; volume: string }[];
+  if (books.length === 0) return '';
+  const lines: string[] = [];
+  const childrenOf = (textbookId: number, parentId: number | null) =>
+    db.prepare(
+      `SELECT id, title FROM curriculum_units WHERE textbook_id=? AND parent_id IS ? ORDER BY seq`,
+    ).all(textbookId, parentId) as { id: number; title: string }[];
+  for (const b of books) {
+    if (books.length > 1) lines.push(`【${b.volume}】`);
+    const render = (parentId: number | null, depth: number) => {
+      for (const u of childrenOf(b.id, parentId)) {
+        lines.push(`${'  '.repeat(depth)}- ${u.title}`);
+        render(u.id, depth + 1);
+      }
+    };
+    render(null, 0);
+  }
+  return lines.join('\n');
+}
+
+/** 与查询最相关的章节/知识点（按 grade+subject 硬过滤后向量召回） */
+export async function retrieveRelated(
+  grade: string,
+  subject: string,
+  query: string,
+  k = 5,
+): Promise<string[]> {
+  const rows = db.prepare(
+    `SELECT content, embedding FROM curriculum_embeddings WHERE grade=? AND subject=?`,
+  ).all(grade, subject) as { content: string; embedding: Buffer }[];
+  if (rows.length === 0) return [];
+  const qv = await embedQuery(query);
+  return rows
+    .map((r) => ({ content: r.content, score: cosineSim(qv, blobToVector(r.embedding)) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k)
+    .map((r) => r.content);
+}
+
+/**
+ * 课程上下文：编排顺序 + 与本轮问题最相关的章节/知识点。
+ * 供 LangGraph loadCurriculum 节点注入系统提示。高中/大学无教材库 → 返回空串。
+ */
+export async function retrieveCurriculum(args: { grade?: string; subject?: string; query?: string }): Promise<string> {
+  const { grade, subject, query } = args;
+  if (!grade || !subject || !/^[1-9]$/.test(grade)) return '';
+  const outline = getOutline(grade, subject);
+  if (!outline) return '';
+  const parts = [`【当前学情】学生正在学「${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}」，本学期教材编排如下：`, outline];
+  if (query) {
+    const related = await retrieveRelated(grade, subject, query, 5);
+    if (related.length) parts.push('\n与学生当前问题最相关的章节/知识点：\n' + related.map((c) => `- ${c}`).join('\n'));
+  }
+  parts.push('\n讲解时贴合该教材的编排与进度，不超纲；可据此判断学生处于哪个章节、需要哪些前置知识。');
+  return parts.join('\n');
+}
