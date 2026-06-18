@@ -81,6 +81,15 @@ const threadId = `web-${Date.now()}`;
 const scroller = ref<HTMLElement | null>(null);
 
 const hasItems = computed(() => items.value.length > 0);
+const hasScrollOverflow = ref(false);
+
+function checkScrollOverflow() {
+  nextTick(() => {
+    const el = scroller.value;
+    if (!el) return;
+    hasScrollOverflow.value = el.scrollHeight > el.clientHeight + 1;
+  });
+}
 const subjectIndex = computed(() => SUBJECT_LABELS.findIndex((s) => s.value === subject.value));
 const showTyping = computed(() => {
   const last = items.value[items.value.length - 1];
@@ -111,14 +120,15 @@ const mascotState = computed<MascotState>(() => {
   return 'idle';
 });
 
-function scrollDown() {
+function scrollDown(force = false) {
   nextTick(() => {
     requestAnimationFrame(() => {
       const el = scroller.value;
       if (!el) return;
       const threshold = 120;
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-      if (isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      if (force || isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: force ? 'instant' : 'smooth' });
+      hasScrollOverflow.value = el.scrollHeight > el.clientHeight + 1;
     });
   });
 }
@@ -209,6 +219,7 @@ function finalizeAssistants() {
     if (it.kind === 'assistant') it.done = true;
   });
   processTikzDiagrams();
+  checkScrollOverflow();
 }
 
 async function send(text: string) {
@@ -233,7 +244,7 @@ async function send(text: string) {
   items.value.push({ kind: 'user', text: t });
   items.value.push(newAssistant());
   const idx = { value: items.value.length - 1 };
-  scrollDown();
+  scrollDown(true); // 发送消息时强制滚到底部
   try {
     await streamChat(
       { threadId, message: t, gradeBand: userProfile.value ? gradeToBand(userProfile.value.grade) : 'middle', grade: userProfile.value?.grade, userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined },
@@ -308,6 +319,7 @@ async function handleNewConversation() {
   } catch {
     // 忽略创建失败
   }
+  checkScrollOverflow();
 }
 
 async function handleDeleteConversation(id: string, event: Event) {
@@ -323,6 +335,7 @@ async function handleDeleteConversation(id: string, event: Event) {
   } catch {
     // 忽略删除失败
   }
+  checkScrollOverflow();
 }
 
 async function selectConversation(id: string) {
@@ -374,6 +387,7 @@ async function selectConversation(id: string) {
   } catch {
     items.value = [];
   }
+  checkScrollOverflow();
 }
 
 // ── 认证相关 ──────────────────────────────
@@ -427,6 +441,7 @@ async function handleSubjectChange(newSubject: Subject) {
     } catch { /* 静默 */ }
   }
   subject.value = newSubject;
+  checkScrollOverflow();
 }
 
 function handleLogout() {
@@ -444,6 +459,15 @@ function onClickOutside(e: MouseEvent) {
 onMounted(() => {
   checkAuth();
   document.addEventListener('click', onClickOutside);
+
+  // ═══ 监听滚动容器尺寸变化（侧栏折叠/窗口resize），更新顶部淡出态 ═══
+  let overflowObserver: ResizeObserver | undefined;
+  nextTick(() => {
+    if (scroller.value) {
+      overflowObserver = new ResizeObserver(() => checkScrollOverflow());
+      overflowObserver.observe(scroller.value);
+    }
+  });
 
   // ═══ 关键：等 Vue 第一帧完全渲染后再移除加载器 ═══
   // Vue 在后台默默挂载和渲染，加载器保持可见直到一切就绪
@@ -645,7 +669,7 @@ onMounted(() => {
         </header>
 
         <!-- 消息区域 -->
-        <main ref="scroller" class="flex-1 overflow-y-auto px-4">
+        <main ref="scroller" class="flex-1 overflow-y-auto px-4" :class="{ 'chat-scroll-fade': hasScrollOverflow }">
           <div class="mx-auto w-full max-w-2xl py-5">
             <!-- 欢迎页 / 消息列表：整块淡入淡出切换，避免逐条 auto-animate 掉帧 -->
             <Transition name="panel" mode="out-in">

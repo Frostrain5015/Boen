@@ -58,7 +58,13 @@
 html,
 body,
 #app {
-  height: 100%;
+  height: 100dvh;
+}
+
+/* ── 消息列表顶部淡出（仅溢出时启用） ───────── */
+.chat-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 48px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 48px, black 100%);
 }
 body {
   margin: 0;

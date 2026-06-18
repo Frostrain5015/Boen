@@ -201,31 +201,45 @@ async function stepWriteQuestions(
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
 
+  let parsed: any;
   try {
-    // 修复中文引号
-    const fixed = jsonStr
-      .replace(/"""/g, '"')
-      .replace(/(?<=: )"([^"]*?)"/g, (m) => {
-        try { JSON.parse('{' + m + '}'); return m; } catch { return '"' + m.slice(1, -1).replace(/"/g, '\\"') + '"'; }
-      });
-    const parsed = JSON.parse(fixed);
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    // 兜底修复：中文引号、多余逗号、LaTeX 反斜杠
+    let fixed = jsonStr
+      .replace(/["""]/g, "'")
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/\\(?!["\\/bfnrtu])/g, '\\\\')
+      .replace(/\\\\begin/g, '\\begin').replace(/\\\\end/g, '\\end')
+      .replace(/\\\\[{}\\]/g, (m) => m.replace('\\\\', '\\'));
+    try { parsed = JSON.parse(fixed); }
+    catch { throw new Error('JSON 解析失败'); }
+  }
     return (parsed.questions || []).map((q: any, i: number) => {
       const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: q.literacies || [], difficulty: q.difficulty || config.difficulty || 'medium', explanation: q.explanation || '' };
       if (base.type === 'multiple_choice') {
         const opts = (q.options || []).filter((o: any) => o?.key);
         while (opts.length < 2) opts.push({ key: String.fromCharCode(65 + opts.length), text: '选项' + String.fromCharCode(65 + opts.length) });
         base.options = opts; base.correctKeys = (q.correctKeys || []).filter((k: string) => opts.some((o: any) => o.key === k));
-        if (!base.correctKeys.length) base.correctKeys = [opts[0].key];
-        base.multiSelect = q.multiSelect ?? false;
+        if (!base.correctKeys.length) base.correctKeys = [opts[0].key]; base.multiSelect = q.multiSelect ?? false;
       }
       if (base.type === 'fill_blank') { base.blanks = q.blanks || []; }
       if (base.type === 'true_false') { base.answer = q.answer ?? true; }
       if (base.type === 'short_answer') { base.referenceAnswer = q.referenceAnswer || ''; base.keyPoints = q.keyPoints || []; }
+      if (!base.knowledgePoint) base.knowledgePoint = '综合';
+      if (!base.explanation) base.explanation = '详见参考答案。';
+      if (!base.literacies?.length) base.literacies = ['综合素养'];
       return base;
     });
   } catch (e: any) {
     console.error(`出题阶段 ${qt.type} 解析失败:`, e.message?.slice(0, 100));
-    return [];
+    // 兜底：返回一道默认题避免前端完全空白
+    const fallback: any = { index: 0, type: qt.type, points: qt.pointsPer, stem: `请回答一道${qt.label}。`, knowledgePoint: '综合', literacies: ['综合素养'], difficulty: config.difficulty || 'medium', explanation: '详见参考答案。' };
+    if (qt.type === 'multiple_choice') { fallback.options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }]; fallback.correctKeys = ['A']; fallback.multiSelect = false; }
+    if (qt.type === 'fill_blank') fallback.blanks = [{ acceptedAnswers: ['答案'] }];
+    if (qt.type === 'true_false') fallback.answer = true;
+    if (qt.type === 'short_answer') { fallback.referenceAnswer = '参考答案'; fallback.keyPoints = ['要点']; }
+    return [fallback];
   }
 }
 
