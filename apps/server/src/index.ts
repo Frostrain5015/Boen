@@ -431,7 +431,9 @@ app.post('/api/exam/generate', async (c) => {
       });
       await send({ type: 'done' });
     } catch (err) {
-      await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('出卷失败:', msg.slice(0, 200));
+      try { await send({ type: 'error', message: msg }); } catch {}
     }
   });
 });
