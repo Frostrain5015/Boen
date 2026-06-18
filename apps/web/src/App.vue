@@ -102,7 +102,7 @@ const hasScrollOverflow = ref(false);
 function activateMode(mode: 'review' | 'preview' | 'weakness') {
   activeMode.value = activeMode.value === mode ? 'none' : mode;
   currentView.value = 'chat';
-  const hints: Record<string, string> = { review: '我想学习 ', preview: '帮我预习 ', weakness: '帮我突破薄弱点 ' };
+  const hints: Record<string, string> = { review: '帮我复习巩固 ', preview: '帮我预习 ', weakness: '帮我突破薄弱点 ' };
   if (activeMode.value === mode) input.value = hints[mode];
 }
 
@@ -527,7 +527,8 @@ function handleSaveProfile(p: UserProfile) {
 async function handlePractice(detail: { kp?: string; subject: Subject; grade: string }) {
   currentView.value = 'chat';
   expandedSection.value = 'chat';
-  activeMode.value = 'review';
+  // 指定了具体知识点 → 突破模式；无指定 → 复习巩固
+  activeMode.value = detail.kp ? 'weakness' : 'review';
   // 学科不同或当前无对话时，新开一个该学科的对话，避免学科串台
   if (!currentConversationId.value || subject.value !== detail.subject) {
     try {
@@ -538,8 +539,11 @@ async function handlePractice(detail: { kp?: string; subject: Subject; grade: st
     } catch { /* 静默 */ }
   }
   subject.value = detail.subject;
-  const topic = detail.kp ? `「${detail.kp}」` : '这个学科';
-  send(`我想练习${topic}，先考我几道题吧`);
+  if (detail.kp) {
+    send(`帮我突破 ${detail.kp}`);
+  } else {
+    send('帮我复习巩固 ');
+  }
 }
 
 async function handleSubjectChange(newSubject: Subject) {
@@ -947,9 +951,9 @@ onMounted(() => {
         <!-- 输入区 -->
         <footer class="px-4 pb-4 pt-1">
           <div class="mx-auto w-full max-w-2xl">
-            <!-- 学习模式（聊天内子模式：预填「我想学习」引导）。考试/档案已移至侧栏 -->
+            <!-- 学习模式（聊天内子模式）。考试/档案已移至侧栏 -->
             <div class="mb-2 flex items-center gap-1.5 px-1">
-              <button @click="activateMode('review')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>学习模式</span></button>
+              <button @click="activateMode('review')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>复习巩固</span></button>
               <button @click="activateMode('preview')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
               <button @click="activateMode('weakness')" class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>突破模式</span></button>
               <!-- 专项练习（点击展开/收起二级菜单） -->

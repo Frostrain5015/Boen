@@ -59,7 +59,7 @@ function detectQuizIntent(text: string): { force: boolean; tool: string } {
 }
 
 function detectReviewIntent(text: string): boolean {
-  return /^(教我|讲(一?下)|讲解|复习|学习|仔细说说|辅导)/.test(text.trim());
+  return /^(教我|讲(一?下)|讲解|复习|学习|仔细说说|辅导|帮我复习)/.test(text.trim());
 }
 
 function detectPreviewIntent(text: string): boolean {
@@ -67,7 +67,7 @@ function detectPreviewIntent(text: string): boolean {
 }
 
 function detectWeaknessIntent(text: string): boolean {
-  return /薄弱|总是错|老错|总做错|反复错|突破|提分/i.test(text.trim());
+  return /薄弱|总是错|老错|总做错|反复错|突破|提分|帮我突破/i.test(text.trim());
 }
 
 /** 复习完成工具 */
