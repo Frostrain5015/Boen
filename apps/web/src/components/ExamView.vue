@@ -335,14 +335,15 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <div class="w-80 space-y-1">
-          <div v-for="st in ['analyze','write','review']" :key="st" class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
-            <span class="step-dot" :class="dotCls(st)">{{ dotIcon(st) }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ stepLabel(st) }}</span>
-            <span v-if="stepState(st) === 'active'" class="step-active-dot"></span>
-            <span v-if="stepState(st) === 'done'" class="text-[11px] font-medium text-[#18a558]">完成</span>
+        <div class="w-80 space-y-0.5">
+          <div v-for="st in ['analyze','write','review']" :key="st">
+            <div class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
+              <span class="step-dot" :class="dotCls(st)">{{ dotIcon(st) }}</span>
+              <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ stepLabel(st) }}</span>
+              <span v-if="stepState(st) === 'active'" class="step-active-dot"></span>
+              <span v-if="stepState(st) === 'done'" class="text-[11px] font-medium text-[#18a558]">完成</span>
+            </div>
           </div>
-          <div v-if="genProgress.message" class="step-msg">{{ genProgress.message }}</div>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
@@ -575,9 +576,6 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .dot-pending { background: var(--accent-soft); color: var(--accent-strong); opacity: 0.5; }
 .step-active-dot { width: 0.375rem; height: 0.375rem; border-radius: 999px; background: var(--accent); animation: stepPulse 1.6s ease-in-out infinite; }
 @keyframes stepPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
-.step-msg { margin: -0.125rem 0 0.25rem 2rem; font-size: 0.75rem; line-height: 1.4; color: var(--ink-soft); animation: msgFadeIn 0.3s ease; }
-@keyframes msgFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
-
 /* ── 结果展开/收起 ── */
 .reveal-enter-active { transition: all 0.25s ease; overflow: hidden; }
 .reveal-leave-active { transition: all 0.15s ease; overflow: hidden; }
