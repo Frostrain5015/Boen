@@ -1,30 +1,31 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { GradeBand } from '@boen/shared';
+import type { Grade } from '@boen/shared';
 import { Sparkles, User, GraduationCap } from 'lucide-vue-next';
 
 const props = defineProps<{
-  profile: { name: string; gradeBand: GradeBand } | null;
+  profile: { name: string; grade: Grade } | null;
 }>();
 
 const emit = defineEmits<{
-  save: [profile: { name: string; gradeBand: GradeBand }];
+  save: [profile: { name: string; grade: Grade }];
 }>();
 
-const GRADES: { value: GradeBand; label: string; desc: string }[] = [
-  { value: 'primary', label: '小学', desc: '1–6 年级' },
-  { value: 'middle', label: '中学', desc: '7–12 年级' },
-  { value: 'undergrad', label: '大学及以上', desc: '本科 / 研究生' },
+/** 分组年级选择：小学 1–6 / 初中 7–9 细化，高中、大学为粗档 */
+const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[] = [
+  { band: '小学', items: ['一', '二', '三', '四', '五', '六'].map((c, i) => ({ value: String(i + 1) as Grade, label: `${c}年级` })) },
+  { band: '初中', items: ['七', '八', '九'].map((c, i) => ({ value: String(i + 7) as Grade, label: `${c}年级` })) },
+  { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
 ];
 
 const name = ref(props.profile?.name ?? '');
-const gradeBand = ref<GradeBand>(props.profile?.gradeBand ?? 'middle');
+const grade = ref<Grade>(props.profile?.grade ?? '8');
 const saved = ref(false);
 
 function handleSave() {
   const trimmed = name.value.trim();
   if (!trimmed) return;
-  emit('save', { name: trimmed, gradeBand: gradeBand.value });
+  emit('save', { name: trimmed, grade: grade.value });
   saved.value = true;
 }
 </script>
@@ -70,17 +71,21 @@ function handleSave() {
               <GraduationCap class="h-3.5 w-3.5" />
               当前年级
             </span>
-            <div class="setup-grades">
-              <button
-                v-for="g in GRADES"
-                :key="g.value"
-                @click="gradeBand = g.value"
-                class="setup-grade"
-                :class="gradeBand === g.value ? 'grade-on' : 'grade-off'"
-              >
-                <span class="grade-label">{{ g.label }}</span>
-                <span class="grade-desc">{{ g.desc }}</span>
-              </button>
+            <div class="setup-grade-groups">
+              <div v-for="grp in GRADE_GROUPS" :key="grp.band" class="setup-grade-group">
+                <span class="grade-band-label">{{ grp.band }}</span>
+                <div class="setup-grades">
+                  <button
+                    v-for="g in grp.items"
+                    :key="g.value"
+                    @click="grade = g.value"
+                    class="setup-grade"
+                    :class="grade === g.value ? 'grade-on' : 'grade-off'"
+                  >
+                    <span class="grade-label">{{ g.label }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </label>
         </div>
@@ -183,18 +188,32 @@ function handleSave() {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .setup-input::placeholder { color: var(--ink-soft); opacity: 0.5; }
+.setup-grade-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.setup-grade-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.grade-band-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
 .setup-grades {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.5rem;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.4rem;
 }
 .setup-grade {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.15rem;
-  padding: 0.65rem 0.4rem;
-  border-radius: 14px;
+  justify-content: center;
+  padding: 0.5rem 0.3rem;
+  border-radius: 12px;
   border: 1.5px solid var(--line);
   background: #fff;
   cursor: pointer;
@@ -205,19 +224,16 @@ function handleSave() {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
-.grade-off { }
+/* 「其他」组只有两项，让它们占两列宽，避免一排 6 列里挤成小方块 */
+.setup-grade-group:last-child .setup-grade { grid-column: span 3; }
 .grade-label {
   font-family: var(--font-display);
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--ink);
-}
-.grade-on .grade-label { color: var(--accent-strong); }
-.grade-desc {
-  font-size: 0.62rem;
-  color: var(--ink-soft);
   white-space: nowrap;
 }
+.grade-on .grade-label { color: var(--accent-strong); }
 .setup-footer {
   display: flex;
   justify-content: center;

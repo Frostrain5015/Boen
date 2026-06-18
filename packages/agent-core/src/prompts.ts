@@ -1,4 +1,5 @@
-import type { GradeBand } from '@boen/shared';
+import type { GradeBand, Grade } from '@boen/shared';
+import { gradeLabel } from '@boen/shared';
 
 /** 年龄段适配：同一套人设，按年龄段注入不同的用词/深度/语气参数 */
 const GRADE_GUIDE: Record<GradeBand, string> = {
@@ -39,12 +40,14 @@ const SUBJECT_GUIDE: Record<string, string> = {
 \n- 需要画示意图（物理情景图、电路图、几何光学等）时，用 TikZ 代码块（```tikz）绘制，前端自动渲染为矢量图。不要在文本中用字符拼图代替。',
 };
 
-export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userName?: string): string {
+export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userName?: string, grade?: Grade): string {
+  const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」，讲解的深度、用词与举例都要贴合该年级的课程进度，不要超纲也不要过于浅显。` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，回答时用「${userName}」称呼他/她，营造亲切的一对一辅导感。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
   return [
     '你是「博文」(Boen)，兼具「学术导师」与「私人学习助理」双重身份的学习伙伴。',
     GRADE_GUIDE[gradeBand],
+    gradeInfo,
     greeting,
     '',
     '【核心风格】',

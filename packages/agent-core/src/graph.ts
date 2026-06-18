@@ -7,6 +7,7 @@ import {
 import { SystemMessage, isToolMessage, isHumanMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { GradeBand, BoenMode } from '@boen/shared';
+import type { Grade } from '@boen/shared';
 import { systemPromptForQa } from './prompts.js';
 import { quizTools } from './quiz/index.js';
 
@@ -14,6 +15,8 @@ import { quizTools } from './quiz/index.js';
 export const BoenState = Annotation.Root({
   ...MessagesAnnotation.spec,
   gradeBand: Annotation<GradeBand>(),
+  /** 具体年级（1–9 / high / college），用于按年级加载课程知识库 */
+  grade: Annotation<Grade | undefined>(),
   subject: Annotation<string>(),
   userName: Annotation<string>(),
   mode: Annotation<BoenMode>(),
@@ -52,7 +55,7 @@ export function buildBoenGraph(model: BaseChatModel) {
   };
 
   const qaNode = async (state: State): Promise<Partial<State>> => {
-    const system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName));
+    const system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
     const last = state.messages[state.messages.length - 1];
 
     let llm;

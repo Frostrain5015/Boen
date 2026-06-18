@@ -1,7 +1,25 @@
 // 博文 Boen —— 前后端共享类型
 
-/** 三个面向的年龄段 */
+/** 三个面向的年龄段（驱动语气/深度） */
 export type GradeBand = 'primary' | 'middle' | 'undergrad';
+
+/** 具体年级：义务教育 1–9 年级细化 + 高中/大学粗档 */
+export type Grade = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'high' | 'college';
+
+/** 具体年级 → 语气年龄段 */
+export function gradeToBand(grade: Grade): GradeBand {
+  if (grade === 'college') return 'undergrad';
+  if (grade === 'high') return 'middle'; // 高中暂沿用中学语气
+  return Number(grade) <= 6 ? 'primary' : 'middle';
+}
+
+/** 具体年级 → 中文标签（用于 UI 与 prompt） */
+export function gradeLabel(grade: Grade): string {
+  if (grade === 'high') return '高中';
+  if (grade === 'college') return '大学及以上';
+  const n = Number(grade);
+  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初中${['七', '八', '九'][n - 7]}年级`;
+}
 
 /** 智能体工作模式（阶段 0 只用到 qa，其余为后续阶段预留） */
 export type BoenMode = 'qa' | 'review' | 'ai-learning';
@@ -19,6 +37,8 @@ export interface ChatRequest {
   message: string;
   /** 用户画像：年龄段，驱动用词/难度适配 */
   gradeBand: GradeBand;
+  /** 具体年级（1–9 / high / college），驱动按年级加载课程知识库 */
+  grade?: Grade;
   /** 用户名（用于智能体个性化称呼） */
   userName?: string;
   /** 期望模式，缺省时由 Router 自动判定 */

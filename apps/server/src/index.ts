@@ -277,6 +277,7 @@ app.post('/api/chat', async (c) => {
         {
           messages: [...skipMsgs, new HumanMessage(body.message)],
           gradeBand: body.gradeBand ?? 'middle',
+          grade: body.grade,
           subject: body.subject ?? 'math',
           userName: body.userName,
           ...(body.mode ? { mode: body.mode } : {}),

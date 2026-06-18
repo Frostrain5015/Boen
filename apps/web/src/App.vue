@@ -2,7 +2,8 @@
 import { ref, computed, nextTick, onMounted } from 'vue';
 import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
-import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, GradeBand } from '@boen/shared';
+import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade } from '@boen/shared';
+import { gradeToBand } from '@boen/shared';
 import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
@@ -31,19 +32,24 @@ const SUBJECT_LABELS: { value: Subject; label: string; emoji: string }[] = [
 
 // ── 用户画像（名字 + 年级，localStorage 持久化）──
 const PROFILE_KEY = 'boen_user_profile';
-function loadProfile(): { name: string; gradeBand: GradeBand } | null {
+type UserProfile = { name: string; grade: Grade };
+/** 旧画像（仅 gradeBand）迁移到具体年级的代表值 */
+const BAND_TO_GRADE: Record<string, Grade> = { primary: '3', middle: '8', undergrad: 'college' };
+function loadProfile(): UserProfile | null {
   try {
     const raw = localStorage.getItem(PROFILE_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
-    if (p.name && p.gradeBand) return p;
+    if (p.name && p.grade) return { name: p.name, grade: p.grade };
+    // 兼容旧版：{ name, gradeBand } → 映射到代表年级
+    if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
   } catch { /* 忽略损坏数据 */ }
   return null;
 }
-function saveProfile(p: { name: string; gradeBand: GradeBand }) {
+function saveProfile(p: UserProfile) {
   localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
 }
-const userProfile = ref(loadProfile());
+const userProfile = ref<UserProfile | null>(loadProfile());
 const showSetupDialog = ref(false);
 
 // ── 认证状态 ──────────────────────────────
@@ -267,7 +273,7 @@ async function send(text: string) {
   scrollDown();
   try {
     await streamChat(
-      { threadId, message: t, gradeBand: userProfile.value?.gradeBand ?? 'middle', userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined },
+      { threadId, message: t, gradeBand: userProfile.value ? gradeToBand(userProfile.value.grade) : 'middle', grade: userProfile.value?.grade, userName: userProfile.value?.name, subject: subject.value, conversationId: currentConversationId.value ?? undefined },
       (e) => handleEvent(e, idx),
     );
   } catch (err) {
@@ -440,7 +446,7 @@ function handleOAuthError() {
   authenticated.value = false;
 }
 
-function handleSaveProfile(p: { name: string; gradeBand: GradeBand }) {
+function handleSaveProfile(p: UserProfile) {
   userProfile.value = p;
   saveProfile(p);
   showSetupDialog.value = false;
