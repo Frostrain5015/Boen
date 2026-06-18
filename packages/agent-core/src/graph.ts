@@ -138,14 +138,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
 
     if (state.mode === 'review') {
       system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      if (!model.bindTools) { /* no tool support */ }
-      else if (state.reviewPhase === 'quizzing') {
+      // 所有阶段都绑出题工具 + 完成工具，LLM 自主决定何时讲解、何时出题
+      if (model.bindTools) {
         tools = model.bindTools(reviewTools as any);
-      }
-      else {
-        const teachTools: any[] = [completeReviewTool];
-        if (deps.lookupKnowledgePoint) teachTools.push(lookupKnowledgePointTool);
-        tools = model.bindTools(teachTools);
       }
     } else if (state.mode === 'preview') {
       system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
@@ -180,15 +175,6 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
       ? [system, new SystemMessage(state.curriculum), ...state.messages]
       : [system, ...state.messages];
     const response = await llm.invoke(messages);
-
-    // 学习模式阶段控制（review/weakness 支持交替讲练）
-    if (state.mode === 'review' || state.mode === 'weakness') {
-      const result: Record<string, unknown> = { messages: [response] };
-      if (last && isToolMessage(last)) {
-        result.reviewPhase = 'quizzing';
-      }
-      return result;
-    }
 
     return { messages: [response] };
   };
