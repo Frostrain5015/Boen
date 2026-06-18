@@ -28,12 +28,20 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
 
 // ── CRUD ─────────────────────────────────────
 
+/** EMA 平滑因子：0.3 = 新成绩占 30%，历史占 70% */
+const PROFICIENCY_ALPHA = 0.3;
+
 export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number): KpProficiency {
   const existing = db.prepare(`SELECT * FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, kgNodeId) as any;
   const correct = existing ? existing.correct_count + score : score;
   const total = existing ? existing.total_count + maxScore : maxScore;
-  const weighted = Math.round((correct / total) * 100);
   const now = Math.floor(Date.now() / 1000);
+
+  // 指数移动平均：新成绩权重 α，旧权重 (1-α)
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  const weighted = existing
+    ? Math.round(PROFICIENCY_ALPHA * pct + (1 - PROFICIENCY_ALPHA) * existing.weighted_score)
+    : Math.round(pct);
 
   db.prepare(`
     INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, last_updated)
