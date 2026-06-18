@@ -54,6 +54,27 @@ export interface ExamProgress {
 }
 export type ExamProgressFn = (p: ExamProgress) => void | Promise<void>;
 
+// ── 重试工具 ──────────────────────────────
+
+/** 带重试的模型调用，每次重试独立超时 */
+async function modelInvokeWithRetry(model: BaseChatModel, prompt: SystemMessage, retries = 2): Promise<any> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await model.invoke([prompt]);
+    } catch (err: any) {
+      lastError = err;
+      const isTimeout = err?.message?.includes('timeout') || err?.message?.includes('timed out') || err?.name === 'TimeoutError';
+      console.warn(`模型调用失败(第${attempt + 1}次): ${err?.message?.slice(0, 80) || err}`);
+      if (attempt < retries) {
+        // 退避 1s → 2s
+        await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+      }
+    }
+  }
+  throw lastError;
+}
+
 // ── 考试生成（三步流水线） ──────────────────
 
 export async function generateExam(
@@ -74,19 +95,18 @@ export async function generateExam(
 
   await onProgress?.({ step: 'analyze', message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections} 个板块`, progress: 20 });
 
-  // ─── Step 2: 出题 ───────────────────────────
-  await onProgress?.({ step: 'write', message: '正在编写选择题…', progress: 25 });
+  // ─── Step 2: 出题（并发：4 种题型同时编写） ──
+  await onProgress?.({ step: 'write', message: '正在并行编写试题…', progress: 25 });
   const allQuestions: ExamQuestion[] = [];
 
-  for (let i = 0; i < blueprint.questionTypes.length; i++) {
-    const qt = blueprint.questionTypes[i];
-    await onProgress?.({
-      step: 'write',
-      message: `正在编写${qt.label}（${i + 1}/${blueprint.questionTypes.length}）…`,
-      progress: 25 + Math.round((i / blueprint.questionTypes.length) * 60),
-    });
-    const questions = await stepWriteQuestions(model, config, qt, blueprint, allQuestions.flatMap(q => [q]));
-    allQuestions.push(...questions);
+  const writeResults = await Promise.allSettled(
+    blueprint.questionTypes.map(qt =>
+      stepWriteQuestions(model, config, qt, blueprint, [])
+    )
+  );
+  for (const r of writeResults) {
+    if (r.status === 'fulfilled') allQuestions.push(...r.value);
+    else console.error(`出题失败:`, r.reason?.message?.slice(0, 100));
   }
 
   await onProgress?.({ step: 'write', message: `已完成 ${allQuestions.length} 道题`, progress: 85 });

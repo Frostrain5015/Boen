@@ -31,7 +31,8 @@ export function getChatModel(cfg: ModelConfig): BaseChatModel {
     model: isDeepSeek ? (cfg.model || 'deepseek-chat') : cfg.model,
     apiKey: cfg.apiKey,
     temperature: cfg.temperature ?? 0.7,
-    timeout: 120000, // 120s 超时，防止 API 无响应时请求无限挂起
+    timeout: 120000,
+    maxRetries: 2,
     streamUsage: false,
     configuration: {
       baseURL: isDeepSeek ? 'https://api.deepseek.com' : (cfg.baseUrl || undefined),
