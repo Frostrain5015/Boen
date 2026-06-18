@@ -212,6 +212,41 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 0 10px transparent; }
 }
+/* ── 全屏加载动画 ──────────────────────────── */
+.loading-mascot {
+  animation: loadingFloat 2.4s ease-in-out infinite;
+}
+@keyframes loadingFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.03); }
+}
+.loading-bar {
+  width: 120px;
+  height: 3px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.loading-bar-inner {
+  width: 40%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent), var(--accent-strong));
+  animation: loadingSlide 1.4s ease-in-out infinite;
+}
+@keyframes loadingSlide {
+  0% { transform: translateX(-30%); }
+  100% { transform: translateX(260%); }
+}
+.fade-slow-enter-active,
+.fade-slow-leave-active {
+  transition: opacity 0.6s ease, filter 0.6s ease;
+}
+.fade-slow-enter-from,
+.fade-slow-leave-to {
+  opacity: 0;
+  filter: blur(6px);
+}
 /* ── TikZ 图形容器 ──────────────────────────── */
 .tikz-wrap {
   margin: 1em 0;
