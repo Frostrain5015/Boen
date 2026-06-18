@@ -818,25 +818,28 @@ function computeLiteracyBreakdown(results: ExamQuestionResult[]): Array<{ litera
  * 模糊查找知识点节点。
  * LLM 在出题时写的 knowledgePoint（如"一般现在时"）和入库的 kg_nodes.title
  * （如"一般现在时的用法"）可能不完全一致，需要从精确→包含逐级降级匹配。
+ * @param subject 限定学科（传 "math" 则不会跨学科匹配到语文的"综合"）
  */
-export function findKnowledgePointNode(title: string): { id: number; weight?: number } | undefined {
+export function findKnowledgePointNode(title: string, subject?: string): { id: number; weight?: number } | undefined {
+  const subjectSql = subject ? ` AND subject=?` : '';
+
   // Level 1: 精确匹配
-  let node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND title=?`).get(title) as ({ id: number; weight: number } | undefined);
+  let node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND title=?${subjectSql}`).get(...(subject ? [title, subject] : [title])) as ({ id: number; weight: number } | undefined);
   if (node) return node;
 
   // Level 2: 查询词被包含在库标题中（"一般现在时" → "一般现在时的用法"）
-  node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND title LIKE ?`).get(`%${title}%`) as ({ id: number; weight: number } | undefined);
+  node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND title LIKE ?${subjectSql}`).get(...(subject ? [`%${title}%`, subject] : [`%${title}%`])) as ({ id: number; weight: number } | undefined);
   if (node) return node;
 
   // Level 3: 库标题被包含在查询词中（反向）
-  node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND ? LIKE '%' || title`).get(title) as ({ id: number; weight: number } | undefined);
+  node = db.prepare(`SELECT id, weight FROM kg_nodes WHERE type='knowledge_point' AND ? LIKE '%' || title${subjectSql}`).get(...(subject ? [title, subject] : [title])) as ({ id: number; weight: number } | undefined);
   if (node) return node;
 
   return undefined;
 }
 
-function getKpTier(kp: string): string {
-  const node = findKnowledgePointNode(kp);
+function getKpTier(kp: string, subject?: string): string {
+  const node = findKnowledgePointNode(kp, subject);
   if (!node) return 'Standard';
   if (node.weight && node.weight >= 0.75) return 'Core';
   if (node.weight && node.weight >= 0.5) return 'Important';
@@ -922,7 +925,7 @@ export async function submitExamSession(examId: string, userId: string, answers:
     if (!qr.knowledgePoint) continue;
     const kps = qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean);
     for (const kp of kps) {
-      const node = findKnowledgePointNode(kp);
+      const node = findKnowledgePointNode(kp, session.subject);
       if (node) updateProficiency(userId, node.id, qr.score, qr.maxScore);
     }
   }
