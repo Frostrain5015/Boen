@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import Mascot from '@/components/Mascot.vue';
+import StarDisplay from '@/components/StarDisplay.vue';
 import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 
@@ -88,6 +89,18 @@ function toggleSection(key: string) {
   const s = new Set(expandedSections.value);
   if (s.has(key)) s.delete(key); else s.add(key);
   expandedSections.value = s;
+}
+
+/** 熟练度 0-100 → 0-5 星（半星粒度） */
+function scoreToStars(ws: number): number {
+  if (ws < 0) return 0;
+  return Math.round((ws / 10) * 2) / 2; // 0-10→0.5, 10-20→1.0, ..., 90-100→5.0
+}
+function starColor(ws: number): string {
+  if (ws < 30) return '#f2557a';
+  if (ws < 60) return '#f59e42';
+  if (ws < 80) return '#e0a92e';
+  return '#18a558';
 }
 
 function masteryColor(ws: number): string {
@@ -306,14 +319,13 @@ watch(grade, fetchOutline);
         <div class="p-3">
           <template v-for="tb in outline.textbooks" :key="tb.volume">
             <div class="mb-3 mt-2 flex items-center gap-3 rounded-xl bg-[var(--surface)] px-3 py-2">
-              <svg class="h-9 w-9 shrink-0 -rotate-90" viewBox="0 0 40 40">
-                <circle cx="20" cy="20" r="16" fill="none" stroke="var(--line)" stroke-width="3" />
-                <circle cx="20" cy="20" r="16" fill="none" :stroke="masteryColor(tb.weightedScore)" stroke-width="3" stroke-linecap="round" :stroke-dasharray="2 * Math.PI * 16" :stroke-dashoffset="2 * Math.PI * 16 * (1 - (tb.weightedScore >= 0 ? tb.weightedScore / 100 : 0))" class="transition-all duration-700" />
-              </svg>
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
-                  <span class="text-xs font-bold" :style="{ color: masteryColor(tb.weightedScore) }">{{ tb.weightedScore >= 0 ? tb.weightedScore : '--' }}</span>
+                  <span v-if="tb.weightedScore >= 0" class="inline-flex gap-0.5">
+                    <StarDisplay :score="tb.weightedScore" />
+                  </span>
+                  <span v-else class="text-[10px] text-[var(--ink-soft)]">--</span>
                 </div>
               </div>
             </div>
@@ -411,12 +423,10 @@ watch(grade, fetchOutline);
             <button @click="closeKpDetail" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50">&times;</button>
           </div>
           <div class="space-y-3 px-5 py-4">
-            <div class="flex items-center gap-3">
-              <span class="text-xs font-medium text-[var(--ink-soft)]">掌握度</span>
-              <div class="h-2 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(selectedKp.weightedScore) }">
-                <div class="h-full rounded-full" :style="{ width: (selectedKp.weightedScore >= 0 ? selectedKp.weightedScore : 0) + '%', background: masteryColor(selectedKp.weightedScore) }"></div>
-              </div>
-              <span class="text-xs font-bold" :style="{ color: masteryColor(selectedKp.weightedScore) }">{{ selectedKp.weightedScore >= 0 ? selectedKp.weightedScore + '%' : '未练习' }}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--ink-soft)]">熟练度</span>
+              <StarDisplay v-if="selectedKp.weightedScore >= 0" :score="selectedKp.weightedScore" />
+              <span v-else class="text-[11px] text-[var(--ink-soft)]">未练习</span>
             </div>
 
             <div v-if="selectedKp.literacies.length" class="space-y-1">
