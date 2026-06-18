@@ -14,9 +14,11 @@ import {
   gradeAnswer,
 } from '@boen/agent-core';
 import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
+import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
+import { updateProficiency, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import { execSync } from 'node:child_process';
 import { writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -245,6 +247,88 @@ app.get('/api/kg/weights/guide', (c) => {
   const guide = formatWeightGuide(subject, grade);
   return c.json({ subject, grade, guide });
 });
+// ── 知识画像 API ────────────────────────────
+/** GET /api/profile/outline?subject=math&grade=7 — 章节树+掌握度 */
+app.get('/api/profile/outline', async (c) => {
+  const userId = await resolveUserId(c);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade') || '7';
+  const outline = getProfileOutline(subject, grade, userId ?? undefined);
+  return c.json(outline);
+});
+
+/** GET /api/profile/proficiency — 用户熟练度数据 */
+app.get('/api/profile/proficiency', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade');
+  const profs = getAllProficiencies(userId, subject, grade);
+  return c.json({ proficiencies: profs });
+});
+
+/** GET /api/profile/weak-points — 薄弱知识点 */
+app.get('/api/profile/weak-points', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade');
+  const threshold = c.req.query('threshold') ? Number(c.req.query('threshold')) : 60;
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 10;
+  const weak = getWeakPoints(userId, subject, grade, threshold, limit);
+  return c.json({ weakPoints: weak });
+});
+
+/** GET /api/profile/strong-points — 优势知识点 */
+app.get('/api/profile/strong-points', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade');
+  const threshold = c.req.query('threshold') ? Number(c.req.query('threshold')) : 75;
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 10;
+  const strong = getStrongPoints(userId, subject, grade, threshold, limit);
+  return c.json({ strongPoints: strong });
+});
+
+/** GET /api/profile/literacies — 素养熟练度 */
+app.get('/api/profile/literacies', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const lits = getLiteracyProficiency(userId, subject);
+  return c.json({ literacies: lits });
+});
+
+/** GET /api/profile/recommendations — 练习推荐 */
+app.get('/api/profile/recommendations', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const subject = c.req.query('subject') || 'math';
+  const grade = c.req.query('grade') || '7';
+  const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 5;
+  const recs = getRecommendedKPs(userId, subject, grade, limit);
+  return c.json({ recommendations: recs });
+});
+
+/** GET /api/profile/weakness-chain/:nodeId — 前置弱点追溯 */
+app.get('/api/profile/weakness-chain/:nodeId', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const nodeId = Number(c.req.param('nodeId'));
+  if (isNaN(nodeId)) return c.json({ error: 'nodeId 无效' }, 400);
+  const chain = getPrerequisiteWeaknessChain(userId, nodeId);
+  return c.json({ chain });
+});
+
+/** POST /api/profile/seed — 从历史答题记录回填熟练度 */
+app.post('/api/profile/seed', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const { updated } = seedProficiencyFromHistory(userId);
+  return c.json({ updated });
+});
+
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
 
@@ -408,6 +492,7 @@ app.post('/api/chat', async (c) => {
 
 app.post('/api/answer', async (c) => {
   const body = (await c.req.json()) as AnswerRequest;
+  const userId = await resolveUserId(c);
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
@@ -431,6 +516,16 @@ app.post('/api/answer', async (c) => {
       // 判分，并把结果回灌给模型
       const { result, toolContent } = gradeAnswer(target.name, target.args, body.answer);
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
+
+      // 更新知识画像（如果用户已认证）
+      if (userId && result.knowledgePoints?.length) {
+        for (const kpName of result.knowledgePoints) {
+          const node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND title=?`).get(kpName) as { id: number } | undefined;
+          if (node) {
+            updateProficiency(userId, node.id, result.score, result.maxScore);
+          }
+        }
+      }
 
       // 持久化判分结果（用于会话重载时恢复题目卡片的已答状态）
       if (body.conversationId) {

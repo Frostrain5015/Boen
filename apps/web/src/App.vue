@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings } from 'lucide-vue-next';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings, GraduationCap, BrainCircuit, BarChart3 } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade } from '@boen/shared';
 import { gradeToBand } from '@boen/shared';
 import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
+import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
@@ -65,6 +66,9 @@ const isOAuthCallback = ref(window.location.pathname === '/auth/callback');
 const conversations = ref<Conversation[]>([]);
 const currentConversationId = ref<string | null>(null);
 const sidebarOpen = ref(true);
+
+// ── 视图切换 ──────────────────────────────
+const currentView = ref<'chat' | 'profile' | 'exam'>('chat');
 
 // ── 聊天状态 ──────────────────────────────
 const items = ref<ChatItem[]>([]);
@@ -544,6 +548,8 @@ onMounted(() => {
 
       <!-- 主内容区 -->
       <div class="flex flex-1 flex-col" :data-subject="subject">
+        <!-- 对话视图 -->
+        <template v-if="currentView === 'chat'">
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
@@ -676,10 +682,13 @@ onMounted(() => {
                     <Mascot :size="24" :float="false" :animated="false" />
                     <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
                   </div>
-                  <!-- 内容 -->
+                  <!-- 内容（严格 timeline：文本在上→出题指示/打字态在下） -->
                   <div class="pl-8">
-                    <!-- 正在出题提示 -->
-                    <div v-if="i === items.length - 1 && isGeneratingQuiz" class="quiz-gen clay-sm">
+                    <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
+                      <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
+                    </div>
+                    <!-- 正在出题提示（文本之后） -->
+                    <div v-if="i === items.length - 1 && isGeneratingQuiz && m.done" class="quiz-gen clay-sm">
                       <div class="quiz-gen-inner">
                         <span class="quiz-gen-icon">
                           <PencilLine class="h-4 w-4" />
@@ -688,10 +697,7 @@ onMounted(() => {
                         <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                       </div>
                     </div>
-                    <TypingDots v-else-if="i === items.length - 1 && showTyping" />
-                    <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
-                      <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
-                    </div>
+                    <TypingDots v-else-if="i === items.length - 1 && showTyping && !m.text" />
                   </div>
                 </div>
               </template>
@@ -703,6 +709,31 @@ onMounted(() => {
         <!-- 输入区 -->
         <footer class="px-4 pb-4 pt-1">
           <div class="mx-auto w-full max-w-2xl">
+            <!-- 模式切换按钮（仿成熟智能体插件栏） -->
+            <div class="mb-2 flex items-center gap-1.5 px-1">
+              <button
+                @click="handleNewConversation; $nextTick(() => send('复习一元一次方程'))"
+                :disabled="busy"
+                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96] disabled:opacity-40"
+              >
+                <GraduationCap class="h-3.5 w-3.5" />
+                <span>学习模式</span>
+              </button>
+              <button
+                @click="currentView = 'exam'"
+                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[#6c5ce7] hover:bg-[#e8e4ff] hover:text-[#5848d6] active:scale-[0.96]"
+              >
+                <BarChart3 class="h-3.5 w-3.5" />
+                <span>考试模式</span>
+              </button>
+              <button
+                @click="currentView = 'profile'"
+                class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[#14b48a] hover:bg-[#d9f4ec] hover:text-[#0e9b76] active:scale-[0.96]"
+              >
+                <BrainCircuit class="h-3.5 w-3.5" />
+                <span>学习画像</span>
+              </button>
+            </div>
             <div class="clay flex items-end gap-2 p-2">
               <textarea
                 v-model="input"
@@ -723,6 +754,16 @@ onMounted(() => {
             </div>
           </div>
         </footer>
+        </template>
+
+        <!-- 学习画像视图 -->
+        <KnowledgeProfile v-else-if="currentView === 'profile'" class="flex-1" />
+
+        <!-- 考试视图 -->
+        <div v-else-if="currentView === 'exam'" class="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+          <Mascot :size="80" state="thinking" />
+          <p class="text-sm font-medium text-[var(--ink-soft)]">考试模式即将上线…</p>
+        </div>
       </div>
     </div>
 

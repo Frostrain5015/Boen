@@ -1,0 +1,411 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue';
+import Mascot from '@/components/Mascot.vue';
+import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, RotateCcw } from 'lucide-vue-next';
+
+interface KpNode {
+  title: string;
+  weightedScore: number;
+  level?: string;
+  correctCount: number;
+  totalCount: number;
+  literacies: string[];
+  prerequisites: string[];
+}
+
+interface SectionNode {
+  title: string;
+  weightedScore: number;
+  level?: string;
+  knowledgePoints: KpNode[];
+}
+
+interface ChapterNode {
+  title: string;
+  weightedScore: number;
+  level?: string;
+  children: SectionNode[];
+}
+
+interface TextbookNode {
+  volume: string;
+  chapters: ChapterNode[];
+}
+
+interface OutlineData {
+  subject: string;
+  grade: string;
+  overall: { weightedScore: number; weakCount: number; goodCount: number; masteredCount: number; totalKps: number };
+  textbooks: TextbookNode[];
+}
+
+const subject = ref<'chinese' | 'math' | 'english' | 'science'>('math');
+const grade = ref<string>('7');
+const outline = ref<OutlineData | null>(null);
+const loading = ref(true);
+const expandedSections = ref<Set<string>>(new Set());
+const selectedKp = ref<KpNode & { sectionTitle: string } | null>(null);
+const animatingNumbers = ref(false);
+
+const SUBJECTS = [
+  { value: 'chinese' as const, label: '语文', emoji: '📖' },
+  { value: 'math' as const, label: '数学', emoji: '🔢' },
+  { value: 'english' as const, label: '英语', emoji: '🔤' },
+  { value: 'science' as const, label: '科学', emoji: '🔬' },
+];
+
+const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === subject.value));
+
+function gradeLabel(g: string): string {
+  const n = Number(g);
+  return n <= 6 ? `小${'一二三四五六'[n - 1]}` : `初${['七', '八', '九'][n - 7]}`;
+}
+
+function toggleSection(key: string) {
+  const s = new Set(expandedSections.value);
+  if (s.has(key)) s.delete(key); else s.add(key);
+  expandedSections.value = s;
+}
+
+function masteryColor(ws: number): string {
+  if (ws < 0) return 'var(--line)';
+  if (ws < 40) return '#f2557a';
+  if (ws < 60) return '#f59e42';
+  if (ws < 80) return '#e0a92e';
+  return '#18a558';
+}
+
+function masteryBg(ws: number): string {
+  if (ws < 0) return '#f0ebe3';
+  if (ws < 40) return '#fdeaef';
+  if (ws < 60) return '#fef3e2';
+  if (ws < 80) return '#fef7e6';
+  return '#e7f7ee';
+}
+
+const ringPercent = computed(() => {
+  if (!outline.value?.overall) return 0;
+  return Math.max(0, Math.min(100, outline.value.overall.weightedScore));
+});
+
+const ringDash = computed(() => {
+  const r = 54;
+  const circ = 2 * Math.PI * r;
+  return { dash: (ringPercent.value / 100) * circ, circ };
+});
+
+async function fetchOutline() {
+  loading.value = true;
+  selectedKp.value = null;
+  try {
+    const res = await fetch(`/api/profile/outline?subject=${subject.value}&grade=${grade.value}`);
+    const data = await res.json();
+    outline.value = data;
+    setTimeout(() => { animatingNumbers.value = true; }, 100);
+  } catch { /* ignore */ }
+  loading.value = false;
+}
+
+function openKpDetail(kp: KpNode, sectionTitle: string) {
+  selectedKp.value = { ...kp, sectionTitle };
+}
+
+function closeKpDetail() {
+  selectedKp.value = null;
+}
+
+function startPractice(kpTitle?: string) {
+  // 跳转到对话模式，传入主题
+  window.dispatchEvent(new CustomEvent('boen-practice', { detail: { kp: kpTitle, subject: subject.value, grade: grade.value } }));
+}
+
+onMounted(fetchOutline);
+watch(subject, fetchOutline);
+watch(grade, fetchOutline);
+</script>
+
+<template>
+  <div class="profile-root" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 400 } }">
+    <!-- Loading -->
+    <div v-if="loading" class="flex h-full items-center justify-center">
+      <div class="flex flex-col items-center gap-3">
+        <Mascot :size="80" state="thinking" />
+        <p class="text-sm font-medium text-[var(--ink-soft)]">加载学习画像…</p>
+      </div>
+    </div>
+
+    <!-- Empty -->
+    <div v-else-if="!outline" class="flex h-full items-center justify-center">
+      <div class="flex flex-col items-center gap-3 text-center">
+        <Mascot :size="80" state="idle" />
+        <p class="text-sm text-[var(--ink-soft)]">暂无课程数据</p>
+      </div>
+    </div>
+
+    <!-- Main layout -->
+    <div v-else class="flex h-full gap-4 p-4">
+      <!-- ═══ Left panel: Stats + Recommendations ═══ -->
+      <div class="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
+        <!-- Subject & Grade selector -->
+        <div class="clay overflow-hidden">
+          <div class="flex items-center gap-2 p-3">
+            <div class="clay-sm relative flex bg-[var(--surface)] p-1">
+              <span
+                class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent"
+                :style="{
+                  transform: `translateX(calc(${subjectIndex} * 4rem))`,
+                  transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }"
+              ></span>
+              <button
+                v-for="s in SUBJECTS" :key="s.value"
+                @click="subject = s.value"
+                class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors"
+                :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"
+              ><span>{{ s.emoji }}</span>{{ s.label }}</button>
+            </div>
+            <select v-model="grade" class="ml-auto rounded-xl border border-[var(--line)] bg-white px-2.5 py-1.5 text-xs font-semibold text-[var(--ink)] outline-none">
+              <option v-for="g in GRADES" :key="g" :value="g">{{ gradeLabel(g) }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Overall ring -->
+        <div class="clay p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+          <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合掌握度</p>
+          <div class="relative mx-auto h-[120px] w-[120px]">
+            <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="8" />
+              <circle
+                cx="60" cy="60" r="54" fill="none"
+                :stroke="masteryColor(ringPercent)"
+                stroke-width="8" stroke-linecap="round"
+                :stroke-dasharray="ringDash.circ"
+                :stroke-dashoffset="ringDash.circ"
+                class="transition-all duration-1000 ease-out"
+                :class="{ '!stroke-dashoffset-0': animatingNumbers }"
+              />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="font-display text-2xl font-bold" :style="{ color: masteryColor(ringPercent) }">{{ ringPercent }}</span>
+              <span class="text-[10px] font-medium text-[var(--ink-soft)]">分</span>
+            </div>
+          </div>
+          <div class="mt-3 grid grid-cols-3 gap-2">
+            <div class="rounded-xl bg-[#fdeaef] p-2">
+              <p class="text-lg font-bold text-[#f2557a]">{{ outline.overall.weakCount }}</p>
+              <p class="text-[10px] font-medium text-[var(--ink-soft)]">薄弱</p>
+            </div>
+            <div class="rounded-xl bg-[#fef7e6] p-2">
+              <p class="text-lg font-bold text-[#e0a92e]">{{ outline.overall.goodCount }}</p>
+              <p class="text-[10px] font-medium text-[var(--ink-soft)]">良好</p>
+            </div>
+            <div class="rounded-xl bg-[#e7f7ee] p-2">
+              <p class="text-lg font-bold text-[#18a558]">{{ outline.overall.masteredCount }}</p>
+              <p class="text-[10px] font-medium text-[var(--ink-soft)]">掌握</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
+          <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
+            <Target class="h-4 w-4 text-[var(--accent)]" />
+            <span class="font-display text-xs font-bold text-[var(--ink)]">推荐练习</span>
+          </div>
+          <div class="flex gap-3 overflow-x-auto px-4 py-3" style="scroll-snap-type: x mandatory;">
+            <div v-if="outline.textbooks.every(t=>t.chapters.every(c=>c.children.every(s=>s.knowledgePoints.every(k=>k.weightedScore>=0)))) && outline.overall.totalKps > 0 && outline.overall.weakCount === 0" class="flex w-full flex-col items-center gap-2 py-4 text-center">
+              <Sparkles class="h-8 w-8 text-[var(--accent)] opacity-50" />
+              <p class="text-xs text-[var(--ink-soft)]">暂无推荐，继续加油！✨</p>
+            </div>
+            <div
+              v-for="kp in outline.textbooks.flatMap(t => t.chapters).flatMap(c => c.children).flatMap(s => s.knowledgePoints).filter(k => k.weightedScore < 0 || k.weightedScore < 60).sort((a, b) => (a.weightedScore < 0 ? 0 : a.weightedScore) - (b.weightedScore < 0 ? 0 : b.weightedScore)).slice(0, 5)"
+              :key="kp.title"
+              class="flex w-48 shrink-0 flex-col gap-2 rounded-2xl border border-[var(--line)] bg-white p-3.5"
+              style="scroll-snap-align: start;"
+              v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { duration: 300 } }"
+            >
+              <div class="flex items-center gap-1.5">
+                <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
+                <span class="truncate text-xs font-bold text-[var(--ink)]">{{ kp.title }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="h-1.5 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
+                  <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
+                </div>
+                <span class="text-[10px] font-bold" :style="{ color: masteryColor(kp.weightedScore) }">{{ kp.weightedScore >= 0 ? kp.weightedScore : '--' }}</span>
+              </div>
+              <button @click="startPractice(kp.title)" class="mt-1 flex items-center justify-center gap-1 rounded-xl bg-[var(--accent)] py-1.5 text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95">
+                <BookOpen class="h-3 w-3" /> 开始练习
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Right panel: Outline Tree ═══ -->
+      <div class="clay flex-1 overflow-y-auto" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
+        <div class="border-b border-[var(--line)] px-5 py-3">
+          <h2 class="font-display text-sm font-bold text-[var(--ink)]">课程大纲 · {{ SUBJECTS.find(s => s.value === subject)?.label }} {{ gradeLabel(grade) }}</h2>
+        </div>
+        <div class="p-3">
+          <template v-for="tb in outline.textbooks" :key="tb.volume">
+            <div class="mb-2 flex items-center gap-2 px-2 py-1.5">
+              <BookOpen class="h-4 w-4 text-[var(--accent)]" />
+              <span class="font-display text-xs font-bold text-[var(--ink-soft)]">{{ tb.volume }}</span>
+            </div>
+            <div v-for="ch in tb.chapters" :key="ch.title" class="mb-1 overflow-hidden rounded-2xl border border-[var(--line)]">
+              <!-- Chapter header -->
+              <button @click="toggleSection('ch-' + ch.title)" class="flex w-full items-center gap-2 bg-white px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-soft)]/30">
+                <component :is="expandedSections.has('ch-' + ch.title) ? ChevronDown : ChevronRight" class="h-4 w-4 shrink-0 text-[var(--ink-soft)]" />
+                <span class="flex-1 font-display text-sm font-bold text-[var(--ink)]">{{ ch.title }}</span>
+                <div class="flex items-center gap-2">
+                  <div class="h-2 w-16 overflow-hidden rounded-full" :style="{ background: masteryBg(ch.weightedScore) }">
+                    <div class="h-full rounded-full transition-all duration-700" :style="{ width: (ch.weightedScore >= 0 ? ch.weightedScore : 0) + '%', background: masteryColor(ch.weightedScore) }"></div>
+                  </div>
+                  <span class="text-[10px] font-bold" :style="{ color: masteryColor(ch.weightedScore) }">{{ ch.weightedScore >= 0 ? ch.weightedScore : '--' }}</span>
+                </div>
+              </button>
+
+              <!-- Sections -->
+              <Transition name="tree-collapse">
+                <div v-if="expandedSections.has('ch-' + ch.title)" class="border-t border-[var(--line)] bg-[var(--surface)]">
+                  <div v-for="sec in ch.children" :key="sec.title" class="border-b border-[var(--line)] last:border-b-0">
+                    <button @click="toggleSection('sec-' + sec.title)" class="flex w-full items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-white/50">
+                      <component :is="expandedSections.has('sec-' + sec.title) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-[var(--ink-soft)]" />
+                      <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
+                      <div v-if="sec.weightedScore < 60 && sec.weightedScore >= 0" class="flex h-5 w-5 items-center justify-center rounded-full bg-[#fdeaef]">
+                        <AlertTriangle class="h-3 w-3 text-[#f2557a]" />
+                      </div>
+                      <div class="h-1.5 w-12 overflow-hidden rounded-full" :style="{ background: masteryBg(sec.weightedScore) }">
+                        <div class="h-full rounded-full transition-all duration-700" :style="{ width: (sec.weightedScore >= 0 ? sec.weightedScore : 0) + '%', background: masteryColor(sec.weightedScore) }"></div>
+                      </div>
+                    </button>
+
+                    <!-- Knowledge points -->
+                    <Transition name="tree-collapse">
+                      <div v-if="expandedSections.has('sec-' + sec.title)" class="space-y-0.5 px-8 pb-2">
+                        <div v-for="kp in sec.knowledgePoints" :key="kp.title"
+                          @click="openKpDetail(kp, sec.title)"
+                          class="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 transition-all hover:bg-[var(--accent-soft)] active:scale-[0.98]"
+                        >
+                          <GraduationCap class="h-3 w-3 shrink-0 text-[var(--accent)]" />
+                          <span class="flex-1 text-[11px] font-medium text-[var(--ink)]">{{ kp.title }}</span>
+                          <div v-if="kp.weightedScore < 60 && kp.weightedScore >= 0" class="flex h-4 w-4 items-center justify-center rounded-full bg-[#fdeaef]">
+                            <AlertTriangle class="h-2.5 w-2.5 text-[#f2557a]" />
+                          </div>
+                          <div class="flex gap-1">
+                            <span v-for="lit in kp.literacies.slice(0, 2)" :key="lit"
+                              class="inline-flex items-center gap-0.5 rounded-full bg-[#f0e7fa] px-1.5 py-0.5 text-[9px] font-semibold text-[#7c3aae]"
+                            ><BrainCircuit class="h-2 w-2" />{{ lit }}</span>
+                          </div>
+                          <div class="h-1.5 w-10 overflow-hidden rounded-full" :style="{ background: masteryBg(kp.weightedScore) }">
+                            <div class="h-full rounded-full transition-all duration-700" :style="{ width: (kp.weightedScore >= 0 ? kp.weightedScore : 0) + '%', background: masteryColor(kp.weightedScore) }"></div>
+                          </div>
+                        </div>
+                      </div>
+                    </Transition>
+                  </div>
+                </div>
+              </Transition>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ KP Detail Floating Panel ═══ -->
+    <Transition name="panel-scale">
+      <div v-if="selectedKp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="closeKpDetail">
+        <div class="clay mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
+          <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+            <div class="flex items-center gap-2">
+              <GraduationCap class="h-4 w-4 text-[var(--accent)]" />
+              <span class="font-display text-sm font-bold text-[var(--ink)]">{{ selectedKp.title }}</span>
+            </div>
+            <button @click="closeKpDetail" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50">&times;</button>
+          </div>
+          <div class="space-y-3 px-5 py-4">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-medium text-[var(--ink-soft)]">掌握度</span>
+              <div class="h-2 flex-1 overflow-hidden rounded-full" :style="{ background: masteryBg(selectedKp.weightedScore) }">
+                <div class="h-full rounded-full" :style="{ width: (selectedKp.weightedScore >= 0 ? selectedKp.weightedScore : 0) + '%', background: masteryColor(selectedKp.weightedScore) }"></div>
+              </div>
+              <span class="text-xs font-bold" :style="{ color: masteryColor(selectedKp.weightedScore) }">{{ selectedKp.weightedScore >= 0 ? selectedKp.weightedScore + '%' : '未练习' }}</span>
+            </div>
+
+            <div v-if="selectedKp.literacies.length" class="space-y-1">
+              <p class="text-xs font-semibold text-[var(--ink-soft)]">关联的核心素养</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span v-for="lit in selectedKp.literacies" :key="lit"
+                  class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2.5 py-1 text-[11px] font-semibold text-[#7c3aae]"
+                ><BrainCircuit class="h-3 w-3" />{{ lit }}</span>
+              </div>
+            </div>
+
+            <div v-if="selectedKp.prerequisites.length" class="space-y-1">
+              <p class="text-xs font-semibold text-[var(--ink-soft)]">前置知识</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span v-for="pre in selectedKp.prerequisites" :key="pre"
+                  class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-strong)]"
+                >{{ pre }}</span>
+              </div>
+            </div>
+
+            <div class="rounded-xl bg-[var(--accent-soft)] p-3">
+              <p class="text-[11px] font-medium text-[var(--ink-soft)]">所属章节</p>
+              <p class="text-xs font-semibold text-[var(--ink)]">{{ selectedKp.sectionTitle }}</p>
+            </div>
+
+            <button @click="startPractice(selectedKp.title); closeKpDetail()"
+              class="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]"
+            >
+              <Target class="h-4 w-4" /> 针对性练习
+              <ArrowRight class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<style scoped>
+.profile-root {
+  height: 100%;
+  background: transparent;
+}
+
+/* Tree collapse transition */
+.tree-collapse-enter-active {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+.tree-collapse-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+.tree-collapse-enter-from { opacity: 0; max-height: 0; }
+.tree-collapse-leave-to { opacity: 0; max-height: 0; }
+
+/* Panel scale transition */
+.panel-scale-enter-active { transition: opacity 0.25s ease; }
+.panel-scale-leave-active { transition: opacity 0.2s ease; }
+.panel-scale-enter-from, .panel-scale-leave-to { opacity: 0; }
+
+/* Pulse animation for weak nodes */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(242, 85, 122, 0.3); }
+  50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Scrollbar styling for tree */
+.clay.flex-1::-webkit-scrollbar { width: 6px; }
+.clay.flex-1::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+
+/* Scrollbar for recommendations */
+.flex.gap-3.overflow-x-auto::-webkit-scrollbar { height: 3px; }
+.flex.gap-3.overflow-x-auto::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+</style>
