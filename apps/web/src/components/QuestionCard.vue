@@ -304,13 +304,13 @@ watch(
             </span>
           </div>
 
-          <!-- 熟练度变化提示 -->
+                    <!-- 熟练度变化提示 -->
           <div v-if="(grading as any).proficiencyChanges?.length" class="mt-2 space-y-0.5">
-            <p class="text-[11px] font-medium text-[var(--ink-soft)]">知识图谱更新</p>
+            <p class="text-[11px] font-medium text-[var(--ink-soft)]">熟练度变化</p>
             <div v-for="pc in (grading as any).proficiencyChanges" :key="pc.kp" class="flex items-center gap-1.5 text-[11px]">
               <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
               <span v-if="pc.before >= 0 && pc.after >= 0" class="font-semibold" :class="pc.after >= pc.before ? 'text-[#18a558]' : 'text-[#f2557a]'">
-                {{ pc.before }}% <span v-if="pc.after !== pc.before">→ {{ pc.after }}%</span>
+                {{ pc.before }} <span v-if="pc.after !== pc.before">→ {{ pc.after }}</span>
               </span>
               <span v-else class="font-semibold text-[var(--accent-strong)]">已记录</span>
               <span v-if="pc.after > pc.before" class="text-[#18a558]">↑</span>

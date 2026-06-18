@@ -211,7 +211,7 @@ watch(grade, fetchOutline);
 
         <!-- Overall ring -->
         <div class="clay p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
-          <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合掌握度</p>
+          <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合熟练度</p>
           <div class="relative mx-auto h-[120px] w-[120px]">
             <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="8" />
@@ -233,7 +233,7 @@ watch(grade, fetchOutline);
           <div class="mt-3 grid grid-cols-3 gap-2">
             <div class="rounded-xl bg-[#fdeaef] p-2">
               <p class="text-lg font-bold text-[#f2557a]">{{ outline.overall.weakCount }}</p>
-              <p class="text-[10px] font-medium text-[var(--ink-soft)]">薄弱</p>
+              <p class="text-[10px] font-medium text-[var(--ink-soft)]">待加强</p>
             </div>
             <div class="rounded-xl bg-[#fef7e6] p-2">
               <p class="text-lg font-bold text-[#e0a92e]">{{ outline.overall.goodCount }}</p>
@@ -241,7 +241,7 @@ watch(grade, fetchOutline);
             </div>
             <div class="rounded-xl bg-[#e7f7ee] p-2">
               <p class="text-lg font-bold text-[#18a558]">{{ outline.overall.masteredCount }}</p>
-              <p class="text-[10px] font-medium text-[var(--ink-soft)]">掌握</p>
+              <p class="text-[10px] font-medium text-[var(--ink-soft)]">优秀</p>
             </div>
           </div>
         </div>
@@ -313,7 +313,7 @@ watch(grade, fetchOutline);
               <div class="flex-1">
                 <div class="flex items-center justify-between">
                   <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
-                  <span class="text-xs font-bold" :style="{ color: masteryColor(tb.weightedScore) }">{{ tb.weightedScore >= 0 ? tb.weightedScore + '%' : '--' }}</span>
+                  <span class="text-xs font-bold" :style="{ color: masteryColor(tb.weightedScore) }">{{ tb.weightedScore >= 0 ? tb.weightedScore : '--' }}</span>
                 </div>
               </div>
             </div>
