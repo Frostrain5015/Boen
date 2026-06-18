@@ -1,0 +1,85 @@
+{
+  "subject": "chinese",
+  "grade": "9",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3249.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：1 祖国啊，我亲爱的祖国 / 舒婷", "kind": "lesson" },
+        { "title": "阅读：2* 梅岭三章 / 陈毅", "kind": "lesson" },
+        { "title": "阅读：3* 短诗五首", "kind": "lesson" },
+        { "title": "阅读：4 海燕 / 高尔基", "kind": "lesson" },
+        { "title": "写作：学习扩写", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：5 孔乙己 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：6 变色龙 / 契诃夫", "kind": "lesson" },
+        { "title": "阅读：7* 溜索 / 阿城", "kind": "lesson" },
+        { "title": "阅读：8* 蒲柳人家（节选）/ 刘绍棠", "kind": "lesson" },
+        { "title": "写作：审题立意", "kind": "lesson" },
+        { "title": "综合性学习：岁月如歌——我们的初中生活", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：9 鱼我所欲也 /《孟子》", "kind": "lesson" },
+        { "title": "阅读：10* 唐雎不辱使命 /《战国策》", "kind": "lesson" },
+        { "title": "阅读：11 送东阳马生序 / 宋濂", "kind": "lesson" },
+        { "title": "阅读：12 词四首（渔家傲秋思/江城子密州出猎/破阵子/满江红）", "kind": "lesson" },
+        { "title": "写作：布局谋篇", "kind": "lesson" },
+        { "title": "名著导读：《儒林外史》——讽刺作品的阅读", "kind": "lesson" },
+        { "title": "课外古诗词诵读（定风波/临江仙/太常引/浣溪沙）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：13 短文两篇（谈读书/不求甚解）", "kind": "lesson" },
+        { "title": "阅读：14 山水画的意境 / 李可染", "kind": "lesson" },
+        { "title": "阅读：15* 无言之美 / 朱光潜", "kind": "lesson" },
+        { "title": "阅读：16* 驱遣我们的想象 / 叶圣陶", "kind": "lesson" },
+        { "title": "写作：修改润色", "kind": "lesson" },
+        { "title": "口语交际：辩论", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 活动·探究",
+      "kind": "unit",
+      "children": [
+        { "title": "任务一 阅读与思考", "kind": "section" },
+        { "title": "阅读：17 屈原（节选）/ 郭沫若", "kind": "lesson" },
+        { "title": "阅读：18 天下第一楼（节选）/ 何冀平", "kind": "lesson" },
+        { "title": "阅读：19 枣儿 / 孙鸿", "kind": "lesson" },
+        { "title": "任务二 准备与排练", "kind": "lesson" },
+        { "title": "任务三 演出与评议", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：20 曹刿论战 /《左传》", "kind": "lesson" },
+        { "title": "阅读：21* 邹忌讽齐王纳谏 /《战国策》", "kind": "lesson" },
+        { "title": "阅读：22* 陈涉世家 / 司马迁", "kind": "lesson" },
+        { "title": "阅读：23 出师表 / 诸葛亮", "kind": "lesson" },
+        { "title": "阅读：24 诗词曲五首", "kind": "lesson" },
+        { "title": "写作：有创意地表达", "kind": "lesson" },
+        { "title": "整本书阅读：《简·爱》——外国小说的阅读", "kind": "lesson" },
+        { "title": "课外古诗词诵读（南安军/别云间/山坡羊骊山怀古/朝天子咏喇叭）", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

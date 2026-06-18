@@ -1,0 +1,106 @@
+{
+  "subject": "chinese",
+  "grade": "3",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3202.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 大青树下的小学", "kind": "lesson" },
+        { "title": "2 花的学校", "kind": "lesson" },
+        { "title": "3* 不懂就要问", "kind": "lesson" },
+        { "title": "口语交际：我的暑假生活", "kind": "lesson" },
+        { "title": "习作：猜猜他是谁", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "4 古诗三首（山行/赠刘景文/夜书所见）", "kind": "lesson" },
+        { "title": "5 铺满金色巴掌的水泥道", "kind": "lesson" },
+        { "title": "6 秋天的雨", "kind": "lesson" },
+        { "title": "7* 听听，秋的声音", "kind": "lesson" },
+        { "title": "习作：写日记", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "8 总也倒不了的老屋", "kind": "lesson" },
+        { "title": "9* 犟龟", "kind": "lesson" },
+        { "title": "10* 小狗学叫", "kind": "lesson" },
+        { "title": "口语交际：名字里的故事", "kind": "lesson" },
+        { "title": "习作：续写故事", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "11 宝葫芦的秘密（节选）", "kind": "lesson" },
+        { "title": "12 在牛肚子里旅行", "kind": "lesson" },
+        { "title": "13* 一块奶酪", "kind": "lesson" },
+        { "title": "习作：我来编童话", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：在那奇妙的王国里", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "14 搭船的鸟", "kind": "lesson" },
+        { "title": "15 金色的草地", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：我们眼中的缤纷世界", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 富饶的西沙群岛", "kind": "lesson" },
+        { "title": "17 海滨小城", "kind": "lesson" },
+        { "title": "18 美丽的小兴安岭", "kind": "lesson" },
+        { "title": "19* 香港，璀璨的明珠", "kind": "lesson" },
+        { "title": "习作：这儿真美", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "20 古诗三首（望天门山/饮湖上初晴后雨/望洞庭）", "kind": "lesson" },
+        { "title": "21 大自然的声音", "kind": "lesson" },
+        { "title": "22 读不完的大书", "kind": "lesson" },
+        { "title": "口语交际：身边的小事", "kind": "lesson" },
+        { "title": "习作：我有一个想法", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "23 司马光", "kind": "lesson" },
+        { "title": "24 一定要争气", "kind": "lesson" },
+        { "title": "25 手术台就是阵地", "kind": "lesson" },
+        { "title": "26* 一个粗瓷大碗", "kind": "lesson" },
+        { "title": "口语交际：请教", "kind": "lesson" },
+        { "title": "习作：那次经历真难忘", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

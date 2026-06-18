@@ -1,0 +1,108 @@
+{
+  "subject": "chinese",
+  "grade": "6",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3205.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 草原 / 老舍", "kind": "lesson" },
+        { "title": "2 丁香结 / 宗璞", "kind": "lesson" },
+        { "title": "3 古诗词三首（宿建德江/六月二十七日望湖楼醉书/西江月夜行黄沙道中）", "kind": "lesson" },
+        { "title": "4* 花之歌 / 纪伯伦", "kind": "lesson" },
+        { "title": "习作：变形记", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 七律·长征 / 毛泽东", "kind": "lesson" },
+        { "title": "6 狼牙山五壮士", "kind": "lesson" },
+        { "title": "7 开国大典", "kind": "lesson" },
+        { "title": "8* 灯光 / 王愿坚", "kind": "lesson" },
+        { "title": "9* 我的战友邱少云", "kind": "lesson" },
+        { "title": "口语交际：演讲", "kind": "lesson" },
+        { "title": "习作：多彩的活动", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "10 竹节人", "kind": "lesson" },
+        { "title": "11 宇宙生命之谜", "kind": "lesson" },
+        { "title": "12* 故宫博物院", "kind": "lesson" },
+        { "title": "习作：____让生活更美好", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "13 桥 / 谈歌", "kind": "lesson" },
+        { "title": "14 穷人 / 列夫·托尔斯泰", "kind": "lesson" },
+        { "title": "15* 金色的鱼钩", "kind": "lesson" },
+        { "title": "口语交际：请你支持我", "kind": "lesson" },
+        { "title": "习作：笔尖流出的故事", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：《童年》", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 夏天里的成长", "kind": "lesson" },
+        { "title": "17 盼 / 铁凝", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：围绕中心意思写", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 古诗三首（浪淘沙/江南春/书湖阴先生壁）", "kind": "lesson" },
+        { "title": "19 只有一个地球", "kind": "lesson" },
+        { "title": "20* 青山不老 / 梁衡", "kind": "lesson" },
+        { "title": "21* 三黑和土地", "kind": "lesson" },
+        { "title": "口语交际：意见不同怎么办", "kind": "lesson" },
+        { "title": "习作：学写倡议书", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "22 文言文二则（伯牙鼓琴/书戴嵩画牛）", "kind": "lesson" },
+        { "title": "23 月光曲", "kind": "lesson" },
+        { "title": "24* 京剧趣谈", "kind": "lesson" },
+        { "title": "口语交际：聊聊书法", "kind": "lesson" },
+        { "title": "习作：我的拿手好戏", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "25 少年闰土 / 鲁迅", "kind": "lesson" },
+        { "title": "26 好的故事 / 鲁迅", "kind": "lesson" },
+        { "title": "27* 我的伯父鲁迅先生 / 周晔", "kind": "lesson" },
+        { "title": "28* 有的人——纪念鲁迅有感 / 臧克家", "kind": "lesson" },
+        { "title": "习作：有你，真好", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

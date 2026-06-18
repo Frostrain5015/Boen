@@ -1,0 +1,88 @@
+{
+  "subject": "chinese",
+  "grade": "9",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3248.html",
+  "units": [
+    {
+      "title": "第一单元 活动·探究",
+      "kind": "unit",
+      "children": [
+        { "title": "任务一 学习鉴赏", "kind": "section" },
+        { "title": "阅读：1 沁园春·雪 / 毛泽东", "kind": "lesson" },
+        { "title": "阅读：2 周总理，你在哪里 / 柯岩", "kind": "lesson" },
+        { "title": "阅读：3 我爱这土地 / 艾青", "kind": "lesson" },
+        { "title": "阅读：4 乡愁 / 余光中", "kind": "lesson" },
+        { "title": "阅读：5 你是人间的四月天 / 林徽因", "kind": "lesson" },
+        { "title": "阅读：6 我看 / 穆旦", "kind": "lesson" },
+        { "title": "任务二 诗歌朗诵", "kind": "lesson" },
+        { "title": "任务三 尝试创作", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：7 想和做 / 胡绳", "kind": "lesson" },
+        { "title": "阅读：8 怀疑与学问 / 顾颉刚", "kind": "lesson" },
+        { "title": "阅读：9* 就英法联军远征中国致巴特勒上尉的信 / 雨果", "kind": "lesson" },
+        { "title": "阅读：10* 精神的三间小屋 / 毕淑敏", "kind": "lesson" },
+        { "title": "写作：观点要明确", "kind": "lesson" },
+        { "title": "综合性学习：我们的数字时代", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：11 岳阳楼记 / 范仲淹", "kind": "lesson" },
+        { "title": "阅读：12 醉翁亭记 / 欧阳修", "kind": "lesson" },
+        { "title": "阅读：13* 湖心亭看雪 / 张岱", "kind": "lesson" },
+        { "title": "阅读：14 诗词三首（行路难/酬乐天扬州初逢席上见赠/水调歌头）", "kind": "lesson" },
+        { "title": "写作：议论要言之有据", "kind": "lesson" },
+        { "title": "课外古诗词诵读（月夜忆舍弟/长沙过贾谊宅/左迁至蓝关示侄孙湘/商山早行）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：15 故乡 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：16 我的叔叔于勒 / 莫泊桑", "kind": "lesson" },
+        { "title": "阅读：17* 孤独之旅 / 曹文轩", "kind": "lesson" },
+        { "title": "阅读：18* 蒲柳人家（节选）/ 刘绍棠", "kind": "lesson" },
+        { "title": "写作：学写小小说", "kind": "lesson" },
+        { "title": "整本书阅读：《简·爱》——怎样读外国小说", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：19 培养德智体美劳全面发展的社会主义建设者和接班人", "kind": "lesson" },
+        { "title": "阅读：20 中国人失掉自信力了吗 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：21* 谈骨气 / 吴晗", "kind": "lesson" },
+        { "title": "阅读：22* 创造宣言 / 陶行知", "kind": "lesson" },
+        { "title": "写作：论证要合理", "kind": "lesson" },
+        { "title": "综合性学习：君子自强不息", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：23 曹刿论战 /《左传》", "kind": "lesson" },
+        { "title": "阅读：24* 邹忌讽齐王纳谏 /《战国策》", "kind": "lesson" },
+        { "title": "阅读：25* 陈涉世家 / 司马迁", "kind": "lesson" },
+        { "title": "阅读：26 出师表 / 诸葛亮", "kind": "lesson" },
+        { "title": "阅读：27 诗词曲五首（十五从军征/白雪歌送武判官归京/南乡子/过零丁洋/山坡羊潼关怀古）", "kind": "lesson" },
+        { "title": "写作：学会深入思考", "kind": "lesson" },
+        { "title": "整本书阅读：《唐诗三百首》", "kind": "lesson" },
+        { "title": "课外古诗词诵读（咸阳城东楼/无题/浣溪沙/丑奴儿书博山道中壁）", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

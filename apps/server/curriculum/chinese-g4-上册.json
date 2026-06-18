@@ -1,0 +1,107 @@
+{
+  "subject": "chinese",
+  "grade": "4",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3203.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 观潮", "kind": "lesson" },
+        { "title": "2 走月亮", "kind": "lesson" },
+        { "title": "3* 现代诗二首", "kind": "lesson" },
+        { "title": "4* 繁星", "kind": "lesson" },
+        { "title": "口语交际：我们与环境", "kind": "lesson" },
+        { "title": "习作：推荐一个好地方", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 一个豆荚里的五粒豆", "kind": "lesson" },
+        { "title": "6 夜间飞行的秘密", "kind": "lesson" },
+        { "title": "7 呼风唤雨的世纪", "kind": "lesson" },
+        { "title": "8* 蝴蝶的家", "kind": "lesson" },
+        { "title": "习作：小小动物园", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "9 古诗三首（暮江吟/题西林壁/雪梅）", "kind": "lesson" },
+        { "title": "10 爬山虎的脚", "kind": "lesson" },
+        { "title": "11 蟋蟀的住宅", "kind": "lesson" },
+        { "title": "口语交际：爱护眼睛保护视力", "kind": "lesson" },
+        { "title": "习作：写观察日记", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "12 盘古开天地", "kind": "lesson" },
+        { "title": "13 精卫填海", "kind": "lesson" },
+        { "title": "14 普罗米修斯", "kind": "lesson" },
+        { "title": "15* 女娲补天", "kind": "lesson" },
+        { "title": "习作：我和____过一天", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 麻雀", "kind": "lesson" },
+        { "title": "17 爬天都峰", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：生活万花筒", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 牛和鹅", "kind": "lesson" },
+        { "title": "19 一只窝囊的大老虎", "kind": "lesson" },
+        { "title": "20 陀螺", "kind": "lesson" },
+        { "title": "口语交际：安慰", "kind": "lesson" },
+        { "title": "习作：记一次游戏", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "21 古诗三首（出塞/凉州词/夏日绝句）", "kind": "lesson" },
+        { "title": "22 为中华之崛起而读书", "kind": "lesson" },
+        { "title": "23* 梅兰芳蓄须", "kind": "lesson" },
+        { "title": "24* 延安，我把你追寻", "kind": "lesson" },
+        { "title": "习作：写信", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "25 王戎不取道旁李", "kind": "lesson" },
+        { "title": "26 西门豹治邺", "kind": "lesson" },
+        { "title": "27* 故事二则", "kind": "lesson" },
+        { "title": "口语交际：讲历史人物故事", "kind": "lesson" },
+        { "title": "习作：我的心儿怦怦跳", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

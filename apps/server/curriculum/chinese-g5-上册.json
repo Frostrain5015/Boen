@@ -1,0 +1,107 @@
+{
+  "subject": "chinese",
+  "grade": "5",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3204.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "1 白鹭", "kind": "lesson" },
+        { "title": "2 落花生", "kind": "lesson" },
+        { "title": "3 桂花雨", "kind": "lesson" },
+        { "title": "4* 珍珠鸟", "kind": "lesson" },
+        { "title": "口语交际：制定班级公约", "kind": "lesson" },
+        { "title": "习作：我的心爱之物", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "5 搭石", "kind": "lesson" },
+        { "title": "6 将相和", "kind": "lesson" },
+        { "title": "7 什么比猎豹的速度更快", "kind": "lesson" },
+        { "title": "8 冀中的地道战", "kind": "lesson" },
+        { "title": "习作：漫画老师", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "9 猎人海力布", "kind": "lesson" },
+        { "title": "10 牛郎织女（一）", "kind": "lesson" },
+        { "title": "11* 牛郎织女（二）", "kind": "lesson" },
+        { "title": "口语交际：讲民间故事", "kind": "lesson" },
+        { "title": "习作：缩写故事", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" },
+        { "title": "快乐读书吧：从前有座山", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元",
+      "kind": "unit",
+      "children": [
+        { "title": "12 古诗三首（示儿/题临安邸/己亥杂诗）", "kind": "lesson" },
+        { "title": "13 少年中国说（节选）", "kind": "lesson" },
+        { "title": "14 圆明园的毁灭", "kind": "lesson" },
+        { "title": "15* 小岛", "kind": "lesson" },
+        { "title": "习作：二十年后的家乡", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 习作单元",
+      "kind": "unit",
+      "children": [
+        { "title": "16 太阳", "kind": "lesson" },
+        { "title": "17 松鼠", "kind": "lesson" },
+        { "title": "习作例文", "kind": "lesson" },
+        { "title": "习作：介绍一种事物", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "18 慈母情深", "kind": "lesson" },
+        { "title": "19 父爱之舟", "kind": "lesson" },
+        { "title": "20* 精彩极了和糟糕透了", "kind": "lesson" },
+        { "title": "口语交际：父母之爱", "kind": "lesson" },
+        { "title": "习作：我想对您说", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元",
+      "kind": "unit",
+      "children": [
+        { "title": "21 古诗词三首（山居秋暝/枫桥夜泊/长相思）", "kind": "lesson" },
+        { "title": "22 四季之美", "kind": "lesson" },
+        { "title": "23 鸟的天堂", "kind": "lesson" },
+        { "title": "24* 月迹", "kind": "lesson" },
+        { "title": "习作：____即景", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元",
+      "kind": "unit",
+      "children": [
+        { "title": "25 古人谈读书", "kind": "lesson" },
+        { "title": "26 忆读书", "kind": "lesson" },
+        { "title": "27* 我的长生果", "kind": "lesson" },
+        { "title": "口语交际：我最喜欢的人物形象", "kind": "lesson" },
+        { "title": "习作：推荐一本书", "kind": "lesson" },
+        { "title": "语文园地", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

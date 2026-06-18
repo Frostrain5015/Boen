@@ -1,0 +1,88 @@
+{
+  "subject": "chinese",
+  "grade": "8",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3247.html",
+  "units": [
+    {
+      "title": "第一单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：1 社戏 / 鲁迅", "kind": "lesson" },
+        { "title": "阅读：2 回延安 / 贺敬之", "kind": "lesson" },
+        { "title": "阅读：3* 安塞腰鼓 / 刘成章", "kind": "lesson" },
+        { "title": "阅读：4* 灯笼 / 吴伯箫", "kind": "lesson" },
+        { "title": "写作：学习仿写", "kind": "lesson" },
+        { "title": "口语交际：应对", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：5 大自然的语言 / 竺可桢", "kind": "lesson" },
+        { "title": "阅读：6 阿西莫夫短文两篇", "kind": "lesson" },
+        { "title": "阅读：7* 大雁归来 / 利奥波德", "kind": "lesson" },
+        { "title": "阅读：8* 时间的脚印 / 陶世龙", "kind": "lesson" },
+        { "title": "写作：说明的顺序", "kind": "lesson" },
+        { "title": "综合性学习：倡导低碳生活", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：9 桃花源记 / 陶渊明", "kind": "lesson" },
+        { "title": "阅读：10 小石潭记 / 柳宗元", "kind": "lesson" },
+        { "title": "阅读：11* 核舟记 / 魏学洢", "kind": "lesson" },
+        { "title": "阅读：12 《诗经》二首（关雎/蒹葭）", "kind": "lesson" },
+        { "title": "写作：学写读后感", "kind": "lesson" },
+        { "title": "综合性学习：古诗苑漫步", "kind": "lesson" },
+        { "title": "名著导读：《经典常谈》——选择性阅读", "kind": "lesson" },
+        { "title": "课外古诗词诵读（式微/子衿/送杜少府之任蜀州/望洞庭湖赠张丞相）", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 活动·探究",
+      "kind": "unit",
+      "children": [
+        { "title": "任务一 学习演讲词", "kind": "section" },
+        { "title": "阅读：13 最后一次讲演 / 闻一多", "kind": "lesson" },
+        { "title": "阅读：14 应有格物致知精神 / 丁肇中", "kind": "lesson" },
+        { "title": "阅读：15 我一生中的重要抉择 / 王选", "kind": "lesson" },
+        { "title": "阅读：16 庆祝奥林匹克运动复兴25周年 / 顾拜旦", "kind": "lesson" },
+        { "title": "任务二 撰写演讲稿", "kind": "lesson" },
+        { "title": "任务三 举办演讲比赛", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：17 壶口瀑布 / 梁衡", "kind": "lesson" },
+        { "title": "阅读：18 在长江源头各拉丹冬 / 马丽华", "kind": "lesson" },
+        { "title": "阅读：19* 登勃朗峰 / 马克·吐温", "kind": "lesson" },
+        { "title": "阅读：20* 一滴水经过丽江 / 阿来", "kind": "lesson" },
+        { "title": "写作：学写游记", "kind": "lesson" },
+        { "title": "口语交际：即席讲话", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元",
+      "kind": "unit",
+      "children": [
+        { "title": "阅读：21 《庄子》二则", "kind": "lesson" },
+        { "title": "阅读：22 《礼记》二则", "kind": "lesson" },
+        { "title": "阅读：23* 马说 / 韩愈", "kind": "lesson" },
+        { "title": "阅读：24 唐诗三首（石壕吏/茅屋为秋风所破歌/卖炭翁）", "kind": "lesson" },
+        { "title": "写作：学写故事", "kind": "lesson" },
+        { "title": "综合性学习：以和为贵", "kind": "lesson" },
+        { "title": "整本书阅读：《钢铁是怎样炼成的》", "kind": "lesson" },
+        { "title": "课外古诗词诵读（题破山寺后禅院/送友人/卜算子黄州定慧院/卜算子咏梅）", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}

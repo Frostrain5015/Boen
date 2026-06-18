@@ -1,0 +1,95 @@
+{
+  "subject": "chinese",
+  "grade": "2",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（统编版）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3201.html",
+  "units": [
+    {
+      "title": "第一单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "1 小蝌蚪找妈妈", "kind": "lesson" },
+        { "title": "2 我是什么", "kind": "lesson" },
+        { "title": "3 植物妈妈有办法", "kind": "lesson" },
+        { "title": "语文园地一", "kind": "lesson" },
+        { "title": "快乐读书吧：读读童话故事", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第二单元 识字",
+      "kind": "unit",
+      "children": [
+        { "title": "1 场景歌", "kind": "lesson" },
+        { "title": "2 树之歌", "kind": "lesson" },
+        { "title": "3 拍手歌", "kind": "lesson" },
+        { "title": "4 田家四季歌", "kind": "lesson" },
+        { "title": "语文园地二", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第三单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "4 彩虹", "kind": "lesson" },
+        { "title": "5 去外婆家", "kind": "lesson" },
+        { "title": "6 数星星的孩子", "kind": "lesson" },
+        { "title": "语文园地三", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第四单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "7 古诗二首（登鹳雀楼/望庐山瀑布）", "kind": "lesson" },
+        { "title": "8 黄山奇石", "kind": "lesson" },
+        { "title": "9 日月潭", "kind": "lesson" },
+        { "title": "10 葡萄沟", "kind": "lesson" },
+        { "title": "语文园地四", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第五单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "11 坐井观天", "kind": "lesson" },
+        { "title": "12 寒号鸟", "kind": "lesson" },
+        { "title": "13 我要的是葫芦", "kind": "lesson" },
+        { "title": "语文园地五", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第六单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "14 八角楼上", "kind": "lesson" },
+        { "title": "15 朱德的扁担", "kind": "lesson" },
+        { "title": "16 难忘的泼水节", "kind": "lesson" },
+        { "title": "17 刘胡兰", "kind": "lesson" },
+        { "title": "语文园地六", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第七单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "18 古诗二首（江雪/敕勒歌）", "kind": "lesson" },
+        { "title": "19 雾在哪里", "kind": "lesson" },
+        { "title": "20 雪孩子", "kind": "lesson" },
+        { "title": "语文园地七", "kind": "lesson" }
+      ]
+    },
+    {
+      "title": "第八单元 阅读",
+      "kind": "unit",
+      "children": [
+        { "title": "21 称赞", "kind": "lesson" },
+        { "title": "22 纸船和风筝", "kind": "lesson" },
+        { "title": "23 快乐的小河", "kind": "lesson" },
+        { "title": "语文园地八", "kind": "lesson" }
+      ]
+    }
+  ],
+  "knowledgePoints": []
+}
