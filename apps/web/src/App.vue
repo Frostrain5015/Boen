@@ -617,6 +617,7 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <Mascot :size="28" :float="false" :animated="false" />
               <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
+              <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.1.1</span>
             </div>
             <button @click="sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
               <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
@@ -743,6 +744,7 @@ onMounted(() => {
         <!-- 顶栏 -->
         <header
           class="flex items-center gap-3 px-5 py-3.5"
+          :class="hasItems ? 'pl-18' : ''"
         >
           <div class="leading-tight">
             <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>

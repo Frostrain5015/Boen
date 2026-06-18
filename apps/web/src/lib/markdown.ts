@@ -2,7 +2,7 @@ import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
 import { tikzCache } from './tikz';
 
-const md = new MarkdownIt({ breaks: true, linkify: true });
+const md = new MarkdownIt({ breaks: false, linkify: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
 
 // ── 前端竖式渲染：\opadd / \opsub / \opmul / \opdiv → KaTeX array ─────

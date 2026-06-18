@@ -165,6 +165,13 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
   }
 }
 
+/** 把 AI 可能返回的字符串格式 literacies 归一化为数组 */
+function normalizeLiteracies(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((l): l is string => typeof l === 'string');
+  if (typeof raw === 'string') return raw.split(/[,，、\s]+/).filter(Boolean);
+  return ['综合素养'];
+}
+
 // ─── 出题阶段 ────────────────────────────────
 
 async function stepWriteQuestions(
@@ -228,7 +235,7 @@ async function stepWriteQuestions(
     catch { throw new Error('JSON 解析失败'); }
   }
     return (parsed.questions || []).map((q: any, i: number) => {
-      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: q.literacies || [], difficulty: q.difficulty || config.difficulty || 'medium', explanation: q.explanation || '' };
+      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || config.difficulty || 'medium', explanation: q.explanation || '' };
       if (base.type === 'multiple_choice') {
         const opts = (q.options || []).filter((o: any) => o?.key);
         while (opts.length < 2) opts.push({ key: String.fromCharCode(65 + opts.length), text: '选项' + String.fromCharCode(65 + opts.length) });
@@ -271,7 +278,8 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
   }
   if (!q2.knowledgePoint) q2.knowledgePoint = '综合';
   if (!q2.explanation) q2.explanation = '详见参考答案。';
-  if (!q2.literacies?.length) q2.literacies = ['综合素养'];
+  q2.literacies = normalizeLiteracies(q2.literacies);
+  if (!q2.literacies.length) q2.literacies = ['综合素养'];
   return q2;
 }
 
@@ -376,7 +384,7 @@ export function gradeExam(
   const questionResults: ExamQuestionResult[] = questions.map((q) => {
     const answer = answerMap.get(q.index);
     if (!answer) {
-      return { index: q.index, correct: false, score: 0, maxScore: q.points, reference: '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, literacy: q.literacies };
+      return { index: q.index, correct: false, score: 0, maxScore: q.points, reference: '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, literacy: normalizeLiteracies(q.literacies) };
     }
 
     const toolName = questionTypeToToolName(q.type);
@@ -393,7 +401,7 @@ export function gradeExam(
       reference: result.reference,
       explanation: result.explanation,
       knowledgePoint: q.knowledgePoint,
-      literacy: q.literacies,
+      literacy: normalizeLiteracies(q.literacies),
     };
   });
 
@@ -465,7 +473,7 @@ function questionTypeToToolName(type: string): string {
 }
 
 function buildRawArgs(q: ExamQuestion): Record<string, unknown> {
-  const base: Record<string, unknown> = { stem: q.stem, explanation: q.explanation ?? '', knowledgePoint: q.knowledgePoint, literacies: q.literacies, difficulty: q.difficulty };
+  const base: Record<string, unknown> = { stem: q.stem, explanation: q.explanation ?? '', knowledgePoint: q.knowledgePoint, literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty };
   if (q.type === 'multiple_choice') return { ...base, options: q.options, correctKeys: q.correctKeys, multiSelect: q.multiSelect };
   if (q.type === 'fill_blank') return { ...base, blanks: q.blanks };
   if (q.type === 'true_false') return { ...base, answer: q.answer };

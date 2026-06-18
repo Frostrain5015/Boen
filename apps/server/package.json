@@ -1,6 +1,6 @@
 {
   "name": "@boen/server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "seed:curriculum": "tsx src/seed-curriculum.ts",
     "seed:kg": "tsx src/seed-knowledge-graph.ts",
     "seed:weights": "tsx src/kg-weights.ts",
-    "verify:curriculum": "tsx src/verify-curriculum.ts"
+    "verify:curriculum": "tsx src/verify-curriculum.ts",
+"seed:kp": "tsx src/seed-kp.ts"
   },
   "dependencies": {
     "@boen/agent-core": "*",
