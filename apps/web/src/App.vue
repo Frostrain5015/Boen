@@ -726,7 +726,7 @@ onMounted(() => {
                 <span>学习模式</span>
               </button>
               <button
-                @click="currentView = 'chat'; input = '我想考试 '"
+                @click="currentView = 'exam'"
                 class="flex items-center gap-1.5 rounded-2xl border border-[var(--line)] bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-[var(--ink)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all hover:border-[#6c5ce7] hover:bg-[#e8e4ff] hover:text-[#5848d6] active:scale-[0.96]"
               >
                 <BarChart3 class="h-3.5 w-3.5" />
