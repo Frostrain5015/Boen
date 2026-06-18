@@ -1,0 +1,29 @@
+{
+  "subject": "english",
+  "grade": "5",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，PEP）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3263.html",
+  "units": [
+    { "title": "Unit 1 Different friends", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 2 My feelings", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 3 Work and play", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 4 Healthy habits", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 5 Food we eat", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 6 Nature and us", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]}
+  ],
+  "knowledgePoints": []
+}

@@ -1,0 +1,24 @@
+{
+  "subject": "english",
+  "grade": "6",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（PEP，三年级起点）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3264.html",
+  "units": [
+    { "title": "Unit 1 How tall are you?", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 2 Last weekend", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 3 Where did you go?", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 4 Then and now", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Recycle: Mike's happy days", "kind": "unit" }
+  ],
+  "knowledgePoints": []
+}

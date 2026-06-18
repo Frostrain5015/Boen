@@ -1,0 +1,31 @@
+{
+  "subject": "english",
+  "grade": "6",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（PEP，三年级起点）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3264.html",
+  "units": [
+    { "title": "Unit 1 How can I get there?", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 2 Ways to go to school", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 3 My weekend plan", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Recycle 1", "kind": "unit" },
+    { "title": "Unit 4 I have a pen pal", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 5 What does he do?", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Unit 6 How do you feel?", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }
+    ]},
+    { "title": "Recycle 2", "kind": "unit" }
+  ],
+  "knowledgePoints": []
+}

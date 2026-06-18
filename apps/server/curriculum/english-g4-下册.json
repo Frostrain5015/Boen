@@ -1,0 +1,29 @@
+{
+  "subject": "english",
+  "grade": "4",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，PEP）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3262.html",
+  "units": [
+    { "title": "Unit 1 Class rules", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 2 Family rules", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 3 Time for school", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 4 Going shopping", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 5 Farms and us", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 6 From farm to table", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]}
+  ],
+  "knowledgePoints": []
+}

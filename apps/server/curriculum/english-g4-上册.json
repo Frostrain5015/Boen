@@ -1,0 +1,30 @@
+{
+  "subject": "english",
+  "grade": "4",
+  "volume": "上册",
+  "publisher": "人民教育出版社",
+  "version": "2024年6月第1版（根据2022年版课程标准修订，PEP）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3262.html",
+  "units": [
+    { "title": "Unit 1 Helping at home", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 2 My friends", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 3 Places we live in", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 4 Helping in the community", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 5 The weather and us", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 6 Changing for the seasons", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Revision: Let's help", "kind": "unit" }
+  ],
+  "knowledgePoints": []
+}

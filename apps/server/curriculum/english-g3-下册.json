@@ -1,0 +1,30 @@
+{
+  "subject": "english",
+  "grade": "3",
+  "volume": "下册",
+  "publisher": "人民教育出版社",
+  "version": "2024年12月第1版（根据2022年版课程标准修订，PEP）",
+  "sourceUrl": "https://www.renjiaoshe.com/jiaocai/3261.html",
+  "units": [
+    { "title": "Unit 1 Meeting new people", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 2 Expressing yourself", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 3 Learning better", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 4 Healthy food", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 5 Old toys", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Unit 6 Numbers in life", "kind": "unit", "children": [
+      { "title": "Part A", "kind": "section" }, { "title": "Part B", "kind": "section" }, { "title": "Part C Project", "kind": "section" }
+    ]},
+    { "title": "Revision: Going to a school fair", "kind": "unit" }
+  ],
+  "knowledgePoints": []
+}
