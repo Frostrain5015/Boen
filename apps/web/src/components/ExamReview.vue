@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { ArrowLeft, GraduationCap, BrainCircuit, CheckCircle2, XCircle, ChevronDown, ChevronUp, FileSearch } from 'lucide-vue-next';
 import type { ExamReviewDetail, ExamQuestion, ExamQuestionResult, AnswerPayload } from '@boen/shared';
 import { getExamReview } from '@/services/chat';
+import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
+import { processTikzDiagrams } from '@/lib/tikz';
 
 const props = defineProps<{ examId: string | null }>();
 const emit = defineEmits<{ (e: 'back'): void }>();
@@ -69,6 +71,7 @@ async function load(examId: string) {
   try {
     const { exam } = await getExamReview(examId);
     detail.value = exam;
+    nextTick(() => processTikzDiagrams()); // 编译题面/选项里的 TikZ 示意图
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -80,6 +83,8 @@ function toggle(i: number) {
   const s = new Set(expanded.value);
   s.has(i) ? s.delete(i) : s.add(i);
   expanded.value = s;
+  // 解析区展开后编译其中的 TikZ
+  if (s.has(i)) nextTick(() => processTikzDiagrams());
 }
 
 watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
@@ -137,8 +142,8 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               </button>
 
               <div class="space-y-3 px-4 py-3">
-                <div v-if="q.passage" class="rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-[var(--ink-soft)]">{{ q.passage }}</div>
-                <p class="text-sm font-medium leading-relaxed text-[var(--ink)]">{{ q.stem }}</p>
+                <div v-if="q.passage" class="md-body rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-[var(--ink-soft)]" v-html="renderMarkdown(q.passage)"></div>
+                <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(q.stem)"></div>
 
                 <!-- 选择题 -->
                 <div v-if="q.type === 'multiple_choice'" class="space-y-1.5">
@@ -149,7 +154,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
                       : 'border-[var(--line)] bg-white'">
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                       :class="(q.correctKeys || []).includes(opt.key) ? 'bg-[#18a558] text-white' : selectedKeys(q).includes(opt.key) ? 'bg-[#f2557a] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span>
-                    <span class="flex-1 text-[var(--ink)]">{{ opt.text }}</span>
+                    <span class="md-body flex-1 text-[var(--ink)]" v-html="renderMarkdownInline(opt.text)"></span>
                     <span v-if="(q.correctKeys || []).includes(opt.key)" class="text-[11px] font-semibold text-[#18a558]">正确答案</span>
                     <span v-else-if="selectedKeys(q).includes(opt.key)" class="text-[11px] font-semibold text-[#f2557a]">你的选择</span>
                   </div>
@@ -178,7 +183,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
                   </div>
                   <div v-if="q.referenceAnswer" class="rounded-xl bg-[#e7f7ee] p-3">
                     <p class="mb-1 text-xs font-semibold text-[#0e9b76]">参考答案</p>
-                    <p class="whitespace-pre-wrap text-[var(--ink)]">{{ q.referenceAnswer }}</p>
+                    <div class="md-body text-[var(--ink)]" v-html="renderMarkdown(q.referenceAnswer)"></div>
                   </div>
                   <div v-if="q.keyPoints?.length" class="flex flex-wrap gap-1.5">
                     <span v-for="(kp, i) in q.keyPoints" :key="i" class="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-strong)]">{{ kp }}</span>
@@ -190,7 +195,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
                   <div v-if="expanded.has(q.index)" class="space-y-2 border-t border-[var(--line)] pt-3">
                     <div v-if="q.explanation" class="rounded-xl bg-[var(--surface)] p-3 text-sm text-[var(--ink)]">
                       <p class="mb-1 text-xs font-semibold text-[var(--ink-soft)]">解析</p>
-                      {{ q.explanation }}
+                      <div class="md-body" v-html="renderMarkdown(q.explanation)"></div>
                     </div>
                     <div class="flex flex-wrap gap-1.5">
                       <span v-if="q.knowledgePoint" class="inline-flex items-center gap-1 rounded-full bg-[#e6edfa] px-2 py-0.5 text-[10px] font-semibold text-[#2b5fa8]"><GraduationCap class="h-2.5 w-2.5" />{{ q.knowledgePoint }}</span>

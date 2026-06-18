@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
 import { streamExamGenerate } from '@/services/chat';
+import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
+import { processTikzDiagrams } from '@/lib/tikz';
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -208,6 +210,11 @@ async function submitExam() {
   }
 }
 
+// 进入答题页后编译题面里的 TikZ 示意图
+watch(examState, (s) => {
+  if (s === 'taking') nextTick(() => processTikzDiagrams());
+});
+
 function goBack() { examState.value = 'config'; if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; } }
 function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
@@ -327,15 +334,15 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
               <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ q.points }}分</span>
             </div>
             <div class="space-y-3 px-4 py-3">
-              <div v-if="q.passage" class="passage-block text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''">{{ q.passage }}</div>
-              <p class="text-sm font-medium leading-relaxed text-[var(--ink)]">{{ q.stem }}</p>
+              <div v-if="q.passage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(q.passage)"></div>
+              <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(q.stem)"></div>
 
               <!-- Multiple Choice -->
               <div v-if="q.type === 'multiple_choice'" class="space-y-2">
                 <button v-for="opt in q.options" :key="opt.key" @click="setAnswer(q.index, q.multiSelect ? [...(getAnswer(q.index) || []), opt.key].filter((k, i, a) => a.indexOf(k) === i) : [opt.key])"
                   class="flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-2.5 text-left text-sm transition-all active:scale-[0.98]"
                   :class="(getAnswer(q.index) || []).includes(opt.key) ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white hover:border-[var(--accent)]'"
-                ><span class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold" :class="(getAnswer(q.index) || []).includes(opt.key) ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span><span>{{ opt.text }}</span></button>
+                ><span class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold" :class="(getAnswer(q.index) || []).includes(opt.key) ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span><span class="md-body" v-html="renderMarkdownInline(opt.text)"></span></button>
                 <p v-if="q.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
               </div>
 

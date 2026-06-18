@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onMounted } from 'vue';
 import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
+import { processTikzDiagrams as runTikz } from '@/lib/tikz';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
 import { gradeToBand } from '@boen/shared';
 import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, listExams, deleteExam, type Conversation, type ConversationMessage } from '@/services/chat';
@@ -138,7 +139,8 @@ function scrollDown(force = false) {
     requestAnimationFrame(() => {
       const el = scroller.value;
       if (!el) return;
-      const threshold = 120;
+      // 自动跟踪阈值放宽：只要用户没有明显向上回滚（约半屏内），新内容输出时就辅助聚焦回最新
+      const threshold = Math.max(280, el.clientHeight * 0.5);
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
       if (force || isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: force ? 'instant' : 'smooth' });
       hasScrollOverflow.value = el.scrollHeight > el.clientHeight + 1;
@@ -147,51 +149,12 @@ function scrollDown(force = false) {
 }
 
 /**
- * 通过服务端 API 编译 TikZ 图形（流式结束/历史恢复后调用）。
- * 缓存已编译的 SVG 源码，避免重复请求同一图形。
+ * 编译页面内的 TikZ 占位块（流式结束/历史恢复后调用）。
+ * 复用 lib/tikz 的共享缓存与逻辑，全站（对话/小测/考试）一致。
  */
-const tikzCache = new Map<string, string>();
-
 async function processTikzDiagrams() {
   await nextTick();
-  // 缓存命中直接替换
-  const wraps = document.querySelectorAll<HTMLElement>('.tikz-wrap[data-tikz]');
-  const uncached: HTMLElement[] = [];
-  wraps.forEach((wrap) => {
-    const src = decodeURIComponent(wrap.dataset.tikz ?? '');
-    const cached = tikzCache.get(src);
-    if (cached) {
-      wrap.innerHTML = cached;
-    } else {
-      uncached.push(wrap);
-    }
-  });
-  if (uncached.length === 0) return;
-
-  // 让出主线程，显示"正在画图"
-  await new Promise((r) => setTimeout(r, 100));
-
-  // 逐个通过 API 编译
-  for (const wrap of uncached) {
-    const code = decodeURIComponent(wrap.dataset.tikz ?? '');
-    if (!code) continue;
-    try {
-      const res = await fetch('/api/render-tikz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
-      });
-      const data = await res.json();
-      if (data.svg) {
-        wrap.innerHTML = data.svg;
-        tikzCache.set(code, data.svg);
-      } else {
-        wrap.innerHTML = `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">TikZ 编译失败</div>`;
-      }
-    } catch {
-      wrap.innerHTML = `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">TikZ 请求失败</div>`;
-    }
-  }
+  await runTikz();
 }
 
 function handleEvent(e: SseEvent, idx: { value: number }) {
@@ -204,6 +167,9 @@ function handleEvent(e: SseEvent, idx: { value: number }) {
     }
     if (cur.kind === 'assistant') {
       cur.text += e.value;
+      // 流式途中一旦检测到代码块闭合（含 ```），立即编译已完整的 TikZ，
+      // 让编译与后续输出并行，结束时直接命中缓存秒显（不必等整段流结束）
+      if (e.value.includes('`')) nextTick(() => runTikz(document, { onlyComplete: true }));
     }
   } else if (e.type === 'quiz_generating') {
     isGeneratingQuiz.value = true;

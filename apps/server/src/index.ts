@@ -239,7 +239,11 @@ app.post('/api/render-tikz', async (c) => {
   const pdfPath = join(tmpDir, 'tikz.pdf');
   const svgPath = join(tmpDir, 'tikz.svg');
 
+  // 用 xelatex + xeCJK 编译，支持中文标签（pdflatex 无法排版 CJK/Unicode，会编译失败）
   const tex = `\\documentclass[tikz]{standalone}
+\\usepackage{fontspec}
+\\usepackage{xeCJK}
+\\setCJKmainfont{Noto Sans CJK SC}
 \\usepackage{tikz}
 \\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
 \\usepackage{pgfplots}
@@ -250,7 +254,7 @@ ${code}
 
   try {
     writeFileSync(texPath, tex, 'utf-8');
-    execSync(`pdflatex -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
+    execSync(`xelatex -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
     const pdfExists = existsSync(pdfPath);
     if (!pdfExists) {
       const log = existsSync(join(tmpDir, 'tikz.log')) ? execSync(`tail -30 "${tmpDir}/tikz.log"`, { encoding: 'utf-8' }) : '';
@@ -605,6 +609,14 @@ app.post('/api/chat', async (c) => {
         addMessage(body.conversationId!, 'user', body.message);
       }
 
+      // 新对话标题：与主回复并发生成（隐藏延迟），在流关闭前回填 title_updated 事件
+      const titlePromise =
+        owned && getConversation(body.conversationId!)?.title === '新对话'
+          ? autoGenerateTitle(body.conversationId!, body.message, async (title) => {
+              await send({ type: 'title_updated', conversationId: body.conversationId!, title });
+            })
+          : null;
+
       // 若存在未作答的题目卡片，先补「跳过」ToolMessage，避免悬空 tool_calls 触发 API 报错
       const skipMsgs = await pendingSkipToolMessages(body.threadId);
 
@@ -632,15 +644,10 @@ app.post('/api/chat', async (c) => {
         }
       }
 
-      // 新对话自动生成标题（不阻塞主流程）
-      if (owned && last && getConversation(body.conversationId!)?.title === '新对话') {
-        autoGenerateTitle(body.conversationId!, body.message, async (title) => {
-          await send({ type: 'title_updated', conversationId: body.conversationId!, title });
-        });
-      }
-
       await emitQuestionIfAny(last, send);
       await emitReviewCompleteIfAny(last, send);
+      // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
+      if (titlePromise) await titlePromise;
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
