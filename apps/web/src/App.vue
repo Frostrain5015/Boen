@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target, PenTool } from 'lucide-vue-next';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText, BookOpen, Target, PenTool, Mic } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams as runTikz } from '@/lib/tikz';
 import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
@@ -24,6 +24,30 @@ type ChatItem =
   | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
   | { kind: 'question'; toolCallId: string; question: QuestionPayload; answered: boolean; grading?: GradingResult };
+
+type SpeechRecognitionResultListLike = {
+  length: number;
+  [index: number]: { [index: number]: { transcript: string } | undefined } | undefined;
+};
+type SpeechRecognitionResultEventLike = Event & { results: SpeechRecognitionResultListLike };
+type SpeechRecognitionErrorEventLike = Event & { error?: string; message?: string };
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+type SpeechRecognitionWindow = Window & {
+  SpeechRecognition?: SpeechRecognitionCtor;
+  webkitSpeechRecognition?: SpeechRecognitionCtor;
+};
 
 const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
 
@@ -102,11 +126,20 @@ const items = ref<ChatItem[]>([]);
 const input = ref('');
 const subject = ref<Subject>('math');
 const busy = ref(false);
+const speechSupported = ref(false);
+const voiceListening = ref(false);
+const voiceError = ref('');
 const threadId = `web-${Date.now()}`;
 const scroller = ref<HTMLElement | null>(null);
 
 const hasItems = computed(() => items.value.length > 0);
 const hasScrollOverflow = ref(false);
+const voiceLocale = computed(() => subject.value === 'english' ? 'en-US' : 'zh-CN');
+const voiceButtonLabel = computed(() => {
+  if (!speechSupported.value) return '当前浏览器不支持语音输入';
+  if (voiceListening.value) return '停止语音输入';
+  return voiceError.value || '语音输入';
+});
 
 function activateMode(mode: 'review' | 'preview' | 'weakness') {
   activeMode.value = activeMode.value === mode ? 'none' : mode;
@@ -158,7 +191,112 @@ const practiceMenu = computed(() => {
 });
 
 let _inputEl: HTMLTextAreaElement | null = null;
+function setInputEl(el: unknown) {
+  _inputEl = el instanceof HTMLTextAreaElement ? el : null;
+}
 function focusInput() { nextTick(() => _inputEl?.focus()); }
+
+let voiceRecognition: SpeechRecognitionLike | null = null;
+let voiceBaseText = '';
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  const speechWindow = window as SpeechRecognitionWindow;
+  return speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition ?? null;
+}
+
+function composeVoiceInput(base: string, transcript: string) {
+  const spoken = transcript.trim();
+  if (!spoken) return base;
+  if (!base) return spoken;
+  if (/\s$/.test(base)) return `${base}${spoken}`;
+  const compact = /[\u4e00-\u9fff]$/.test(base) || /^[\u4e00-\u9fff]/.test(spoken);
+  return `${base}${compact ? '' : ' '}${spoken}`;
+}
+
+function collectSpeechTranscript(results: SpeechRecognitionResultListLike) {
+  let transcript = '';
+  for (let i = 0; i < results.length; i++) {
+    transcript += results[i]?.[0]?.transcript ?? '';
+  }
+  return transcript;
+}
+
+function speechErrorMessage(error?: string) {
+  const messages: Record<string, string> = {
+    'not-allowed': '麦克风权限被拒绝',
+    'service-not-allowed': '语音识别服务不可用',
+    'audio-capture': '没有找到麦克风',
+    'no-speech': '没有听到声音',
+    network: '语音识别网络错误',
+  };
+  return messages[error ?? ''] ?? '语音输入失败';
+}
+
+function stopVoiceInput(abort = false) {
+  const recognition = voiceRecognition;
+  if (!recognition) {
+    voiceListening.value = false;
+    return;
+  }
+  voiceRecognition = null;
+  recognition.onresult = null;
+  recognition.onerror = null;
+  recognition.onend = null;
+  try {
+    abort ? recognition.abort() : recognition.stop();
+  } catch {
+    // Ignore stale recognition instances after browser-level teardown.
+  }
+  voiceListening.value = false;
+}
+
+function startVoiceInput() {
+  if (busy.value) return;
+  const Recognition = getSpeechRecognitionCtor();
+  if (!Recognition) {
+    speechSupported.value = false;
+    voiceError.value = '当前浏览器不支持语音输入';
+    return;
+  }
+
+  stopVoiceInput(true);
+  voiceBaseText = input.value;
+  voiceError.value = '';
+
+  const recognition = new Recognition();
+  voiceRecognition = recognition;
+  recognition.lang = voiceLocale.value;
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  recognition.onresult = (event) => {
+    input.value = composeVoiceInput(voiceBaseText, collectSpeechTranscript(event.results));
+    focusInput();
+  };
+  recognition.onerror = (event) => {
+    voiceError.value = speechErrorMessage(event.error);
+  };
+  recognition.onend = () => {
+    if (voiceRecognition !== recognition) return;
+    voiceRecognition = null;
+    voiceListening.value = false;
+    focusInput();
+  };
+
+  try {
+    recognition.start();
+    voiceListening.value = true;
+  } catch (err) {
+    voiceRecognition = null;
+    voiceListening.value = false;
+    voiceError.value = err instanceof Error ? err.message : '语音输入启动失败';
+  }
+}
+
+function toggleVoiceInput() {
+  if (voiceListening.value) stopVoiceInput();
+  else startVoiceInput();
+}
 
 function checkScrollOverflow() {
   nextTick(() => {
@@ -272,6 +410,7 @@ function finalizeAssistants() {
 async function send(text: string) {
   const t = text.trim();
   if (!t || busy.value) return;
+  stopVoiceInput();
   // 发送后清除专项练习标记
   practiceType.value = null;
 
@@ -568,6 +707,7 @@ async function handlePractice(detail: { kp?: string; subject: Subject; grade: st
 
 async function handleSubjectChange(newSubject: Subject) {
   if (subject.value === newSubject) return;
+  stopVoiceInput();
   // 当前对话已有内容时，切换学科强制建新对话
   if (items.value.length > 0) {
     try {
@@ -627,6 +767,7 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
+  speechSupported.value = Boolean(getSpeechRecognitionCtor());
   checkAuth();
   document.addEventListener('click', onClickOutside);
 
@@ -656,6 +797,11 @@ onMounted(() => {
       });
     });
   });
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutside);
+  stopVoiceInput(true);
 });
 </script>
 
@@ -996,12 +1142,25 @@ onMounted(() => {
             </div>
             <div class="clay flex items-end gap-2 p-2">
               <textarea
+                :ref="setInputEl"
                 v-model="input"
                 @keydown="onKeydown"
                 rows="1"
                 placeholder="今天想学习什么？"
                 class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
               />
+              <button
+                @click="toggleVoiceInput"
+                :disabled="busy || !speechSupported"
+                class="grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border transition-all active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
+                :class="voiceListening ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-[0_0_0_4px_var(--accent-soft)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+                :aria-label="voiceButtonLabel"
+                :aria-pressed="voiceListening"
+                :title="voiceButtonLabel"
+              >
+                <Mic class="h-5 w-5" :class="{ 'animate-pulse': voiceListening }" />
+              </button>
+              <span class="sr-only" aria-live="polite">{{ voiceButtonLabel }}</span>
               <button
                 @click="send(input)"
                 :disabled="busy || !input.trim()"
