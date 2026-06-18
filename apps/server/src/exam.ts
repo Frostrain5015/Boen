@@ -116,30 +116,20 @@ async function buildProfileContext(userId: string, config: ExamConfig): Promise<
 async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide: string, profileContext: string): Promise<ExamBlueprint> {
   const subjectLabel: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
   const gradeLabel = (g: string) => { const n = Number(g); return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初${'一二三'[n - 7]}`; };
+  const totalScore = config.totalScore ?? 100;
 
   const prompt = [
     `你是一位经验丰富的考试命题专家。请为${subjectLabel[config.subject] ?? config.subject}（${gradeLabel(config.grade)}）设计一份试卷蓝图。`,
-    `难度级别：${config.difficulty || 'medium'}。总分：${config.totalScore || 100}分。`,
-    '',
+    `难度级别：${config.difficulty || 'medium'}。总分：${totalScore}分。`,
     `知识点权重分布（用于决定题目分布）：\n${weightGuide}`,
     profileContext ? `\n学生学情：\n${profileContext}` : '',
     '',
-    '请输出 JSON 格式的试卷蓝图：',
+    '输出 JSON 格式的试卷蓝图：',
     '```json',
-    '{',
-    '  "title": "试卷标题（包含学科、年级信息）",',
-    '  "sections": 3,',
-    '  "totalScore": 100,',
-    '  "questionTypes": [',
-    '    { "type": "multiple_choice", "label": "选择题", "count": 10, "pointsPer": 5, "focusKps": ["知识点1", "知识点2"] },',
-    '    { "type": "fill_blank", "label": "填空题", "count": 5, "pointsPer": 5, "focusKps": ["知识点3"] },',
-    '    { "type": "true_false", "label": "判断题", "count": 3, "pointsPer": 5, "focusKps": [] },',
-    '    { "type": "short_answer", "label": "简答题", "count": 2, "pointsPer": 10, "focusKps": [] }',
-    '  ]',
-    '}',
+    `{"title":"${subjectLabel[config.subject] ?? config.subject}${gradeLabel(config.grade)}试卷","sections":3,"totalScore":${totalScore},"questionTypes":[{"type":"multiple_choice","label":"选择题","count":8,"pointsPer":5,"focusKps":[]},{"type":"fill_blank","label":"填空题","count":4,"pointsPer":5,"focusKps":[]},{"type":"true_false","label":"判断题","count":3,"pointsPer":5,"focusKps":[]},{"type":"short_answer","label":"简答题","count":2,"pointsPer":10,"focusKps":[]}]}`,
     '```',
-    '要求：总分=$(config.totalScore || 100)分，各题型 pointsPer * count 之和必须等于总分。选择+判断占比不超过 60%。',
-  ].join('\n');
+    `各题型 pointsPer * count 之和必须等于总分 ${totalScore}。选择题不超过 10 道。`,
+  ].filter(Boolean).join('\n');
 
   const response = await model.invoke([new SystemMessage(prompt)]);
   const content = typeof response.content === 'string' ? response.content : '';
