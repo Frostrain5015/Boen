@@ -31,6 +31,8 @@ export const BoenState = Annotation.Root({
   curriculum: Annotation<string | undefined>(),
   /** 复习模式阶段：teaching=讲解中 quizzing=出题中 strict=true 时仅在teaching可出题 */
   reviewPhase: Annotation<string>(),
+  /** 薄弱点数据（由服务端从知识画像中获取，突破模式注入） */
+  weaknessData: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
@@ -112,15 +114,20 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
   };
 
   const loadCurriculum = async (state: State): Promise<Partial<State>> => {
-    if (!deps.retrieveCurriculum) return {};
-    const lastHuman = [...state.messages].reverse().find(isHumanMessage);
-    const query = lastHuman ? String(lastHuman.content) : '';
-    try {
-      const curriculum = await deps.retrieveCurriculum({ grade: state.grade, subject: state.subject, query });
-      return { curriculum: curriculum || undefined };
-    } catch {
-      return {};
+    let parts: string[] = [];
+    if (deps.retrieveCurriculum) {
+      const lastHuman = [...state.messages].reverse().find(isHumanMessage);
+      const query = lastHuman ? String(lastHuman.content) : '';
+      try {
+        const curriculum = await deps.retrieveCurriculum({ grade: state.grade, subject: state.subject, query });
+        if (curriculum) parts.push(curriculum);
+      } catch {}
     }
+    // 薄弱点模式：注入知识画像数据
+    if (state.mode === 'weakness' && state.weaknessData) {
+      parts.push(state.weaknessData);
+    }
+    return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };
 
   const qaNode = async (state: State): Promise<Partial<State>> => {

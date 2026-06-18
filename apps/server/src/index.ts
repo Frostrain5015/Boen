@@ -624,6 +624,21 @@ app.post('/api/chat', async (c) => {
       // 若存在未作答的题目卡片，先补「跳过」ToolMessage，避免悬空 tool_calls 触发 API 报错
       const skipMsgs = await pendingSkipToolMessages(body.threadId);
 
+      // 突破模式：加载知识画像中的薄弱点数据
+      let weaknessData: string | undefined;
+      if (body.mode === 'weakness' && userId) {
+        try {
+          const weakPoints = getWeakPoints(userId, body.subject ?? 'math', body.grade, 60, 8);
+          if (weakPoints.length > 0) {
+            weaknessData = '【你的薄弱知识点（来自知识画像）】\n' + weakPoints.map(w =>
+              `- ${w.title}（当前掌握度 ${w.weightedScore}%，等级：${w.level === 'needs_practice' ? '需练习' : w.level === 'developing' ? '发展中' : w.level === 'proficient' ? '熟练' : '掌握'}，最近更新：${new Date(w.lastUpdated * 1000).toLocaleDateString('zh-CN')}）`
+            ).join('\n');
+          } else {
+            weaknessData = '【知识画像】当前暂无明显的薄弱知识点记录。可以通过考试或练习来建立你的知识画像。';
+          }
+        } catch { weaknessData = undefined; }
+      }
+
       const last = await runGraph(
         {
           messages: [...skipMsgs, new HumanMessage(body.message)],
@@ -631,6 +646,7 @@ app.post('/api/chat', async (c) => {
           grade: body.grade,
           subject: body.subject ?? 'math',
           userName: body.userName,
+          weaknessData,
           ...(body.mode ? { mode: body.mode } : {}),
         },
         body.threadId,
