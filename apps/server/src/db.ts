@@ -287,3 +287,5 @@ db.exec(`
   }
   db.exec(`CREATE INDEX IF NOT EXISTS idx_mistakes_correct ON mistake_items(user_id, is_correct)`);
 }
+
+export default db;
