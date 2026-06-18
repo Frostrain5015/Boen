@@ -218,5 +218,6 @@ export async function retrieveCurriculum(args: { grade?: string; subject?: strin
     if (related.length) parts.push('\n与学生当前问题最相关的章节/知识点：\n' + related.map((c) => `- ${c}`).join('\n'));
   }
   parts.push('\n讲解时贴合该教材的编排与进度，不超纲；可据此判断学生处于哪个章节、需要哪些前置知识。');
+  parts.push('\n【学习周期提示】一个单元完整的闭环是：预习 → 同步练习 → 错题追练 → 单元复习 → 考前巩固。根据学生的提问和行为判断当前阶段，主动引导到下一步。');
   return parts.join('\n');
 }

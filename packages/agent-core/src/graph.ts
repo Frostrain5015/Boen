@@ -36,6 +36,8 @@ export const BoenState = Annotation.Root({
   weaknessData: Annotation<string | undefined>(),
   /** 专项练习类型 */
   practiceType: Annotation<string | undefined>(),
+  /** LLM 发起的模式切换建议，等待用户确认 */
+  pendingModeSwitch: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
@@ -85,27 +87,80 @@ const completeReviewTool = tool(async () => '', {
   schema: completeReviewSchema,
 });
 
+// ── 模式切换工具 ────────────────────────────
+
+/** 模式切换工具：LLM 根据学习周期感知主动建议，工具返回确认提示 */
+function makeSwitchTool(name: string, description: string, hint: string, extraSchema: Record<string, z.ZodType> = {}) {
+  return tool(async () => hint, {
+    name,
+    description,
+    schema: z.object({ reason: z.string().describe('向学生说明为什么建议切换到此模式'), ...extraSchema }),
+  });
+}
+
+const SWITCH_TO_PREVIEW = 'switch_to_preview';
+const SWITCH_TO_REVIEW = 'switch_to_review';
+const SWITCH_TO_WEAKNESS = 'switch_to_weakness';
+const SWITCH_TO_PRACTICE = 'switch_to_practice';
+
+const switchModeTools: any[] = [
+  makeSwitchTool(SWITCH_TO_PREVIEW,
+    '根据学习周期感知主动建议学生切换到预习模式来预习新章节。当判断学生即将学习或刚刚开始一个新单元时调用此工具发起建议。',
+    '切换到预习模式需要你的确认。回复「好」或「开始预习」来确认。'),
+  makeSwitchTool(SWITCH_TO_REVIEW,
+    '根据学习周期感知主动建议学生切换到复习巩固模式来做系统复习。当判断学生已完成一个单元的学习或练习、需要巩固时调用此工具发起建议。',
+    '切换到复习巩固模式需要你的确认。回复「好」或「开始复习」来确认。'),
+  makeSwitchTool(SWITCH_TO_WEAKNESS,
+    '根据学习周期感知主动建议学生切换到薄弱点突破模式来专项训练薄弱环节。当发现学生反复出现同类错误、或某个知识点掌握度明显偏低时调用此工具发起建议。',
+    '切换到突破模式需要你的确认。回复「好」或「开始突破」来确认。'),
+  makeSwitchTool(SWITCH_TO_PRACTICE,
+    '根据学习周期感知主动建议学生进入专项练习做同步巩固。当学生刚学完新内容、或做题量不足时调用此工具发起建议。',
+    '进入专项练习需要你的确认。回复「好」或「开始练习」来确认。',
+    { type: z.enum(['mental-arithmetic', 'dictation', 'recitation', 'reading', 'writing', 'vocabulary']).describe('练习类型') }),
+];
+
 /**
  * 构建博文主图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
-  const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool] : quizTools;
-  const reviewTools: any[] = [...quizTools, completeReviewTool];
+  const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools] : [...quizTools, ...switchModeTools];
+  const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
+
+  /** 用户确认切换的意图检测 */
+  function detectConfirmIntent(text: string): boolean {
+    return /^好|^行|^可以|^确定|^确认|^开始|^嗯|^ok|^是的|^对|来吧|切换|同意/i.test(text.trim());
+  }
 
   const router = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1];
     if (last && isHumanMessage(last)) {
       const text = String(last.content);
       const { force, tool: qTool } = detectQuizIntent(text);
+
+      // 有挂起的模式切换建议且用户确认了 → 执行切换
+      if (state.pendingModeSwitch && detectConfirmIntent(text)) {
+        const pending = state.pendingModeSwitch;
+        // practice 模式附带类型："practice:dictation"
+        if (pending.startsWith('practice:')) {
+          const type = pending.split(':')[1] ?? 'mental-arithmetic';
+          return { mode: 'qa', practiceType: type, forceQuiz: false, pendingModeSwitch: undefined };
+        }
+        return { mode: pending as BoenMode, forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
+      }
+      // 用户拒绝了切换 → 清除挂起
+      if (state.pendingModeSwitch && /^不|别|不用|算了|等下/i.test(text.trim())) {
+        return { pendingModeSwitch: undefined };
+      }
+
       if (detectPreviewIntent(text)) {
-        return { mode: 'preview', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
+        return { mode: 'preview', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
       if (detectReviewIntent(text)) {
-        return { mode: 'review', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
+        return { mode: 'review', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
       if (detectWeaknessIntent(text)) {
-        return { mode: 'weakness', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching' };
+        return { mode: 'weakness', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
       // 学习模式中收到用户消息 → 切回讲解阶段
       if (state.mode === 'review' || state.mode === 'preview' || state.mode === 'weakness') {
@@ -181,6 +236,28 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
       ? [system, new SystemMessage(state.curriculum), ...state.messages]
       : [system, ...state.messages];
     const response = await llm.invoke(messages);
+
+    // 检测模式切换工具调用 → 记录待确认状态
+    const calls = (response as any)?.tool_calls ?? [];
+    const switchCall = calls.find((c: any) =>
+      [SWITCH_TO_PREVIEW, SWITCH_TO_REVIEW, SWITCH_TO_WEAKNESS, SWITCH_TO_PRACTICE].includes(c.name)
+    );
+    if (switchCall) {
+      const modeMap: Record<string, string> = {
+        [SWITCH_TO_PREVIEW]: 'preview',
+        [SWITCH_TO_REVIEW]: 'review',
+        [SWITCH_TO_WEAKNESS]: 'weakness',
+        // practice 需要从调用参数中提取练习类型，默认 mental-arithmetic
+        [SWITCH_TO_PRACTICE]: 'practice',
+      };
+      const target = modeMap[switchCall.name] ?? 'qa';
+      // practice 模式需要附带练习类型
+      if (target === 'practice') {
+        const args = switchCall.args ?? {};
+        return { messages: [response], pendingModeSwitch: `practice:${(args as any).type ?? 'mental-arithmetic'}` };
+      }
+      return { messages: [response], pendingModeSwitch: target };
+    }
 
     return { messages: [response] };
   };
