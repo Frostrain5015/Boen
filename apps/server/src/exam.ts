@@ -415,10 +415,27 @@ async function stepReview(
     .map(qt => `  ${qt.label}（${qt.type}）${qt.count}题×${qt.pointsPer}分，重点考查：${qt.focusKps.join('、') || '综合'}`)
     .join('\n');
 
+  // ── 本地相似性预检：题干去重 ──────────────
+  const seenStems = new Set<string>();
+  for (const q of fixed) {
+    const norm = q.stem?.replace(/\s+/g, '').slice(0, 30) ?? '';
+    for (const seen of seenStems) {
+      // 编辑距离或公共子串检测：前 30 个字符交集超过 70% 视为雷同
+      const common = [...norm].filter(c => seen.includes(c)).length;
+      const ratio = Math.max(norm.length, seen.length) > 0 ? common / Math.max(norm.length, seen.length) : 0;
+      if (ratio > 0.7) {
+        localIssues.push({ index: q.index, issue: `题干与前序题目高度相似（"${norm.slice(0, 20)}…"），疑似雷同` });
+        break;
+      }
+    }
+    seenStems.add(norm);
+  }
+
   const currentPoints = fixed.reduce((s, q) => s + q.points, 0);
   const expectedTotal = config.totalScore ?? 100;
   const prompt = [
     '你是一位经验丰富的试卷审核专家。以下是刚刚生成的一套试卷，请逐题审核。',
+    '⚠ 注意：4 种题型是并行生成的，各题型之间不知道彼此内容，因此跨题型雷同的风险比以往更高——请重点检查相似性。',
     '',
     '=== 试卷蓝图（考查要求）===',
     blueprintSummary,
@@ -430,8 +447,8 @@ async function stepReview(
     `当前各题分值和：${currentPoints} 分（应为 ${expectedTotal} 分）`,
     '',
     '### 审核维度',
-    '1. **内容正确性** — 参考答案/解析是否有知识性错误、解法漏洞或逻辑矛盾？',
-    '2. **题目间相似性** — 各题之间题干情景、数据、设问方式是否雷同？比如同一组数字在选择题出现后又原封不动出现在填空题里。不同题型的题目可以考查同一知识点，但情景和数据必须差异化。',
+    '1. **题目间相似性**（★ 最重要）— 各题题干情景、数据、设问是否雷同？不同题型的题目可以用同一知识点，但情景和数据必须差异化。注意检查选择题选项文本是否与填空/简答题干接近。',
+    '2. **内容正确性** — 参考答案/解析是否有知识性错误、解法漏洞或逻辑矛盾？',
     '3. **蓝图匹配度** — 题目是否真的考查了 blueprint 指定的知识点？难度是否匹配？',
     '4. **格式完整性** — 题干是否有实质性内容？选择题选项有无明显凑数？题干/解析中的 KaTeX/TikZ/\\op 语法是否正确闭合？',
     '5. **区分度** — 题目是否太 trivial（如选项有常识性送分答案）或超纲？',
