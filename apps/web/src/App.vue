@@ -863,7 +863,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-2">
               <Mascot :size="28" :float="false" :animated="false" />
               <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
-              <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.1.1</span>
+              <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.2.0</span>
             </div>
             <button @click="sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
               <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
@@ -964,6 +964,13 @@ onUnmounted(() => {
               <BrainCircuit class="h-4 w-4 shrink-0" />
               <span class="flex-1">档案</span>
             </button>
+          </div>
+
+          <!-- ICP 备案 -->
+          <div class="shrink-0 border-t border-[var(--line)] px-3 py-2 text-center">
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-(--ink-soft)/50 hover:text-(--ink-soft)/80 transition-colors">
+              浙ICP备2026040257号-1
+            </a>
           </div>
         </div>
       </aside>
