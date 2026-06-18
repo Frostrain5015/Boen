@@ -346,6 +346,67 @@ app.post('/api/profile/seed', async (c) => {
   return c.json({ updated });
 });
 
+import { generateExam, createExamSession, getExamSession, submitExamSession } from './exam.js';
+
+/** POST /api/exam/generate — 生成新试卷 */
+app.post('/api/exam/generate', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number };
+  if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
+  return streamSSE(c, async (stream) => {
+    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    try {
+      await send({ type: 'exam_generating' });
+      const exam = await generateExam(model, { subject: body.subject, grade: body.grade, difficulty: body.difficulty, durationMinutes: body.durationMinutes });
+      const session = createExamSession(userId, {subject:body.subject,grade:body.grade}, exam);
+      const publicQuestions = exam.questions.map(q => ({
+        index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
+        knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
+        options: q.type === 'multiple_choice' ? q.options : undefined,
+        multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
+        blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
+      }));
+      await send({ type: 'exam_ready', examId: session.id, title: exam.title, totalQuestions: exam.questions.length, totalScore: exam.totalScore, durationMinutes: exam.durationMinutes });
+      await send({ type: 'done' });
+    } catch (err) {
+      await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  });
+});
+
+/** POST /api/exam/submit — 提交考试答案 */
+app.post('/api/exam/submit', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json() as { examId: string; answers: Array<{ questionIndex: number; answer: any }> };
+  if (!body.examId || !body.answers?.length) return c.json({ error: '缺少必填字段' }, 400);
+  try {
+    const results = submitExamSession(body.examId, userId, body.answers as any);
+    return c.json({ success: true, results });
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+  }
+});
+
+/** GET /api/exam/:examId — 获取考试详情和结果 */
+app.get('/api/exam/:examId', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const examId = c.req.param('examId');
+  const session = getExamSession(examId, userId);
+  if (!session) return c.json({ error: '考试未找到' }, 404);
+  const publicQuestions = session.questions.map(q => ({
+    index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
+    knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
+    options: q.type === 'multiple_choice' ? q.options : undefined,
+    multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
+    blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
+  }));
+  return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions: publicQuestions, results: session.results } });
+});
+
+
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
 
@@ -410,7 +471,7 @@ app.get('/api/conversations', async (c) => {
 app.post('/api/conversations', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json<{ title?: string; subject?: string }>();
+  const body = await c.req.json<{ title?: string; subject: string }>();
   const conversation = createConversation(userId, body.title ?? '新对话', body.subject ?? 'math');
   return c.json({ conversation }, 201);
 });
@@ -452,7 +513,7 @@ app.delete('/api/conversations/:id', async (c) => {
 // ── 聊天 API ────────────────────────────────
 
 app.post('/api/chat', async (c) => {
-  const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject?: string };
+  const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject: string };
   // 仅在 conversationId 属于当前登录用户时才落库，避免串写他人对话
   const userId = await resolveUserId(c);
   const owned =

@@ -8,6 +8,7 @@ import { streamChat, streamAnswer, getConversations, getConversation, createConv
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
+import ExamView from '@/components/ExamView.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
@@ -765,10 +766,7 @@ onMounted(() => {
         <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" />
 
         <!-- 考试视图 -->
-        <div v-else-if="currentView === 'exam'" key="exam" class="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-          <Mascot :size="80" state="thinking" />
-          <p class="text-sm font-medium text-[var(--ink-soft)]">考试模式即将上线…</p>
-        </div>
+        <ExamView v-else-if="currentView === 'exam'" key="exam" class="flex-1" @back="currentView = 'chat'" />
       </div>
     </div>
 
