@@ -240,6 +240,12 @@ app.post('/api/render-tikz', async (c) => {
   const svgPath = join(tmpDir, 'tikz.svg');
 
   // 用 xelatex + xeCJK 编译，支持中文标签（pdflatex 无法排版 CJK/Unicode，会编译失败）
+  // 自动适配裸 xlop 命令（不在 tikzpicture 内的 \opadd / \opsub / \opmul / \opdiv）
+  // 这些命令只需一个 simple wrapper，不需要真正的 tikz 绘图环境
+  const wrapXlop = /\\op(?:add|sub|mul|div)\b/.test(code) && !/\\begin\s*\{tikzpicture\}/.test(code);
+  const body = wrapXlop
+    ? `\\tikzpicture\\node{${code}};\\endtikzpicture`
+    : code;
   const tex = `\\documentclass[tikz]{standalone}
 \\usepackage{fontspec}
 \\usepackage{xeCJK}
@@ -248,8 +254,9 @@ app.post('/api/render-tikz', async (c) => {
 \\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
 \\usepackage{pgfplots}
 \\pgfplotsset{compat=1.18}
+\\usepackage{xlop}
 \\begin{document}
-${code}
+${body}
 \\end{document}`;
 
   try {

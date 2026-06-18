@@ -64,7 +64,7 @@
       "kind": "chapter",
       "children": [
         { "title": "认识有余数的除法", "kind": "lesson" },
-        { "title": "用竖式计算有余数的除法", "kind": "lesson" },
+        { "title": "用竖式计算有余数的除法", "kind": "lesson", "knowledgePoints": ["列竖式计算"] },
         { "title": "余数与除数的关系", "kind": "lesson" },
         { "title": "解决问题", "kind": "lesson" },
         { "title": "整理和复习", "kind": "lesson" }
@@ -94,7 +94,7 @@
             { "title": "近似数", "kind": "lesson" }
           ]
         },
-        { "title": "3. 简单的加、减法", "kind": "section" },
+        { "title": "3. 简单的加、减法", "kind": "section", "knowledgePoints": ["列竖式计算"] },
         { "title": "整理和复习", "kind": "lesson" }
       ]
     },
@@ -119,5 +119,7 @@
       "kind": "chapter"
     }
   ],
-  "knowledgePoints": []
+  "knowledgePoints": [
+    { "title": "列竖式计算", "description": "用竖式格式进行加减乘除运算，理解数位对齐、进位、借位、试商的步骤" }
+  ]
 }

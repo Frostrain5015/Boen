@@ -198,7 +198,8 @@ async function stepWriteQuestions(
     `一次性输出全部 ${qt.count} 道题的数组。每道题必须包含: type, stem, points, knowledgePoint, literacies, difficulty, explanation。`,
     'knowledgePoint 和 literacies 必须填写，不能为空。',
     '排版：公式/方程一律用 KaTeX（行内 $...$，独立 $$...$$）。题目涉及几何图形、函数图像、受力分析、电路、坐标系、统计图等可视化内容时，',
-    '在 stem（或 explanation）里用 TikZ 代码块（```tikz ... ```）画示意图，前端会编译成矢量图——直观的示意图更利于学生理解；不要用字符拼图。',
+    '在 stem（或 explanation）里用 TikZ 代码块（```tikz ... ```）画示意图，前端会编译成矢量图——直观的示意图更利于学生理解；不要用字符拼图。\
+    列竖式计算（加减乘除）用 TikZ + xlop 包的 \\opadd / \\opsub / \\opmul / \\opdiv 渲染，如 \\begin{tikzpicture}\\node{\\opadd[style=text]{698}{310}};\\end{tikzpicture}。',
     '注意：stem 是 JSON 字符串，内部的反斜杠和换行需正确转义（如 \\\\begin、\\\\draw、\\n）。',
   ].filter(Boolean).join('\n');
 

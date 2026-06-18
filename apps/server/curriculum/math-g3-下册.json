@@ -21,7 +21,7 @@
       "kind": "chapter",
       "children": [
         { "title": "口算除法", "kind": "lesson" },
-        { "title": "笔算除法", "kind": "lesson" },
+        { "title": "笔算除法", "kind": "lesson", "knowledgePoints": ["列竖式计算"] },
         { "title": "用估算解决问题", "kind": "lesson" },
         { "title": "数量关系分析", "kind": "lesson" },
         { "title": "整理和复习", "kind": "lesson" }
@@ -97,5 +97,7 @@
       "kind": "chapter"
     }
   ],
-  "knowledgePoints": []
+  "knowledgePoints": [
+    { "title": "列竖式计算", "description": "用竖式格式进行加减乘除运算，理解数位对齐、进位、借位、试商的步骤" }
+  ]
 }
