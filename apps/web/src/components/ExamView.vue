@@ -108,17 +108,40 @@ function masteryColor(ws: number): string {
   if (ws < 40) return '#f2557a'; if (ws < 60) return '#f59e42'; if (ws < 80) return '#e0a92e'; return '#18a558';
 }
 
-/** 生成步骤行的活跃度 class */
-function gnCls(step: string): string {
-  return genProgress.value.step === step ? '' : 'opacity-30';
+/** 步骤是否已完成（依据进度阈值） */
+function stepDone(step: string): boolean {
+  const p = genProgress.value.progress;
+  if (step === 'analyze') return p > 20;
+  if (step === 'write') return p > 85;
+  if (step === 'review') return p >= 100;
+  return false;
 }
-/** 步骤圆点的样式 class */
+/** 步骤当前状态: 'pending' | 'active' | 'done' */
+function stepState(step: string): 'pending' | 'active' | 'done' {
+  if (stepDone(step)) return 'done';
+  return genProgress.value.step === step ? 'active' : 'pending';
+}
+/** 步骤圆点样式 class */
 function dotCls(step: string): string {
-  return genProgress.value.step === step ? 'dot-active' : 'dot-pending';
+  const s = stepState(step);
+  if (s === 'done') return 'dot-done';
+  if (s === 'active') return 'dot-active';
+  return 'dot-pending';
 }
-/** 步骤圆点的图标 */
+/** 步骤圆点图标 */
 function dotIcon(step: string): string {
-  return genProgress.value.step === step ? '●' : '●';
+  return stepDone(step) ? '✓' : '●';
+}
+/** 步骤标签文字：pending → 待…  active → 正在…  done → …已完成 */
+function stepLabel(step: string): string {
+  const s = stepState(step);
+  const labels: Record<string, [string, string, string]> = {
+    analyze: ['待分析知识点', '正在分析知识图谱', '分析已完成'],
+    write: ['待编写试题', '正在编写试题', '编写已完成'],
+    review: ['待审核试题', '正在审核试题', '审核已完成'],
+  };
+  const idx = s === 'pending' ? 0 : s === 'active' ? 1 : 2;
+  return labels[step]?.[idx] ?? step;
 }
 
 function setAnswer(qIndex: number, value: any) {
@@ -165,13 +188,21 @@ function startTimer(minutes: number) {
 
 interface ExamReadyData { examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
 
+/** 根据限时决定试卷总分：15分钟→20分，45分钟→50分，90分钟→100分 */
+function totalScoreForDuration(minutes: number): number {
+  if (minutes <= 15) return 20;
+  if (minutes <= 45) return 50;
+  return 100;
+}
+
 async function generateExamPaper() {
   examState.value = 'generating';
   genProgress.value = { step: 'analyze', message: '正在准备…', progress: 0 };
   let ready: ExamReadyData | undefined;
   let errMsg = '';
   try {
-    await streamExamGenerate(config.value, (e) => {
+    const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes) };
+    await streamExamGenerate(examRequest, (e) => {
       if (e.type === 'exam_progress') {
         genProgress.value = { step: e.step, message: e.message, progress: e.progress };
       } else if (e.type === 'exam_ready') {
@@ -305,24 +336,13 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
         <div class="w-80 space-y-1">
-          <div class="step-row" :class="gnCls('analyze')">
-            <span class="step-dot" :class="dotCls('analyze')">{{ dotIcon('analyze') }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">分析知识图谱</span>
-            <span v-if="genProgress.step === 'analyze'" class="step-active-dot"></span>
+          <div v-for="st in ['analyze','write','review']" :key="st" class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
+            <span class="step-dot" :class="dotCls(st)">{{ dotIcon(st) }}</span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ stepLabel(st) }}</span>
+            <span v-if="stepState(st) === 'active'" class="step-active-dot"></span>
+            <span v-if="stepState(st) === 'done'" class="text-[11px] font-medium text-[#18a558]">完成</span>
           </div>
-          <div v-if="genProgress.step === 'analyze' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
-          <div class="step-row" :class="gnCls('write')">
-            <span class="step-dot" :class="dotCls('write')">{{ dotIcon('write') }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">编写试题</span>
-            <span v-if="genProgress.step === 'write'" class="step-active-dot"></span>
-          </div>
-          <div v-if="genProgress.step === 'write' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
-          <div class="step-row" :class="gnCls('review')">
-            <span class="step-dot" :class="dotCls('review')">{{ dotIcon('review') }}</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">审核试题</span>
-            <span v-if="genProgress.step === 'review'" class="step-active-dot"></span>
-          </div>
-          <div v-if="genProgress.step === 'review' && genProgress.message" class="step-msg">{{ genProgress.message }}</div>
+          <div v-if="genProgress.message" class="step-msg">{{ genProgress.message }}</div>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
@@ -450,8 +470,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
               <circle cx="60" cy="60" r="54" fill="none" :stroke="masteryColor(results.percentage)" stroke-width="8" stroke-linecap="round" :stroke-dasharray="2 * Math.PI * 54" :stroke-dashoffset="2 * Math.PI * 54 * (1 - results.percentage / 100)" class="transition-all duration-1000 ease-out" />
             </svg>
             <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="font-display text-3xl font-bold" :style="{ color: masteryColor(results.percentage) }">{{ results.percentage }}</span>
-              <span class="text-[10px] font-medium text-[var(--ink-soft)]">分</span>
+              <span class="font-display text-3xl font-bold" :style="{ color: masteryColor(results.percentage) }">{{ results.percentage }}<span class="text-base">%</span></span>
+              <span class="text-[10px] font-medium text-[var(--ink-soft)]">正确率</span>
             </div>
           </div>
           <span class="inline-block rounded-full px-4 py-1 font-display text-sm font-bold" :class="results.grade === '优秀' ? 'bg-[#e7f7ee] text-[#18a558]' : results.grade === '良好' ? 'bg-[#fef7e6] text-[#e0a92e]' : results.grade === '及格' ? 'bg-[#fef3e2] text-[#f59e42]' : 'bg-[#fdeaef] text-[#f2557a]'">{{ results.grade }}</span>
@@ -527,8 +547,9 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- Back Button -->
-        <div class="pb-6 text-center">
-          <button @click="examState = 'config'; session = null; results = null; answers = new Map()" class="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white px-6 py-2.5 font-display text-sm font-semibold text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.97]"><ArrowLeft class="h-4 w-4" /> 返回首页</button>
+        <div class="flex items-center justify-center gap-3 pb-6">
+          <button @click="session = null; results = null; answers = new Map(); $emit('back')" class="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white px-5 py-2.5 font-display text-sm font-semibold text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.97]"><ArrowLeft class="h-4 w-4" /> 返回首页</button>
+          <span class="text-xs text-[var(--ink-soft)]">成绩已保存，可在侧边栏「考试」中查看</span>
         </div>
       </div>
     </div>

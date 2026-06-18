@@ -52,7 +52,7 @@ export const streamAnswer = (req: AnswerRequest, onEvent: (e: SseEvent) => void)
 
 /** 生成试卷（流式：实时推送 规划→出题→审核 进度） */
 export const streamExamGenerate = (
-  config: { subject: string; grade: string; durationMinutes: number; notes?: string },
+  config: { subject: string; grade: string; durationMinutes: number; notes?: string; totalScore?: number },
   onEvent: (e: SseEvent) => void,
 ) => streamSse('/api/exam/generate', config, onEvent);
 
