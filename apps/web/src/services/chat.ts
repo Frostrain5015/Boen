@@ -1,4 +1,4 @@
-import type { ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
+import type { ChatRequest, AnswerRequest, SseEvent, ExamSummary, ExamReviewDetail } from '@boen/shared';
 import { getToken } from './auth';
 
 /** 通用 SSE 流读取：POST body，逐事件回调 */
@@ -122,4 +122,16 @@ export async function updateConversationTitle(id: string, title: string): Promis
 /** 删除对话 */
 export async function deleteConversation(id: string): Promise<void> {
   await apiFetch(`/api/conversations/${id}`, { method: 'DELETE' });
+}
+
+// ── 考试历史 API ────────────────────────────
+
+/** 获取当前用户的考试历史列表 */
+export async function listExams(): Promise<{ exams: ExamSummary[] }> {
+  return apiFetch('/api/exams');
+}
+
+/** 获取单场考试的回顾详情（含题目、用户作答、评分） */
+export async function getExamReview(examId: string): Promise<{ exam: ExamReviewDetail }> {
+  return apiFetch(`/api/exam/${examId}`);
 }

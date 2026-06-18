@@ -379,7 +379,7 @@ app.post('/api/profile/seed', async (c) => {
   return c.json({ updated });
 });
 
-import { generateExam, createExamSession, getExamSession, submitExamSession } from './exam.js';
+import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions } from './exam.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
@@ -417,31 +417,46 @@ app.post('/api/exam/generate', async (c) => {
 app.post('/api/exam/submit', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json() as { examId: string; answers: Array<{ questionIndex: number; answer: any }> };
-  if (!body.examId || !body.answers?.length) return c.json({ error: '缺少必填字段' }, 400);
+  const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
+  if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
+  // 允许 answers 为空数组（用户可能留空全部题目），未作答的题由评分逻辑按 0 分处理
+  const answers = Array.isArray(body.answers) ? body.answers : [];
   try {
-    const results = submitExamSession(body.examId, userId, body.answers as any);
+    const results = submitExamSession(body.examId, userId, answers as any);
     return c.json({ success: true, results });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
 });
 
-/** GET /api/exam/:examId — 获取考试详情和结果 */
+/** GET /api/exams — 当前用户的考试历史列表（概要） */
+app.get('/api/exams', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ exams: listExamSessions(userId) });
+});
+
+/** GET /api/exam/:examId — 获取考试详情和结果
+ *  - 进行中（pending）：返回脱敏题目（不含正确答案），用于答题
+ *  - 已完成（completed）：返回完整题目（含答案）+ 用户作答，用于历史回顾
+ */
 app.get('/api/exam/:examId', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const examId = c.req.param('examId');
   const session = getExamSession(examId, userId);
   if (!session) return c.json({ error: '考试未找到' }, 404);
-  const publicQuestions = session.questions.map(q => ({
-    index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
-    knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
-    options: q.type === 'multiple_choice' ? q.options : undefined,
-    multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
-    blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
-  }));
-  return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions: publicQuestions, results: session.results } });
+  const completed = session.status === 'completed';
+  const questions = completed
+    ? session.questions // 已交卷：揭示完整题目（正确答案/解析）供回顾
+    : session.questions.map(q => ({
+        index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
+        knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
+        options: q.type === 'multiple_choice' ? q.options : undefined,
+        multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
+        blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
+      }));
+  return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions, answers: completed ? session.answers : undefined, results: session.results } });
 });
 
 

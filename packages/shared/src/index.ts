@@ -166,6 +166,36 @@ export interface ExamResults {
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
 }
 
+/** 考试历史列表项（概要） */
+export interface ExamSummary {
+  examId: string;
+  title: string;
+  subject: string;
+  grade: string;
+  totalScore: number;
+  status: 'pending' | 'completed';
+  createdAt: number;
+  submittedAt?: number;
+  /** 已完成考试的成绩概要 */
+  result?: { totalScore: number; maxScore: number; percentage: number; grade: string };
+}
+
+/** 考试回顾详情：已完成考试返回完整题目（含答案）+ 用户作答 + 评分 */
+export interface ExamReviewDetail {
+  examId: string;
+  title: string;
+  subject: string;
+  grade: string;
+  totalScore: number;
+  durationMinutes: number;
+  status: 'pending' | 'completed';
+  createdAt: number;
+  submittedAt?: number;
+  questions: ExamQuestion[];
+  answers?: Array<{ questionIndex: number; answer: AnswerPayload }>;
+  results?: ExamResults;
+}
+
 // ─────────────────────────────────────────────────────────────
 // SSE 事件
 // ─────────────────────────────────────────────────────────────

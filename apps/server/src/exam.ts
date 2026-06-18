@@ -11,7 +11,7 @@
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult } from '@boen/shared';
+import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary } from '@boen/shared';
 import { gradeAnswer } from '@boen/agent-core';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
@@ -40,6 +40,7 @@ export interface ExamSession {
   status: 'pending' | 'completed';
   createdAt: number;
   submittedAt?: number;
+  answers?: Array<{ questionIndex: number; answer: AnswerPayload }>;
   results?: ExamResults;
 }
 
@@ -480,8 +481,33 @@ export function getExamSession(examId: string, userId: string): ExamSession | nu
     id: row.id, userId: row.user_id, subject: row.subject, grade: row.grade, title: row.title,
     questions: JSON.parse(row.questions), totalScore: row.total_score, durationMinutes: row.duration_minutes ?? 45,
     status: row.status, createdAt: row.created_at, submittedAt: row.submitted_at,
+    answers: row.answers ? JSON.parse(row.answers) : undefined,
     results: row.results ? JSON.parse(row.results) : undefined,
   };
+}
+
+/** 列出用户的全部考试（概要），按创建时间倒序，供「考试历史」页回顾 */
+export function listExamSessions(userId: string): ExamSummary[] {
+  const rows = db.prepare(
+    `SELECT id, subject, grade, title, total_score, status, created_at, submitted_at, results
+     FROM exam_sessions WHERE user_id=? ORDER BY created_at DESC`,
+  ).all(userId) as any[];
+  return rows.map((r) => {
+    const results = r.results ? (JSON.parse(r.results) as ExamResults) : undefined;
+    return {
+      examId: r.id,
+      title: r.title,
+      subject: r.subject,
+      grade: r.grade,
+      totalScore: r.total_score,
+      status: r.status,
+      createdAt: r.created_at,
+      submittedAt: r.submitted_at ?? undefined,
+      result: results
+        ? { totalScore: results.totalScore, maxScore: results.maxScore, percentage: results.percentage, grade: results.grade }
+        : undefined,
+    };
+  });
 }
 
 export function submitExamSession(examId: string, userId: string, answers: Array<{ questionIndex: number; answer: AnswerPayload }>): ExamResults {

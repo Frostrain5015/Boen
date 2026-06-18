@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft } from 'lucide-vue-next';
-import type { QuestionType } from '@boen/shared';
+import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
 import { streamExamGenerate } from '@/services/chat';
 
@@ -49,7 +49,7 @@ interface ExamResultsData {
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
 }
 
-const emit = defineEmits<{ (e: 'back'): void }>();
+const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
 
 const examState = ref<'config' | 'generating' | 'taking' | 'grading' | 'results'>('config');
 const config = ref<ExamConfigData>({ subject: 'math', grade: '7', difficulty: 'medium', durationMinutes: 45 });
@@ -116,6 +116,25 @@ function getAnswer(qIndex: number) {
   return answers.value.get(qIndex);
 }
 
+/** 把前端存储的原始作答值规整为后端期望的 AnswerPayload；留空返回 null（视为未作答） */
+function toAnswerPayload(type: QuestionType, raw: unknown): AnswerPayload | null {
+  if (raw === undefined || raw === null) return null;
+  if (type === 'multiple_choice') {
+    return Array.isArray(raw) && raw.length ? { type, selectedKeys: raw as string[] } : null;
+  }
+  if (type === 'fill_blank') {
+    const arr = Array.isArray(raw) ? (raw as string[]) : [];
+    return arr.some((s) => String(s ?? '').trim()) ? { type, answers: arr } : null;
+  }
+  if (type === 'true_false') {
+    return typeof raw === 'boolean' ? { type, value: raw } : null;
+  }
+  if (type === 'short_answer') {
+    return typeof raw === 'string' && raw.trim() ? { type, text: raw } : null;
+  }
+  return null;
+}
+
 function startTimer(minutes: number) {
   timer.value = minutes * 60;
   if (timerInterval.value) clearInterval(timerInterval.value);
@@ -157,6 +176,7 @@ async function generateExamPaper() {
     await loadQuestions(r.examId);
     examState.value = 'taking';
     startTimer(r.durationMinutes);
+    emit('refresh'); // 新试卷已入库，刷新侧栏考试列表
   } catch (err) {
     alert('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'config';
@@ -167,7 +187,12 @@ async function submitExam() {
   if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; }
   if (!session.value) return;
   examState.value = 'grading';
-  const answerArray = Array.from(answers.value.entries()).map(([qIndex, answer]) => ({ questionIndex: qIndex, answer }));
+  // 只提交已作答的题（留空的题跳过，由后端按未作答计 0 分）
+  const answerArray: { questionIndex: number; answer: AnswerPayload }[] = [];
+  for (const q of session.value.questions) {
+    const payload = toAnswerPayload(q.type, answers.value.get(q.index));
+    if (payload) answerArray.push({ questionIndex: q.index, answer: payload });
+  }
   try {
     const res = await fetch('/api/exam/submit', {
       method: 'POST',
@@ -175,7 +200,7 @@ async function submitExam() {
       body: JSON.stringify({ examId: session.value.examId, answers: answerArray }),
     });
     const data = await res.json();
-    if (data.results) { results.value = data.results; examState.value = 'results'; }
+    if (data.results) { results.value = data.results; examState.value = 'results'; emit('refresh'); }
     else throw new Error(data.error || '提交失败');
   } catch (err) {
     alert('提交失败: ' + (err instanceof Error ? err.message : String(err)));

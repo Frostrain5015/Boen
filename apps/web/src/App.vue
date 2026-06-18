@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue';
-import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, PencilLine, Settings, GraduationCap, BrainCircuit, BarChart3 } from 'lucide-vue-next';
+import { Send, Sparkles, LogOut, User, Plus, Trash2, MessageSquare, ChevronLeft, ChevronRight, ChevronDown, PencilLine, Settings, GraduationCap, BrainCircuit, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
-import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade } from '@boen/shared';
+import type { QuestionPayload, AnswerPayload, GradingResult, SseEvent, Grade, ExamSummary } from '@boen/shared';
 import { gradeToBand } from '@boen/shared';
-import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, type Conversation, type ConversationMessage } from '@/services/chat';
+import { streamChat, streamAnswer, getConversations, getConversation, createConversation, deleteConversation, listExams, type Conversation, type ConversationMessage } from '@/services/chat';
 import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
 import QuestionCard from '@/components/QuestionCard.vue';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
 import ExamView from '@/components/ExamView.vue';
+import ExamReview from '@/components/ExamReview.vue';
 import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import Mascot from '@/components/Mascot.vue';
 import TypingDots from '@/components/TypingDots.vue';
@@ -68,9 +69,21 @@ const conversations = ref<Conversation[]>([]);
 const currentConversationId = ref<string | null>(null);
 const sidebarOpen = ref(true);
 
+// ── 考试历史 ──────────────────────────────
+const exams = ref<ExamSummary[]>([]);
+const selectedExamId = ref<string | null>(null);
+const examViewKey = ref(0); // 递增以强制重挂 ExamView（开始新考试）
+
 // ── 视图切换 ──────────────────────────────
-const currentView = ref<'chat' | 'profile' | 'exam'>('chat');
+const currentView = ref<'chat' | 'profile' | 'exam' | 'examReview'>('chat');
+// 侧栏手风琴：同时只展开一个二级菜单（档案无二级菜单）
+const expandedSection = ref<'chat' | 'exam' | null>('chat');
 const activeMode = ref<'none' | 'review' | 'exam'>('none');
+
+const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
+  chinese: { label: '语文', emoji: '📖' }, math: { label: '数学', emoji: '🔢' },
+  english: { label: '英语', emoji: '🔤' }, science: { label: '科学', emoji: '🔬' },
+};
 
 // ── 聊天状态 ──────────────────────────────
 const items = ref<ChatItem[]>([]);
@@ -311,6 +324,49 @@ async function loadConversations() {
   }
 }
 
+// ── 考试历史 ──────────────────────────────
+async function loadExams() {
+  try {
+    const { exams: list } = await listExams();
+    exams.value = list;
+  } catch {
+    // 忽略加载失败
+  }
+}
+
+function subjectMeta(s: string) { return SUBJECT_MAP[s] ?? { label: s, emoji: '📁' }; }
+function examGradeLabel(g: string): string {
+  const n = Number(g);
+  if (!n) return g;
+  return n <= 6 ? `小${'一二三四五六'[n - 1]}` : `初${'一二三'[n - 7]}`;
+}
+
+// 侧栏分区切换（手风琴）：对话/考试展开二级菜单，档案直接进入
+function selectSection(section: 'chat' | 'exam' | 'profile') {
+  if (section === 'profile') {
+    expandedSection.value = null;
+    currentView.value = 'profile';
+    return;
+  }
+  expandedSection.value = section;
+  // 考试分区：有选中的回顾则保持回顾视图，否则进入出卷/答题视图
+  if (section === 'chat') currentView.value = 'chat';
+  else currentView.value = selectedExamId.value ? 'examReview' : 'exam';
+}
+
+function startNewExam() {
+  selectedExamId.value = null;
+  examViewKey.value++; // 强制重挂，回到出卷配置页
+  currentView.value = 'exam';
+  expandedSection.value = 'exam';
+}
+
+function openExamReview(examId: string) {
+  selectedExamId.value = examId;
+  currentView.value = 'examReview';
+  expandedSection.value = 'exam';
+}
+
 async function handleNewConversation() {
   try {
     const { conversation } = await createConversation('新对话', subject.value);
@@ -398,7 +454,7 @@ async function checkAuth() {
   authenticated.value = auth;
   if (auth) {
     currentUser.value = await getCurrentUser();
-    await loadConversations();
+    await Promise.all([loadConversations(), loadExams()]);
   }
   authChecked.value = true;
 }
@@ -413,6 +469,7 @@ function handleOAuthSuccess() {
     currentUser.value = user;
   });
   loadConversations();
+  loadExams();
   // 首次登录弹出画像设置
   if (!userProfile.value) showSetupDialog.value = true;
 }
@@ -514,65 +571,118 @@ onMounted(() => {
     <div class="app-grain"></div>
 
     <div class="relative z-10 flex h-full">
-      <!-- 侧边栏：对话列表（仅在聊天模式显示） -->
+      <!-- 侧边栏：对话 / 考试 / 档案（常驻，手风琴二级菜单） -->
       <aside
-        v-if="currentView === 'chat'"
         class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
         :class="sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
       >
         <!-- 内层固定 256px，宽度动画时整体被裁切，内容不重排 -->
         <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
-        <!-- 侧边栏头部 -->
-        <div class="flex items-center justify-between border-b border-[var(--line)] p-3">
-          <h2 class="font-display text-sm font-bold text-[var(--ink)]">对话历史</h2>
-          <button
-            @click="handleNewConversation"
-            class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-[0_8px_18px_-8px_var(--accent-glow),inset_0_-2px_0_rgba(0,0,0,0.12),inset_0_1.5px_0_rgba(255,255,255,0.25)] transition-all hover:scale-105 hover:shadow-[0_11px_22px_-8px_var(--accent-glow)]"
-            title="新建对话"
-          >
-            <Plus class="h-4 w-4" />
-          </button>
-        </div>
-
-        <!-- 对话列表 -->
-        <div class="flex-1 overflow-y-auto p-2">
-          <div v-if="conversations.length === 0" class="py-8 text-center text-sm text-[var(--ink-soft)]">
-            <MessageSquare class="mx-auto mb-2 h-8 w-8 opacity-40" />
-            <p>还没有对话</p>
-            <p class="mt-1 text-xs">点击上方 + 开始新对话</p>
+          <!-- 品牌 + 折叠 -->
+          <div class="flex items-center justify-between border-b border-[var(--line)] px-3 py-2.5">
+            <div class="flex items-center gap-2">
+              <Mascot :size="28" :float="false" :animated="false" />
+              <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
+            </div>
+            <button @click="sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
+              <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
+            </button>
           </div>
-          <div v-else class="flex flex-col gap-1">
+
+          <div class="flex-1 overflow-y-auto px-2 py-2">
+            <!-- ═══ 对话 ═══ -->
             <button
-              v-for="conv in conversations"
-              :key="conv.id"
-              @click="selectConversation(conv.id)"
-              class="group flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-all"
-              :class="
-                currentConversationId === conv.id
-                  ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'
-                  : 'text-[var(--ink)] hover:bg-[var(--line)]/50'
-              "
+              @click="selectSection('chat')"
+              class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
+              :class="currentView === 'chat' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
             >
               <MessageSquare class="h-4 w-4 shrink-0" />
-              <div class="min-w-0 flex-1">
-                <p class="truncate font-medium">{{ conv.title }}</p>
-                <div class="flex items-center gap-1.5">
-                  <span class="subject-tag">{{ subjectLabel(conv.subject).emoji }}{{ subjectLabel(conv.subject).label }}</span>
-                  <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
-                </div>
-              </div>
-              <button
-                @click="(e) => handleDeleteConversation(conv.id, e)"
-                class="opacity-0 rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100"
-                title="删除对话"
-              >
-                <Trash2 class="h-3.5 w-3.5" />
+              <span class="flex-1">对话</span>
+              <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="expandedSection === 'chat' ? '' : '-rotate-90'" />
+            </button>
+            <!-- 对话二级菜单 -->
+            <div v-if="expandedSection === 'chat'" class="mb-1 mt-1 space-y-0.5 pl-2">
+              <button @click="handleNewConversation" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]">
+                <Plus class="h-3.5 w-3.5" /> 新建对话
               </button>
+              <div v-if="conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有对话</div>
+              <button
+                v-for="conv in conversations" :key="conv.id"
+                @click="selectConversation(conv.id)"
+                class="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
+                :class="currentView === 'chat' && currentConversationId === conv.id ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+              >
+                <MessageSquare class="h-3.5 w-3.5 shrink-0 opacity-60" />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-medium">{{ conv.title }}</p>
+                  <div class="flex items-center gap-1.5">
+                    <span class="subject-tag">{{ subjectLabel(conv.subject).emoji }}{{ subjectLabel(conv.subject).label }}</span>
+                    <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
+                  </div>
+                </div>
+                <button @click="(e) => handleDeleteConversation(conv.id, e)" class="opacity-0 rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100" title="删除对话">
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              </button>
+            </div>
+
+            <!-- ═══ 考试 ═══ -->
+            <button
+              @click="selectSection('exam')"
+              class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
+              :class="currentView === 'exam' || currentView === 'examReview' ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            >
+              <FileText class="h-4 w-4 shrink-0" />
+              <span class="flex-1">考试</span>
+              <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="expandedSection === 'exam' ? '' : '-rotate-90'" />
+            </button>
+            <!-- 考试二级菜单 -->
+            <div v-if="expandedSection === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
+              <button @click="startNewExam" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#5848d6] transition-colors hover:bg-[#e8e4ff]">
+                <Plus class="h-3.5 w-3.5" /> 新考试
+              </button>
+              <div v-if="exams.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有考试记录</div>
+              <button
+                v-for="ex in exams" :key="ex.examId"
+                @click="ex.status === 'completed' ? openExamReview(ex.examId) : startNewExam()"
+                class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
+                :class="currentView === 'examReview' && selectedExamId === ex.examId ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+              >
+                <span class="shrink-0 text-base">{{ subjectMeta(ex.subject).emoji }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-medium">{{ ex.title }}</p>
+                  <div class="flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
+                    <span>{{ subjectMeta(ex.subject).label }}·{{ examGradeLabel(ex.grade) }}</span>
+                    <span>{{ formatDate(ex.submittedAt ?? ex.createdAt) }}</span>
+                  </div>
+                </div>
+                <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6]">{{ ex.result.percentage }}</span>
+                <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42]">未完成</span>
+              </button>
+            </div>
+
+            <!-- ═══ 档案（知识图谱，无二级菜单）═══ -->
+            <button
+              @click="selectSection('profile')"
+              class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
+              :class="currentView === 'profile' ? 'bg-[#d9f4ec] text-[#0e9b76]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            >
+              <BrainCircuit class="h-4 w-4 shrink-0" />
+              <span class="flex-1">档案</span>
             </button>
           </div>
         </div>
-        </div>
       </aside>
+
+      <!-- 折叠态下的展开把手 -->
+      <button
+        v-if="!sidebarOpen"
+        @click="sidebarOpen = true"
+        class="absolute left-2 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)]"
+        title="展开侧栏"
+      >
+        <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
+      </button>
 
       <!-- 主内容区 -->
       <div class="flex flex-1 flex-col" :data-subject="subject">
@@ -585,15 +695,6 @@ onMounted(() => {
         <header
           class="flex items-center gap-3 px-5 py-3.5"
         >
-          <!-- 侧边栏切换 -->
-          <button
-            @click="sidebarOpen = !sidebarOpen"
-            class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"
-          >
-            <ChevronLeft v-if="sidebarOpen" class="h-5 w-5 text-[var(--ink-soft)]" />
-            <ChevronRight v-else class="h-5 w-5 text-[var(--ink-soft)]" />
-          </button>
-
           <Mascot :size="46" :float="false" :animated="false" />
           <div class="leading-tight">
             <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>
@@ -742,7 +843,7 @@ onMounted(() => {
         <!-- 输入区 -->
         <footer class="px-4 pb-4 pt-1">
           <div class="mx-auto w-full max-w-2xl">
-            <!-- 模式切换按钮（仿成熟智能体插件栏） -->
+            <!-- 学习模式（聊天内子模式：预填「我想学习」引导）。考试/档案已移至侧栏 -->
             <div class="mb-2 flex items-center gap-1.5 px-1">
               <button
                 @click="activeMode = activeMode === 'review' ? 'none' : 'review'; currentView = 'chat'; if (activeMode === 'review') input = '我想学习 '"
@@ -751,22 +852,6 @@ onMounted(() => {
               >
                 <GraduationCap class="h-3.5 w-3.5" />
                 <span>学习模式</span>
-              </button>
-              <button
-                @click="activeMode = 'exam'; currentView = 'exam'"
-                class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]"
-                :class="activeMode === 'exam' ? 'border-[#6c5ce7] bg-[#e8e4ff] text-[#5848d6]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[#6c5ce7] hover:bg-[#e8e4ff] hover:text-[#5848d6]'"
-              >
-                <BarChart3 class="h-3.5 w-3.5" />
-                <span>考试模式</span>
-              </button>
-              <button
-                @click="activeMode = 'none'; currentView = 'profile'"
-                class="flex items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]"
-                :class="(currentView as string) === 'profile' ? 'border-[#14b48a] bg-[#d9f4ec] text-[#0e9b76]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[#14b48a] hover:bg-[#d9f4ec] hover:text-[#0e9b76]'"
-              >
-                <BrainCircuit class="h-3.5 w-3.5" />
-                <span>学习画像</span>
               </button>
             </div>
             <div class="clay flex items-end gap-2 p-2">
@@ -791,11 +876,14 @@ onMounted(() => {
         </footer>
         </template>
 
-        <!-- 学习画像视图 -->
+        <!-- 档案（学习画像 / 知识图谱）视图 -->
         <KnowledgeProfile v-else-if="currentView === 'profile'" key="profile" class="flex-1" @back="currentView = 'chat'" />
 
-        <!-- 考试视图 -->
-        <ExamView v-else-if="currentView === 'exam'" key="exam" class="flex-1" @back="currentView = 'chat'" />
+        <!-- 考试视图（出卷 / 答题），:key 递增可重挂以开始新考试 -->
+        <ExamView v-else-if="currentView === 'exam'" :key="`exam-${examViewKey}`" class="flex-1" @back="currentView = 'chat'" @refresh="loadExams" />
+
+        <!-- 考试回顾视图 -->
+        <ExamReview v-else-if="currentView === 'examReview'" key="examReview" class="flex-1" :exam-id="selectedExamId" @back="currentView = 'chat'" />
       </div>
     </div>
 
