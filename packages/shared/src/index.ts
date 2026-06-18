@@ -164,6 +164,8 @@ export interface ExamResults {
   tierBreakdown: Array<{ tier: string; correct: number; total: number; percentage: number }>;
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
+  /** 博文对本次考试的综合分析总结（Markdown），包括考查知识点、答题情况、失分点与薄弱点 */
+  analysis?: string;
 }
 
 /** 考试历史列表项（概要） */

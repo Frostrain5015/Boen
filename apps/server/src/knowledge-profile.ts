@@ -228,7 +228,10 @@ export function seedProficiencyFromHistory(userId: string): { updated: number } 
       const meta = JSON.parse(msg.content);
       if (meta.__boen_type === 'grading_result' && meta.result?.knowledgePoints?.length) {
         for (const kpName of meta.result.knowledgePoints) {
-          const node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND title=?`).get(kpName) as { id: number } | undefined;
+          // 模糊匹配：精确 → 包含 → 反向包含（与 exam.ts findKnowledgePointNode 一致）
+          let node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND title=?`).get(kpName) as { id: number } | undefined;
+          if (!node) node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND title LIKE ?`).get(`%${kpName}%`) as { id: number } | undefined;
+          if (!node) node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND ? LIKE '%' || title`).get(kpName) as { id: number } | undefined;
           if (node) {
             updateProficiency(userId, node.id, meta.result.score ?? 0, meta.result.maxScore ?? 1);
             count++;

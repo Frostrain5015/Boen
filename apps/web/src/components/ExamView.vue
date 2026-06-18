@@ -49,6 +49,7 @@ interface ExamResultsData {
   tierBreakdown: Array<{ tier: string; correct: number; total: number; percentage: number }>;
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
+  analysis?: string;
 }
 
 const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
@@ -287,7 +288,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <!-- ═══ GENERATING（分步进度） ═══ -->
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
-        <Mascot :size="80" state="thinking" />
+        <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
         <div class="w-72 space-y-3">
           <div class="flex items-center gap-3" :class="genProgress.step === 'analyze' || genProgress.progress > 20 ? 'opacity-100' : 'opacity-40'">
             <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="genProgress.progress > 20 ? 'bg-[#18a558] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ genProgress.progress > 20 ? '✓' : '1' }}</span>
@@ -375,12 +376,17 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       </div>
     </div>
 
-    <!-- ═══ GRADING ═══ -->
+    <!-- ═══ GRADING（与 GENERATING 一致布局） ═══ -->
     <div v-if="examState === 'grading'" class="flex h-full flex-col items-center justify-center">
-      <div class="flex flex-col items-center gap-4">
-        <Mascot :size="90" state="thinking" />
-        <p class="font-display text-lg font-bold text-[var(--ink)]">批改中…</p>
-        <div class="h-1.5 w-48 overflow-hidden rounded-full bg-[var(--line)]"><div class="h-full w-full origin-left animate-pulse rounded-full bg-[var(--accent)]"></div></div>
+      <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
+        <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
+        <div class="w-72 space-y-2 text-center">
+          <p class="font-display text-lg font-bold text-[var(--ink)]">批改中…</p>
+          <p class="text-sm font-medium text-[var(--ink-soft)]">正在逐题评分并生成分析报告</p>
+        </div>
+        <div class="h-1.5 w-72 overflow-hidden rounded-full bg-[var(--line)]">
+          <div class="loading-bar-inner h-full rounded-full"></div>
+        </div>
       </div>
     </div>
 
@@ -401,6 +407,17 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           </div>
           <span class="inline-block rounded-full px-4 py-1 font-display text-sm font-bold" :class="results.grade === '优秀' ? 'bg-[#e7f7ee] text-[#18a558]' : results.grade === '良好' ? 'bg-[#fef7e6] text-[#e0a92e]' : results.grade === '及格' ? 'bg-[#fef3e2] text-[#f59e42]' : 'bg-[#fdeaef] text-[#f2557a]'">{{ results.grade }}</span>
           <div class="mt-3 text-xs text-[var(--ink-soft)]">{{ results.totalScore }}/{{ results.maxScore }} 分</div>
+        </div>
+
+        <!-- 博文综合分析 -->
+        <div v-if="results.analysis" class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 120 } }">
+          <div class="flex items-start gap-3 p-4">
+            <div class="shrink-0"><Mascot :size="44" state="happy" /></div>
+            <div class="min-w-0 flex-1">
+              <p class="mb-2 font-display text-xs font-bold text-[var(--accent)]">博文的总结</p>
+              <div class="analysis-body text-sm leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(results.analysis)"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Tier Breakdown -->

@@ -5,3 +5,4 @@ export { LOOKUP_KNOWLEDGE_POINT_TOOL, lookupKnowledgePointTool } from './curricu
 export type { LookupKnowledgePointArgs } from './curriculum-tools.js';
 export { systemPromptForQa } from './prompts.js';
 export { quizTools, QUIZ_TOOL_NAMES, toQuestionPayload, gradeAnswer } from './quiz/index.js';
+export type { ShortAnswerGraderParams, ShortAnswerGraderResult, ShortAnswerGrader } from './quiz/index.js';

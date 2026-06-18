@@ -8,6 +8,25 @@ import {
 
 export { quizTools, QUIZ_TOOL_NAMES } from './schemas.js';
 
+// ── 简答题 LLM 评分器类型 ──────────────────────
+export interface ShortAnswerGraderParams {
+  stem: string;
+  referenceAnswer?: string | null;
+  keyPoints?: string[] | null;
+  userAnswer: string;
+  /** 满分（供 LLM 参考，与最终 scoring 无关） */
+  maxScore: number;
+}
+
+export interface ShortAnswerGraderResult {
+  correct: boolean;
+  score: number;
+  explanation: string;
+}
+
+/** 异步外部评分器，由调用方提供（典型实现：LLM 调用） */
+export type ShortAnswerGrader = (params: ShortAnswerGraderParams) => Promise<ShortAnswerGraderResult>;
+
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
 const setEq = (a: string[], b: string[]) => {
   const sa = new Set(a.map((x) => x.trim().toUpperCase()));
@@ -67,11 +86,12 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
 }
 
 /** 服务端判分。返回判分结果 + 回灌给模型的 ToolMessage 内容。 */
-export function gradeAnswer(
+export async function gradeAnswer(
   toolName: string,
   rawArgs: unknown,
   answer: AnswerPayload,
-): { result: GradingResult; toolContent: string } {
+  gradeShortAnswer?: ShortAnswerGrader,
+): Promise<{ result: GradingResult; toolContent: string }> {
   let result: GradingResult;
 
   const commonResult = (base: GradingResult): GradingResult => {
@@ -120,8 +140,26 @@ export function gradeAnswer(
     const ref = a.referenceAnswer
       ? (a.keyPoints?.length ? `${a.referenceAnswer}\n要点：${a.keyPoints.join('、')}` : a.referenceAnswer)
       : (a.keyPoints?.length ? `要点：${a.keyPoints.join('、')}` : '（无参考答案）');
-    // 简答题由模型定性评判
-    result = commonResult({ correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation ?? '' });
+    if (gradeShortAnswer) {
+      // LLM 评分：由外部回调调用模型进行语义评判
+      const graderResult = await gradeShortAnswer({
+        stem: a.stem,
+        referenceAnswer: a.referenceAnswer,
+        keyPoints: a.keyPoints,
+        userAnswer: answer.text,
+        maxScore: 1,
+      });
+      result = commonResult({
+        correct: graderResult.correct,
+        score: graderResult.score,
+        maxScore: 1,
+        reference: ref,
+        explanation: graderResult.explanation || (a.explanation ?? ''),
+      });
+    } else {
+      // 无评分器时保持占位（一般由调用方保证传入）
+      result = commonResult({ correct: null, score: 0, maxScore: 1, reference: ref, explanation: a.explanation ?? '' });
+    }
   } else {
     throw new Error(`题型与答案不匹配：${toolName}`);
   }

@@ -402,7 +402,7 @@ app.post('/api/profile/seed', async (c) => {
   return c.json({ updated });
 });
 
-import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession } from './exam.js';
+import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode } from './exam.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
@@ -445,7 +445,7 @@ app.post('/api/exam/submit', async (c) => {
   // 允许 answers 为空数组（用户可能留空全部题目），未作答的题由评分逻辑按 0 分处理
   const answers = Array.isArray(body.answers) ? body.answers : [];
   try {
-    const results = submitExamSession(body.examId, userId, answers as any);
+    const results = await submitExamSession(body.examId, userId, answers as any, model);
     return c.json({ success: true, results });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
@@ -680,14 +680,17 @@ app.post('/api/answer', async (c) => {
       );
       if (alreadyAnswered) throw new Error('这道题已经结束啦，换道新题试试～');
 
+      // 简答题走 LLM 语义评分（只有简答题需要，避免不必要开销）
+      const shortAnswerGrader = target.name === 'ask_short_answer' ? createShortAnswerGrader(model) : undefined;
+
       // 判分，并把结果回灌给模型
-      const { result, toolContent } = gradeAnswer(target.name, target.args, body.answer);
+      const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
-      // 更新知识画像（如果用户已认证）
+      // 更新知识画像（如果用户已认证；用模糊匹配处理 LLM 输出与入库标题的差异）
       if (userId && result.knowledgePoints?.length) {
         for (const kpName of result.knowledgePoints) {
-          const node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND title=?`).get(kpName) as { id: number } | undefined;
+          const node = findKnowledgePointNode(kpName);
           if (node) {
             updateProficiency(userId, node.id, result.score, result.maxScore);
           }
