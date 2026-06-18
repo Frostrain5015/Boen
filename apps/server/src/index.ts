@@ -735,11 +735,10 @@ app.post('/api/answer', async (c) => {
       // 简答题走 LLM 语义评分（只有简答题需要，避免不必要开销）
       const shortAnswerGrader = target.name === 'ask_short_answer' ? createShortAnswerGrader(model) : undefined;
 
-      // 判分，并把结果回灌给模型
+      // 判分
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
-      await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
-      // 更新知识画像并记录变化（从图状态获取当前学科）
+      // 先更新知识画像并记录变化（从图状态获取当前学科），再发送判分结果
       const profChanges: Array<{ kp: string; before: number; after: number }> = [];
       if (userId && result.knowledgePoints?.length) {
         const subject = (state.values as any)?.subject ?? 'math';
@@ -757,10 +756,10 @@ app.post('/api/answer', async (c) => {
           }
         }
       }
-      // 将熟练度变化附加到判分事件中
-      if (profChanges.length) {
-        (result as any).proficiencyChanges = profChanges;
-      }
+      if (profChanges.length) { (result as any).proficiencyChanges = profChanges; }
+
+      // 发送判分结果（含熟练度变化）
+      await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
       // 持久化判分结果（用于会话重载时恢复题目卡片的已答状态）
       if (body.conversationId) {
