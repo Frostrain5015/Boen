@@ -57,25 +57,26 @@ const processedStem = computed(() => {
 interface MathField extends HTMLElement {
   value: string;
   readOnly: boolean;
-  /** 智能模式：打公式走数学模式、打文字（含中文）自动切文本模式，二者混排 */
   smartMode: boolean;
-  /** 右键/上下文菜单项；置空 [] 关闭调色、背景、变体等菜单，避免学生分心 */
   menuItems: unknown[];
 }
 
-/** 初始化一个 math-field：智能模式 + 关菜单 + 同步只读态 */
 function initField(mf: MathField | null) {
   if (!mf) return;
-  mf.smartMode = true;
-  mf.menuItems = [];
-  mf.readOnly = props.answered;
+  try {
+    mf.smartMode = true;
+    mf.menuItems = [];
+    mf.readOnly = props.answered;
+  } catch { /* MathLive 未加载时忽略 */ }
 }
 
 const blankFields = ref<(MathField | null)[]>([]);
 const shortField = ref<MathField | null>(null);
 
-/** 是否对该题型启用 MathLive（仅数学学科） */
-const useMathField = computed(() => props.subject === 'math');
+/** 是否对该题型启用 MathLive（仅数学学科，且 MathLive 已注册） */
+const useMathField = computed(() =>
+  props.subject === 'math' && typeof customElements !== 'undefined' && customElements.get('math-field') != null
+);
 
 function setBlankField(el: unknown, i: number) {
   const mf = el as MathField | null;
