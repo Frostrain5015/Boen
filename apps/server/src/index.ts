@@ -738,22 +738,32 @@ app.post('/api/answer', async (c) => {
       // 判分
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
 
-      // 先更新知识画像并记录变化，再发送判分结果
+      // 更新知识画像：优先用 knowledgePointId 直连节点，否则回退到文本模糊匹配
       const profChanges: Array<{ kp: string; before: number; after: number }> = [];
-      if (userId && result.knowledgePoints?.length) {
+      if (userId) {
         const subject = (state.values as any)?.subject ?? 'math';
-        for (const kpName of result.knowledgePoints) {
-          const kps = kpName.split(/[；;]/).map(s => s.trim()).filter(Boolean);
-          for (const kp of kps) {
-            const node = findKnowledgePointNode(kp, subject);
-            if (!node) { profChanges.push({ kp, before: -1, after: -1 }); continue; }
-            const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
-            const before = oldRow?.weighted_score ?? -1;
-            updateProficiency(userId, node.id, result.score, result.maxScore);
-            const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
-            const after = newRow?.weighted_score ?? -1;
-            profChanges.push({ kp, before: Math.max(0, before), after: Math.max(0, after) });
+        // 收集要更新的节点：ID 优先
+        const nodesToUpdate: Array<{ id: number; title: string }> = [];
+        if (result.knowledgePointId) {
+          const node = db.prepare('SELECT id, title FROM kg_nodes WHERE id=?').get(result.knowledgePointId) as { id: number; title: string } | undefined;
+          if (node) nodesToUpdate.push(node);
+        }
+        // 若无 ID 或 ID 无效，则从文本模糊匹配
+        if (nodesToUpdate.length === 0 && result.knowledgePoints?.length) {
+          for (const kpName of result.knowledgePoints) {
+            for (const kp of kpName.split(/[；;]/).map(s => s.trim()).filter(Boolean)) {
+              const node = findKnowledgePointNode(kp, subject);
+              if (node) nodesToUpdate.push({ id: node.id, title: kp });
+            }
           }
+        }
+        for (const node of nodesToUpdate) {
+          const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+          const before = oldRow?.weighted_score ?? -1;
+          updateProficiency(userId, node.id, result.score, result.maxScore);
+          const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+          const after = newRow?.weighted_score ?? -1;
+          profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });
         }
       }
       if (profChanges.length) { (result as any).proficiencyChanges = profChanges; }

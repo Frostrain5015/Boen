@@ -219,5 +219,24 @@ export async function retrieveCurriculum(args: { grade?: string; subject?: strin
   }
   parts.push('\n讲解时贴合该教材的编排与进度，不超纲；可据此判断学生处于哪个章节、需要哪些前置知识。');
   parts.push('\n【学习周期提示】一个单元完整的闭环是：预习 → 同步练习 → 错题追练 → 单元复习 → 考前巩固。根据学生的提问和行为判断当前阶段，主动引导到下一步。');
+
+  // 注入本年级知识点列表（含 ID，供 LLM 出题时精确引用 knowledgePointId）
+  const kpList = db.prepare(
+    `SELECT n.id, n.title FROM kg_nodes n
+     JOIN curriculum_kg_map m ON m.node_id = n.id
+     JOIN curriculum_units u ON u.id = m.unit_id
+     JOIN curriculum_textbooks t ON t.id = u.textbook_id
+     WHERE t.subject=? AND t.grade=? AND n.type='knowledge_point'
+     GROUP BY n.id ORDER BY n.title`
+  ).all(subject, grade) as { id: number; title: string }[];
+  if (kpList.length > 0) {
+    parts.push('\n【本年级已有知识点（出题时务必填写 knowledgePointId 字段，值为下方列表中的 ID；knowledgePoint 文本也要填但仅用于显示）】');
+    const shown = kpList.slice(0, 50);
+    for (const k of shown) {
+      parts.push(`- [${k.id}] ${k.title}`);
+    }
+    if (kpList.length > 50) parts.push(`- ……（共 ${kpList.length} 个，仅列出前 50）`);
+  }
+
   return parts.join('\n');
 }

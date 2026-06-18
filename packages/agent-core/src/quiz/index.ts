@@ -100,6 +100,7 @@ export async function gradeAnswer(
       ...base,
       knowledgePoints: args.knowledgePoint ? [String(args.knowledgePoint)] : undefined,
       literacies: Array.isArray(args.literacies) ? (args.literacies as string[]) : undefined,
+      knowledgePointId: args.knowledgePointId ? Number(args.knowledgePointId) : undefined,
     };
   };
 

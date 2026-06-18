@@ -81,6 +81,8 @@ export interface GradingResult {
   perBlank?: boolean[];
   knowledgePoints?: string[];
   literacies?: string[];
+  /** LLM 出题时直接引用的知识图谱节点 ID，优先于此 ID 更新画像 */
+  knowledgePointId?: number;
 }
 
 export interface AnswerRequest {
@@ -140,6 +142,8 @@ export interface ExamQuestion {
   referenceAnswer?: string;
   keyPoints?: string[];
   knowledgePoint?: string;
+  /** 知识图谱节点 ID（出题时从课程上下文引用，精确更新画像用） */
+  knowledgePointId?: number;
   literacies?: string[];
   difficulty?: Difficulty;
   explanation: string;

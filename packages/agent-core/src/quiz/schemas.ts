@@ -7,6 +7,7 @@ const difficulty = z.preprocess(
   z.enum(['easy', 'medium', 'hard']).nullish(),
 ).describe('题目难度');
 const knowledgePoint = z.string().nullish().describe('对应考点（仅填主要考点标题，如"解一元一次方程"）');
+const knowledgePointId = z.number().nullish().describe('知识点 ID（来自课程知识库，优先使用 knowledgePointId 而非 knowledgePoint 文本）');
 const literacies = z.array(z.string()).nullish().describe('本题考查的核心素养，如"数感""符号意识""运算能力""推理意识""模型意识""空间观念""几何直观""数据意识""应用意识""创新意识"等，选 1-3 个');
 const explanation = z.string().describe(
   '答案解析。请用以下结构（Markdown 格式）：\n' +
@@ -32,6 +33,7 @@ export const multipleChoiceSchema = z.object({
   correctKeys: z.array(z.string()).min(1).describe('正确选项的 key；多选时填多个'),
   multiSelect: z.boolean().describe('是否为多选题'),
   knowledgePoint,
+  knowledgePointId,
   literacies,
   difficulty,
   explanation,
@@ -45,6 +47,7 @@ export const fillBlankSchema = z.object({
     .min(1)
     .describe('按题干中空的先后顺序排列'),
   knowledgePoint,
+  knowledgePointId,
   difficulty,
   explanation,
 });
@@ -54,6 +57,7 @@ export const trueFalseSchema = z.object({
   passage: passageField,
   answer: z.boolean().describe('该陈述是否正确'),
   knowledgePoint,
+  knowledgePointId,
   literacies,
   difficulty,
   explanation,
@@ -65,6 +69,7 @@ export const shortAnswerSchema = z.object({
   referenceAnswer: z.string().nullish().describe('参考答案（可选，模型可后续在回复中补充）'),
   keyPoints: z.array(z.string()).nullish().describe('评分要点'),
   knowledgePoint,
+  knowledgePointId,
   difficulty,
   explanation: z.string().nullish().describe('解析与作答点评（可选，模型可在后续回复中给出）'),
 });

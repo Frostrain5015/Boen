@@ -346,7 +346,7 @@ async function stepWriteQuestions(
       throw new Error('JSON 解析失败');
     }
     return (parsed.questions || []).map((q: any, i: number) => {
-      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '', groupId: q.groupId ?? undefined };
+      const base: any = { index: i, type: q.type || qt.type, points: q.points ?? qt.pointsPer, stem: q.stem || '', passage: q.passage, knowledgePoint: q.knowledgePoint || (qt.focusKps[i] || ''), knowledgePointId: q.knowledgePointId ?? undefined, literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty || 'medium', explanation: q.explanation || '', groupId: q.groupId ?? undefined };
       if (base.type === 'multiple_choice') {
         const opts = (q.options || []).filter((o: any) => o?.key);
         while (opts.length < 2) opts.push({ key: String.fromCharCode(65 + opts.length), text: '选项' + String.fromCharCode(65 + opts.length) });
@@ -884,7 +884,7 @@ function questionTypeToToolName(type: string): string {
 }
 
 function buildRawArgs(q: ExamQuestion): Record<string, unknown> {
-  const base: Record<string, unknown> = { stem: q.stem, explanation: q.explanation ?? '', knowledgePoint: q.knowledgePoint, literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty };
+  const base: Record<string, unknown> = { stem: q.stem, explanation: q.explanation ?? '', knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId, literacies: normalizeLiteracies(q.literacies), difficulty: q.difficulty };
   if (q.type === 'multiple_choice') return { ...base, options: q.options, correctKeys: q.correctKeys, multiSelect: q.multiSelect };
   if (q.type === 'fill_blank') return { ...base, blanks: q.blanks };
   if (q.type === 'true_false') return { ...base, answer: q.answer };
@@ -952,24 +952,28 @@ export async function submitExamSession(examId: string, userId: string, answers:
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
 
-  // 更新知识画像并记录变化
+  // 更新知识画像并记录变化（优先用 knowledgePointId 直连节点）
   const proficiencyChanges: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }> = [];
   for (const qr of results.questionResults) {
-    if (!qr.knowledgePoint) continue;
-    const kps = qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean);
-    for (const kp of kps) {
-      const node = findKnowledgePointNode(kp, session.subject);
-      if (!node) continue;
-      // 记录更新前
+    // 收集要更新的节点
+    const nodesToUpdate: Array<{ id: number; title: string }> = [];
+    if ((qr as any).knowledgePointId) {
+      const node = db.prepare('SELECT id, title FROM kg_nodes WHERE id=?').get((qr as any).knowledgePointId) as { id: number; title: string } | undefined;
+      if (node) nodesToUpdate.push(node);
+    }
+    if (nodesToUpdate.length === 0 && qr.knowledgePoint) {
+      for (const kp of qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean)) {
+        const node = findKnowledgePointNode(kp, session.subject);
+        if (node) nodesToUpdate.push({ id: node.id, title: kp });
+      }
+    }
+    for (const node of nodesToUpdate) {
       const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
       const before = oldRow?.weighted_score ?? -1;
       updateProficiency(userId, node.id, qr.score, qr.maxScore);
-      // 记录更新后
       const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
       const after = newRow?.weighted_score ?? -1;
-      if (before !== after || before === -1) {
-        proficiencyChanges.push({ kpTitle: kp, before: Math.max(0, before), after, score: qr.score, maxScore: qr.maxScore });
-      }
+      proficiencyChanges.push({ kpTitle: node.title, before: Math.max(0, before), after: Math.max(0, after), score: qr.score, maxScore: qr.maxScore });
     }
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
