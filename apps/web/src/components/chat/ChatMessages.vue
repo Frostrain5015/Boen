@@ -49,6 +49,7 @@ onMounted(() => {
             :question="m.question"
             :answered="m.answered"
             :grading="m.grading"
+            :user-answer="(m as any).userAnswer"
             :subject="uiStore.subject"
             @submit="(a) => chatStore.onAnswer(m, a)"
           />

@@ -25,7 +25,7 @@ export type Subject = 'chinese' | 'math' | 'english' | 'science';
 export type ChatItem =
   | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
-  | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult };
+  | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload };
 
 const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
 
@@ -276,17 +276,6 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const { conversation: conv, messages: msgs } = await getConversation(id);
       uiStore.subject = conv.subject as Subject;
-      const gradingByToolCallId = new Map<string, GradingResult>();
-      for (const m of msgs) {
-        if (m.role === 'system') {
-          try {
-            const meta = JSON.parse(m.content);
-            if (meta.__boen_type === 'grading_result' && meta.toolCallId) {
-              gradingByToolCallId.set(meta.toolCallId, meta.result as GradingResult);
-            }
-          } catch { /* ignore non-structured messages */ }
-        }
-      }
       const restored: ChatItem[] = [];
       for (const m of msgs) {
         if (m.role === 'user') {
@@ -296,13 +285,16 @@ export const useChatStore = defineStore('chat', () => {
             const meta = JSON.parse(m.content);
             if (meta.__boen_type === 'question') {
               const toolCallId: string = meta.toolCallId ?? '';
-              const wasAnswered = !!meta.answered || gradingByToolCallId.has(toolCallId);
+              const wasAnswered = meta.answered === true;
+              const grading = wasAnswered ? (meta.grading as GradingResult | undefined) : undefined;
+              const userAnswer = wasAnswered ? meta.userAnswer : undefined;
               restored.push({
                 kind: 'question',
                 toolCallId,
                 question: meta.payload,
                 answered: wasAnswered,
-                grading: wasAnswered ? gradingByToolCallId.get(toolCallId) : undefined,
+                grading,
+                userAnswer,
               });
             }
           } catch { /* non-structured system message, ignore */ }

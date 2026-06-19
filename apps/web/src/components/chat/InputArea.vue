@@ -64,15 +64,28 @@ onMounted(() => {
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
           </div>
         </Transition>
-        <div
-          v-if="authStore.authenticated && !authStore.isPremium && !chatStore.dailyLimitReached"
-          class="px-4 pb-1 text-left"
-          style="font-family: var(--font-body); font-size: 0.75rem;"
-          :style="{ color: (authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--ink-soft)', opacity: (authStore.dailyRemaining ?? 10) <= 3 ? 1 : 0.6 }"
-        >
-          今日剩余 {{ authStore.dailyRemaining ?? 0 }} 条对话
-        </div>
         <div class="clay flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
+          <!-- 免费用户用量环 -->
+          <div
+            v-if="authStore.authenticated && !authStore.isPremium"
+            class="relative flex h-9 w-9 shrink-0 items-center justify-center"
+            :title="`今日剩余 ${authStore.dailyRemaining ?? 0} 次`"
+          >
+            <svg class="h-9 w-9 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--line)" stroke-width="3" />
+              <circle
+                cx="18" cy="18" r="15" fill="none"
+                :stroke="(authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--accent)'"
+                stroke-width="3" stroke-linecap="round"
+                :stroke-dasharray="2 * Math.PI * 15"
+                :stroke-dashoffset="2 * Math.PI * 15 * (1 - ((authStore.dailyRemaining ?? 10) / 10))"
+                class="transition-all duration-500"
+              />
+            </svg>
+            <span class="absolute text-[10px] font-bold" :style="{ color: (authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--ink-soft)' }">
+              {{ authStore.dailyRemaining ?? 10 }}
+            </span>
+          </div>
           <textarea
             :ref="setInputEl"
             v-model="chatStore.input"

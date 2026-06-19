@@ -112,3 +112,19 @@ export function getRecentMessages(conversationId: string, limit: number): ChatMe
 export function deleteMessages(conversationId: string) {
   db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(conversationId);
 }
+
+/**
+ * 更新某条系统消息的内容（按 conversation_id 和 toolCallId 匹配 __boen_type 消息）。
+ * 用于答题后把判分结果写回题目消息，避免状态分裂。
+ */
+export function updateQuestionMessage(conversationId: string, toolCallId: string, content: string) {
+  const pattern = `%__boen_type%question%${toolCallId}%`;
+  const row = db.prepare(
+    `SELECT id FROM messages WHERE conversation_id = ? AND role = 'system' AND content LIKE ? LIMIT 1`
+  ).get(conversationId, pattern) as { id: number } | undefined;
+  if (row) {
+    const now = Math.floor(Date.now() / 1000);
+    db.prepare('UPDATE messages SET content = ?, created_at = ? WHERE id = ?').run(content, now, row.id);
+    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').run(now, conversationId);
+  }
+}

@@ -32,6 +32,7 @@ import {
   addMessage,
   getMessages,
   getRecentMessages,
+  updateQuestionMessage,
 } from './conversation.js';
 import {
   analyzeMistake,
@@ -1145,9 +1146,16 @@ app.post('/api/answer', async (c) => {
       // 发送判分结果（含熟练度变化）
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
-      // 持久化判分结果（用于会话重载时恢复题目卡片的已答状态）
-      if (body.conversationId) {
-        addMessage(body.conversationId, 'system', JSON.stringify({ __boen_type: 'grading_result', toolCallId: body.toolCallId, result }));
+      // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂
+      if (body.conversationId && body.answer) {
+        updateQuestionMessage(body.conversationId, body.toolCallId, JSON.stringify({
+          __boen_type: 'question',
+          toolCallId: body.toolCallId,
+          payload: null, // 原始 payload 在旧消息中，但前端优先使用 messages 里的原始 question 消息
+          answered: true,
+          grading: result,
+          userAnswer: body.answer,
+        }));
       }
 
       // 答复该 AIMessage 的全部 tool_calls，保证消息序列合法（正常只有一个）

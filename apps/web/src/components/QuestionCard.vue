@@ -18,6 +18,8 @@ const props = defineProps<{
   grading?: GradingResult;
   /** 当前学科（数学模式下显示公式编辑工具栏） */
   subject?: string;
+  /** 用户作答（会话重载时恢复已选选项） */
+  userAnswer?: AnswerPayload;
 }>();
 const emit = defineEmits<{ submit: [answer: AnswerPayload] }>();
 
@@ -40,6 +42,15 @@ const shortText = ref('');
 
 /** 解析折叠控制 */
 const showExplanation = ref(false);
+
+// 从 userAnswer 恢复用户选择（会话重载时用）
+watch(() => props.userAnswer, (ua) => {
+  if (!ua) return;
+  if (ua.type === 'multiple_choice') selectedKeys.value = ua.selectedKeys;
+  else if (ua.type === 'fill_blank') blanks.value = ua.answers;
+  else if (ua.type === 'true_false') tfValue.value = ua.value;
+  else if (ua.type === 'short_answer') shortText.value = ua.text;
+}, { immediate: true });
 
 // 从 reference 反推正确选项 key（作答后才用于高亮）
 const correctKeys = computed(() => {
