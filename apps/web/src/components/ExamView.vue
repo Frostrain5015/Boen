@@ -686,8 +686,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <!-- 单题区域 -->
       <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
         <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
-          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
-            <div class="mx-auto max-w-2xl pb-24">
+          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
+            <div class="mx-auto w-full max-w-2xl my-auto">
               <div class="clay overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
                 <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5 sm:px-5">
                   <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ (currentQuestion?.index ?? 0) + 1 }}</span>
@@ -734,8 +734,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </Transition>
       </div>
 
-      <!-- 底部导航 -->
-      <div class="absolute bottom-0 left-0 right-0 z-20 border-t border-[var(--line)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-sm">
+      <!-- 底部导航（无边沉浸） -->
+      <div class="absolute bottom-0 left-0 right-0 z-20 px-4 py-3">
         <div class="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <button @click="prevQuestion" :disabled="isFirstQuestion" class="exam-nav-btn" :class="isFirstQuestion ? 'exam-nav-btn-disabled' : 'exam-nav-btn-secondary'">
             <ArrowLeft class="h-4 w-4" /> 上一题
@@ -912,22 +912,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 /* ── 顶部题号轨道 ── */
 .dot-nav-wrap {
   position: relative;
-  background:
-    linear-gradient(90deg, var(--surface) 0%, rgba(255,255,255,0.74) 48%, var(--surface) 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 22px -22px rgba(92, 74, 50, 0.45);
 }
-.dot-nav-wrap::before,
-.dot-nav-wrap::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 2;
-  width: 2rem;
-  pointer-events: none;
-}
-.dot-nav-wrap::before { left: 0; background: linear-gradient(90deg, var(--surface), transparent); }
-.dot-nav-wrap::after { right: 0; background: linear-gradient(270deg, var(--surface), transparent); }
 .dot-nav-scroll {
   display: flex;
   align-items: center;
