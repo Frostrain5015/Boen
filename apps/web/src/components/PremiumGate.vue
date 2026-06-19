@@ -82,11 +82,9 @@ function handleContact() {
               首月
             </span>
           </div>
-          <!-- 续费价 -->
+          <!-- 后续续费价 -->
           <p style="font-family: var(--font-body); font-size: 0.85rem; color: var(--ink-soft)">
-            <span style="text-decoration: line-through; opacity: 0.6">¥19.9</span>
-            <span class="mx-1">→</span>
-            <span>¥19.9/月</span>
+            次月起 ¥19.9/月
           </p>
         </div>
 

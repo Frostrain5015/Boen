@@ -1074,6 +1074,17 @@ app.post('/api/chat', async (c) => {
 app.post('/api/answer', async (c) => {
   const body = (await c.req.json()) as AnswerRequest;
   const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+
+  // 免费用户每次 AI 调用都计为一次
+  const subInfo = userId ? await resolveSubscription(c).catch(() => null) : null;
+  if (subInfo && !subInfo.sub.isPremium) {
+    const usage = checkAndIncrementUsage(userId);
+    if (!usage.allowed) {
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或订阅会员', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+    }
+  }
+
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
