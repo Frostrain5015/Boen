@@ -89,7 +89,7 @@ const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === subjec
 
 function gradeLabel(g: string): string {
   const n = Number(g);
-  return n <= 6 ? `小${'一二三四五六'[n - 1]}` : `初${['七', '八', '九'][n - 7]}`;
+  return n <= 6 ? `小${'一二三四五六'[n - 1]}` : `初${['一', '二', '三'][n - 7]}`;
 }
 
 function toggleSection(key: string) {

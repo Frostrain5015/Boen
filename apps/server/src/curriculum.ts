@@ -27,7 +27,7 @@ export interface TextbookSeed {
 const SUBJECT_LABEL: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
 function gradeCn(grade: string): string {
   const n = Number(grade);
-  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初中${['七', '八', '九'][n - 7] ?? grade}`;
+  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初中${['一', '二', '三'][n - 7] ?? grade}`;
 }
 
 // ── 入库（idempotent：同一册重灌会先清后写）──────

@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sshpass *)",
+      "Bash(node *)",
+      "Bash(npm *)",
+      "Bash(pm2 *)",
+      "Bash(git *)",
+      "Bash(rm *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(mkdir *)",
+      "Bash(echo *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(chmod *)",
+      "Bash(date *)",
+      "Bash(pwd *)",
+      "Bash(whoami *)",
+      "Bash(sqlite3 *)",
+      "Bash(ps *)",
+      "Bash(kill *)",
+      "Bash(export *)",
+      "Bash(which *)",
+      "Bash(cargo *)"
+    ]
+  }
+}
