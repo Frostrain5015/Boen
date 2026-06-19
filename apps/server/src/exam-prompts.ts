@@ -85,6 +85,39 @@ export function blueprintArchitectPrompt(
     '⚠ 各板块的知识点不要重复——同一知识点只应出现在一个板块中。',
     '💡 语文/英语等文科科目必须出综合大题：同一篇阅读材料必须出 2-4 道小题（单选/填空/简答混合），所有小题设相同 groupId（数字），阅读材料只放在第一题的 passage 字段，后续同组小题不要再重复放 passage。这是强制要求，不遵守将导致材料重复显示，整卷作废。',
     KATEX_FORMAT_GUIDE,
+    '',
+    '=== 你必须严格按以下 JSON 结构输出（字段名不能改，缺一不可） ===',
+    `{
+  "title": "试卷标题",
+  "totalScore": ${totalScore},
+  "sections": [
+    {
+      "title": "板块标题",
+      "knowledgePoints": [
+        {"title": "知识点名", "weight": 0.5}
+      ],
+      "difficulty": "easy|medium|hard",
+      "questionTypes": [
+        {
+          "type": "multiple_choice|fill_blank|true_false|short_answer",
+          "count": 6,
+          "pointsPer": 3,
+          "focusKps": ["重点知识点"]
+        }
+      ]
+    }
+  ],
+  "coveragePlan": {
+    "must": ["必考知识点"],
+    "focus": ["重点考查"],
+    "stretch": ["拓展"]
+  },
+  "difficultyDistribution": {
+    "easy": 0.4,
+    "medium": 0.4,
+    "hard": 0.2
+  }
+}`,
   ].filter(Boolean).join('\n');
 }
 
