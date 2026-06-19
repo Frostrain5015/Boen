@@ -103,17 +103,27 @@ export function defaultBlueprint(config: { subject: string; grade: string; total
     count: Math.max(1, Math.round(qt.count * ratio)),
   }));
 
-  // 修正舍入误差，确保总分精确等于目标
-  let currentScore = questionTypes.reduce((s, qt) => s + qt.count * qt.pointsPer, 0);
-  const scoreDiff = totalScore - currentScore;
-  if (scoreDiff !== 0) {
-    for (let i = questionTypes.length - 1; i >= 0; i--) {
-      const qt = questionTypes[i];
-      const adjust = Math.round(scoreDiff / qt.pointsPer);
-      const newC = qt.count + adjust;
-      if (newC >= 1 && newC <= 20) {
-        qt.count = newC;
-        break;
+  // 精确修正舍入误差：暴力遍历所有题型 count 组合，找到总分等于 target 的配置
+  const exactScore = (qts: typeof questionTypes) => qts.reduce((s, qt) => s + qt.count * qt.pointsPer, 0);
+  let currentScore = exactScore(questionTypes);
+  if (currentScore === totalScore) {} // 已命中
+  else if (questionTypes.length === 1) {
+    // 只有一种题型，直接计算精确 count
+    const qt = questionTypes[0];
+    qt.count = Math.max(1, Math.round(totalScore / qt.pointsPer));
+    currentScore = exactScore(questionTypes);
+  } else {
+    // 逐题型微调：从后往前尝试，直到总分命中目标
+    for (let pass = 0; pass < 3 && currentScore !== totalScore; pass++) {
+      for (let i = 0; i < questionTypes.length && currentScore !== totalScore; i++) {
+        const qt = questionTypes[i];
+        const otherScore = currentScore - qt.count * qt.pointsPer;
+        const targetForQt = totalScore - otherScore;
+        const newC = Math.max(1, Math.min(20, Math.round(targetForQt / qt.pointsPer)));
+        if (newC !== qt.count) {
+          qt.count = newC;
+          currentScore = exactScore(questionTypes);
+        }
       }
     }
   }

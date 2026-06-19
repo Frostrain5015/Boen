@@ -137,12 +137,20 @@ async function runSingleReview(
 
 /** 把 LLM 输出转为 DimensionScore[] */
 function parseReviewOutput(data: any, dimension: ReviewDimension): ReviewResult {
-  const scores: DimensionScore[] = (data.scores ?? []).map((s: any) => ({
+  const rawScores = Array.isArray(data?.scores) ? data.scores : [];
+  const scores: DimensionScore[] = rawScores.map((s: any) => ({
     dimension,
-    score: Math.max(0, Math.min(100, s.score ?? 80)),
-    issues: Array.isArray(s.issues) ? s.issues : [],
-    similarTo: Array.isArray(s.similarTo) ? s.similarTo : undefined,
+    score: Math.max(0, Math.min(100, typeof s?.score === 'number' ? s.score : 80)),
+    issues: Array.isArray(s?.issues) ? s.issues : [],
+    similarTo: Array.isArray(s?.similarTo) ? s.similarTo : undefined,
   }));
+  // 如果没有有效评分，给所有题默认 80 分
+  if (scores.length === 0) {
+    return {
+      scores: [],
+      overallMatchScore: dimension === 'blueprint_match' ? 80 : undefined,
+    };
+  }
   return {
     scores,
     overallMatchScore: typeof data.overallMatchScore === 'number' ? data.overallMatchScore : undefined,
