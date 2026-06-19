@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { BrainCircuit } from 'lucide-vue-next';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
+import PremiumGate from '@/components/PremiumGate.vue';
 import { useUiStore } from '@/stores/ui';
 import { useExamStore } from '@/stores/exam';
 import type { Subject } from '@/stores/chat';
@@ -26,5 +28,7 @@ function handleExam(detail: { subject: Subject; grade: string; durationMinutes: 
 </script>
 
 <template>
-  <KnowledgeProfile class="flex-1" @back="handleBack" @practice="handlePractice" @exam="handleExam" />
+  <PremiumGate feature-name="知识画像分析" :icon="BrainCircuit">
+    <KnowledgeProfile class="flex-1" @back="handleBack" @practice="handlePractice" @exam="handleExam" />
+  </PremiumGate>
 </template>

@@ -25,6 +25,17 @@
   --accent-soft: #d9f4ec;
   --accent-glow: rgba(20, 180, 138, 0.4);
   --accent-on: #ffffff;
+
+  /* ── 会员系统专用令牌 ── */
+  --premium-gold: #d4a053;
+  --premium-gold-strong: #b8862d;
+  --premium-gold-soft: #fdf3e0;
+  --premium-gold-glow: rgba(212, 160, 83, 0.35);
+
+  /* 锁定态 */
+  --locked-ink: #b0a698;
+  --locked-surface: #f7f2eb;
+  --locked-line: #e8dfd2;
 }
 /* 语文：暖橙色 */
 [data-subject='chinese'] {
@@ -500,6 +511,69 @@ body {
 }
 .view-fade-enter-from { opacity: 0; transform: translateY(8px); }
 .view-fade-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* ── 会员系统 UI ─────────────────────────────── */
+
+/* 会员金色徽章 */
+.badge-premium {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(135deg, #f5d89a 0%, var(--premium-gold) 50%, var(--premium-gold-strong) 100%);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  box-shadow: 0 2px 8px -2px var(--premium-gold-glow),
+              inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* 免费标签 */
+.badge-free {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--locked-surface);
+  color: var(--ink-soft);
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  border: 1px solid var(--locked-line);
+}
+
+/* 付费墙遮罩（毛玻璃） */
+.premium-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  background: rgba(251, 246, 238, 0.82);
+}
+
+/* 锁定图标脉冲 */
+@keyframes lockPulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+/* 限额横幅滑入 */
+.slide-up-enter-active {
+  transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+}
+.slide-up-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.slide-up-enter-from { opacity: 0; transform: translateY(20px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(10px); }
 
 /* ── 无障碍：尊重 reduced-motion ───────────── */
 @media (prefers-reduced-motion: reduce) {

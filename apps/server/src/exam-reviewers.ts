@@ -224,7 +224,7 @@ export async function reviewBoard(
 
 // ── 本地格式预检 ────────────────────────────────────────────
 
-const FALLBACK_MARKERS = ['请回答一道', '请回答', '默认题目', 'fallback', '备选题目', '__needs_review__'];
+const FALLBACK_MARKERS = ['请回答一道', '请回答', '默认题目', 'fallback', '备选题目', '__needs_review__', '选项待补充'];
 const EMBEDDED_OPTION_PATTERN = /(^|[\s\n])A\s*[.．、:：)]\s*[\s\S]+(^|[\s\n])B\s*[.．、:：)]\s*/i;
 
 function isPlaceholderOptionText(text: unknown, key?: string): boolean {

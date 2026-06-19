@@ -16,6 +16,11 @@ import { SystemMessage } from '@langchain/core/messages';
 import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint } from '@boen/shared';
 import { gradeAnswer, makeGenerateQuestionsTool } from '@boen/agent-core';
 import type { ShortAnswerGrader } from '@boen/agent-core';
+import { dirname, resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
+import { writeFileSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
@@ -182,17 +187,18 @@ function normalizeBlanks(raw: any, stem: string): { blanks: { acceptedAnswers: s
 }
 
 function choiceWithoutOptionsToShortAnswer(q: ExamQuestion): ExamQuestion {
-  const converted: ExamQuestion = {
+  // 不再转换为简答题——保持选择题类型，由审核阶段标记重出。
+  // 临时用原始选项或兜底选项保持结构完整。
+  const options = (q.options?.length ?? 0) >= 2
+    ? q.options!
+    : [{ key: 'A', text: '（选项待补充）' }, { key: 'B', text: '（选项待补充）' }];
+  return {
     ...q,
-    type: 'short_answer',
-    referenceAnswer: q.referenceAnswer ?? '',
-    keyPoints: q.keyPoints ?? [],
-    explanation: q.explanation || '原题选项结构不完整，已自动转为简答题作答。',
+    options,
+    correctKeys: q.correctKeys?.length ? q.correctKeys.filter(k => options.some(o => o.key === k)) : [options[0].key],
+    multiSelect: q.multiSelect ?? false,
+    explanation: q.explanation || '本题选项结构不完整，将在审核阶段修正。',
   };
-  delete converted.options;
-  delete converted.correctKeys;
-  delete converted.multiSelect;
-  return converted;
 }
 
 /** 本地格式兜底：补齐必填字段、修复残缺选项 */
@@ -222,6 +228,32 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
 }
 
 // ── 考试生成（四阶段并发流水线） ──────────────
+
+/** 简易哈希（用于 TikZ 代码块去重） */
+function simpleHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return `h${Math.abs(h).toString(36)}`;
+}
+
+/** 文本中是否包含 ```tikz 代码块 */
+function hasTikzBlocks(text: string): boolean {
+  return /```tikz\s*\n?[\s\S]*?```/.test(text ?? '');
+}
+
+/** 提取文本中所有 ```tikz ... ``` 代码块 */
+function extractTikzBlocks(text: string): Array<{ code: string; start: number; end: number }> {
+  const blocks: Array<{ code: string; start: number; end: number }> = [];
+  const re = /```tikz\s*\n?([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text ?? '')) !== null) {
+    blocks.push({ code: match[1].trim(), start: match.index, end: match.index + match[0].length });
+  }
+  return blocks;
+}
 
 /**
  * 重构后的考试生成流水线：
@@ -329,6 +361,33 @@ export async function generateExam(
 
     const totalScore = questions.reduce((s, q) => s + q.points, 0);
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
+
+    // ─── TikZ 预渲染：出题阶段直接交给服务器 LaTeX 引擎编译 ────
+    {
+      const tikzQS = questions.filter(q => hasTikzBlocks(q.stem) || hasTikzBlocks(q.passage ?? '') || q.options?.some(o => hasTikzBlocks(o.text)));
+      if (tikzQS.length > 0) {
+        await Promise.all(tikzQS.map(async (q) => {
+          const svgs: Record<string, string> = {};
+          const blocks = [...extractTikzBlocks(q.stem), ...extractTikzBlocks(q.passage ?? ''), ...(q.options ?? []).flatMap(o => extractTikzBlocks(o.text))];
+          for (const block of blocks) {
+            const hash = simpleHash(block.code);
+            if (svgs[hash]) continue;
+            const tmpDir = mkdtempSync(join(tmpdir(), 'tikz-'));
+            try {
+              const texPath = join(tmpDir, 'tikz.tex'), pdfPath = join(tmpDir, 'tikz.pdf'), svgPath = join(tmpDir, 'tikz.svg');
+              writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${block.code}\\end{document}`, 'utf-8');
+              execSync(`xelatex -no-shell-escape -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
+              if (existsSync(pdfPath)) {
+                execSync(`dvisvgm --pdf --no-fonts -o "${svgPath}" "${pdfPath}"`, { timeout: 15000, stdio: 'pipe' });
+                if (existsSync(svgPath)) { const svg = execSync(`cat "${svgPath}"`, { encoding: 'utf-8', timeout: 5000 }); if (svg) svgs[hash] = svg; }
+              }
+            } catch { /* 单个 TikZ 编译失败不影响整卷 */ } finally { try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理 */ } }
+          }
+          if (Object.keys(svgs).length) q.tikzSvgs = svgs;
+        }));
+      }
+    }
+
     return { title: blueprint.title, questions, totalScore, durationMinutes: estMinutes };
   } catch (e: any) {
     console.error('生成试卷失败:', e?.message?.slice(0, 200));
@@ -455,17 +514,51 @@ async function invokeGenerateQuestions(
     }
   }
 
-  // 文本回退：使用专为文本模式设计的 prompt（不含"通过工具输出"的指令）
-  const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n直接输出 JSON 数组 {"questions": [...]}，不要 markdown 代码块，不要其他文字。' +
-    `\n一次性输出全部 ${count} 道题。`;
+  // 文本回退：带详细 JSON schema 示例
+  const schemaExample = questionType === 'multiple_choice'
+    ? `{
+  "questions": [
+    {
+      "stem": "题干（不要含选项字母）",
+      "options": [{"key": "A", "text": "选项1"}, {"key": "B", "text": "选项2"}, {"key": "C", "text": "选项3"}, {"key": "D", "text": "选项4"}],
+      "correctKeys": ["A"],
+      "multiSelect": false,
+      "knowledgePoint": "考点名称",
+      "literacies": ["核心素养1", "核心素养2"],
+      "difficulty": "medium",
+      "explanation": "解析内容"
+    }
+  ]
+}`
+    : `{
+  "questions": [
+    {
+      "stem": "题干内容",
+      "knowledgePoint": "考点名称",
+      "literacies": ["核心素养"],
+      "difficulty": "medium",
+      "explanation": "解析内容"
+    }
+  ]
+}`;
+  const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n直接输出纯净 JSON，不要 markdown 代码块，不要其他任何文字。' +
+    `\nJSON schema 示例：\n${schemaExample}\n一次性输出全部 ${count} 道题。`;
   try {
     const response = await model.invoke([new SystemMessage(textPrompt)]);
     const content = typeof response.content === 'string' ? response.content : '';
-    // 宽容解析：先尝试 JSON.parse，再尝试提取代码块
+    // 宽容解析：先尝试 JSON.parse；失败则剥离 thinking 杂讯后重试
     let parsed: any;
     try { parsed = JSON.parse(content); } catch {
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const cleaned = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+      let cleaned = jsonMatch ? jsonMatch[1].trim() : content.trim();
+      // 跳过 thinking content：找到第一个独立的花括号开始
+      const objStart = cleaned.indexOf('{');
+      if (objStart > -1) cleaned = cleaned.slice(objStart);
+      const arrStart = cleaned.indexOf('[');
+      if (arrStart > -1 && (objStart === -1 || arrStart < objStart)) cleaned = cleaned.slice(arrStart);
+      // 截掉末尾多余文本
+      const lastClose = cleaned.lastIndexOf('}') > cleaned.lastIndexOf(']') ? cleaned.lastIndexOf('}') + 1 : cleaned.lastIndexOf(']') + 1;
+      if (lastClose > 0) cleaned = cleaned.slice(0, lastClose);
       parsed = JSON.parse(cleaned);
     }
     const questions = parsed.questions ?? (Array.isArray(parsed) ? parsed : []);

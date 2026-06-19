@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import type { Grade } from '@boen/shared';
-import { isAuthenticated, getCurrentUser, logout, type FrostUser } from '@/services/auth';
+import { ref, computed } from 'vue';
+import type { Grade, SubscriptionStatus } from '@boen/shared';
+import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { useChatStore } from './chat';
 import { useExamStore } from './exam';
 
@@ -35,8 +35,38 @@ export const useAuthStore = defineStore('auth', () => {
   const isOAuthCallback = ref(window.location.pathname === '/auth/callback');
   const showSetupDialog = ref(false);
   const userProfile = ref<UserProfile | null>(loadProfile());
+  const subscription = ref<SubscriptionStatus | null>(null);
+
+  // ── Computed ──────────────────────────────────────────────
+  const isPremium = computed(() => subscription.value?.isPremium ?? false);
+  const dailyRemaining = computed(() => subscription.value?.dailyRemaining ?? null);
 
   // ── Actions ───────────────────────────────────────────────
+
+  async function fetchSubscription() {
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetch('/api/subscription/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        subscription.value = (await res.json()) as SubscriptionStatus;
+      }
+    } catch {
+      /* 静默失败，不影响基础功能 */
+    }
+  }
+
+  function decrementDailyUsage() {
+    if (subscription.value && !subscription.value.isPremium && subscription.value.dailyRemaining != null) {
+      subscription.value = {
+        ...subscription.value,
+        dailyUsed: (subscription.value.dailyUsed ?? 0) + 1,
+        dailyRemaining: Math.max(0, subscription.value.dailyRemaining - 1),
+      };
+    }
+  }
 
   async function checkAuth() {
     if (isOAuthCallback.value) return;
@@ -46,7 +76,7 @@ export const useAuthStore = defineStore('auth', () => {
       currentUser.value = await getCurrentUser();
       const chatStore = useChatStore();
       const examStore = useExamStore();
-      await Promise.all([chatStore.loadConversations(), examStore.loadExams()]);
+      await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription()]);
     }
     authChecked.value = true;
   }
@@ -59,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     getCurrentUser().then((user) => {
       currentUser.value = user;
     });
+    fetchSubscription();
     const chatStore = useChatStore();
     const examStore = useExamStore();
     chatStore.loadConversations();
@@ -95,11 +126,16 @@ export const useAuthStore = defineStore('auth', () => {
     isOAuthCallback,
     showSetupDialog,
     userProfile,
+    subscription,
+    isPremium,
+    dailyRemaining,
     checkAuth,
     handleOAuthSuccess,
     handleOAuthError,
     doLogout,
     saveProfile,
     openSetupDialog,
+    fetchSubscription,
+    decrementDailyUsage,
   };
 });

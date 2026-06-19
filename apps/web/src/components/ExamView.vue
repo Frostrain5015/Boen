@@ -39,6 +39,7 @@ interface ExamQuestionData {
   difficulty?: string;
   explanation?: string;
   groupId?: number;
+  tikzSvgs?: Record<string, string>;
 }
 
 interface ExamSessionData {
@@ -115,6 +116,15 @@ const groupedQuestions = computed(() => {
     }
   }
   return groups;
+});
+
+/** 合并所有题目的预渲染 TikZ SVG 映射 */
+const tikzSvgsMap = computed(() => {
+  const all: Record<string, string> = {};
+  for (const q of session.value?.questions ?? []) {
+    if (q.tikzSvgs) Object.assign(all, q.tikzSvgs);
+  }
+  return Object.keys(all).length ? all : undefined;
 });
 
 const SUBJECTS = [
@@ -476,13 +486,13 @@ async function submitExam() {
 // 进入答题页后编译题面里的 TikZ 示意图
 watch(examState, (s) => {
   if (s === 'taking') {
-    nextTick(() => processTikzDiagrams());
+    nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
     centerCurrentDot();
   }
 });
 watch(currentQuestionIndex, () => {
   centerCurrentDot();
-  nextTick(() => processTikzDiagrams());
+  nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
 });
 
 function startExam() {

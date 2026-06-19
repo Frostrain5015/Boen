@@ -2,7 +2,7 @@
  * TikZ 渲染模块
  *
  * - 竖式运算（\opadd / \opsub / \opmul / \opdiv）保留前端轻量渲染器。
- * - 真正的 TikZ 图形调用服务端 /api/render-tikz 渲染为 SVG。
+ * - 真正的 TikZ 图形优先使用预渲染 SVG（出题阶段编译），否则调用服务端 /api/render-tikz。
  */
 
 const errBox = (msg: string) =>
@@ -15,7 +15,7 @@ function renderXlop(code: string): string | null {
   const mAdd = code.match(/\\opadd\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (mAdd) return renderAddSub(mAdd[1], mAdd[2], '+');
   const mSub = code.match(/\\opsub\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mSub) return renderAddSub(mSub[1], mSub[2], '\u2212');
+  if (mSub) return renderAddSub(mSub[1], mSub[2], '−');
   const mMul = code.match(/\\opmul\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (mMul) return renderMul(mMul[1], mMul[2]);
   const mDiv = code.match(/\\opdiv\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
@@ -37,15 +37,14 @@ function renderAddSub(aStr: string, bStr: string, op: string): string {
     const digit = sum % 10;
     carry = Math.floor(sum / 10);
     result.unshift(String(digit));
-    if (carry) carryRow = '\u00B9' + result.slice(0).join('').slice(0, -1).replace(/\d/g, ' ') + '\u00B9 ';
+    if (carry) carryRow = '¹' + result.slice(0).join('').slice(0, -1).replace(/\d/g, ' ') + '¹ ';
     else carryRow = '';
   }
   if (carry) result.unshift(String(carry));
 
   const resultStr = result.join('');
   const resLen = resultStr.length;
-  const lineWidth = resLen;
-  const line = '\u2500'.repeat(lineWidth);
+  const line = '─'.repeat(resLen);
 
   return vertBox(`
     ${carry ? `<div style="font-size:0.7em;color:#e74c3c;letter-spacing:0.1em;height:1.1em">${' '.repeat(resLen - 1)}${carry}</div>` : ''}
@@ -68,7 +67,7 @@ function renderMul(aStr: string, bStr: string): string {
   }
   const maxW = Math.max(a.length, b.length + 1, product.length, ...partials.map(p => p.length));
   const lines = [`<div style="letter-spacing:0.15em">${a.padStart(maxW, ' ')}</div>`];
-  lines.push(`<div style="letter-spacing:0.15em">\u00D7${b.padStart(maxW - 1, ' ')}</div>`);
+  lines.push(`<div style="letter-spacing:0.15em">×${b.padStart(maxW - 1, ' ')}</div>`);
   if (partials.length > 1) {
     for (const p of partials) {
       lines.push(`<div style="letter-spacing:0.15em;color:#666">${p.padStart(maxW, ' ')}</div>`);
@@ -81,8 +80,8 @@ function renderMul(aStr: string, bStr: string): string {
 
 function renderDiv(dividend: string, divisor: string): string {
   return vertBox(`
-    <div style="font-size:0.85rem;color:#666">${divisor} \u27CC ${dividend}</div>
-    <div style="font-size:0.8rem;color:#18a558;margin-top:2px">\u2248 ${(parseInt(dividend) / parseInt(divisor)).toFixed(1)}</div>
+    <div style="font-size:0.85rem;color:#666">${divisor} ⟌ ${dividend}</div>
+    <div style="font-size:0.8rem;color:#18a558;margin-top:2px">≈ ${(parseInt(dividend) / parseInt(divisor)).toFixed(1)}</div>
   `);
 }
 
@@ -91,14 +90,26 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** 简易哈希（与服务器端 simpleHash 一致） */
+function simpleHash(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return `h${Math.abs(h).toString(36)}`;
+}
+
 /**
  * 处理 DOM 中的 TikZ 占位块：
  * - xlop 竖式命令 → 前端 HTML 渲染
- * - 其他 TikZ 图形 → 调用服务端 /api/render-tikz 渲染为 SVG
+ * - 其他 TikZ 图形 → 优先使用预渲染 SVG，否则调用服务端 /api/render-tikz
+ * @param root 根 DOM 节点
+ * @param preRendered 预渲染的 SVG 映射（key=TikZ hash, value=SVG），来自考试出题阶段
  */
 export async function processTikzDiagrams(
   root: ParentNode = document,
-  _opts?: { onlyComplete?: boolean },
+  preRendered?: Record<string, string>,
 ): Promise<void> {
   const wraps = Array.from(root.querySelectorAll<HTMLElement>('.tikz-wrap[data-tikz]'));
   for (const wrap of wraps) {
@@ -114,7 +125,18 @@ export async function processTikzDiagrams(
       continue;
     }
 
-    // 服务端渲染
+    // 优先使用预渲染 SVG（出题阶段已编译好）
+    if (preRendered) {
+      const hash = simpleHash(code);
+      const svg = preRendered[hash];
+      if (svg) {
+        wrap.innerHTML = svg;
+        wrap.dataset.tikzState = 'done';
+        continue;
+      }
+    }
+
+    // 回退：服务端渲染
     try {
       const token = localStorage.getItem('boen_access_token');
       const res = await fetch('/api/render-tikz', {
@@ -127,11 +149,11 @@ export async function processTikzDiagrams(
         wrap.innerHTML = data.svg;
         wrap.dataset.tikzState = 'done';
       } else {
-        wrap.innerHTML = `<details class="tikz-fallback"><summary>\uD83D\uDCD0 TikZ \u6E32\u67D3\u5931\u8D25</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
+        wrap.innerHTML = `<details class="tikz-fallback"><summary>📐 TikZ 渲染失败</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
         wrap.dataset.tikzState = 'done';
       }
     } catch {
-      wrap.innerHTML = `<details class="tikz-fallback"><summary>\uD83D\uDCD0 TikZ \u6E32\u67D3\u5931\u8D25</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
+      wrap.innerHTML = `<details class="tikz-fallback"><summary>📐 TikZ 渲染失败</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
       wrap.dataset.tikzState = 'done';
     }
   }

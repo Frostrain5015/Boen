@@ -454,7 +454,7 @@ app.get('/api/profile/proficiency', async (c) => {
   const authResult = await resolveSubscription(c);
   const gate = requirePremium(c, authResult);
   if (gate) return gate;
-  const userId = authResult.userId;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const profs = getAllProficiencies(userId, subject, grade);
@@ -466,7 +466,7 @@ app.get('/api/profile/report', async (c) => {
   const authResult = await resolveSubscription(c);
   const gate = requirePremium(c, authResult);
   if (gate) return gate;
-  const userId = authResult.userId;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade') || '7';
   const profs = getAllProficiencies(userId, subject, grade);
@@ -501,7 +501,7 @@ app.get('/api/profile/weak-points', async (c) => {
   const authResult = await resolveSubscription(c);
   const gate = requirePremium(c, authResult);
   if (gate) return gate;
-  const userId = authResult.userId;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const threshold = c.req.query('threshold') ? Number(c.req.query('threshold')) : 60;
@@ -512,8 +512,10 @@ app.get('/api/profile/weak-points', async (c) => {
 
 /** GET /api/profile/strong-points — 优势知识点 */
 app.get('/api/profile/strong-points', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const threshold = c.req.query('threshold') ? Number(c.req.query('threshold')) : 75;
@@ -524,8 +526,10 @@ app.get('/api/profile/strong-points', async (c) => {
 
 /** GET /api/profile/literacies — 素养熟练度 */
 app.get('/api/profile/literacies', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const lits = getLiteracyProficiency(userId, subject);
   return c.json({ literacies: lits });
@@ -533,8 +537,10 @@ app.get('/api/profile/literacies', async (c) => {
 
 /** GET /api/profile/recommendations — 练习推荐 */
 app.get('/api/profile/recommendations', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade') || '7';
   const limit = c.req.query('limit') ? Number(c.req.query('limit')) : 5;
@@ -544,8 +550,10 @@ app.get('/api/profile/recommendations', async (c) => {
 
 /** GET /api/profile/weakness-chain/:nodeId — 前置弱点追溯 */
 app.get('/api/profile/weakness-chain/:nodeId', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const nodeId = Number(c.req.param('nodeId'));
   if (isNaN(nodeId)) return c.json({ error: 'nodeId 无效' }, 400);
   const chain = getPrerequisiteWeaknessChain(userId, nodeId);
@@ -554,16 +562,20 @@ app.get('/api/profile/weakness-chain/:nodeId', async (c) => {
 
 /** POST /api/profile/seed — 从历史答题记录回填熟练度 */
 app.post('/api/profile/seed', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const { updated } = seedProficiencyFromHistory(userId);
   return c.json({ updated });
 });
 
 // ── 错题本 API ─────────────────────────────────────────────
 app.get('/api/mistakes', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   return c.json(listMistakes(userId, {
     subject: c.req.query('subject') || undefined,
     grade: c.req.query('grade') || undefined,
@@ -574,8 +586,10 @@ app.get('/api/mistakes', async (c) => {
 });
 
 app.post('/api/mistakes', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   try {
     const contentType = c.req.header('content-type') ?? '';
     if (contentType.includes('multipart/form-data')) {
@@ -622,8 +636,10 @@ app.post('/api/mistakes', async (c) => {
 });
 
 app.post('/api/mistakes/:id/analyze', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const mistakeId = c.req.param('id');
   return streamSSE(c, async (stream) => {
     const send = (e: AnalyzeMistakeEvent) => stream.writeSSE({ data: JSON.stringify(e) });
@@ -640,16 +656,20 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
 });
 
 app.get('/api/mistakes/:id', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const detail = getMistakeDetail(c.req.param('id'), userId);
   if (!detail) return c.json({ error: '错题不存在' }, 404);
   return c.json(detail);
 });
 
 app.patch('/api/mistakes/:id', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   try {
     const body = await c.req.json<{ promptText?: string; studentAnswer?: string; correctAnswer?: string; errorReason?: string }>();
     const mistake = updateMistake(c.req.param('id'), userId, body);
@@ -660,16 +680,20 @@ app.patch('/api/mistakes/:id', async (c) => {
 });
 
 app.delete('/api/mistakes/:id', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const ok = archiveMistake(c.req.param('id'), userId);
   if (!ok) return c.json({ error: '错题不存在' }, 404);
   return c.json({ success: true });
 });
 
 app.get('/api/mistakes/:id/assets/:assetId', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const asset = getMistakeAssetFile(c.req.param('id'), Number(c.req.param('assetId')), userId);
   if (!asset) return c.json({ error: '图片不存在' }, 404);
   const bytes = await readMistakeAsset(asset.filePath);
@@ -677,8 +701,10 @@ app.get('/api/mistakes/:id/assets/:assetId', async (c) => {
 });
 
 app.post('/api/mistakes/:id/practice', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const detail = getMistakeDetail(c.req.param('id'), userId);
   if (!detail) return c.json({ error: '错题不存在' }, 404);
   return c.json({ prompt: formatMistakePracticePrompt(detail.mistake) });
@@ -688,8 +714,10 @@ import { generateExam, createExamSession, getExamSession, submitExamSession, lis
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number; notes?: string; totalScore?: number };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
   return streamSSE(c, async (stream) => {
@@ -722,8 +750,10 @@ app.post('/api/exam/generate', async (c) => {
 
 /** POST /api/exam/submit — 提交考试答案 */
 app.post('/api/exam/submit', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
   if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
   // 允许 answers 为空数组（用户可能留空全部题目），未作答的题由评分逻辑按 0 分处理
@@ -738,8 +768,10 @@ app.post('/api/exam/submit', async (c) => {
 
 /** POST /api/exam/submit/stream - stream real grading progress */
 app.post('/api/exam/submit/stream', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
   if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
   const answers = Array.isArray(body.answers) ? body.answers : [];
@@ -765,15 +797,19 @@ app.post('/api/exam/submit/stream', async (c) => {
 
 /** GET /api/exams — 当前用户的考试历史列表（概要） */
 app.get('/api/exams', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   return c.json({ exams: listExamSessions(userId) });
 });
 
 /** DELETE /api/exam/:examId — 删除一场考试（任意状态，仅限本人） */
 app.delete('/api/exam/:examId', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const ok = deleteExamSession(c.req.param('examId'), userId);
   if (!ok) return c.json({ error: '考试未找到' }, 404);
   return c.json({ success: true });
@@ -784,8 +820,10 @@ app.delete('/api/exam/:examId', async (c) => {
  *  - 已完成（completed）：返回完整题目（含答案）+ 用户作答，用于历史回顾
  */
 app.get('/api/exam/:examId', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const examId = c.req.param('examId');
   const session = getExamSession(examId, userId);
   if (!session) return c.json({ error: '考试未找到' }, 404);
@@ -798,6 +836,7 @@ app.get('/api/exam/:examId', async (c) => {
         options: q.type === 'multiple_choice' ? q.options : undefined,
         multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
         blankCount: q.type === 'fill_blank' ? (q.blankCount ?? q.blanks?.length ?? 1) : undefined,
+        tikzSvgs: q.tikzSvgs,
       }));
   return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions, answers: completed ? session.answers : undefined, results: session.results } });
 });

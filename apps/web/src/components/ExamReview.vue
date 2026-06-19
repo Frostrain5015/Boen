@@ -56,6 +56,15 @@ const proficiencyMap = computed(() => {
   return m;
 });
 
+/** 合并所有题目的预渲染 TikZ SVG 映射 */
+const tikzSvgsMap = computed(() => {
+  const all: Record<string, string> = {};
+  for (const q of detail.value?.questions ?? []) {
+    if (q.tikzSvgs) Object.assign(all, q.tikzSvgs);
+  }
+  return Object.keys(all).length ? all : undefined;
+});
+
 function percent(score?: number, maxScore?: number): number {
   return maxScore && maxScore > 0 ? Math.round(((score ?? 0) / maxScore) * 100) : 0;
 }
@@ -110,7 +119,7 @@ async function load(examId: string) {
   try {
     const { exam } = await getExamReview(examId);
     detail.value = exam;
-    nextTick(() => processTikzDiagrams()); // 编译题面/选项里的 TikZ 示意图
+    nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value)); // 优先使用预渲染 SVG
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -123,7 +132,7 @@ function toggle(i: number) {
   s.has(i) ? s.delete(i) : s.add(i);
   expanded.value = s;
   // 解析区展开后编译其中的 TikZ
-  if (s.has(i)) nextTick(() => processTikzDiagrams());
+  if (s.has(i)) nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
 }
 
 watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });

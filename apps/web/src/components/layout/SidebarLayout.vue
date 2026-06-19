@@ -11,17 +11,20 @@ import {
   FileText,
   NotebookPen,
   BrainCircuit,
+  Lock,
 } from 'lucide-vue-next';
 import Mascot from '@/components/Mascot.vue';
 import { useChatStore } from '@/stores/chat';
 import { useExamStore, subjectMeta, examGradeLabel } from '@/stores/exam';
 import { useUiStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const route = useRoute();
 const chatStore = useChatStore();
 const examStore = useExamStore();
 const uiStore = useUiStore();
+const authStore = useAuthStore();
 
 const currentView = computed(() => {
   const name = route.name as string;
@@ -155,6 +158,7 @@ function startNewExam() {
         >
           <FileText class="h-4 w-4 shrink-0" />
           <span class="flex-1">考试</span>
+          <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
           <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="uiStore.expandedSection === 'exam' ? '' : '-rotate-90'" />
         </button>
         <!-- 考试二级菜单 -->
@@ -193,6 +197,7 @@ function startNewExam() {
         >
           <NotebookPen class="h-4 w-4 shrink-0" />
           <span class="flex-1">错题本</span>
+          <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
 
         <!-- ═══ 档案 ═══ -->
@@ -203,6 +208,7 @@ function startNewExam() {
         >
           <BrainCircuit class="h-4 w-4 shrink-0" />
           <span class="flex-1">档案</span>
+          <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
       </div>
 

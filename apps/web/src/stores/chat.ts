@@ -50,6 +50,7 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
   const reaction = ref<MascotState | null>(null);
+  const dailyLimitReached = ref(false);
   let reactionTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ── Getters ───────────────────────────────────────────────
@@ -125,6 +126,16 @@ export const useChatStore = defineStore('chat', () => {
       const q = items.value.find((it) => it.kind === 'question' && it.toolCallId === e.toolCallId);
       if (q && q.kind === 'question') q.grading = e.result;
       triggerReaction(e.result.correct ? 'happy' : 'surprise');
+    } else if (e.type === 'usage') {
+      const authStore = useAuthStore();
+      if (authStore.subscription && !authStore.subscription.isPremium) {
+        authStore.subscription = {
+          ...authStore.subscription,
+          dailyLimit: e.dailyLimit,
+          dailyUsed: e.dailyUsed,
+          dailyRemaining: e.dailyRemaining,
+        };
+      }
     } else if (e.type === 'error') {
       items.value.push(newAssistant(`\u26a0\ufe0f ${e.message}`));
     }
@@ -186,7 +197,17 @@ export const useChatStore = defineStore('chat', () => {
         (e) => handleEvent(e, idx),
       );
     } catch (err) {
-      items.value.push(newAssistant(`\u26a0\ufe0f \u8bf7\u6c42\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
+      const status = (err as any)?.status;
+      if (status === 429) {
+        dailyLimitReached.value = true;
+        // 移除乐观添加的空助手消息
+        const lastItem = items.value[items.value.length - 1];
+        if (lastItem?.kind === 'assistant' && !lastItem.text) {
+          items.value.pop();
+        }
+      } else {
+        items.value.push(newAssistant(`\u26a0\ufe0f \u8bf7\u6c42\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
+      }
     } finally {
       finalizeAssistants();
       busy.value = false;
@@ -309,6 +330,7 @@ export const useChatStore = defineStore('chat', () => {
     conversations,
     currentConversationId,
     reaction,
+    dailyLimitReached,
     // getters
     hasItems,
     showTyping,

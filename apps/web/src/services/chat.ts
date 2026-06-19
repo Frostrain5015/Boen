@@ -32,6 +32,20 @@ async function streamSse(
   });
   if (!res.body) throw new Error('无响应流');
 
+  // 非 2xx 响应（如 429 限额、401 未认证）：解析 JSON 错误体并抛出
+  if (!res.ok) {
+    try {
+      const errBody = await res.json() as Record<string, unknown>;
+      const err = new Error(errBody.message as string || `请求失败 (${res.status})`);
+      (err as any).status = res.status;
+      (err as any).body = errBody;
+      throw err;
+    } catch (e) {
+      if ((e as any).status) throw e; // 重新抛出已构造的错误
+      throw new Error(`请求失败 (${res.status})`);
+    }
+  }
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';

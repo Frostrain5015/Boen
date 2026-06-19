@@ -2,12 +2,15 @@
 import { nextTick, onMounted } from 'vue';
 import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
+import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
+import DailyLimitBanner from '@/components/DailyLimitBanner.vue';
 import { useVoiceInput } from '@/composables/useVoiceInput';
 import Mascot from '@/components/Mascot.vue';
 
 const chatStore = useChatStore();
 const uiStore = useUiStore();
+const authStore = useAuthStore();
 const { speechSupported, voiceListening, voiceButtonLabel, toggleVoiceInput, initVoiceSupport } = useVoiceInput();
 
 let _inputEl: HTMLTextAreaElement | null = null;
@@ -48,6 +51,7 @@ onMounted(() => {
           </Transition>
         </div>
       </div>
+      <DailyLimitBanner :show="chatStore.dailyLimitReached" />
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
         <Transition name="mascot-pop">
@@ -60,7 +64,15 @@ onMounted(() => {
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
           </div>
         </Transition>
-        <div class="clay flex items-end gap-2 p-2">
+        <div
+          v-if="authStore.authenticated && !authStore.isPremium && !chatStore.dailyLimitReached"
+          class="px-4 pb-1 text-left"
+          style="font-family: var(--font-body); font-size: 0.75rem;"
+          :style="{ color: (authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--ink-soft)', opacity: (authStore.dailyRemaining ?? 10) <= 3 ? 1 : 0.6 }"
+        >
+          今日剩余 {{ authStore.dailyRemaining ?? 0 }} 条对话
+        </div>
+        <div class="clay flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
           <textarea
             :ref="setInputEl"
             v-model="chatStore.input"

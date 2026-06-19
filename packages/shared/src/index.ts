@@ -251,6 +251,8 @@ export interface ExamQuestion {
   explanation: string;
   /** 分步设问分组 ID：同 groupId 的题目共享 passage/stem，前端合并展示 */
   groupId?: number;
+  /** 预渲染的 TikZ 图形 SVG，key 为 TikZ 代码的 hash */
+  tikzSvgs?: Record<string, string>;
 }
 
 export interface ExamQuestionResult {
