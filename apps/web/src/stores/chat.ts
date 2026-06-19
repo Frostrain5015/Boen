@@ -115,6 +115,7 @@ export const useChatStore = defineStore('chat', () => {
       if (cur && cur.kind === 'assistant' && !cur.text.trim()) items.value.splice(idx.value, 1);
       items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
       idx.value = -1;
+      scrollDown(true);
     } else if (e.type === 'title_updated') {
       const conv = conversations.value.find((c) => c.id === e.conversationId);
       if (conv) conv.title = e.title;
@@ -206,6 +207,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     } finally {
       finalizeAssistants();
+      scrollDown(true);
       busy.value = false;
       isGeneratingQuiz.value = false;
     }
@@ -223,6 +225,7 @@ export const useChatStore = defineStore('chat', () => {
       items.value.push(newAssistant(`\u26a0\ufe0f \u63d0\u4ea4\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
     } finally {
       finalizeAssistants();
+      scrollDown(true);
       busy.value = false;
       isGeneratingQuiz.value = false;
     }
