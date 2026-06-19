@@ -159,6 +159,15 @@ const timerDisplay = computed(() => {
 const timerUrgent = computed(() => timer.value < 300 && timer.value > 0);
 
 const currentQuestion = computed(() => session.value?.questions[currentQuestionIndex.value] ?? null);
+/** 去重的题干：若 stem 以 passage 开头，去掉重复部分 */
+const displayStem = computed(() => {
+  const q = currentQuestion.value;
+  if (!q) return '';
+  if (q.passage && q.stem.startsWith(q.passage.slice(0, 40))) {
+    return q.stem.slice(q.passage.length).trim();
+  }
+  return q.stem;
+});
 const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
 const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
 /** 题号窗口：固定显示 9 个（当前居中），左右溢出时动态调整 */
@@ -711,7 +720,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
                   <div v-if="currentQuestion?.passage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(currentQuestion.passage)"></div>
-                  <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(currentQuestion?.stem ?? '')"></div>
+                  <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(displayStem)"></div>
 
                   <!-- Multiple Choice -->
                   <div v-if="currentQuestion?.type === 'multiple_choice'" class="space-y-2.5">
