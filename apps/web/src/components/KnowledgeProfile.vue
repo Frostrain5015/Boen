@@ -109,7 +109,7 @@ function masteryColor(ws: number): string {
   if (ws < 40) return '#f2557a';
   if (ws < 60) return '#f59e42';
   if (ws < 80) return '#e0a92e';
-  return '#18a558';
+  return '#d4a053';
 }
 
 function masteryBg(ws: number): string {
@@ -117,7 +117,7 @@ function masteryBg(ws: number): string {
   if (ws < 40) return '#fdeaef';
   if (ws < 60) return '#fef3e2';
   if (ws < 80) return '#fef7e6';
-  return '#e7f7ee';
+  return '#fdf3e0';
 }
 
 async function fetchOutline() {
@@ -224,7 +224,7 @@ watch(grade, fetchOutline);
                   </clipPath>
                 </defs>
                 <path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="#e0dcd3" stroke="#e0dcd3" stroke-width="0.5" />
-                <path :clip-path="'url(#ovr-star-' + i + ')'" d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="#18a558" stroke="#18a558" stroke-width="0.5" />
+                <path :clip-path="'url(#ovr-star-' + i + ')'" d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z" fill="#d4a053" stroke="#d4a053" stroke-width="0.5" />
               </svg>
             </span>
           </div>
@@ -237,8 +237,8 @@ watch(grade, fetchOutline);
               <p class="text-lg font-bold text-[#e0a92e]">{{ outline.overall.goodCount }}</p>
               <p class="text-[10px] font-medium text-[var(--ink-soft)]">良好</p>
             </div>
-            <div class="rounded-xl bg-[#e7f7ee] p-2">
-              <p class="text-lg font-bold text-[#18a558]">{{ outline.overall.masteredCount }}</p>
+            <div class="rounded-xl bg-[#fdf3e0] p-2">
+              <p class="text-lg font-bold text-[#d4a053]">{{ outline.overall.masteredCount }}</p>
               <p class="text-[10px] font-medium text-[var(--ink-soft)]">优秀</p>
             </div>
           </div>

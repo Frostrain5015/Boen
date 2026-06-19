@@ -344,18 +344,23 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
   /** 数据丰富度阈值：低于此练习次数的知识点在聚合时权重打折 */
   const RICHNESS_THRESHOLD = 5;
 
-  // 加权平均函数：按 weight × 数据丰富度加权（练习次数越多、权重越大，越有可信度）
+  // 加权平均函数：所有 KP 参与聚合，未练习的计 0 分，按「已练习占比」打折
   function weightedAvg(kps: any[]): number {
-    const valid = kps.filter((k: any) => k.weightedScore >= 0);
-    if (!valid.length) return -1;
+    const practiced = kps.filter((k: any) => k.weightedScore >= 0);
+    if (!practiced.length) return -1;
+    // 所有知识点（含未练习的计 0 分）参与加权
     let sumScore = 0, sumWeight = 0;
-    for (const k of valid) {
+    for (const k of kps) {
       const richness = Math.min(1, (k.totalCount ?? 0) / RICHNESS_THRESHOLD);
-      const w = (k.weight ?? 0.5) * richness;
-      sumScore += k.weightedScore * w;
+      // 未练习的知识点也有最小权重，避免被完全忽略
+      const w = (k.weight ?? 0.5) * Math.max(0.2, richness);
+      const score = k.weightedScore >= 0 ? k.weightedScore : 0;
+      sumScore += score * w;
       sumWeight += w;
     }
-    return sumWeight > 0 ? Math.round(sumScore / sumWeight) : Math.round(valid.reduce((s: number, k: any) => s + k.weightedScore, 0) / valid.length);
+    // 再按已练习比例打折（练了 1/2 个知识点 → 最多 50 分）
+    const practiceRatio = practiced.length / kps.length;
+    return sumWeight > 0 ? Math.round((sumScore / sumWeight) * practiceRatio) : -1;
   }
 
   for (const tb of tbs) {
