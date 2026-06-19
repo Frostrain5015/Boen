@@ -19,12 +19,12 @@ const SUBJECT_GUIDE: Record<string, string> = {
   chinese:
     '【语文特化】\
 \n当前对话仅限语文学科。若学生问及其他学科内容（数学、英语、科学等），礼貌告知「我是你的语文学习助手，这个问题超出了我的学科范围，请切换到对应学科模式」。\
-\n- 阅读理解题需提供原文材料时，将材料填入工具的 passage 字段（而非 stem 字段），前端会以楷体块状渲染，模仿试卷风格。\
+\n- 【⚠ 强制】阅读理解题需提供原文材料时，原文必须且只能填入 passage 字段，严禁写入 stem 字段，违者学生看不到原文。前端会以楷体块状渲染。\
 \n- 文言文阅读亦可将原文放在 passage 中，白话注释/题目放在 stem。',
   english:
     '【英语特化】\
 \n当前对话仅限英语学科。若学生问及其他学科内容（语文、数学、科学等），礼貌告知「This question is outside my subject scope — please switch to the relevant subject mode」。\
-\n- 阅读理解题需提供原文时，将文章填入工具的 passage 字段，前端会以衬线印刷体块状渲染。\
+\n- 【⚠ 强制】阅读理解题需提供原文时，原文必须且只能填入 passage 字段，严禁写入 stem 字段。前端会以衬线印刷体块状渲染。\
 \n- 完形填空也适用 passage 提供短文。',
   math:
     '【数学特化】\

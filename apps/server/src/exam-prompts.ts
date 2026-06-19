@@ -146,7 +146,7 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
       : '',
     'knowledgePoint 和 literacies 必须填写，不得为空。',
     `难度统一为 ${difficulty}。`,
-    '分步设问：如果多题共享同一段阅读材料或同一个题干场景（如阅读理解、几何大题），给它们相同的 groupId（数字），并将共享内容写在第一题的 passage 字段中，后续同组题不再重复 passage。没有分组的题不填 groupId。',
+    '【⚠ 阅读材料强制令】阅读理解/完形填空等有原文的题型，原文必须且只能写在 passage 字段中，严禁将原文写进 stem 字段，严禁在 stem 中使用 ** passage ** 等标记来代替 passage 字段。stem 字段只写提问/题干本身。违反此规则将导致学生看不到阅读材料，整题作废。',
     KATEX_FORMAT_GUIDE,
     xlopGuide(config.grade),
     formatRetryHint ? `\n⚠ 上次输出格式有误：${formatRetryHint}。请严格按照工具 schema 输出，不要输出任何文本。` : '',
