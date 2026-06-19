@@ -67,9 +67,11 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
 
   // 自适应 alpha：进步时加速上升，退步时减速下降
   const alpha = existing ? adaptiveAlpha(effectivePct, existing.weighted_score) : BASE_ALPHA;
+  // 首次答题从 50 分起步用 EMA 平滑上升，避免1题满分
+  const INITIAL_WEIGHT = 50;
   const weighted = existing
     ? Math.round(alpha * effectivePct + (1 - alpha) * existing.weighted_score)
-    : Math.round(Math.min(100, (score / maxScore) * 100));
+    : Math.round(alpha * effectivePct + (1 - alpha) * INITIAL_WEIGHT);
 
   db.prepare(`
     INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, last_updated)
