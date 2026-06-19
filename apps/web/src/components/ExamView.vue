@@ -159,14 +159,36 @@ const timerDisplay = computed(() => {
 const timerUrgent = computed(() => timer.value < 300 && timer.value > 0);
 
 const currentQuestion = computed(() => session.value?.questions[currentQuestionIndex.value] ?? null);
-/** 去重的题干：若 stem 以 passage 开头，去掉重复部分 */
+/** 去重的题干：若 stem 以 passage 开头，去掉重复部分；若 stem 含 ** passage ** 标记则提取标记后内容 */
 const displayStem = computed(() => {
   const q = currentQuestion.value;
   if (!q) return '';
+  // 模型把 passage 写进了 stem（用 ** passage ** 做分隔）
+  const passageMarker = /。?\s*\*\*\s*passage\s*\*\*\s*/i;
+  if (passageMarker.test(q.stem)) {
+    // 如果 passage 字段有内容，先用它渲染；stem 只取标记后的提问部分
+    const parts = q.stem.split(passageMarker);
+    return parts[parts.length - 1]?.trim() || q.stem;
+  }
   if (q.passage && q.stem.startsWith(q.passage.slice(0, 40))) {
     return q.stem.slice(q.passage.length).trim();
   }
   return q.stem;
+});
+/** 扩展的 passage：若 stem 含 ** passage ** 标记，提取标记后的正文作为 passage */
+const displayPassage = computed(() => {
+  const q = currentQuestion.value;
+  if (!q) return '';
+  if (q.passage) return q.passage;
+  const marker = /。?\s*\*\*\s*passage\s*\*\*\s*/i;
+  const match = q.stem.match(marker);
+  if (match) {
+    const afterMarker = q.stem.slice(match.index! + match[0].length).trim();
+    // 取到第一个"问题："或"Question："之前的内容
+    const questionSplit = afterMarker.split(/\n\s*(?:问题|Question)\s*[：:]\s*/);
+    return questionSplit[0]?.trim() || '';
+  }
+  return '';
 });
 const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
 const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
@@ -719,7 +741,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                   <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ currentQuestion?.points }}分</span>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
-                  <div v-if="currentQuestion?.passage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(currentQuestion.passage)"></div>
+                  <div v-if="displayPassage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(displayPassage)"></div>
                   <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(displayStem)"></div>
 
                   <!-- Multiple Choice -->
