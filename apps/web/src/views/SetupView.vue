@@ -33,7 +33,7 @@ function handleSave() {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col items-center justify-center p-6" style="background: var(--paper)">
+  <div class="flex min-h-full flex-col items-center justify-center p-6">
     <div class="w-full max-w-md">
       <!-- 头部 -->
       <div class="mb-6 flex items-center gap-3">
