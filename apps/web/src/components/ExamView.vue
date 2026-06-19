@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import Mascot from '@/components/Mascot.vue';
-import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight, LayoutGrid } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
 import { streamExamGenerate } from '@/services/chat';
@@ -82,8 +82,8 @@ const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
 const scoreRevealed = ref(false);
 const currentQuestionIndex = ref(0);
-const answerSheetExpanded = ref(false);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
+const dotNavRef = ref<HTMLElement | null>(null);
 
 /** 将题目按 groupId 分组，无 groupId 的每题自成一组 */
 const groupedQuestions = computed(() => {
@@ -134,10 +134,6 @@ const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
 const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
 const nextButtonLabel = computed(() => (isLastQuestion.value ? '提交' : '下一题'));
 const nextButtonIcon = computed(() => (isLastQuestion.value ? Send : ChevronRight));
-const progressPercent = computed(() => {
-  const total = session.value?.questions.length ?? 1;
-  return ((currentQuestionIndex.value + 1) / total) * 100;
-});
 function isQuestionAnswered(q: ExamQuestionData): boolean {
   const a = answers.value.get(q.index);
   if (a === undefined || a === null) return false;
@@ -157,7 +153,6 @@ function goToQuestion(idx: number) {
   if (!session.value || idx < 0 || idx >= session.value.questions.length) return;
   questionSwitchDirection.value = idx > currentQuestionIndex.value ? 'next' : 'prev';
   currentQuestionIndex.value = idx;
-  answerSheetExpanded.value = false;
 }
 function prevQuestion() { goToQuestion(currentQuestionIndex.value - 1); }
 function nextQuestion() {
@@ -167,8 +162,21 @@ function nextQuestion() {
 
 function handleKeydown(e: KeyboardEvent) {
   if (examState.value !== 'taking') return;
-  if (e.key === 'ArrowLeft' && !answerSheetExpanded.value) { e.preventDefault(); prevQuestion(); }
-  if (e.key === 'ArrowRight' && !answerSheetExpanded.value) { e.preventDefault(); nextQuestion(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevQuestion(); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); nextQuestion(); }
+}
+
+function centerCurrentDot() {
+  nextTick(() => {
+    const nav = dotNavRef.value;
+    const current = nav?.querySelector<HTMLElement>('.question-dot-current');
+    if (!nav || !current) return;
+    const target = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2;
+    nav.scrollTo({
+      left: Math.max(0, target),
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  });
 }
 
 function gradeLabel(g: string): string {
@@ -231,6 +239,31 @@ function setAnswer(qIndex: number, value: any) {
 
 function getAnswer(qIndex: number) {
   return answers.value.get(qIndex);
+}
+
+function isPlaceholderOptionText(text: unknown, key?: string): boolean {
+  const raw = String(text ?? '').trim();
+  const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
+  const expected = key ? key.toUpperCase() : '[A-F]';
+  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+}
+
+function stripOptionPrefix(text: string, key?: string): string {
+  const k = key ? key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '[A-Fa-f]';
+  return String(text ?? '').trim().replace(new RegExp(`^(?:选项\\s*)?${k}\\s*[.．、:：)]\\s*`, 'i'), '').trim();
+}
+
+function displayOptions(q: ExamQuestionData | null): { key: string; text: string }[] {
+  if (!q?.options) return [];
+  return q.options
+    .map((o) => ({ key: String(o.key ?? '').trim().toUpperCase(), text: stripOptionPrefix(o.text, o.key) }))
+    .filter((o) => o.key && !isPlaceholderOptionText(o.text, o.key));
+}
+
+function blankCountForQuestion(q: ExamQuestionData | null): number {
+  if (!q || q.type !== 'fill_blank') return 0;
+  const markerCount = (q.stem.match(/_{2,}|＿{2,}|（\s*）|\(\s*\)|\[\s*\]/g) ?? []).length;
+  return Math.max(q.blankCount ?? 0, q.blanks?.length ?? 0, markerCount, 1);
 }
 
 /** 单题模式下 safely 设置选择题作答（currentQuestion 可能为 null 时自动忽略） */
@@ -355,14 +388,17 @@ async function submitExam() {
 
 // 进入答题页后编译题面里的 TikZ 示意图
 watch(examState, (s) => {
-  if (s === 'taking') nextTick(() => processTikzDiagrams());
+  if (s === 'taking') {
+    nextTick(() => processTikzDiagrams());
+    centerCurrentDot();
+  }
 });
+watch(currentQuestionIndex, () => centerCurrentDot());
 
 function startExam() {
   if (!session.value) return;
   currentQuestionIndex.value = 0;
   answers.value = new Map();
-  answerSheetExpanded.value = false;
   questionSwitchDirection.value = 'next';
   examState.value = 'taking';
   startTimer(session.value.durationMinutes);
@@ -404,7 +440,6 @@ function goBack() {
   if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; }
   currentQuestionIndex.value = 0;
   answers.value = new Map();
-  answerSheetExpanded.value = false;
 }
 function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
@@ -516,11 +551,9 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <span class="text-xs font-bold text-[var(--ink)]">{{ currentQuestionIndex + 1 }} / {{ session.totalQuestions }}</span>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
-          <button @click="answerSheetExpanded = !answerSheetExpanded" class="group flex h-8 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 sm:px-3 text-xs font-bold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white hover:shadow-[0_0_0_4px_var(--accent-soft)] active:scale-95" aria-label="答题卡">
-            <LayoutGrid class="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
-            <span class="hidden sm:inline">答题卡</span>
-            <span class="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-white px-1 text-[10px] text-[var(--accent-strong)] transition-colors group-hover:bg-white/20 group-hover:text-white">{{ answeredCount }}</span>
-          </button>
+          <div class="hidden items-center gap-1.5 rounded-xl bg-[#e8f6ed] px-2.5 py-1.5 text-xs font-bold text-[#1f8f52] sm:flex">
+            已答 {{ answeredCount }}/{{ session.totalQuestions }}
+          </div>
           <div class="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-display text-xs font-bold transition-colors sm:px-3 sm:text-sm" :class="timerUrgent ? 'bg-[#fdeaef] text-[#f2557a] animate-pulse' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">
             <Clock class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span>{{ timerDisplay }}</span>
@@ -528,13 +561,23 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
       </div>
 
-      <!-- 进度条（题号） -->
-      <div class="h-1 w-full bg-[var(--line)]">
-        <div class="h-full bg-[var(--accent)] transition-all duration-500" :style="{ width: progressPercent + '%' }"></div>
-      </div>
-      <div class="hidden items-center justify-between bg-[var(--surface)] px-5 py-2 text-xs font-medium text-[var(--ink-soft)] sm:flex">
-        <span>第 <span class="font-bold text-[var(--accent-strong)]">{{ currentQuestionIndex + 1 }}</span> 题 / 共 {{ session.totalQuestions }} 题</span>
-        <span>已答 <span class="font-bold text-[var(--accent-strong)]">{{ answeredCount }}</span> 题</span>
+      <!-- 题号轨道 -->
+      <div class="dot-nav-wrap">
+        <div ref="dotNavRef" class="dot-nav-scroll" role="navigation" aria-label="题号导航">
+          <button
+            v-for="q in session.questions"
+            :key="q.index"
+            @click="goToQuestion(q.index)"
+            class="question-dot"
+            :class="[
+              currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.index) ? 'question-dot-answered' : 'question-dot-idle',
+            ]"
+            :aria-label="`第 ${q.index + 1} 题${answeredStatus.get(q.index) ? '，已作答' : '，未作答'}`"
+            :aria-current="currentQuestionIndex === q.index ? 'step' : undefined"
+          >
+            <span>{{ q.index + 1 }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- 单题区域 -->
@@ -554,7 +597,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
                   <!-- Multiple Choice -->
                   <div v-if="currentQuestion?.type === 'multiple_choice'" class="space-y-2.5">
-                    <button v-for="opt in (currentQuestion?.options ?? [])" :key="opt.key" @click="setMultipleChoiceAnswer(currentQuestion?.index, currentQuestion?.multiSelect, opt.key)"
+                    <button v-for="opt in displayOptions(currentQuestion)" :key="opt.key" @click="setMultipleChoiceAnswer(currentQuestion?.index, currentQuestion?.multiSelect, opt.key)"
                       class="exam-opt group"
                       :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-selected' : 'exam-opt-idle'"
                     >
@@ -571,9 +614,9 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
                   <!-- Fill Blank -->
                   <div v-if="currentQuestion?.type === 'fill_blank'" class="space-y-2.5">
-                    <div v-for="i in (currentQuestion?.blankCount ?? currentQuestion?.blanks?.length ?? 1)" :key="i" class="flex items-center gap-2" v-motion :initial="{ opacity: 0, x: -12 }" :enter="{ opacity: 1, x: 0, transition: { delay: 80 + i * 50 } }">
+                    <div v-for="i in blankCountForQuestion(currentQuestion)" :key="i" class="flex items-center gap-2" v-motion :initial="{ opacity: 0, x: -12 }" :enter="{ opacity: 1, x: 0, transition: { delay: 80 + i * 50 } }">
                       <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">{{ i }}</span>
-                      <input :value="(getAnswer(currentQuestion?.index ?? -1) || [])[i - 1] || ''" @input="(e) => setFillBlankAnswer(currentQuestion?.index, currentQuestion?.blankCount ?? currentQuestion?.blanks?.length ?? 1, i - 1, (e.target as HTMLInputElement).value)" class="exam-field flex-1" placeholder="填写答案" />
+                      <input :value="(getAnswer(currentQuestion?.index ?? -1) || [])[i - 1] || ''" @input="(e) => setFillBlankAnswer(currentQuestion?.index, blankCountForQuestion(currentQuestion), i - 1, (e.target as HTMLInputElement).value)" class="exam-field flex-1" placeholder="填写答案" />
                     </div>
                   </div>
 
@@ -603,41 +646,6 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
       </div>
 
-      <!-- 答题卡（底部弹出） -->
-      <Transition name="sheet-up">
-        <div v-if="answerSheetExpanded" class="absolute inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-[var(--line)] bg-[var(--surface)] shadow-[0_-12px_40px_rgba(0,0,0,0.1)]">
-          <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
-            <div>
-              <h3 class="font-display text-sm font-bold text-[var(--ink)]">答题卡</h3>
-              <p class="text-[10px] text-[var(--ink-soft)]">已答 {{ answeredCount }} / {{ session.totalQuestions }} 题</p>
-            </div>
-            <button @click="answerSheetExpanded = false" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" aria-label="关闭答题卡"><XCircle class="h-4 w-4 text-[var(--ink-soft)]" /></button>
-          </div>
-          <div class="max-h-[45vh] overflow-y-auto p-5">
-            <div class="grid grid-cols-5 gap-2.5 sm:grid-cols-8 md:grid-cols-10">
-              <button v-for="q in session.questions" :key="q.index" @click="goToQuestion(q.index)" class="answer-sheet-cell" :class="[
-                answeredStatus.get(q.index) ? 'answer-sheet-answered' : 'answer-sheet-unanswered',
-                currentQuestionIndex === q.index ? 'answer-sheet-current' : '',
-              ]" v-motion :initial="{ opacity: 0, scale: 0.6 }" :enter="{ opacity: 1, scale: 1, transition: { delay: Math.min(q.index * 25, 500) } }">
-                <span class="answer-sheet-num">{{ q.index + 1 }}</span>
-                <span class="answer-sheet-dot"></span>
-              </button>
-            </div>
-          </div>
-          <div class="border-t border-[var(--line)] px-5 py-3">
-            <div class="flex items-center gap-4 text-xs text-[var(--ink-soft)]">
-              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-[var(--accent)]"></span> 已作答</span>
-              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded border border-[var(--line)] bg-white"></span> 未作答</span>
-              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded border-2 border-[var(--accent)] bg-white"></span> 当前题</span>
-            </div>
-          </div>
-        </div>
-      </Transition>
-
-      <!-- 答题卡遮罩 -->
-      <Transition name="fade">
-        <div v-if="answerSheetExpanded" @click="answerSheetExpanded = false" class="absolute inset-0 z-25 bg-black/20 backdrop-blur-[2px]"></div>
-      </Transition>
     </div>
 
     <!-- ═══ GRADING（与 GENERATING 一致布局） ═══ -->
@@ -798,6 +806,119 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 @keyframes loadingSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
+/* ── 顶部题号轨道 ── */
+.dot-nav-wrap {
+  position: relative;
+  border-top: 1px solid rgba(236, 224, 207, 0.62);
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, var(--surface) 0%, rgba(255,255,255,0.74) 48%, var(--surface) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 22px -22px rgba(92, 74, 50, 0.45);
+}
+.dot-nav-wrap::before,
+.dot-nav-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 2rem;
+  pointer-events: none;
+}
+.dot-nav-wrap::before { left: 0; background: linear-gradient(90deg, var(--surface), transparent); }
+.dot-nav-wrap::after { right: 0; background: linear-gradient(270deg, var(--surface), transparent); }
+.dot-nav-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 3.25rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 0.46rem max(1rem, calc((100vw - 42rem) / 2)) 0.54rem;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+.dot-nav-scroll::-webkit-scrollbar { display: none; }
+.question-dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: #fffdf8;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 3px 9px -8px rgba(92, 74, 50, 0.55), inset 0 -1px 0 rgba(92, 74, 50, 0.06);
+  transform-origin: center;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+.question-dot::after {
+  content: '';
+  position: absolute;
+  inset: -0.28rem;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.22s ease;
+}
+.question-dot:hover {
+  transform: translateY(-2px);
+  border-color: rgba(249, 115, 22, 0.5);
+  color: var(--accent-strong);
+  box-shadow: 0 9px 18px -14px rgba(92, 74, 50, 0.45), inset 0 -1px 0 rgba(92, 74, 50, 0.06);
+}
+.question-dot:active { transform: translateY(0) scale(0.93); }
+.question-dot:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.24), 0 8px 18px -14px rgba(92, 74, 50, 0.5);
+}
+.question-dot-idle { background: #fffdf8; }
+.question-dot-answered {
+  border-color: #bde8c7;
+  background: #e8f6ed;
+  color: #1f8f52;
+  box-shadow: 0 5px 14px -12px rgba(31, 143, 82, 0.55), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.question-dot-answered::after {
+  opacity: 1;
+  transform: scale(0.78);
+  border-color: rgba(31, 143, 82, 0.18);
+}
+.question-dot-current {
+  z-index: 3;
+  border-color: #f97316;
+  background: linear-gradient(145deg, #ffb15d 0%, #f97316 100%);
+  color: #fff;
+  transform: translateY(-3px) scale(1.12);
+  box-shadow:
+    0 9px 18px -10px rgba(249, 115, 22, 0.65),
+    0 0 0 4px rgba(249, 115, 22, 0.16),
+    inset 0 1px 0 rgba(255,255,255,0.38);
+}
+.question-dot-current::after {
+  opacity: 1;
+  transform: scale(1);
+  border-color: rgba(249, 115, 22, 0.35);
+}
+.question-dot-current span { animation: dotNumberPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes dotNumberPop {
+  from { transform: scale(0.76); opacity: 0.65; }
+  to { transform: scale(1); opacity: 1; }
+}
+
 /* ── 步骤列表 ── */
 .step-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0; transition: opacity 0.4s ease; }
 .step-dot { display: flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 999px; font-size: 0.5rem; flex-shrink: 0; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
@@ -891,41 +1012,12 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .question-prev-enter-from { opacity: 0; transform: translateX(-35px) scale(0.98); }
 .question-prev-leave-to { opacity: 0; transform: translateX(35px) scale(0.98); }
 
-/* ── 答题卡展开动画 ── */
-.sheet-up-enter-active, .sheet-up-leave-active { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease; }
-.sheet-up-enter-from, .sheet-up-leave-to { transform: translateY(100%); opacity: 0; }
-
-/* ── 遮罩淡入 ── */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-/* ── 答题卡热力图格子 ── */
-.answer-sheet-cell {
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 1 / 1; border-radius: 12px;
-  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
-  cursor: pointer; overflow: hidden;
-  transition: transform 0.16s ease, box-shadow 0.2s, border-color 0.2s, background-color 0.2s;
-}
-.answer-sheet-cell:hover { transform: translateY(-2px) scale(1.05); }
-.answer-sheet-cell:active { transform: scale(0.95); }
-.answer-sheet-answered { background: var(--accent); color: #fff; border: 1.5px solid var(--accent); box-shadow: 0 4px 10px -4px rgba(0,0,0,0.18); }
-.answer-sheet-unanswered { background: #fff; color: var(--ink-soft); border: 1.5px solid var(--line); }
-.answer-sheet-unanswered:hover { border-color: var(--accent); color: var(--accent-strong); }
-.answer-sheet-current { box-shadow: 0 0 0 3px var(--accent-soft); }
-.answer-sheet-answered.answer-sheet-current { box-shadow: 0 0 0 3px rgba(255,255,255,0.6), 0 0 0 5px var(--accent-soft); }
-.answer-sheet-dot {
-  position: absolute; bottom: 5px; right: 5px;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: currentColor; opacity: 0.6;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .exam-opt, .exam-tf, .exam-nav-btn, .answer-sheet-cell { transition: none; }
+  .exam-opt, .exam-tf, .exam-nav-btn, .question-dot, .question-dot::after { transition: none; }
   .question-next-enter-active, .question-next-leave-active,
   .question-prev-enter-active, .question-prev-leave-active { transition: none; }
-  .sheet-up-enter-active, .sheet-up-leave-active { transition: none; }
   .exam-opt-key-selected { transform: none; }
+  .question-dot-current span { animation: none; }
+  .dot-nav-scroll { scroll-behavior: auto; }
 }
 </style>

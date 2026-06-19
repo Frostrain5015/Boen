@@ -73,15 +73,111 @@ function normalizeLiteracies(raw: unknown): string[] {
 
 const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
 
+const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+function stripOptionPrefix(text: string, key?: string): string {
+  const k = key ? key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '[A-Fa-f]';
+  return String(text ?? '').trim().replace(new RegExp(`^(?:选项\\s*)?${k}\\s*[.．、:：)]\\s*`, 'i'), '').trim();
+}
+
+function isPlaceholderOptionText(text: unknown, key?: string): boolean {
+  const raw = String(text ?? '').trim();
+  const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
+  const expected = key ? key.toUpperCase() : '[A-F]';
+  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+}
+
+function extractOptionsFromStem(stem: string): { stem: string; options: { key: string; text: string }[] } {
+  const source = String(stem ?? '').replace(/\r\n/g, '\n');
+  const marker = /(^|[\s\n])([A-Fa-f])\s*[.．、:：)]\s*/g;
+  const matches = [...source.matchAll(marker)]
+    .filter((m) => m.index !== undefined)
+    .map((m) => ({
+      key: m[2].toUpperCase(),
+      start: m.index! + m[1].length,
+      contentStart: m.index! + m[0].length,
+    }));
+
+  if (matches.length < 2) return { stem: source.trim(), options: [] };
+
+  const valid = matches.filter((m, i) => OPTION_KEYS[i] === m.key || OPTION_KEYS.includes(m.key));
+  if (valid.length < 2) return { stem: source.trim(), options: [] };
+
+  const first = valid[0];
+  const options = valid.map((m, i) => {
+    const next = valid[i + 1];
+    return {
+      key: m.key,
+      text: source.slice(m.contentStart, next ? next.start : source.length).trim(),
+    };
+  }).filter((o) => o.text.length > 0);
+
+  return {
+    stem: source.slice(0, first.start).trim(),
+    options,
+  };
+}
+
+function normalizeOptions(stem: string, rawOptions: unknown): { stem: string; options: { key: string; text: string }[] } {
+  const extracted = extractOptionsFromStem(stem);
+  const fromRaw = Array.isArray(rawOptions)
+    ? rawOptions
+        .map((o: any, i) => {
+          const key = String(o?.key ?? OPTION_KEYS[i] ?? '').trim().toUpperCase();
+          const text = stripOptionPrefix(String(o?.text ?? ''), key);
+          return { key, text };
+        })
+        .filter((o) => o.key && !isPlaceholderOptionText(o.text, o.key))
+    : [];
+
+  if (extracted.options.length >= 2) {
+    return { stem: extracted.stem || stem, options: extracted.options };
+  }
+
+  return { stem: stem.trim(), options: fromRaw };
+}
+
+function countBlankMarkers(stem: string): number {
+  const matches = String(stem ?? '').match(/_{2,}|＿{2,}|（\s*）|\(\s*\)|\[\s*\]/g);
+  return matches?.length ?? 0;
+}
+
+function normalizeBlanks(raw: any, stem: string): { blanks: { acceptedAnswers: string[] }[]; blankCount: number } {
+  const rawBlanks = Array.isArray(raw?.blanks) ? raw.blanks : [];
+  const blanks = rawBlanks.map((b: any) => {
+    const answers = Array.isArray(b?.acceptedAnswers)
+      ? b.acceptedAnswers.map((a: unknown) => String(a ?? ''))
+      : [String(b?.acceptedAnswer ?? b?.answer ?? '')];
+    return { acceptedAnswers: answers.length ? answers : [''] };
+  });
+
+  const markerCount = countBlankMarkers(stem);
+  const declaredCount = Number(raw?.blankCount ?? raw?.blank_count ?? 0);
+  const blankCount = Math.max(markerCount, blanks.length, Number.isFinite(declaredCount) ? declaredCount : 0, 1);
+
+  while (blanks.length < blankCount) blanks.push({ acceptedAnswers: [''] });
+  return { blanks, blankCount };
+}
+
 /** 本地格式兜底：补齐必填字段、修复残缺选项 */
 function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
   const q2 = { ...q, index: i };
   if (q2.type === 'multiple_choice') {
+    const normalized = normalizeOptions(q2.stem ?? '', q2.options);
+    q2.stem = normalized.stem || q2.stem;
+    q2.options = normalized.options;
     if (!q2.options || q2.options.length < 2) {
       q2.options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }];
       q2.correctKeys = ['A'];
     }
     if (!q2.correctKeys?.length) q2.correctKeys = [q2.options[0].key];
+    q2.correctKeys = q2.correctKeys.filter((k) => q2.options!.some((o) => o.key === k));
+    if (!q2.correctKeys.length) q2.correctKeys = [q2.options[0].key];
+  }
+  if (q2.type === 'fill_blank') {
+    const normalized = normalizeBlanks(q2, q2.stem ?? '');
+    q2.blanks = normalized.blanks;
+    q2.blankCount = normalized.blankCount;
   }
   if (!q2.knowledgePoint) q2.knowledgePoint = '综合';
   if (!q2.explanation) q2.explanation = '详见参考答案。';
@@ -377,15 +473,18 @@ function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion 
   };
 
   if (base.type === 'multiple_choice') {
-    base.options = (raw.options ?? []).filter((o: any) => o?.key);
+    const normalized = normalizeOptions(base.stem, raw.options);
+    base.stem = normalized.stem || base.stem;
+    base.options = normalized.options;
     while (base.options!.length < 2) base.options!.push({ key: String.fromCharCode(65 + base.options!.length), text: '选项' + String.fromCharCode(65 + base.options!.length) });
     base.correctKeys = (raw.correctKeys ?? []).filter((k: string) => base.options!.some(o => o.key === k));
     if (!base.correctKeys!.length) base.correctKeys = [base.options![0].key];
     base.multiSelect = raw.multiSelect ?? false;
   }
   if (base.type === 'fill_blank') {
-    base.blanks = raw.blanks ?? [];
-    base.blankCount = base.blanks.length;
+    const normalized = normalizeBlanks(raw, base.stem);
+    base.blanks = normalized.blanks;
+    base.blankCount = normalized.blankCount;
   }
   if (base.type === 'true_false') base.answer = raw.answer ?? true;
   if (base.type === 'short_answer') { base.referenceAnswer = raw.referenceAnswer ?? ''; base.keyPoints = raw.keyPoints ?? []; }
@@ -722,9 +821,10 @@ export function createExamSession(userId: string, config: ExamConfig, data: { ti
 export function getExamSession(examId: string, userId: string): ExamSession | null {
   const row = db.prepare(`SELECT * FROM exam_sessions WHERE id=? AND user_id=?`).get(examId, userId) as any;
   if (!row) return null;
+  const questions = (JSON.parse(row.questions) as ExamQuestion[]).map((q, i) => localFormatFix(q, i));
   return {
     id: row.id, userId: row.user_id, subject: row.subject, grade: row.grade, title: row.title,
-    questions: JSON.parse(row.questions), totalScore: row.total_score, durationMinutes: row.duration_minutes ?? 45,
+    questions, totalScore: row.total_score, durationMinutes: row.duration_minutes ?? 45,
     status: row.status, createdAt: row.created_at, submittedAt: row.submitted_at,
     answers: row.answers ? JSON.parse(row.answers) : undefined,
     results: row.results ? JSON.parse(row.results) : undefined,
@@ -737,11 +837,13 @@ export function deleteExamSession(examId: string, userId: string): boolean {
   return info.changes > 0;
 }
 
-/** 列出用户的全部考试（概要），按创建时间倒序，供「考试历史」页回顾 */
+/** 列出用户已完成的考试（概要），按提交时间倒序，供「考试历史」页回顾 */
 export function listExamSessions(userId: string): ExamSummary[] {
   const rows = db.prepare(
     `SELECT id, subject, grade, title, total_score, status, created_at, submitted_at, results
-     FROM exam_sessions WHERE user_id=? ORDER BY created_at DESC`,
+     FROM exam_sessions
+     WHERE user_id=? AND status='completed'
+     ORDER BY COALESCE(submitted_at, created_at) DESC`,
   ).all(userId) as any[];
   return rows.map((r) => {
     const results = r.results ? (JSON.parse(r.results) as ExamResults) : undefined;

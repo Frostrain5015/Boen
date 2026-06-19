@@ -136,6 +136,12 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     '',
     '=== 输出要求 ===',
     `输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation。`,
+    questionType === 'multiple_choice'
+      ? '选择题结构要求：stem 只写题干，不要把 A/B/C/D 选项写进 stem；options 必须写真实选项文本，不允许写 "{选项A}"、"选项A"、"A" 等占位符。'
+      : '',
+    questionType === 'fill_blank'
+      ? '填空题结构要求：stem 中每个空必须用 ____ 或（ ）标出；blanks 必须按空的顺序给出 acceptedAnswers，空数必须与题干空位一致。'
+      : '',
     'knowledgePoint 和 literacies 必须填写，不能为空。',
     `难度统一为 ${difficulty}。`,
     '分步设问：如果多题共享同一段阅读材料或同一个题干场景（如阅读理解、几何大题），给它们相同的 groupId（数字），并将共享内容写在第一题的 passage 字段中，后续同组题不再重复 passage。没有分组的题不填 groupId。',

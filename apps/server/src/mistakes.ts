@@ -5,10 +5,11 @@ import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import OcrPkg from '@alicloud/ocr-api20210707';
-// CJS/ESM 互操作：OcrPkg 拿到的是 exports 对象，Client 类在 .default 上
-const OcrClient = OcrPkg.default as unknown as new (config: any) => { recognizeEduPaperStructed(req: any): Promise<any> };
-const { RecognizeEduPaperStructedRequest } = OcrPkg;
+import * as OcrPkg from '@alicloud/ocr-api20210707';
+// CJS/ESM interop: runtime exports expose both default Client and request classes.
+const OcrRuntime = OcrPkg as any;
+const OcrClient = (OcrRuntime.default ?? OcrRuntime) as new (config: any) => { recognizeEduPaperStructed(req: any): Promise<any> };
+const { RecognizeEduPaperStructedRequest } = OcrRuntime;
 import * as OpenApi from '@alicloud/openapi-client';
 import type {
   Difficulty,

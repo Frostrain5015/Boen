@@ -693,7 +693,7 @@ app.get('/api/exam/:examId', async (c) => {
         knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
         options: q.type === 'multiple_choice' ? q.options : undefined,
         multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
-        blankCount: q.type === 'fill_blank' ? q.blanks?.length : undefined,
+        blankCount: q.type === 'fill_blank' ? (q.blankCount ?? q.blanks?.length ?? 1) : undefined,
       }));
   return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions, answers: completed ? session.answers : undefined, results: session.results } });
 });

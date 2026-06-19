@@ -225,6 +225,18 @@ export async function reviewBoard(
 // ── 本地格式预检 ────────────────────────────────────────────
 
 const FALLBACK_MARKERS = ['请回答一道', '请回答', '默认题目', 'fallback', '备选题目', '__needs_review__'];
+const EMBEDDED_OPTION_PATTERN = /(^|[\s\n])A\s*[.．、:：)]\s*[\s\S]+(^|[\s\n])B\s*[.．、:：)]\s*/i;
+
+function isPlaceholderOptionText(text: unknown, key?: string): boolean {
+  const raw = String(text ?? '').trim();
+  const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
+  const expected = key ? key.toUpperCase() : '[A-F]';
+  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+}
+
+function countBlankMarkers(stem: string): number {
+  return String(stem ?? '').match(/_{2,}|＿{2,}|（\s*）|\(\s*\)|\[\s*\]/g)?.length ?? 0;
+}
 
 function detectLocalFormatIssues(questions: ExamQuestion[]): Map<number, string> {
   const issues = new Map<number, string>();
@@ -235,6 +247,15 @@ function detectLocalFormatIssues(questions: ExamQuestion[]): Map<number, string>
     }
     if (q.type === 'multiple_choice' && (!q.options || q.options.length < 3)) {
       issues.set(q.index, `选择题选项不足（${q.options?.length ?? 0}个）`);
+    }
+    if (q.type === 'multiple_choice' && EMBEDDED_OPTION_PATTERN.test(stem)) {
+      issues.set(q.index, '选择题题干混入了 A/B/C/D 选项，结构不合格');
+    }
+    if (q.type === 'multiple_choice' && q.options?.some(o => isPlaceholderOptionText(o.text, o.key))) {
+      issues.set(q.index, '选择题选项存在占位符文本');
+    }
+    if (q.type === 'fill_blank' && Math.max(q.blankCount ?? 0, q.blanks?.length ?? 0, countBlankMarkers(stem)) < 1) {
+      issues.set(q.index, '填空题缺少空位和答案结构');
     }
     if (!q.explanation || q.explanation.length < 5) {
       issues.set(q.index, '解析内容缺失或过短');
