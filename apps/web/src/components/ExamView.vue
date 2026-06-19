@@ -8,6 +8,7 @@ import { streamExamGenerate, streamExamSubmit } from '@/services/chat';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
+import { useUiStore } from '@/stores/ui';
 import StarDisplay from '@/components/StarDisplay.vue';
 
 const toast = useToast();
@@ -128,13 +129,13 @@ const tikzSvgsMap = computed(() => {
 });
 
 const SUBJECTS = [
-  { value: 'chinese' as const, label: '语文', emoji: '📖', color: '#e8813e', soft: '#fdf0e0' },
-  { value: 'math' as const, label: '数学', emoji: '🔢', color: '#14b48a', soft: '#d9f4ec' },
-  { value: 'english' as const, label: '英语', emoji: '🔤', color: '#5b8def', soft: '#e0edfe' },
-  { value: 'science' as const, label: '科学', emoji: '🔬', color: '#8b5cf6', soft: '#eee6fe' },
+  { value: 'chinese' as const, label: '语文', emoji: '📖' },
+  { value: 'math' as const, label: '数学', emoji: '🔢' },
+  { value: 'english' as const, label: '英语', emoji: '🔤' },
+  { value: 'science' as const, label: '科学', emoji: '🔬' },
 ];
-const currentSubjectColor = computed(() => SUBJECTS.find(s => s.value === config.value.subject)?.color ?? '#14b48a');
-const currentSubjectSoft = computed(() => SUBJECTS.find(s => s.value === config.value.subject)?.soft ?? '#d9f4ec');
+/** 学科主题色（与 index.css data-subject CSS 变量保持一致） */
+const UI_STORE = useUiStore();
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const DURATIONS = [
   { value: 15, label: '巩固自测', emoji: '📝' },
@@ -583,8 +584,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">学科</p>
             <div class="clay-sm relative flex bg-[var(--surface)] p-1">
-              <span class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px]" :style="{ background: currentSubjectColor, transform: `translateX(calc(${subjectIndex} * 4rem))`, transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease' }"></span>
-              <button v-for="s in SUBJECTS" :key="s.value" @click="config.subject = s.value" class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors" :class="config.subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><span>{{ s.emoji }}</span>{{ s.label }}</button>
+              <span class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px]" :style="{ background: 'var(--accent)', transform: `translateX(calc(${subjectIndex} * 4rem))`, transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }"></span>
+              <button v-for="s in SUBJECTS" :key="s.value" @click="config.subject = s.value; UI_STORE.subject = s.value" class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors" :class="config.subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><span>{{ s.emoji }}</span>{{ s.label }}</button>
             </div>
           </div>
           <div>
