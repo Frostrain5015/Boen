@@ -666,30 +666,30 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
       </div>
 
-      <!-- 题号轨道 -->
-      <div class="dot-nav-wrap">
-        <div ref="dotNavRef" class="dot-nav-scroll" role="navigation" aria-label="题号导航">
-          <button
-            v-for="q in session.questions"
-            :key="q.index"
-            @click="goToQuestion(q.index)"
-            class="question-dot"
-            :class="[
-              currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.index) ? 'question-dot-answered' : 'question-dot-idle',
-            ]"
-            :aria-label="`第 ${q.index + 1} 题${answeredStatus.get(q.index) ? '，已作答' : '，未作答'}`"
-            :aria-current="currentQuestionIndex === q.index ? 'step' : undefined"
-          >
-            <span>{{ q.index + 1 }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- 单题区域 -->
+      <!-- 单题区域（题号轨道 + 题目卡片） -->
       <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
         <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
-          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col items-center justify-center overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
-            <div class="mx-auto w-full max-w-2xl my-auto">
+          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
+            <!-- 题号轨道（固定在题目卡片正上方） -->
+            <div class="shrink-0 pt-5 pb-3">
+              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex max-w-2xl justify-center" role="navigation" aria-label="题号导航">
+                <button
+                  v-for="q in session.questions"
+                  :key="q.index"
+                  @click="goToQuestion(q.index)"
+                  class="question-dot"
+                  :class="[
+                    currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.idnex) ? 'question-dot-answered' : 'question-dot-idle',
+                  ]"
+                  :aria-label="`第 ${q.index + 1} 题${answeredStatus.get(q.index) ? '，已作答' : '，未作答'}`"
+                  :aria-current="currentQuestionIndex === q.index ? 'step' : undefined"
+                >
+                  <span>{{ q.index + 1 }}</span>
+                </button>
+              </div>
+            </div>
+            <!-- 题目卡片 -->
+            <div class="mx-auto w-full max-w-2xl pb-6">
               <div class="clay overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
                 <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5 sm:px-5">
                   <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ (currentQuestion?.index ?? 0) + 1 }}</span>
