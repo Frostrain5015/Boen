@@ -271,6 +271,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mistake_prof_item ON mistake_proficiency_events(mistake_id);
 `);
 
+// ── 订阅系统 ─────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    user_id TEXT PRIMARY KEY,
+    tier TEXT NOT NULL DEFAULT 'free',
+    activated_at INTEGER,
+    expires_at INTEGER,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_chat_usage (
+    user_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    message_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, date)
+  );
+  CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_chat_usage(user_id, date);
+`);
+
 // ── Mistake notebook 迁移：答案匹配度与正确性标记 ──
 // 做对的题（匹配度≥0.8）前端不再作为错题展示，但题型风格仍沉淀
 {

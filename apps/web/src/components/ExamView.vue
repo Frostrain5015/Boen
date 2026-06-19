@@ -614,7 +614,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ generationStepLabel(item.step) }}</span>
             <span v-if="generationStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ genProgress.message }}</p>
+          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ generationStepLabel(genProgress.step as GenerationStep) }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
@@ -757,7 +757,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ item.label }}</span>
             <span v-if="gradingStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <p class="pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ gradingProgress.message }}</p>
+          <p class="pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ gradingProgress.step === 'grade' ? '正在批改评分' : gradingProgress.step === 'analyze' ? '正在生成分析' : gradingProgress.step === 'profile' ? '正在写入画像' : gradingProgress.step === 'save' ? '正在保存结果' : '' }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill h-full rounded-full" :style="{ width: gradingProgress.progress + '%' }"></div>

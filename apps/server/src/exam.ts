@@ -241,13 +241,13 @@ export async function generateExam(
     const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
 
     // ─── 阶段一：蓝图架构师 ────────────────────
-    await onProgress?.({ step: 'blueprint', message: '正在分析知识图谱与权重分布…', progress: 5 });
+    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 5 });
     const weightGuide = buildWeightGuideForPrompt(weightDist);
     const profileContext = userId ? await buildProfileContext(userId, config) : '';
     const styleContext = userId ? await retrieveMistakeStyleSamples(userId, config.subject, config.grade, config.notes ?? '', [], 3).catch(() => '') : '';
     const enrichedConfig: ExamConfig = { ...config, styleContext };
 
-    await onProgress?.({ step: 'blueprint', message: '正在生成试卷蓝图…', progress: 10 });
+    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 10 });
     const blueprint = await stepBlueprintArchitect(
       model,
       { subject: enrichedConfig.subject, grade: enrichedConfig.grade, totalScore: enrichedConfig.totalScore, notes: enrichedConfig.notes },
@@ -256,15 +256,11 @@ export async function generateExam(
       mode,
     );
 
-    await onProgress?.({
-      step: 'blueprint',
-      message: `蓝图生成完成：${blueprint.title}，共 ${blueprint.sections.length} 个板块，${blueprint.totalScore} 分`,
-      progress: 20,
-    });
+    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 20 });
 
     // ─── 阶段二：题目编写组（按 section × questionType 并发，限 6 路） ────
     const writeTasks = flattenBlueprint(blueprint);
-    await onProgress?.({ step: 'write', message: `正在并发出题（${writeTasks.length} 组，最多 6 路并发）…`, progress: 25 });
+    await onProgress?.({ step: 'write', message: 'write', progress: 25 });
 
     let completedGroups = 0;
     const writeResults = await withConcurrencyLimit(
@@ -273,7 +269,7 @@ export async function generateExam(
         completedGroups++;
         await onProgress?.({
           step: 'write',
-          message: `已完成 ${completedGroups}/${writeTasks.length} 组`,
+          message: 'write',
           progress: 25 + Math.round((completedGroups / writeTasks.length) * 55),
         });
         return result;
@@ -289,22 +285,18 @@ export async function generateExam(
 
     // 编号 + 本地格式修复
     let questions = allQuestions.map((q, i) => localFormatFix(q, i));
-    await onProgress?.({ step: 'write', message: `已完成 ${questions.length} 道题`, progress: 82 });
+    await onProgress?.({ step: 'write', message: 'write', progress: 82 });
 
     // ─── 阶段三：审核委员会（5 维度并发） ──────
-    await onProgress?.({ step: 'review', message: '正在执行 5 维度并发审核…', progress: 85 });
+    await onProgress?.({ step: 'review', message: 'review', progress: 85 });
     const { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
 
     const regenCount = scores.filter(s => s.needsRegeneration).length;
-    await onProgress?.({
-      step: 'review',
-      message: `审核完成，${regenCount} 题需要重出`,
-      progress: 90,
-    });
+    await onProgress?.({ step: 'review', message: 'review', progress: 90 });
 
     // ─── 阶段四：重出闭环（并发 + 反馈注入 + 二次校验） ────
     if (regenCount > 0) {
-      await onProgress?.({ step: 'regenerate', message: `正在并发重出 ${regenCount} 题…`, progress: 92 });
+      await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: 92 });
       const crossGroupContext = buildCrossGroupContext(questions);
       const regenResult = await regenerateQuestions(
         model,
@@ -317,15 +309,11 @@ export async function generateExam(
       questions = regenResult.questions.map((q, i) => localFormatFix(q, i));
 
       if (regenResult.report.regeneratedIndices.length > 0) {
-        await onProgress?.({
-          step: 'regenerate',
-          message: `重出完成：${regenResult.report.regeneratedIndices.length} 题已替换${regenResult.report.qualityWarnings.length ? `，${regenResult.report.qualityWarnings.length} 题保留原题` : ''}`,
-          progress: 98,
-        });
+        await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: 98 });
       }
     }
 
-    await onProgress?.({ step: 'complete', message: `试卷生成完成，共 ${questions.length} 道题`, progress: 100 });
+    await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
 
     // 安全兜底：极端情况下 0 道题 → 注入一道默认题
     if (questions.length === 0) {
@@ -707,7 +695,7 @@ export async function gradeExam(
   examInfo?: { subject?: string; grade?: string },
   onProgress?: ExamGradingProgressFn,
 ): Promise<ExamResults> {
-  await onProgress?.({ step: 'grade', message: '正在批改客观题与主观题', progress: 12 });
+  await onProgress?.({ step: 'grade', message: 'grade', progress: 12 });
   const answerMap = new Map(answers.map(a => [a.questionIndex, a.answer]));
   const shortAnswerGrader = model ? createShortAnswerGrader(model) : undefined;
 
@@ -739,7 +727,7 @@ export async function gradeExam(
     };
   }));
 
-  await onProgress?.({ step: 'grade', message: `已完成 ${questionResults.length} 道题评分`, progress: 58 });
+  await onProgress?.({ step: 'grade', message: 'grade', progress: 58 });
 
   const totalScore = questionResults.reduce((s, r) => s + r.score, 0);
   const maxScore = questionResults.reduce((s, r) => s + r.maxScore, 0);
@@ -758,15 +746,15 @@ export async function gradeExam(
   // 生成综合分析（有模型时）
   if (model) {
     try {
-      await onProgress?.({ step: 'analyze', message: '正在生成综合判卷分析', progress: 68 });
+      await onProgress?.({ step: 'analyze', message: 'analyze', progress: 68 });
       const analysis = await generateExamAnalysis(model, questions, examResults, { subject: examInfo?.subject ?? '', grade: examInfo?.grade ?? '' });
       if (analysis) examResults.analysis = analysis;
-      await onProgress?.({ step: 'analyze', message: '综合分析已生成', progress: 78 });
+      await onProgress?.({ step: 'analyze', message: 'analyze', progress: 78 });
     } catch (err) {
       console.warn('[grading] analysis failed:', err);
     }
   } else {
-    await onProgress?.({ step: 'analyze', message: '已跳过模型分析', progress: 78 });
+    await onProgress?.({ step: 'analyze', message: 'analyze', progress: 78 });
   }
 
   return examResults;
@@ -920,9 +908,9 @@ export async function submitExamSession(
   if (!session) throw new Error('考试会话未找到');
   if (session.status === 'completed') throw new Error('该考试已提交');
 
-  await onProgress?.({ step: 'grade', message: '准备开始判卷', progress: 4 });
+  await onProgress?.({ step: 'grade', message: 'grade', progress: 4 });
   const results = await gradeExam(session.questions, answers, model, { subject: session.subject, grade: session.grade }, onProgress);
-  await onProgress?.({ step: 'profile', message: '正在写入知识图谱画像', progress: 84 });
+  await onProgress?.({ step: 'profile', message: 'profile', progress: 84 });
 
   // 更新知识画像并记录变化（优先用 knowledgePointId 直连节点）
   const proficiencyChanges: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }> = [];
@@ -950,10 +938,10 @@ export async function submitExamSession(
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
 
-  await onProgress?.({ step: 'save', message: '正在保存成绩与判卷详情', progress: 94 });
+  await onProgress?.({ step: 'save', message: 'save', progress: 94 });
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
-  await onProgress?.({ step: 'complete', message: '判卷完成', progress: 100 });
+  await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
 
   return results;
 }
