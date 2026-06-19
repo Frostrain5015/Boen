@@ -95,7 +95,7 @@ function startNewExam() {
 </script>
 
 <template>
-  <!-- 侧边�?-->
+  <!-- 侧边栏 -->
   <aside
     class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
     :class="uiStore.sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
@@ -114,7 +114,7 @@ function startNewExam() {
       </div>
 
       <div class="flex-1 overflow-y-auto px-2 py-2">
-        <!-- ══�?对话 ══�?-->
+        <!-- ═══ 对话 ═══ -->
         <button
           @click="selectSection('chat')"
           class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
@@ -129,7 +129,7 @@ function startNewExam() {
           <button @click="chatStore.handleNewConversation()" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]">
             <Plus class="h-3.5 w-3.5" /> 新建对话
           </button>
-          <div v-if="chatStore.conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有对�?/div>
+          <div v-if="chatStore.conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有对话</div>
           <button
             v-for="conv in chatStore.conversations" :key="conv.id"
             @click="selectConversation(conv.id)"
@@ -150,7 +150,7 @@ function startNewExam() {
           </button>
         </div>
 
-        <!-- ══�?考试 ══�?-->
+        <!-- ═══ 考试 ═══ -->
         <button
           @click="selectSection('exam')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
@@ -159,10 +159,10 @@ function startNewExam() {
           <FileText class="h-4 w-4 shrink-0" />
           <span class="flex-1">考试</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
-          <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="(uiStore.expandedSection as string) === 'exam' ? '' : '-rotate-90'" />
+          <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="uiStore.expandedSection === 'exam' ? '' : '-rotate-90'" />
         </button>
         <!-- 考试二级菜单 -->
-        <div v-if="(uiStore.expandedSection as string) === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
+        <div v-if="uiStore.expandedSection === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="startNewExam" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#5848d6] transition-colors hover:bg-[#e8e4ff]">
             <Plus class="h-3.5 w-3.5" /> 新考试
           </button>
@@ -189,18 +189,18 @@ function startNewExam() {
           </button>
         </div>
 
-        <!-- ══�?错题�?══�?-->
+        <!-- ═══ 错题本 ═══ -->
         <button
           @click="selectSection('mistakes')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
           :class="currentView === 'mistakes' ? 'bg-[#fff1d8] text-[#c76b17]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
         >
           <NotebookPen class="h-4 w-4 shrink-0" />
-          <span class="flex-1">错题�?/span>
+          <span class="flex-1">错题本</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
 
-        <!-- ══�?档案 ══�?-->
+        <!-- ═══ 档案 ═══ -->
         <button
           @click="selectSection('profile')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
@@ -215,7 +215,7 @@ function startNewExam() {
       <!-- ICP 备案 -->
       <div class="shrink-0 border-t border-[var(--line)] px-3 py-2 text-center">
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-(--ink-soft)/50 hover:text-(--ink-soft)/80 transition-colors">
-          浙ICP�?026040257�?1
+          浙ICP备2026040257号-1
         </a>
       </div>
     </div>
