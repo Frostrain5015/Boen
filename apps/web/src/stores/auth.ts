@@ -89,14 +89,25 @@ export const useAuthStore = defineStore('auth', () => {
     authChecked.value = true;
     getCurrentUser().then((user) => {
       currentUser.value = user;
+      // 按用户 ID 隔离 profile 数据（不同账户登录不串）
+      const scopedKey = user?.sub ? `${PROFILE_KEY}_${user.sub}` : PROFILE_KEY;
+      try {
+        const raw = localStorage.getItem(scopedKey);
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p.name && p.grade) userProfile.value = p;
+          else if (p.name && p.gradeBand) userProfile.value = { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+        } else {
+          userProfile.value = null;
+        }
+      } catch { userProfile.value = null; }
+      if (!userProfile.value) router.push('/setup');
     });
     fetchSubscription();
     const chatStore = useChatStore();
     const examStore = useExamStore();
     chatStore.loadConversations();
     examStore.loadExams();
-    // Prompt profile setup on first login → 导航到 /setup 独立页面
-    if (!userProfile.value) router.push('/setup');
   }
 
   function handleOAuthError() {
@@ -112,7 +123,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   function saveProfile(p: UserProfile) {
     userProfile.value = p;
-    saveProfileToStorage(p);
+    const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : PROFILE_KEY;
+    localStorage.setItem(scopedKey, JSON.stringify(p));
     showSetupDialog.value = false;
   }
 

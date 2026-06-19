@@ -54,12 +54,13 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
 
 function createModel(provider: string) {
-  if (provider === 'deepseek' || provider === 'default') {
+  if (provider === 'deepseek') {
     return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY });
   }
   if (provider === 'deepseek-pro') {
     return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: DEEPSEEK_API_KEY });
   }
+  // 'default' → 环境变量配置（当前为讯飞 MaaS / Kimi K2.6）
   return getChatModel({
     provider: (process.env.BOEN_PROVIDER ?? 'openai') as 'openai' | 'anthropic',
     model: process.env.BOEN_MODEL ?? 'astron-code-latest',
