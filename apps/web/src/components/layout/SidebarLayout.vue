@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
@@ -37,12 +37,12 @@ const currentView = computed(() => {
 
 function subjectLabel(val: string) {
   const found = [
-    { value: 'chinese', label: '璇枃', emoji: '馃摉' },
-    { value: 'math', label: '鏁板', emoji: '馃敘' },
-    { value: 'english', label: '鑻辫', emoji: '馃敜' },
-    { value: 'science', label: '绉戝', emoji: '馃敩' },
+    { value: 'chinese', label: '语文', emoji: '📖' },
+    { value: 'math', label: '数学', emoji: '🔢' },
+    { value: 'english', label: '英语', emoji: '🔤' },
+    { value: 'science', label: '科学', emoji: '🔬' },
   ].find((s) => s.value === val);
-  return found ?? { label: val, emoji: '馃搧' };
+  return found ?? { label: val, emoji: '📁' };
 }
 
 function formatDate(timestamp: number) {
@@ -95,41 +95,41 @@ function startNewExam() {
 </script>
 
 <template>
-  <!-- 渚ц竟鏍?-->
+  <!-- 侧边栏 -->
   <aside
     class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
     :class="uiStore.sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
   >
     <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
-      <!-- 鍝佺墝 + 鎶樺彔 -->
-      <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' || currentView === 'exam' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
+      <!-- 品牌 + 折叠 -->
+      <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
         <div class="flex items-center gap-2">
           <Mascot :size="28" :float="false" :animated="false" />
-          <span class="brand-text text-lg font-bold tracking-tight">鍗氭枃 Boen</span>
+          <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
           <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.2.2</span>
         </div>
-        <button @click="uiStore.sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="鏀惰捣渚ф爮">
+        <button @click="uiStore.sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
           <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
         </button>
       </div>
 
       <div class="flex-1 overflow-y-auto px-2 py-2">
-        <!-- 鈺愨晲鈺?瀵硅瘽 鈺愨晲鈺?-->
+        <!-- ═══ 对话 ═══ -->
         <button
           @click="selectSection('chat')"
           class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
           :class="currentView === 'chat' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
         >
           <MessageSquare class="h-4 w-4 shrink-0" />
-          <span class="flex-1">瀵硅瘽</span>
+          <span class="flex-1">对话</span>
           <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="uiStore.expandedSection === 'chat' ? '' : '-rotate-90'" />
         </button>
-        <!-- 瀵硅瘽浜岀骇鑿滃崟 -->
+        <!-- 对话二级菜单 -->
         <div v-if="uiStore.expandedSection === 'chat'" class="mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="chatStore.handleNewConversation()" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]">
-            <Plus class="h-3.5 w-3.5" /> 鏂板缓瀵硅瘽
+            <Plus class="h-3.5 w-3.5" /> 新建对话
           </button>
-          <div v-if="chatStore.conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">杩樻病鏈夊璇?/div>
+          <div v-if="chatStore.conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有对话</div>
           <button
             v-for="conv in chatStore.conversations" :key="conv.id"
             @click="selectConversation(conv.id)"
@@ -144,29 +144,29 @@ function startNewExam() {
                 <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
               </div>
             </div>
-            <button @click="(e) => chatStore.handleDeleteConversation(conv.id, e)" class="opacity-0 rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100" title="鍒犻櫎瀵硅瘽">
+            <button @click="(e) => chatStore.handleDeleteConversation(conv.id, e)" class="opacity-0 rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100" title="删除对话">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
           </button>
         </div>
 
-        <!-- 鈺愨晲鈺?鑰冭瘯 鈺愨晲鈺?-->
+        <!-- ═══ 考试 ═══ -->
         <button
           @click="selectSection('exam')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
           :class="currentView === 'exam' || currentView === 'examReview' ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
         >
           <FileText class="h-4 w-4 shrink-0" />
-          <span class="flex-1">鑰冭瘯</span>
+          <span class="flex-1">考试</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
-          <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="uiStore.expandedSection === 'exam' ? '' : '-rotate-90'" />
+          <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="(uiStore.expandedSection as string) === 'exam' ? '' : '-rotate-90'" />
         </button>
-        <!-- 鑰冭瘯浜岀骇鑿滃崟 -->
-        <div v-if="uiStore.expandedSection === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
+        <!-- 考试二级菜单 -->
+        <div v-if="(uiStore.expandedSection as string) === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="startNewExam" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#5848d6] transition-colors hover:bg-[#e8e4ff]">
-            <Plus class="h-3.5 w-3.5" /> 鏂拌€冭瘯
+            <Plus class="h-3.5 w-3.5" /> 新考试
           </button>
-          <div v-if="examStore.exams.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">杩樻病鏈夎€冭瘯璁板綍</div>
+          <div v-if="examStore.exams.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有考试记录</div>
           <button
             v-for="ex in examStore.exams" :key="ex.examId"
             @click="ex.status === 'completed' ? openExamReview(ex.examId) : startNewExam()"
@@ -177,56 +177,56 @@ function startNewExam() {
             <div class="min-w-0 flex-1">
               <p class="truncate font-medium">{{ ex.title }}</p>
               <div class="flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
-                <span>{{ subjectMeta(ex.subject).label }}路{{ examGradeLabel(ex.grade) }}</span>
+                <span>{{ subjectMeta(ex.subject).label }}·{{ examGradeLabel(ex.grade) }}</span>
                 <span>{{ formatDate(ex.submittedAt ?? ex.createdAt) }}</span>
               </div>
             </div>
             <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] group-hover:hidden">{{ ex.result.percentage }}</span>
-            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">鏈畬鎴?/span>
-            <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="hidden shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:block" title="鍒犻櫎鑰冭瘯">
+            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">未完成</span>
+            <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="hidden shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:block" title="删除考试">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
           </button>
         </div>
 
-        <!-- 鈺愨晲鈺?閿欓鏈?鈺愨晲鈺?-->
+        <!-- ═══ 错题本 ═══ -->
         <button
           @click="selectSection('mistakes')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
           :class="currentView === 'mistakes' ? 'bg-[#fff1d8] text-[#c76b17]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
         >
           <NotebookPen class="h-4 w-4 shrink-0" />
-          <span class="flex-1">閿欓鏈?/span>
+          <span class="flex-1">错题本</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
 
-        <!-- 鈺愨晲鈺?妗ｆ 鈺愨晲鈺?-->
+        <!-- ═══ 档案 ═══ -->
         <button
           @click="selectSection('profile')"
           class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
           :class="currentView === 'profile' ? 'bg-[#d9f4ec] text-[#0e9b76]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
         >
           <BrainCircuit class="h-4 w-4 shrink-0" />
-          <span class="flex-1">妗ｆ</span>
+          <span class="flex-1">档案</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
       </div>
 
-      <!-- ICP 澶囨 -->
+      <!-- ICP 备案 -->
       <div class="shrink-0 border-t border-[var(--line)] px-3 py-2 text-center">
         <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-(--ink-soft)/50 hover:text-(--ink-soft)/80 transition-colors">
-          娴橧CP澶?026040257鍙?1
+          浙ICP备2026040257号-1
         </a>
       </div>
     </div>
   </aside>
 
-  <!-- 鎶樺彔鎬佷笅鐨勫睍寮€鎶婃墜 -->
+  <!-- 折叠态下的展开把手 -->
   <button
     v-if="!uiStore.sidebarOpen"
     @click="uiStore.sidebarOpen = true"
     class="absolute bottom-3 left-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)]"
-    title="灞曞紑渚ф爮"
+    title="展开侧栏"
   >
     <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
   </button>
