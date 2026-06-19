@@ -1089,8 +1089,11 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
 /* ── 阅读材料 ── */
 .passage-block { border-radius: 14px; padding: 0.9rem 1.1rem; line-height: 1.8; font-size: 0.9rem; }
+.passage-block :deep(h1), .passage-block :deep(h2) { text-align: center; font-weight: 700; margin: 0 0 0.6em; }
 .passage-block-chi { font-family: 'KaiTi','STKaiti',serif; background: #fff8f0; border: 1.5px solid #f0dcc0; color: #5c4a32; }
+.passage-block-chi :deep(h1), .passage-block-chi :deep(h2) { font-family: 'KaiTi','STKaiti',serif; font-size: 1.15rem; }
 .passage-block-eng { font-family: 'Georgia','Times New Roman',serif; background: #f5f0ff; border: 1.5px solid #d8cce8; color: #3d2e5c; }
+.passage-block-eng :deep(h1), .passage-block-eng :deep(h2) { font-family: 'Georgia','Times New Roman',serif; font-size: 1.05rem; }
 
 /* ── 单题考试：选项按钮 ── */
 .exam-opt {
