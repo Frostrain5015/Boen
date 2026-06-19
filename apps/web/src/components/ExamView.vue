@@ -128,11 +128,13 @@ const tikzSvgsMap = computed(() => {
 });
 
 const SUBJECTS = [
-  { value: 'chinese' as const, label: '语文', emoji: '📖' },
-  { value: 'math' as const, label: '数学', emoji: '🔢' },
-  { value: 'english' as const, label: '英语', emoji: '🔤' },
-  { value: 'science' as const, label: '科学', emoji: '🔬' },
+  { value: 'chinese' as const, label: '语文', emoji: '📖', color: '#e8813e', soft: '#fdf0e0' },
+  { value: 'math' as const, label: '数学', emoji: '🔢', color: '#14b48a', soft: '#d9f4ec' },
+  { value: 'english' as const, label: '英语', emoji: '🔤', color: '#5b8def', soft: '#e0edfe' },
+  { value: 'science' as const, label: '科学', emoji: '🔬', color: '#8b5cf6', soft: '#eee6fe' },
 ];
+const currentSubjectColor = computed(() => SUBJECTS.find(s => s.value === config.value.subject)?.color ?? '#14b48a');
+const currentSubjectSoft = computed(() => SUBJECTS.find(s => s.value === config.value.subject)?.soft ?? '#d9f4ec');
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const DURATIONS = [
   { value: 15, label: '巩固自测', emoji: '📝' },
@@ -567,7 +569,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 </script>
 
 <template>
-  <div class="exam-root" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 300 } }">
+  <div class="exam-root" :data-subject="config.subject" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 300 } }">
     <!-- ═══ CONFIG ═══ -->
     <div v-if="examState === 'config'" class="flex h-full flex-col items-center justify-center p-6">
       <div class="clay w-full max-w-lg overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
@@ -581,7 +583,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">学科</p>
             <div class="clay-sm relative flex bg-[var(--surface)] p-1">
-              <span class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px] bg-accent" :style="{ transform: `translateX(calc(${subjectIndex} * 4rem))`, transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)' }"></span>
+              <span class="absolute top-1 bottom-1 left-1 w-16 rounded-[14px]" :style="{ background: currentSubjectColor, transform: `translateX(calc(${subjectIndex} * 4rem))`, transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease' }"></span>
               <button v-for="s in SUBJECTS" :key="s.value" @click="config.subject = s.value" class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors" :class="config.subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><span>{{ s.emoji }}</span>{{ s.label }}</button>
             </div>
           </div>
@@ -612,7 +614,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在出卷</h2>
+        <h2 class="brand-text text-xl font-bold tracking-tight" :style="{ color: currentSubjectColor }">博文正在出卷</h2>
         <div class="w-80 space-y-0.5">
           <div
             v-for="item in generationSteps"
