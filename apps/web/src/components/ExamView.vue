@@ -196,13 +196,15 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function centerCurrentDot() {
+  // 题号超出可见区域时滚动居中当前题号
   nextTick(() => {
     const nav = dotNavRef.value;
-    const current = nav?.querySelector<HTMLElement>('.question-dot-current');
-    if (!nav || !current) return;
-    const target = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2;
+    if (!nav) return;
+    const current = nav.querySelector<HTMLElement>('.question-dot-current');
+    if (!current) return;
+    const scrollLeft = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2;
     nav.scrollTo({
-      left: Math.max(0, target),
+      left: Math.max(0, scrollLeft),
       behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
     });
   });
@@ -935,7 +937,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
   color: var(--ink-soft);
   cursor: pointer;
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   line-height: 1;
   box-shadow: 0 3px 9px -8px rgba(92, 74, 50, 0.55), inset 0 -1px 0 rgba(92, 74, 50, 0.06);

@@ -25,6 +25,9 @@ import type {
   ExamQualityReport,
 } from '@boen/shared';
 import { withConcurrencyLimit } from './concurrency.js';
+
+/** 单维度审核超时（毫秒） */
+const REVIEW_TIMEOUT = 120_000;
 import {
   reviewCorrectnessPrompt,
   reviewSimilarityPrompt,
@@ -54,8 +57,8 @@ const REGEN_THRESHOLD_DIMENSION = 60;   // 任一维度 < 60 → 重出
 const dimensionScoreSchema = z.object({
   index: z.number().int().describe('题目索引（从0开始）'),
   score: z.number().min(0).max(100).describe('该题在本维度的得分 0-100'),
-  issues: z.array(z.string()).default([]).describe('具体问题描述'),
-  similarTo: z.array(z.number()).optional().describe('仅 similarity 维度：与哪些题号雷同'),
+  issues: z.array(z.string()).describe('具体问题描述（可为空数组）'),
+  similarTo: z.array(z.number()).nullable().optional().describe('仅 similarity 维度：与哪些题号雷同'),
 });
 
 const correctnessReviewSchema = z.object({
@@ -87,35 +90,32 @@ interface ReviewResult {
   overallMatchScore?: number;
 }
 
+/** 带超时的 Promise.race */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`[review] ${label} 超时 (${ms}ms)`)), ms)
+    ),
+  ]);
+}
+
 async function runSingleReview(
   model: BaseChatModel,
   prompt: string,
-  toolName: string,
+  _toolName: string,
   schema: z.ZodObject<any, any, any>,
   dimension: ReviewDimension,
 ): Promise<ReviewResult> {
-  const reviewTool = makeReviewTool(toolName, `审核维度：${dimension}。通过本工具输出结构化评分。`, schema);
-
+  // 审核不走 bindTools / tool_choice — 讯飞 API 不支持结构化输出 schema 中的
+  // .optional() / .nullable() 等修饰符，会导致 invoke 卡死（不报错也不返回）。
+  // 直接走文本模式，prompt 已要求输出 JSON。
   try {
-    if (model.bindTools) {
-      const bound = model.bindTools([reviewTool], {
-        tool_choice: { type: 'function', function: { name: toolName } },
-      } as any);
-      const response = await bound.invoke([new SystemMessage(prompt)]);
-      const toolCalls = (response as any)?.tool_calls ?? [];
-      const call = toolCalls.find((c: any) => c.name === toolName);
-
-      if (call?.args) {
-        const parsed = schema.safeParse(call.args);
-        if (parsed.success) {
-          return parseReviewOutput(parsed.data, dimension);
-        }
-      }
-    }
-
-    // 回退到文本模式
-    console.warn(`[review:${dimension}] bindTools 不可用，回退到文本模式`);
-    const response = await model.invoke([new SystemMessage(prompt + '\n\n请直接输出 JSON，不要有其他文字。')]);
+    const response = await withTimeout(
+      model.invoke([new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON，不要 markdown 代码块，不要其他文字。')]),
+      REVIEW_TIMEOUT,
+      dimension,
+    );
     const content = typeof response.content === 'string' ? response.content : '';
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
@@ -123,7 +123,6 @@ async function runSingleReview(
     return parseReviewOutput(parsed, dimension);
   } catch (err) {
     console.warn(`[review:${dimension}] 审核失败，该维度降级为默认分 80:`, err instanceof Error ? err.message.slice(0, 80) : err);
-    // 降级：所有题该维度给 80 分（保守放过，不触发重出）
     return {
       scores: [],
       overallMatchScore: dimension === 'blueprint_match' ? 80 : undefined,
