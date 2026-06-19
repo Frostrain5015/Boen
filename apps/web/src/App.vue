@@ -45,13 +45,7 @@ onMounted(() => {
   <!-- 登录页面（authChecked 为 false 时也拦截，防止闪未登录对话界面） -->
   <LoginView v-else-if="!authStore.authChecked || !authStore.authenticated" />
 
-  <!-- 用户画像设置对话框 -->
-  <UserSetupDialog
-    v-if="authStore.showSetupDialog"
-    :profile="authStore.userProfile"
-    @save="authStore.saveProfile"
-    @close="authStore.showSetupDialog = false"
-  />
+  <!-- 用户设置 → 独立路由 /setup，不再使用弹窗 -->
 
   <!-- 主应用 -->
   <div v-else :data-subject="uiStore.subject" class="relative flex h-full flex-col">

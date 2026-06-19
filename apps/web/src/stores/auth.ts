@@ -95,8 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     const examStore = useExamStore();
     chatStore.loadConversations();
     examStore.loadExams();
-    // Prompt profile setup on first login
-    if (!userProfile.value) showSetupDialog.value = true;
+    // Prompt profile setup on first login → 导航到 /setup 独立页面
+    if (!userProfile.value) router.push('/setup');
   }
 
   function handleOAuthError() {
@@ -117,7 +117,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function openSetupDialog() {
-    showSetupDialog.value = true;
+    router.push('/setup');
   }
 
   return {
