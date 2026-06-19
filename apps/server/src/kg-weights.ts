@@ -20,16 +20,7 @@
  *   overall      — 综合权重 (0-1)，由各维度加权计算
  */
 
-import Database from 'better-sqlite3';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync } from 'node:fs';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_DIR = join(__dirname, '../data');
-if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
-const db = new Database(join(DB_DIR, 'boen.db'));
-db.pragma('journal_mode = WAL');
+import db from './db.js';
 
 // ── 权重层级定义 ──────────────────────────────
 export interface WeightTier {
@@ -243,5 +234,5 @@ if (process.argv[1] && process.argv[1].includes('kg-weights')) {
     console.log(formatWeightGuide(subj, grade));
   }
 
-  db.close();
+  process.exit(0);
 }

@@ -1,11 +1,8 @@
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
-import { existsSync, mkdirSync } from 'node:fs';
+import { DATA_DIR } from './paths.js';
 
-const DB_DIR = join(process.cwd(), 'data');
-if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
-
-const db = new Database(join(DB_DIR, 'boen.db'));
+const db = new Database(join(DATA_DIR, 'boen.db'));
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');

@@ -20,4 +20,16 @@ export default defineConfig({
       '/api': { target: 'http://localhost:8787', changeOrigin: true },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-mathlive': ['mathlive'],
+          'vendor-katex': ['katex', '@traptitech/markdown-it-katex'],
+          'vendor-markdown': ['markdown-it'],
+          'vendor-motion': ['@vueuse/motion', '@formkit/auto-animate'],
+        },
+      },
+    },
+  },
 });

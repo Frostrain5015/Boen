@@ -180,7 +180,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
       try {
         const curriculum = await deps.retrieveCurriculum({ grade: state.grade, subject: state.subject, query });
         if (curriculum) parts.push(curriculum);
-      } catch {}
+      } catch (err) {
+        console.warn('[agent] curriculum retrieval failed:', err);
+      }
     }
     // 薄弱点模式：注入知识画像数据
     if (state.mode === 'weakness' && state.weaknessData) {

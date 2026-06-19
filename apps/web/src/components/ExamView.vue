@@ -7,6 +7,9 @@ import { getToken } from '@/services/auth';
 import { streamExamGenerate } from '@/services/chat';
 import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
+import { useToast } from '@/composables/useToast';
+
+const toast = useToast();
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -247,7 +250,7 @@ async function generateExamPaper() {
     // 计时器在用户点击「开始考试」后才启动
     emit('refresh'); // 新试卷已入库，刷新侧栏考试列表
   } catch (err) {
-    alert('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
+    toast.error('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'config';
   }
 }
@@ -272,7 +275,7 @@ async function submitExam() {
     if (data.results) { results.value = data.results; examState.value = 'graded'; emit('refresh'); }
     else throw new Error(data.error || '提交失败');
   } catch (err) {
-    alert('提交失败: ' + (err instanceof Error ? err.message : String(err)));
+    toast.error('提交失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'taking';
   }
 }

@@ -262,7 +262,8 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
   let response;
   try {
     response = await model.invoke([new SystemMessage(prompt)]);
-  } catch {
+  } catch (err) {
+    console.error('[exam] blueprint generation failed:', err);
     // 模型调用失败走默认蓝图
     return defaultBlueprint(subjectLabel, gradeLabel, config);
   }
@@ -280,7 +281,8 @@ async function stepAnalyze(model: BaseChatModel, config: ExamConfig, weightGuide
         type: qt.type, label: qt.label, count: qt.count || 3, pointsPer: qt.pointsPer || 5, focusKps: qt.focusKps || [],
       })),
     };
-  } catch {
+  } catch (err) {
+    console.error('[exam] blueprint JSON parse failed:', err);
     return defaultBlueprint(subjectLabel, gradeLabel, config);
   }
 }
@@ -808,7 +810,9 @@ export async function gradeExam(
     try {
       const analysis = await generateExamAnalysis(model, questions, examResults, { subject: examInfo?.subject ?? '', grade: examInfo?.grade ?? '' });
       if (analysis) examResults.analysis = analysis;
-    } catch { /* 分析失败不阻断评分结果 */ }
+    } catch (err) {
+      console.warn('[grading] analysis failed:', err);
+    }
   }
 
   return examResults;

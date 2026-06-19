@@ -1,15 +1,7 @@
 // kg-enrich.ts — 为已有知识点建立完整的语义映射
 // 连接 知识点 → 主题领域 → 核心素养 → 认知层级
 
-import Database from 'better-sqlite3';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync } from 'node:fs';
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_DIR = join(__dirname, '../data');
-if (!existsSync(DB_DIR)) mkdirSync(DB_DIR, { recursive: true });
-const db = new Database(join(DB_DIR, 'boen.db'));
-db.pragma('journal_mode = WAL');
+import db from './db.js';
 
 const insEdge = db.prepare(
   `INSERT OR IGNORE INTO kg_edges (source_id, target_id, type, weight) VALUES (?, ?, ?, ?)`
@@ -235,4 +227,4 @@ if (start) {
   if (lits.length) console.log('  培养素养 →', lits.map((l:any)=>l.title).join('、'));
 }
 
-db.close();
+process.exit(0);

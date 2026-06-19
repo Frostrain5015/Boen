@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import { MotionPlugin } from '@vueuse/motion';
 import { autoAnimatePlugin } from '@formkit/auto-animate/vue';
 // 本地自托管字体（随构建打包，规避国内访问 Google Fonts 失败）
@@ -14,6 +15,7 @@ import './fonts.css';
 import 'katex/dist/katex.min.css';
 import './index.css';
 import App from './App.vue';
+import router from './router';
 
 // MathLive：空闲时动态导入，不阻塞首帧
 if (typeof requestIdleCallback !== 'undefined') {
@@ -29,4 +31,9 @@ if (typeof requestIdleCallback !== 'undefined') {
   }, 2000);
 }
 
-createApp(App).use(MotionPlugin).use(autoAnimatePlugin).mount('#app');
+const app = createApp(App);
+app.use(createPinia());
+app.use(router);
+app.use(MotionPlugin);
+app.use(autoAnimatePlugin);
+app.mount('#app');

@@ -122,7 +122,7 @@ async function fetchOutline() {
     const data = await res.json();
     outline.value = data;
     setTimeout(() => { animatingNumbers.value = true; }, 100);
-  } catch { /* ignore */ }
+  } catch (e) { console.warn('[profile] load outline failed:', e); }
   loading.value = false;
 }
 

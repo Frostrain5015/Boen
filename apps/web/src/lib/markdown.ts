@@ -1,6 +1,5 @@
 import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
-import { tikzCache } from './tikz';
 
 const md = new MarkdownIt({ breaks: false, linkify: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
@@ -119,10 +118,10 @@ export function renderMarkdownInline(text: string): string {
   return md.renderInline(normalizeXlop(normalized));
 }
 
-// ── TikZ 代码块：走服务端编译 ──────────────
+// ── TikZ 代码块：服务端已下线，降级为占位 ──────────────
 
 /**
- * 自定义 fence：```tikz 以及 ```latex 且包含 tikzpicture → 服务端编译占位
+ * 自定义 fence：```tikz 以及 ```latex 且包含 tikzpicture → 占位块（processTikzDiagrams 会处理 xlop 或显示降级提示）
  * （xlop 竖式已被上面的 normalization 处理，此处不再需要捕获 xlop）
  */
 const defaultFence = md.renderer.rules.fence;
@@ -134,12 +133,10 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const katexHtml = xlopToKatex(content);
     if (katexHtml) return md.render(katexHtml);
   }
-  // tikz 真正的图形 → 服务端编译。如果缓存中已有 SVG，直接输出防止流式重渲染闪回占位态
+  // tikz 图形 → 占位，processTikzDiagrams 会渲染 xlop 或显示降级提示
   if (info === 'tikz' || (info === 'latex' && /\\begin\s*\{tikzpicture\}/.test(content))) {
-    const cached = tikzCache.get(content);
-    if (cached) return cached + '\n';
     const encoded = encodeURIComponent(content);
-    return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">📐</span><span class="tikz-gen-label">博文正在画图</span><span class="tikz-gen-dots"><span></span><span></span><span></span></span></div></div>\n`;
+    return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">\uD83D\uDCD0</span><span class="tikz-gen-label">TikZ \u6E32\u67D3\u6682\u4E0D\u53EF\u7528</span></div></div>\n`;
   }
   return defaultFence!(tokens, idx, options, env, self);
 };

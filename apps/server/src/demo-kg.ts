@@ -1,7 +1,4 @@
-import Database from 'better-sqlite3';
-import { join } from 'node:path';
-const db = new Database(join(process.cwd(), 'data', 'boen.db'));
-db.pragma('journal_mode = WAL');
+import db from './db.js';
 
 const tb = db.prepare(`SELECT * FROM curriculum_textbooks WHERE subject='math' AND grade='7' AND volume='上册'`).get() as any;
 console.log('教材:', tb.version);
@@ -89,4 +86,4 @@ if (firstUnit) {
   }
 }
 
-db.close();
+process.exit(0);

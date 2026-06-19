@@ -279,8 +279,9 @@ watch(selectedMistake, async (mistake) => {
   if (!mistake || !asset) return;
   try {
     selectedAssetObjectUrl.value = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
-  } catch {
+  } catch (e) {
     selectedAssetObjectUrl.value = '';
+    console.warn('[mistakes] fetch asset failed:', e);
   }
 }, { immediate: true });
 

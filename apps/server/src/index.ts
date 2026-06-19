@@ -20,9 +20,6 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { updateProficiency, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
-import { execSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   createConversation,
   getConversations,
@@ -93,7 +90,8 @@ async function resolveUserId(c: Context): Promise<string | null> {
     if (!data.sub) return null;
     userIdCache.set(token, { sub: data.sub, exp: Date.now() + 5 * 60_000 });
     return data.sub;
-  } catch {
+  } catch (err) {
+    console.error('[auth] userinfo failed:', err);
     return null;
   }
 }
@@ -178,7 +176,7 @@ async function autoGenerateTitle(conversationId: string, userMessage: string, on
       await onTitle(title);
     }
   } catch {
-    // 标题生成失败不影响主流程
+    console.warn('[title] auto-generation failed');
   }
 }
 
@@ -248,52 +246,6 @@ function formString(form: FormData, key: string): string | undefined {
 function isFormFile(value: unknown): value is { name?: string; type?: string; arrayBuffer: () => Promise<ArrayBuffer> } {
   return !!value && typeof value === 'object' && 'arrayBuffer' in value && typeof (value as any).arrayBuffer === 'function';
 }
-
-// ── TiKZ 渲染 API（服务端 PGF/TikZ → SVG）───
-/** POST /api/render-tikz — 接收 TikZ 源码，返回 SVG */
-app.post('/api/render-tikz', async (c) => {
-  const { code } = await c.req.json<{ code?: string }>();
-  if (!code?.trim()) return c.json({ error: 'TikZ code required' }, 400);
-
-  const tmpDir = mkdtempSync('/tmp/tikz-');
-  const texPath = join(tmpDir, 'tikz.tex');
-  const pdfPath = join(tmpDir, 'tikz.pdf');
-  const svgPath = join(tmpDir, 'tikz.svg');
-
-  // 统一用 standalone（不传 [tikz] 选项 —— \usepackage{tikz} 已在下面独立加载，两者等价）。
-  // 此前分支 standalone vs standalone[tikz] 在服务器特定 TeXLive 版本上导致裁剪异常。
-  const tex = `\\documentclass{standalone}
-\\usepackage{fontspec}
-\\usepackage{xeCJK}
-\\setCJKmainfont{Noto Sans CJK SC}
-\\usepackage{tikz}
-\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
-\\usepackage{pgfplots}
-\\pgfplotsset{compat=1.18}
-\\usepackage{xlop}
-\\begin{document}
-${code}
-\\end{document}`;
-
-  try {
-    writeFileSync(texPath, tex, 'utf-8');
-    execSync(`xelatex -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
-    const pdfExists = existsSync(pdfPath);
-    if (!pdfExists) {
-      const log = existsSync(join(tmpDir, 'tikz.log')) ? execSync(`tail -30 "${tmpDir}/tikz.log"`, { encoding: 'utf-8' }) : '';
-      return c.json({ error: 'pdflatex failed', log }, 500);
-    }
-    execSync(`dvisvgm --pdf --no-fonts -o "${svgPath}" "${pdfPath}"`, { timeout: 15000, stdio: 'pipe' });
-    const svg = existsSync(svgPath) ? execSync(`cat "${svgPath}"`, { encoding: 'utf-8' }) : '';
-    if (!svg) return c.json({ error: 'dvisvgm produced empty output' }, 500);
-    return c.json({ svg });
-  } catch (err) {
-    const log = existsSync(join(tmpDir, 'tikz.log')) ? execSync(`tail -30 "${tmpDir}/tikz.log"`, { encoding: 'utf-8' }) : '';
-    return c.json({ error: err instanceof Error ? err.message : String(err), log }, 500);
-  } finally {
-    execSync(`rm -rf "${tmpDir}"`);
-  }
-});
 
 // ── 知识图谱 API ────────────────────────────
 // 初始化表（幂等）
@@ -814,7 +766,10 @@ app.post('/api/chat', async (c) => {
           } else {
             weaknessData = '【知识画像】当前暂无明显的薄弱知识点记录。可以通过考试或练习来建立你的知识画像。';
           }
-        } catch { weaknessData = undefined; }
+        } catch (err) {
+          console.warn('[profile] weakness data retrieval failed:', err);
+          weaknessData = undefined;
+        }
       }
 
       // 通知前端开始加载知识库
@@ -822,7 +777,8 @@ app.post('/api/chat', async (c) => {
       if (userId && (body.mode === 'weakness' || body.practiceType || /错题|举一反三|出题|练习|测验|测试|考我|quiz/i.test(body.message))) {
         try {
           styleExamples = await retrieveMistakeStyleSamples(userId, body.subject ?? 'math', body.grade ?? '7', body.message, [], 3);
-        } catch {
+        } catch (err) {
+          console.warn('[mistakes] style samples retrieval failed:', err);
           styleExamples = undefined;
         }
       }

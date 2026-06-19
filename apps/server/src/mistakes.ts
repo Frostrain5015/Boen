@@ -27,8 +27,7 @@ import { retrieveRelated } from './curriculum.js';
 import { blobToVector, cosineSim, embedQuery, embedTexts, vectorToBlob } from './embeddings.js';
 import { getProficiencyLevel } from './knowledge-profile.js';
 
-const DATA_DIR = join(process.cwd(), 'data');
-const ASSET_ROOT = join(DATA_DIR, 'mistake-assets');
+import { ASSET_ROOT } from './paths.js';
 const MAX_IMAGE_MB = Number(process.env.ALIYUN_OCR_MAX_IMAGE_MB ?? '8');
 const MAX_IMAGE_BYTES = Math.max(1, MAX_IMAGE_MB) * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -1040,7 +1039,8 @@ export async function retrieveMistakeStyleSamples(userId: string, subject: strin
   if (query.trim()) {
     try {
       queryVector = await embedQuery(query);
-    } catch {
+    } catch (err) {
+      console.warn('[mistakes] embedding query failed:', err);
       queryVector = null;
     }
   }
