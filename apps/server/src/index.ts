@@ -53,12 +53,13 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
 
-function createModel(provider: string) {
+function createModel(provider: string, opts?: { enableThinking?: boolean }) {
+  const thinking = opts?.enableThinking ?? true;
   if (provider === 'deepseek') {
-    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY });
+    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY, enableThinking: thinking });
   }
   if (provider === 'deepseek-pro') {
-    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: DEEPSEEK_API_KEY });
+    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: DEEPSEEK_API_KEY, enableThinking: thinking });
   }
   // 'default' → 环境变量配置（当前为讯飞 MaaS / Kimi K2.6）
   return getChatModel({
@@ -66,9 +67,12 @@ function createModel(provider: string) {
     model: process.env.BOEN_MODEL ?? 'astron-code-latest',
     apiKey: process.env.BOEN_API_KEY ?? '',
     baseUrl: process.env.BOEN_BASE_URL,
+    enableThinking: thinking,
   });
 }
 let model = createModel('default');
+/** 不带 thinking 的模型（用于出卷/审核等需要 tool_choice 的场景） */
+const structuredModel = createModel('default', { enableThinking: false });
 let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
 
 /** 切换模型并重建 LangGraph 图 */
@@ -730,7 +734,7 @@ app.post('/api/exam/generate', async (c) => {
     try {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
-        model,
+        structuredModel,
         { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes, totalScore: body.totalScore },
         (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
         userId,
