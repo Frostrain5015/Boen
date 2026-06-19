@@ -118,7 +118,14 @@ async function runSingleReview(
       dimension,
     );
     const content = typeof response.content === 'string' ? response.content : '';
-    const rawData = JSON.parse(content);
+    // 清洗 JSON：移除值中嵌入的控制字符，再提取首个 { 到最后一个 } 之间的子串
+    const sanitized = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    const jsonStart = sanitized.indexOf('{');
+    const jsonEnd = sanitized.lastIndexOf('}');
+    const cleanJson = jsonStart !== -1 && jsonEnd > jsonStart
+      ? sanitized.slice(jsonStart, jsonEnd + 1)
+      : sanitized;
+    const rawData = JSON.parse(cleanJson);
     const parsed = schema.safeParse(rawData);
     if (parsed.success) return parseReviewOutput(parsed.data, dimension);
     console.warn(`[review:${dimension}] JSON 格式不符，使用默认分:`, parsed.error.issues.slice(0, 2));
