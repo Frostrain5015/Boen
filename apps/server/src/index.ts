@@ -66,7 +66,7 @@ function createModel(provider: string): BaseChatModel {
     provider: 'deepseek',
     model: modelName,
     apiKey: DEEPSEEK_API_KEY,
-    enableThinking: true,
+    enableThinking: false, // 现阶段追求快速出结果，关闭 thinking 模式
   });
 }
 let model = createModel('default');

@@ -274,7 +274,6 @@ function tryFixBlueprint(raw: any, targetScore: number): ExamBlueprint | null {
     if (!raw.difficultyDistribution) {
       raw.difficultyDistribution = { easy: 0.4, medium: 0.4, hard: 0.2 };
     }
-    // 确保 difficultyDistribution 三者之和 = 1
     const dd = raw.difficultyDistribution;
     const sum = (dd.easy ?? 0) + (dd.medium ?? 0) + (dd.hard ?? 0);
     if (sum > 0 && Math.abs(sum - 1) > 0.01) {
@@ -282,9 +281,19 @@ function tryFixBlueprint(raw: any, targetScore: number): ExamBlueprint | null {
       dd.medium = dd.medium / sum;
       dd.hard = dd.hard / sum;
     }
+    // 修复模型 output：knowledgePoints 可能是字符串数组而非对象
+    if (raw.sections) {
+      for (const sec of raw.sections) {
+        if (Array.isArray(sec.knowledgePoints)) {
+          sec.knowledgePoints = sec.knowledgePoints.map((kp: any) =>
+            typeof kp === 'string' ? { title: kp, weight: 0.5 } : kp,
+          );
+        }
+      }
+    }
     const parsed = examBlueprintSchema.parse(raw);
     return validateAndFixBlueprint(parsed, targetScore);
-  } catch {
+  } catch (e) {
     return null;
   }
 }
