@@ -30,9 +30,8 @@ onMounted(() => {
   <main ref="scroller" class="chat-scroller min-h-0 flex-1 overflow-y-auto px-4" :class="{ 'chat-scroll-fade': hasScrollOverflow }">
     <div class="mx-auto w-full max-w-2xl py-5">
       <!-- 欢迎页 / 消息列表：整块淡入淡出切换 -->
-      <Transition name="panel" mode="out-in">
       <!-- 欢迎页 -->
-      <div v-if="!chatStore.hasItems" key="welcome" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
+      <div v-if="!chatStore.hasItems" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
         <Mascot :size="120" :state="chatStore.mascotState" />
         <div>
           <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
@@ -41,7 +40,7 @@ onMounted(() => {
       </div>
 
       <!-- 消息列表 -->
-      <div v-else key="list" v-auto-animate class="flex flex-col gap-6">
+      <div v-else v-auto-animate class="flex flex-col gap-6">
         <template v-for="(m, i) in chatStore.items" :key="i">
           <!-- 题目卡片 -->
           <QuestionCard
@@ -94,7 +93,6 @@ onMounted(() => {
           </div>
         </template>
       </div>
-      </Transition>
     </div>
   </main>
 </template>

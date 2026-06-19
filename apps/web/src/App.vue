@@ -63,7 +63,7 @@ onMounted(() => {
       <!-- 主内容区 -->
       <div class="flex min-h-0 min-w-0 flex-1 flex-col" :data-subject="uiStore.subject">
         <router-view v-slot="{ Component }">
-          <Transition name="view-fade" mode="out-in">
+          <Transition name="view-fade">
             <component :is="Component" />
           </Transition>
         </router-view>
