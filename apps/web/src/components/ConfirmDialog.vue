@@ -6,7 +6,6 @@ const { isOpen, options, handleConfirm, handleCancel } = useConfirm();
 </script>
 
 <template>
-  <Teleport to="body">
     <Transition name="confirm-fade">
       <div v-if="isOpen" class="confirm-overlay" @click.self="handleCancel">
         <div class="confirm-card clay" role="dialog" aria-modal="true" :aria-label="options.title">
@@ -40,7 +39,6 @@ const { isOpen, options, handleConfirm, handleCancel } = useConfirm();
         </div>
       </div>
     </Transition>
-  </Teleport>
 </template>
 
 <style scoped>

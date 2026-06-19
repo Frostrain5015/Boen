@@ -40,7 +40,6 @@ function handleSave() {
 </script>
 
 <template>
-  <Teleport to="body">
     <div class="setup-overlay" @click.self="emit('close')">
       <div
         class="setup-card clay"
@@ -129,7 +128,6 @@ function handleSave() {
         </div>
       </div>
     </div>
-  </Teleport>
 </template>
 
 <style scoped>
