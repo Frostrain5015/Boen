@@ -119,11 +119,11 @@ function normalizeXlop(text: string): string {
 // ── 填空标记安全化 ──────────────────────────
 
 /**
- * 预处理填空标记 ____（3+ 下划线），替换为 KaTeX 安全的空白方框。
+ * 预处理填空标记 ____（3+ 下划线），替换为 KaTeX 安全的带序号下划线。
  * 关键处理逻辑：
  * 1. 先找出所有 $...$ 或 $$...$$ 数学模式区间，在区间内保留 KaTeX 语法
- * 2. ____ 在数学模式内 → 替换为 \boxed{\hspace{2em}}（不引入额外 $）
- * 3. ____ 在数学模式外 → 替换为 $\boxed{\hspace{2em}}$（包裹进数学模式）
+ * 2. ____ 在数学模式内 → 替换为 \underline{\hspace{3em}}（不引入额外 $）
+ * 3. ____ 在数学模式外 → 替换为 $\underline{\hspace{3em}}$（包裹进数学模式）
  */
 const BLANK_RE = /\_{3,}/g;
 const MATH_SPAN_RE = /(\$\$[\s\S]*?\$\$|\$[^$\n]*?\$)/g;
@@ -133,14 +133,14 @@ function normalizeBlanks(text: string): string {
   const mathSpans: Record<string, string> = {};
   let mathIndex = 0;
   const withPlaceholders = text.replace(MATH_SPAN_RE, (match) => {
-    const cleaned = match.replace(BLANK_RE, '\\boxed{\\hspace{2em}}');
+    const cleaned = match.replace(BLANK_RE, '\\underline{\\hspace{3em}}');
     const key = `\x00MATH${mathIndex++}\x00`;
     mathSpans[key] = cleaned;
     return key;
   });
 
   // 非数学区间的 ____ → 包裹进数学模式
-  const result = withPlaceholders.replace(BLANK_RE, ' $\\boxed{\\hspace{2em}}$ ');
+  const result = withPlaceholders.replace(BLANK_RE, ' $\\underline{\\hspace{3em}}$ ');
 
   // 恢复数学区间
   return result.replace(/\x00MATH\d+\x00/g, (key) => mathSpans[key] || '');
