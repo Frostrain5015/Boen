@@ -13,6 +13,75 @@ import type { ExamBlueprint, Difficulty } from '@boen/shared';
 import { getExamStructure, type QuestionTypeConfig } from './exam-structures.js';
 import { blueprintArchitectPrompt, subjectLabel, gradeLabel } from './exam-prompts.js';
 
+const QUESTION_TYPE_ORDER: Record<string, number> = {
+  multiple_choice: 0,
+  true_false: 1,
+  fill_blank: 2,
+  short_answer: 3,
+};
+
+function sortQuestionTypes<T extends { type: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (QUESTION_TYPE_ORDER[a.type] ?? 99) - (QUESTION_TYPE_ORDER[b.type] ?? 99));
+}
+
+function tuneCountsToTarget<T extends { type: string; count: number; pointsPer: number }>(items: T[], targetScore: number): number {
+  if (!items.length) return 0;
+
+  type State = { cost: number; counts: number[] };
+  let dp = new Map<number, State>([[0, { cost: 0, counts: [] }]]);
+  const maxScore = Math.max(targetScore * 2, targetScore + 120, 200);
+
+  for (const item of items) {
+    const next = new Map<number, State>();
+    const maxCount = item.type === 'multiple_choice' ? 10 : 20;
+    for (const [score, state] of dp.entries()) {
+      for (let count = 1; count <= maxCount; count++) {
+        const nextScore = score + count * item.pointsPer;
+        if (nextScore > maxScore) continue;
+        const cost = state.cost + Math.abs(count - item.count) * 10 + (count === item.count ? 0 : 1);
+        const current = next.get(nextScore);
+        if (!current || cost < current.cost) {
+          next.set(nextScore, { cost, counts: [...state.counts, count] });
+        }
+      }
+    }
+    dp = next;
+  }
+
+  let bestScore = targetScore;
+  let best = dp.get(targetScore);
+  if (!best) {
+    for (const [score, state] of dp.entries()) {
+      if (!best) {
+        best = state;
+        bestScore = score;
+        continue;
+      }
+      const currentRank = Math.abs(score - targetScore) * 1000 + state.cost;
+      const bestRank = Math.abs(bestScore - targetScore) * 1000 + best.cost;
+      if (currentRank < bestRank) {
+        best = state;
+        bestScore = score;
+      }
+    }
+  }
+
+  if (best) {
+    best.counts.forEach((count, idx) => { items[idx].count = count; });
+  }
+
+  return items.reduce((sum, item) => sum + item.count * item.pointsPer, 0);
+}
+
+function finalizeBlueprint(bp: ExamBlueprint, targetScore: number): ExamBlueprint {
+  const sections = bp.sections.map(section => ({
+    ...section,
+    questionTypes: sortQuestionTypes(section.questionTypes.map(qt => ({ ...qt }))),
+  }));
+  const totalScore = tuneCountsToTarget(sections.flatMap(section => section.questionTypes), targetScore);
+  return { ...bp, sections, totalScore };
+}
+
 // ── 蓝图 Zod Schema（绑定到 model.bindTools 做结构化输出） ──────
 
 const blueprintKpSchema = z.object({
@@ -68,7 +137,7 @@ export function buildConstraintBoundary(grade: string, mode: 'exam' | 'quiz', to
   const struct = getExamStructure(grade);
   const variant = mode === 'quiz' ? struct.quiz : struct.exam;
 
-  const typeGuidance = variant.questionTypes.map(qt =>
+  const typeGuidance = sortQuestionTypes(variant.questionTypes).map(qt =>
     `  - ${qt.label}（${qt.type}）：标准 ${qt.count} 题 × ${qt.pointsPer} 分/题`).join('\n');
 
   return [
@@ -86,6 +155,7 @@ export function buildConstraintBoundary(grade: string, mode: 'exam' | 'quiz', to
     '- 题型种类和分值参考标准配比，可微调但不可大幅偏离',
     '- 难度分布参考标准比例，可微调',
     '- 各题型 pointsPer × count 之和必须等于目标总分',
+    '- 题型顺序固定为：选择题 multiple_choice → 判断题 true_false → 填空题 fill_blank → 简答/解答题 short_answer',
     '- 选择题不超过 10 道',
   ].join('\n');
 }
@@ -98,7 +168,7 @@ export function defaultBlueprint(config: { subject: string; grade: string; total
   const variant = mode === 'quiz' ? struct.quiz : struct.exam;
   const ratio = totalScore / variant.totalScore;
 
-  const questionTypes: QuestionTypeConfig[] = variant.questionTypes.map(qt => ({
+  const questionTypes: QuestionTypeConfig[] = sortQuestionTypes(variant.questionTypes).map(qt => ({
     ...qt,
     count: Math.max(1, Math.round(qt.count * ratio)),
   }));
@@ -128,7 +198,7 @@ export function defaultBlueprint(config: { subject: string; grade: string; total
     }
   }
 
-  return {
+  return finalizeBlueprint({
     title: `${subjectLabel(config.subject)}${gradeLabel(config.grade)}综合试卷`,
     sections: [{
       title: '综合',
@@ -148,7 +218,7 @@ export function defaultBlueprint(config: { subject: string; grade: string; total
       medium: variant.difficultyRatio.medium / 100,
       hard: variant.difficultyRatio.hard / 100,
     },
-  };
+  }, totalScore);
 }
 
 // ── 蓝图架构师主函数 ──────────────────────────────────────
@@ -206,7 +276,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
 
   // 偏差 < 5% → 微调最后一个题型 count，精确命中目标总分
   if (deviation < 0.05) {
-    if (diff === 0) return { ...bp, totalScore: actualScore };
+    if (diff === 0) return finalizeBlueprint({ ...bp, totalScore: actualScore }, targetScore);
     // 从后往前找 pointsPer 最小的题型来调整（粒度最细）
     for (let i = allQts.length - 1; i >= 0; i--) {
       const qt = allQts[i];
@@ -225,7 +295,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
       const target = sec.questionTypes.find(t => t.type === qt.type);
       if (target) target.count = qt.count;
     }
-    return { ...bp, totalScore: actualScore };
+    return finalizeBlueprint({ ...bp, totalScore: actualScore }, targetScore);
   }
 
   // 偏差 ≥ 5% → 按比例调整每个 section 的 count
@@ -268,7 +338,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     }
   }
 
-  return { ...bp, sections: fixedSections, totalScore: newScore };
+  return finalizeBlueprint({ ...bp, sections: fixedSections, totalScore: newScore }, targetScore);
 }
 
 /** 尝试修复常见的 schema 校验失败 */
@@ -339,8 +409,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 /** 把蓝图展平为出题任务列表（每个任务 = 一个 section × questionType 组） */
 export function flattenBlueprint(blueprint: ExamBlueprint): WriteTask[] {
-  const tasks: WriteTask[] = [];
-  for (const section of blueprint.sections) {
+  const tasks: Array<WriteTask & { sectionOrder: number }> = [];
+  for (const [sectionOrder, section] of blueprint.sections.entries()) {
     for (const qt of section.questionTypes) {
       tasks.push({
         sectionTitle: section.title,
@@ -351,8 +421,12 @@ export function flattenBlueprint(blueprint: ExamBlueprint): WriteTask[] {
         pointsPer: qt.pointsPer,
         focusKps: qt.focusKps,
         difficulty: section.difficulty,
+        sectionOrder,
       });
     }
   }
-  return tasks;
+  return tasks.sort((a, b) =>
+    (QUESTION_TYPE_ORDER[a.questionType] ?? 99) - (QUESTION_TYPE_ORDER[b.questionType] ?? 99) ||
+    ((a as any).sectionOrder ?? 0) - ((b as any).sectionOrder ?? 0)
+  ).map(({ sectionOrder: _sectionOrder, ...task } : WriteTask & { sectionOrder?: number }) => task);
 }

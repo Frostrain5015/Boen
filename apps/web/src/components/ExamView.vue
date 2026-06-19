@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onUpdated, watch, nextTick } from 'vue';
 import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
@@ -50,6 +50,10 @@ interface ExamSessionData {
   totalScore: number;
   durationMinutes: number;
   questions: ExamQuestionData[];
+  qualityReport?: {
+    qualityWarnings?: number[];
+    scores?: Array<{ index: number; total?: number; needsRegeneration?: boolean }>;
+  };
 }
 
 interface ExamResultsData {
@@ -87,12 +91,13 @@ const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
-type GenerationStep = 'kg' | 'blueprint' | 'write' | 'review';
+type GenerationStep = 'kg' | 'blueprint' | 'write' | 'review' | 'regenerate';
 const generationSteps: Array<{ step: GenerationStep }> = [
   { step: 'kg' },
   { step: 'blueprint' },
   { step: 'write' },
   { step: 'review' },
+  { step: 'regenerate' },
 ];
 type GradingStep = 'grade' | 'analyze' | 'profile' | 'save' | 'complete';
 const gradingProgress = ref<{ step: GradingStep; message: string; progress: number }>({ step: 'grade', message: '准备开始判卷', progress: 0 });
@@ -136,6 +141,35 @@ const tikzSvgsMap = computed(() => {
   }
   return Object.keys(all).length ? all : undefined;
 });
+
+const qualityWarningSet = computed(() => {
+  const warnings = session.value?.qualityReport?.qualityWarnings ?? [];
+  return new Set(warnings);
+});
+
+const tikzTimers = new Set<number>();
+let tikzScheduled = false;
+function scheduleTikzProcessing() {
+  if (tikzScheduled) return;
+  tikzScheduled = true;
+  const run = () => {
+    processTikzDiagrams(document, tikzSvgsMap.value).catch((err) => {
+      console.warn(`${EXAM_TRACE_PREFIX} tikz:process-failed`, err);
+    });
+  };
+  nextTick(() => {
+    tikzScheduled = false;
+    run();
+    requestAnimationFrame(run);
+    for (const delay of [120, 500, 1200]) {
+      const id = window.setTimeout(() => {
+        tikzTimers.delete(id);
+        run();
+      }, delay);
+      tikzTimers.add(id);
+    }
+  });
+}
 
 const SUBJECTS = [
   { value: 'chinese' as const, label: '语文', emoji: '📖' },
@@ -343,7 +377,7 @@ function generationStepState(step: GenerationStep): 'pending' | 'active' | 'done
     return 'pending';
   }
   if (step === 'blueprint') {
-    if (current === 'blueprint' && p >= 20) return 'done';
+    if (current === 'blueprint' && p >= 18) return 'done';
     if (current === 'blueprint' && p >= 10) return 'active';
     if (['write', 'review', 'regenerate', 'complete'].includes(current)) return 'done';
     return 'pending';
@@ -355,7 +389,14 @@ function generationStepState(step: GenerationStep): 'pending' | 'active' | 'done
   }
   if (step === 'review') {
     if (current === 'complete') return 'done';
-    if (['review', 'regenerate'].includes(current)) return 'active';
+    if (current === 'review') return 'active';
+    if (current === 'regenerate') return 'done';
+    return 'pending';
+  }
+  if (step === 'regenerate') {
+    if (current === 'complete') return 'done';
+    if (current === 'regenerate') return 'active';
+    if (current === 'review' && p >= 82) return 'done';
     return 'pending';
   }
   return 'pending';
@@ -375,9 +416,37 @@ function generationStepLabel(step: GenerationStep): string {
     blueprint: '试卷蓝图设计',
     write: '试题编写',
     review: '质量审核',
+    regenerate: '修订试题',
   };
   return labels[step];
 }
+
+const generationDetailText = computed(() => {
+  const step = genProgress.value.step;
+  const progress = genProgress.value.progress;
+  if (step === 'blueprint' && progress < 10) return '正在扫描知识图谱';
+  if (step === 'blueprint') return '正在订立大纲';
+  if (step === 'write') return '正在编写试题';
+  if (step === 'review' && progress >= 82) return '正在进行复核';
+  if (step === 'review') return '正在审核初稿';
+  if (step === 'regenerate') return '正在修订试题';
+  if (step === 'complete') return '正在整理试卷';
+  return '正在准备生成';
+});
+
+const generationProgressStyle = computed(() => {
+  const step = genProgress.value.step;
+  const duration =
+    step === 'write' ? 720 :
+    step === 'review' ? 900 :
+    step === 'regenerate' ? 1050 :
+    step === 'complete' ? 420 :
+    520;
+  return {
+    width: `${genProgress.value.progress}%`,
+    transitionDuration: `${duration}ms`,
+  };
+});
 
 function gradingStepState(step: GradingStep): 'pending' | 'active' | 'done' {
   const order: GradingStep[] = ['grade', 'analyze', 'profile', 'save', 'complete'];
@@ -590,11 +659,20 @@ async function submitExam() {
 watch(examState, (s) => {
   examTrace('state', s);
   if (s === 'taking' || s === 'results') {
-    nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
+    scheduleTikzProcessing();
   }
 });
 watch(currentGroup, () => {
-  nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
+  scheduleTikzProcessing();
+});
+watch(tikzSvgsMap, () => {
+  if (examState.value === 'taking' || examState.value === 'results') scheduleTikzProcessing();
+});
+watch(() => session.value?.questions.length ?? 0, () => {
+  if (examState.value === 'taking' || examState.value === 'results') scheduleTikzProcessing();
+});
+onUpdated(() => {
+  if (examState.value === 'taking' || examState.value === 'results') scheduleTikzProcessing();
 });
 
 function startExam() {
@@ -646,7 +724,7 @@ function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
   if (s.has(qIndex)) s.delete(qIndex); else s.add(qIndex);
   expandedResults.value = s;
-  nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
+  scheduleTikzProcessing();
 }
 
 async function loadQuestions(examId: string) {
@@ -654,7 +732,7 @@ async function loadQuestions(examId: string) {
     const res = await fetch(`/api/exam/${examId}`, { headers: authHeaders() });
     const data = await res.json();
     if (data.exam?.questions && session.value) {
-      session.value = { ...session.value, questions: data.exam.questions };
+      session.value = { ...session.value, questions: data.exam.questions, qualityReport: data.exam.qualityReport };
       const typeCounts = data.exam.questions.reduce((acc: Record<string, number>, q: ExamQuestionData) => {
         acc[q.type] = (acc[q.type] ?? 0) + 1;
         return acc;
@@ -678,7 +756,12 @@ function authHeaders(): Record<string, string> {
 }
 
 onMounted(() => { window.addEventListener('keydown', handleKeydown); });
-onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value); window.removeEventListener('keydown', handleKeydown); });
+onUnmounted(() => {
+  if (timerInterval.value) clearInterval(timerInterval.value);
+  for (const id of tikzTimers) window.clearTimeout(id);
+  tikzTimers.clear();
+  window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <template>
@@ -739,10 +822,10 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ generationStepLabel(item.step) }}</span>
             <span v-if="generationStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ generationStepLabel(genProgress.step as GenerationStep) }}</p>
+          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ generationDetailText }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
-          <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
+          <div class="progress-fill" :style="generationProgressStyle"></div>
         </div>
       </div>
     </div>
@@ -811,6 +894,10 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                   <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ sq.points }}分</span>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                  <div v-if="qualityWarningSet.has(sq.index)" class="flex items-start gap-2 rounded-xl border border-[#f2c46d] bg-[#fff7df] px-3 py-2 text-xs font-semibold text-[#9a5b12]">
+                    <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>注意：该题质量未通过终审</span>
+                  </div>
                   <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(subStem(sq))"></div>
 
                   <!-- Multiple Choice -->

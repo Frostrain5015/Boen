@@ -114,8 +114,18 @@ export async function processTikzDiagrams(
   const wraps = Array.from(root.querySelectorAll<HTMLElement>('.tikz-wrap[data-tikz]'));
   for (const wrap of wraps) {
     if (wrap.dataset.tikzState === 'done') continue;
-    const code = decodeURIComponent(wrap.dataset.tikz ?? '');
-    if (!code) continue;
+    if (wrap.dataset.tikzState === 'rendering') continue;
+    let code = '';
+    try {
+      code = decodeURIComponent(wrap.dataset.tikz ?? '').trim();
+    } catch {
+      code = String(wrap.dataset.tikz ?? '').trim();
+    }
+    if (!code) {
+      wrap.innerHTML = errBox('TikZ 代码为空');
+      wrap.dataset.tikzState = 'done';
+      continue;
+    }
 
     // 先尝试前端竖式渲染（xlop 命令）
     const vertHtml = renderXlop(code);
@@ -137,15 +147,19 @@ export async function processTikzDiagrams(
     }
 
     // 回退：服务端渲染
+    wrap.dataset.tikzState = 'rendering';
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
     try {
       const token = localStorage.getItem('boen_access_token');
       const res = await fetch('/api/render-tikz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ code }),
+        signal: controller.signal,
       });
-      const data = await res.json() as { svg?: string; error?: string };
-      if (data.svg) {
+      const data = await res.json().catch(() => ({})) as { svg?: string; error?: string };
+      if (res.ok && data.svg) {
         wrap.innerHTML = data.svg;
         wrap.dataset.tikzState = 'done';
       } else {
@@ -155,6 +169,8 @@ export async function processTikzDiagrams(
     } catch {
       wrap.innerHTML = `<details class="tikz-fallback"><summary>📐 TikZ 渲染失败</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
       wrap.dataset.tikzState = 'done';
+    } finally {
+      window.clearTimeout(timeout);
     }
   }
 }

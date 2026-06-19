@@ -4,6 +4,20 @@ import katex from '@traptitech/markdown-it-katex';
 const md = new MarkdownIt({ breaks: false, linkify: true, html: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
 
+function sanitizeGeneratedHtml(text: string): string {
+  return String(text ?? '')
+    .replace(/&lt;\s*\/?\s*u\s*&gt;/gi, '')
+    .replace(/&lt;\s*br\s*\/?\s*&gt;/gi, '\n')
+    .replace(/([A-Za-z0-9\u4e00-\u9fff])\s*<\s*\/\s*u\s*>\s*\1\s*<\s*\/\s*u\s*>/gi, '$1')
+    .replace(/([A-Za-z0-9\u4e00-\u9fff])\s*<\s*\/\s*u\s*>\s*\1\b/gi, '$1')
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/?\s*u\s*>/gi, '')
+    .replace(/<\s*\/?\s*(?:span|font|div|p|strong|em|b|i)\b[^<>]*>/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // ── 前端竖式渲染：\opadd / \opsub / \opmul / \opdiv → KaTeX array ─────
 
 /** 把 xlop 命令转成 KaTeX-compatible \begin{array} 字符串 */
@@ -139,7 +153,7 @@ function normalizeBlanks(text: string): string {
  * 同时将模型中出现的 \opadd 等 xlop 命令转换为 KaTeX array。
  */
 export function renderMarkdown(text: string): string {
-  const normalized = (text ?? '')
+  const normalized = sanitizeGeneratedHtml(text)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`)
     // 画线句支持：'被引用的句子' / '被引用的句子' → <u>被引用的句子</u>（语文阅读常见）
@@ -158,7 +172,7 @@ export function renderMarkdown(text: string): string {
  * 行内渲染（不包 <p>、不产生块级间距），用于选项文字等短文本场景。
  */
 export function renderMarkdownInline(text: string): string {
-  const normalized = (text ?? '')
+  const normalized = sanitizeGeneratedHtml(text)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
   return md.renderInline(normalizeXlop(normalizeBlanks(normalized)));
@@ -181,7 +195,7 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   }
   // tikz 图形 → 占位，processTikzDiagrams 会渲染 xlop 或显示降级提示
   if (info === 'tikz' || (info === 'latex' && /\\begin\s*\{tikzpicture\}/.test(content))) {
-    const encoded = encodeURIComponent(content);
+    const encoded = encodeURIComponent(content.trim());
     return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">\uD83D\uDCD0</span><span class="tikz-gen-label">TikZ \u6E32\u67D3\u4E2D\u2026</span></div></div>\n`;
   }
   return defaultFence!(tokens, idx, options, env, self);

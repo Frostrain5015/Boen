@@ -82,6 +82,7 @@ export function blueprintArchitectPrompt(
     '4. 难度分布（difficultyDistribution）：easy/medium/hard 的占比（三者之和 = 1）',
     '',
     '⚠ 重要：各题型 pointsPer × count 之和必须等于总分。选择题不超过 10 道。',
+    '⚠ 题型顺序是硬约束：卷面必须先选择题 multiple_choice，再判断题 true_false，再填空题 fill_blank，最后简答/解答题 short_answer；sections[].questionTypes 也按这个顺序输出。',
     '⚠ 各板块的知识点不要重复——同一知识点只应出现在一个板块中。',
     '💡 语文/英语等文科科目必须出综合大题：同一篇阅读材料必须出 2-4 道小题（单选/填空/简答混合），所有小题设相同 groupId（数字），阅读材料只放在第一题的 passage 字段，后续同组小题不要再重复放 passage。这是强制要求，不遵守将导致材料重复显示，整卷作废。',
     KATEX_FORMAT_GUIDE,

@@ -99,10 +99,55 @@ function normalizeLiteracies(raw: unknown): string[] {
 const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
+const QUESTION_TYPE_ORDER: Record<string, number> = {
+  multiple_choice: 0,
+  true_false: 1,
+  fill_blank: 2,
+  short_answer: 3,
+};
+
+function cleanGeneratedText(raw: unknown): string {
+  let text = String(raw ?? '');
+  if (!text) return '';
+
+  text = text
+    .replace(/&lt;\s*\/?\s*u\s*&gt;/gi, '')
+    .replace(/&lt;\s*br\s*\/?\s*&gt;/gi, '\n')
+    .replace(/([A-Za-z0-9\u4e00-\u9fff])\s*<\s*\/\s*u\s*>\s*\1\s*<\s*\/\s*u\s*>/gi, '$1')
+    .replace(/([A-Za-z0-9\u4e00-\u9fff])\s*<\s*\/\s*u\s*>\s*\1\b/gi, '$1')
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/?\s*u\s*>/gi, '')
+    .replace(/<\s*\/?\s*(?:span|font|div|p|strong|em|b|i)\b[^<>]*>/gi, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return text;
+}
+
+function orderExamQuestionsForDelivery(questions: ExamQuestion[]): ExamQuestion[] {
+  const grouped = new Map<string, { order: number; typeOrder: number; questions: ExamQuestion[] }>();
+  questions.forEach((q, originalOrder) => {
+    const key = q.groupId === undefined ? `q:${originalOrder}` : `g:${q.groupId}`;
+    const typeOrder = QUESTION_TYPE_ORDER[q.type] ?? 99;
+    const group = grouped.get(key);
+    if (group) {
+      group.typeOrder = Math.min(group.typeOrder, typeOrder);
+      group.questions.push(q);
+    } else {
+      grouped.set(key, { order: originalOrder, typeOrder, questions: [q] });
+    }
+  });
+
+  return [...grouped.values()]
+    .sort((a, b) => a.typeOrder - b.typeOrder || a.order - b.order)
+    .flatMap((group) => group.questions)
+    .map((q, i) => localFormatFix(q, i));
+}
 
 function stripOptionPrefix(text: string, key?: string): string {
   const k = key ? key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '[A-Fa-f]';
-  return String(text ?? '').trim().replace(new RegExp(`^(?:选项\\s*)?${k}\\s*[.．、:：)]\\s*`, 'i'), '').trim();
+  return cleanGeneratedText(text).replace(new RegExp(`^(?:选项\\s*)?${k}\\s*[.．、:：)]\\s*`, 'i'), '').trim();
 }
 
 function isPlaceholderOptionText(text: unknown, key?: string): boolean {
@@ -146,7 +191,8 @@ function extractOptionsFromStem(stem: string): { stem: string; options: { key: s
 }
 
 function normalizeOptions(stem: string, rawOptions: unknown): { stem: string; options: { key: string; text: string }[] } {
-  const extracted = extractOptionsFromStem(stem);
+  const cleanedStem = cleanGeneratedText(stem);
+  const extracted = extractOptionsFromStem(cleanedStem);
   const raw = Array.isArray(rawOptions) ? rawOptions : [];
 
   // 先处理原始选项（清洗前缀 + 过滤占位符）
@@ -161,20 +207,20 @@ function normalizeOptions(stem: string, rawOptions: unknown): { stem: string; op
   const valid = cleaned.filter((o) => !isPlaceholderOptionText(o.text, o.key));
 
   // 超过 2 个有效选项 → 直接用
-  if (valid.length >= 2) return { stem: stem.trim(), options: valid };
+  if (valid.length >= 2) return { stem: cleanedStem, options: valid };
 
   // 原始选项有内容但全被占位符过滤 → 回退到清洗后的（保留模型本意）
   if (cleaned.length >= 2) {
     console.warn('[normalizeOptions] 选项文本疑似占位符，保留原始值');
-    return { stem: stem.trim(), options: cleaned };
+    return { stem: cleanedStem, options: cleaned };
   }
 
   // 从题干提取
   if (extracted.options.length >= 2) {
-    return { stem: extracted.stem || stem, options: extracted.options };
+    return { stem: extracted.stem || cleanedStem, options: extracted.options };
   }
 
-  return { stem: stem.trim(), options: cleaned };
+  return { stem: cleanedStem, options: cleaned };
 }
 
 function countBlankMarkers(stem: string): number {
@@ -217,6 +263,15 @@ function choiceWithoutOptionsToShortAnswer(q: ExamQuestion): ExamQuestion {
 /** 本地格式兜底：补齐必填字段、修复残缺选项 */
 function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
   let q2 = { ...q, index: i };
+  q2.stem = cleanGeneratedText(q2.stem);
+  q2.passage = q2.passage ? cleanGeneratedText(q2.passage) : undefined;
+  q2.explanation = cleanGeneratedText(q2.explanation);
+  q2.referenceAnswer = q2.referenceAnswer ? cleanGeneratedText(q2.referenceAnswer) : undefined;
+  q2.keyPoints = q2.keyPoints?.map(cleanGeneratedText).filter(Boolean);
+  q2.options = q2.options?.map((o) => ({ ...o, text: cleanGeneratedText(o.text) }));
+  q2.blanks = q2.blanks?.map((blank) => ({
+    acceptedAnswers: blank.acceptedAnswers.map(cleanGeneratedText),
+  }));
   if (q2.type === 'multiple_choice') {
     const normalized = normalizeOptions(q2.stem ?? '', q2.options);
     q2.stem = normalized.stem || q2.stem;
@@ -309,7 +364,7 @@ function validateExamQuestionForDelivery(q: ExamQuestion): string | null {
 
 function normalizeOptionalPassage(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
-  const text = raw.trim();
+  const text = cleanGeneratedText(raw);
   if (!text) return undefined;
   if (/有阅读材料时填写|无则省略|阅读材料时填写|无则省略此字段/.test(text)) return undefined;
   return text;
@@ -371,7 +426,7 @@ export async function generateExam(
     const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
 
     // ─── 阶段一：蓝图架构师 ────────────────────
-    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 5 });
+    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 4 });
     const weightGuide = buildWeightGuideForPrompt(weightDist);
     const profileContext = userId ? await buildProfileContext(userId, config) : '';
     const scopeQuery = [config.chapters?.join(' '), config.notes].filter(Boolean).join('\n');
@@ -388,11 +443,11 @@ export async function generateExam(
       mode,
     );
 
-    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 20 });
+    await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 18 });
 
     // ─── 阶段二：题目编写组（按 section × questionType 并发，限 6 路） ────
     const writeTasks = flattenBlueprint(blueprint);
-    await onProgress?.({ step: 'write', message: 'write', progress: 25 });
+    await onProgress?.({ step: 'write', message: 'write', progress: 22 });
 
     let completedGroups = 0;
     const writeResults = await withConcurrencyLimit(
@@ -402,7 +457,7 @@ export async function generateExam(
         await onProgress?.({
           step: 'write',
           message: 'write',
-          progress: 25 + Math.round((completedGroups / writeTasks.length) * 55),
+          progress: 22 + Math.round((completedGroups / writeTasks.length) * 42),
         });
         return result;
       }),
@@ -415,22 +470,23 @@ export async function generateExam(
       else console.error(`出题组失败:`, r.reason?.message?.slice(0, 100));
     }
 
-    // 编号 + 本地格式修复
-    let questions = allQuestions.map((q, i) => localFormatFix(q, i));
-    await onProgress?.({ step: 'write', message: 'write', progress: 82 });
+    // 编号 + 本地格式修复 + 卷面题型顺序硬约束：
+    // 选择/判断在前，填空/简答在后；同 groupId 的材料题保持相邻。
+    let questions = orderExamQuestionsForDelivery(allQuestions);
+    await onProgress?.({ step: 'write', message: 'write', progress: 66 });
 
     // ─── 阶段三：审核委员会（5 维度并发） ──────
-    await onProgress?.({ step: 'review', message: 'review', progress: 85 });
+    await onProgress?.({ step: 'review', message: 'review', progress: 70 });
     let { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
     const regeneratedIndices = new Set<number>();
     const qualityWarnings = new Set<number>();
 
     let regenCount = scores.filter(s => s.needsRegeneration).length;
-    await onProgress?.({ step: 'review', message: 'review', progress: 90 });
+    await onProgress?.({ step: 'review', message: 'review', progress: 76 });
 
     const maxRegenerationRounds = 3;
     for (let round = 1; regenCount > 0 && round <= maxRegenerationRounds; round++) {
-      await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(98, 90 + round * 2) });
+      await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(96, 78 + round * 5) });
       const crossGroupContext = buildCrossGroupContext(questions);
       const regenResult = await regenerateQuestions(
         model,
@@ -440,11 +496,11 @@ export async function generateExam(
         crossGroupContext,
         writeSingleQuestion,
       );
-      questions = regenResult.questions.map((q, i) => localFormatFix(q, i));
+      questions = orderExamQuestionsForDelivery(regenResult.questions);
       for (const index of regenResult.report.regeneratedIndices) regeneratedIndices.add(index);
       for (const index of regenResult.report.qualityWarnings) qualityWarnings.add(index);
 
-      await onProgress?.({ step: 'review', message: 'review', progress: Math.min(99, 92 + round * 2) });
+      await onProgress?.({ step: 'review', message: 'review', progress: Math.min(98, 82 + round * 5) });
       const nextReview = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
       scores = nextReview.scores;
       regenCount = scores.filter(s => s.needsRegeneration).length;
@@ -469,10 +525,8 @@ export async function generateExam(
           .join(',');
         return `Q${s.index + 1}(${dims || s.total})`;
       }).join('；');
-      throw new Error(`试卷质量审核未通过：${summary}`);
+      console.warn(`[exam] 试卷质量终审未完全通过，继续放行并标记风险题：${summary}`);
     }
-
-    await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
 
     if (questions.length === 0) {
       throw new Error('试卷生成失败：没有生成任何有效题目');
@@ -480,7 +534,7 @@ export async function generateExam(
 
     // 修正总分精确等于目标分
     let totalScore = questions.reduce((s, q) => s + q.points, 0);
-    const targetTotal = blueprint.totalScore;
+    const targetTotal = enrichedConfig.totalScore ?? blueprint.totalScore;
     if (totalScore !== targetTotal && questions.length > 0) {
       const diff = targetTotal - totalScore;
       // 把差值调整到最后一题上
@@ -517,7 +571,10 @@ export async function generateExam(
       }
     }
 
-    return { title: blueprint.title, questions, totalScore, durationMinutes: estMinutes, blueprint, qualityReport };
+    await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
+
+    const deliveryBlueprint = { ...blueprint, totalScore };
+    return { title: blueprint.title, questions, totalScore, durationMinutes: estMinutes, blueprint: deliveryBlueprint, qualityReport };
   } catch (e: any) {
     console.error('生成试卷失败:', e?.message?.slice(0, 200));
     throw new Error(`生成试卷失败：${e?.message || '未知错误'}`);
