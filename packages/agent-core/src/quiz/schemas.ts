@@ -30,13 +30,13 @@ export const multipleChoiceSchema = z.object({
     .array(z.object({ key: z.string().describe('选项编号，如 A'), text: z.string() }))
     .min(2)
     .describe('选项列表'),
-  correctKeys: z.array(z.string()).min(1).describe('正确选项的 key；多选时填多个'),
-  multiSelect: z.boolean().describe('是否为多选题'),
+  correctKeys: z.array(z.string()).min(1).default(['A']).describe('正确选项的 key；多选时填多个'),
+  multiSelect: z.boolean().default(false).describe('是否为多选题'),
   knowledgePoint,
   knowledgePointId,
   literacies,
   difficulty,
-  explanation,
+  explanation: z.string().default('详见解析。').describe('答案解析'),
 });
 
 export const fillBlankSchema = z.object({
@@ -49,7 +49,7 @@ export const fillBlankSchema = z.object({
   knowledgePoint,
   knowledgePointId,
   difficulty,
-  explanation,
+  explanation: z.string().default('详见解析。').describe('答案解析'),
 });
 
 export const trueFalseSchema = z.object({
@@ -60,7 +60,7 @@ export const trueFalseSchema = z.object({
   knowledgePointId,
   literacies,
   difficulty,
-  explanation,
+  explanation: z.string().default('详见解析。').describe('答案解析'),
 });
 
 export const shortAnswerSchema = z.object({
