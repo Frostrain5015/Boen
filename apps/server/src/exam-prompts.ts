@@ -146,7 +146,8 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
       : '',
     'knowledgePoint 和 literacies 必须填写，不得为空。',
     `难度统一为 ${difficulty}。`,
-    '【⚠ 阅读材料强制令】阅读理解/完形填空等有原文的题型，原文必须且只能写在 passage 字段中，严禁将原文写进 stem 字段，严禁在 stem 中使用 ** passage ** 等标记来代替 passage 字段。stem 字段只写提问/题干本身。违反此规则将导致学生看不到阅读材料，整题作废。',
+    '【⚠ 阅读材料强制令】阅读理解/完形填空等有原文的题型，原文必须且只能写在 passage 字段中，严禁将原文写进 stem 字段，严禁在 stem 中使用 ** passage ** 等标记来代替 passage 字段。stem 字段只写提问/题干本身。违反此规则将导致学生看不到阅读材料，整题作废。\
+	\n   passage 开头可用 `# 标题` 标注文章标题（如有），前端会以标题样式渲染。',
     KATEX_FORMAT_GUIDE,
     xlopGuide(config.grade),
     formatRetryHint ? `\n⚠ 上次输出格式有误：${formatRetryHint}。请严格按照工具 schema 输出，不要输出任何文本。` : '',
