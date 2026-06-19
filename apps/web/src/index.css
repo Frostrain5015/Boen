@@ -140,6 +140,15 @@ body {
 
 /* ── 黏土卡片 ──────────────────────────────── */
 .clay {
+  background: var(--surface);
+  border: 1.5px solid #ffffff;
+  border-radius: 26px;
+  box-shadow:
+    0 22px 44px -22px rgba(86, 64, 40, 0.32),
+    0 8px 18px -10px rgba(86, 64, 40, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.9);
+}
+.clay-glass {
   background: rgba(255, 253, 248, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
