@@ -161,6 +161,25 @@ const timerUrgent = computed(() => timer.value < 300 && timer.value > 0);
 const currentQuestion = computed(() => session.value?.questions[currentQuestionIndex.value] ?? null);
 const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
 const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
+/** 题号窗口：固定显示 9 个（当前居中），左右溢出时动态调整 */
+const VISIBLE_DOT_COUNT = 9;
+const visibleDots = computed(() => {
+  const qs = session.value?.questions ?? [];
+  const total = qs.length;
+  if (total <= VISIBLE_DOT_COUNT) return qs;
+  const half = Math.floor(VISIBLE_DOT_COUNT / 2);
+  let start = currentQuestionIndex.value - half;
+  start = Math.max(0, Math.min(start, total - VISIBLE_DOT_COUNT));
+  return qs.slice(start, start + VISIBLE_DOT_COUNT);
+});
+const visibleDotOffset = computed(() => {
+  // 计算当前题号在可见窗口前的偏移量（用于首尾 item 显示省略效果）
+  const qs = session.value?.questions ?? [];
+  if (qs.length <= VISIBLE_DOT_COUNT) return 0;
+  const half = Math.floor(VISIBLE_DOT_COUNT / 2);
+  let start = currentQuestionIndex.value - half;
+  return Math.max(0, Math.min(start, qs.length - VISIBLE_DOT_COUNT));
+});
 const nextButtonLabel = computed(() => (isLastQuestion.value ? '提交' : '下一题'));
 const nextButtonIcon = computed(() => (isLastQuestion.value ? Send : ChevronRight));
 function isQuestionAnswered(q: ExamQuestionData): boolean {
@@ -196,18 +215,7 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function centerCurrentDot() {
-  // 题号超出可见区域时滚动居中当前题号
-  nextTick(() => {
-    const nav = dotNavRef.value;
-    if (!nav) return;
-    const current = nav.querySelector<HTMLElement>('.question-dot-current');
-    if (!current) return;
-    const scrollLeft = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2;
-    nav.scrollTo({
-      left: Math.max(0, scrollLeft),
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-    });
-  });
+  // 固定窗口渲染，无需滚动
 }
 
 function gradeLabel(g: string): string {
@@ -673,11 +681,12 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
         <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
           <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
-            <!-- 题号轨道（固定在题目卡片正上方） -->
+            <!-- 题号轨道（固定窗口 9 个，当前居中） -->
             <div class="shrink-0 pt-5 pb-3">
-              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex max-w-2xl justify-center" role="navigation" aria-label="题号导航">
+              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex max-w-sm items-center justify-center gap-0.5" role="navigation" aria-label="题号导航">
+                <button v-if="visibleDotOffset > 0" disabled class="question-dot-edge">‹‹</button>
                 <button
-                  v-for="q in session.questions"
+                  v-for="q in visibleDots"
                   :key="q.index"
                   @click="goToQuestion(q.index)"
                   class="question-dot"
@@ -689,6 +698,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                 >
                   <span>{{ q.index + 1 }}</span>
                 </button>
+                <button v-if="visibleDotOffset + VISIBLE_DOT_COUNT < (session?.questions.length ?? 0)" disabled class="question-dot-edge">››</button>
               </div>
             </div>
             <!-- 题目卡片 -->
@@ -924,6 +934,13 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
   scrollbar-width: none;
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
+.question-dot-edge {
+  display: grid; place-items: center;
+  width: 1.2rem; height: 2.75rem;
+  border: none; background: transparent;
+  font-size: 0.7rem; color: var(--ink-soft);
+  opacity: 0.4; cursor: default;
+}
 .question-dot {
   position: relative;
   display: grid;
