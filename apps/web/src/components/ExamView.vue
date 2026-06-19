@@ -322,9 +322,10 @@ function getAnswer(qIndex: number) {
 
 function isPlaceholderOptionText(text: unknown, key?: string): boolean {
   const raw = String(text ?? '').trim();
+  if (!raw) return true;
   const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
   const expected = key ? key.toUpperCase() : '[A-F]';
-  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+  return normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
 }
 
 function stripOptionPrefix(text: string, key?: string): string {

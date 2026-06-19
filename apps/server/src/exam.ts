@@ -89,9 +89,11 @@ function stripOptionPrefix(text: string, key?: string): string {
 
 function isPlaceholderOptionText(text: unknown, key?: string): boolean {
   const raw = String(text ?? '').trim();
+  if (!raw) return true;
   const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
   const expected = key ? key.toUpperCase() : '[A-F]';
-  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+  // 只过滤明确的占位符模式，不拦截文本恰好是 key 字母的正常选项
+  return normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
 }
 
 function extractOptionsFromStem(stem: string): { stem: string; options: { key: string; text: string }[] } {
@@ -127,21 +129,34 @@ function extractOptionsFromStem(stem: string): { stem: string; options: { key: s
 
 function normalizeOptions(stem: string, rawOptions: unknown): { stem: string; options: { key: string; text: string }[] } {
   const extracted = extractOptionsFromStem(stem);
-  const fromRaw = Array.isArray(rawOptions)
-    ? rawOptions
-        .map((o: any, i) => {
-          const key = String(o?.key ?? OPTION_KEYS[i] ?? '').trim().toUpperCase();
-          const text = stripOptionPrefix(String(o?.text ?? ''), key);
-          return { key, text };
-        })
-        .filter((o) => o.key && !isPlaceholderOptionText(o.text, o.key))
-    : [];
+  const raw = Array.isArray(rawOptions) ? rawOptions : [];
 
+  // 先处理原始选项（清洗前缀 + 过滤占位符）
+  const cleaned = raw
+    .map((o: any, i) => {
+      const key = String(o?.key ?? OPTION_KEYS[i] ?? '').trim().toUpperCase();
+      const text = stripOptionPrefix(String(o?.text ?? ''), key);
+      return { key, text };
+    })
+    .filter((o) => o.key);
+
+  const valid = cleaned.filter((o) => !isPlaceholderOptionText(o.text, o.key));
+
+  // 超过 2 个有效选项 → 直接用
+  if (valid.length >= 2) return { stem: stem.trim(), options: valid };
+
+  // 原始选项有内容但全被占位符过滤 → 回退到清洗后的（保留模型本意）
+  if (cleaned.length >= 2) {
+    console.warn('[normalizeOptions] 选项文本疑似占位符，保留原始值');
+    return { stem: stem.trim(), options: cleaned };
+  }
+
+  // 从题干提取
   if (extracted.options.length >= 2) {
     return { stem: extracted.stem || stem, options: extracted.options };
   }
 
-  return { stem: stem.trim(), options: fromRaw };
+  return { stem: stem.trim(), options: cleaned };
 }
 
 function countBlankMarkers(stem: string): number {

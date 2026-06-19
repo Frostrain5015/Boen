@@ -229,9 +229,10 @@ const EMBEDDED_OPTION_PATTERN = /(^|[\s\n])A\s*[.．、:：)]\s*[\s\S]+(^|[\s\n]
 
 function isPlaceholderOptionText(text: unknown, key?: string): boolean {
   const raw = String(text ?? '').trim();
+  if (!raw) return true;
   const normalized = raw.replace(/[{}（）()【】\s]/g, '').toUpperCase();
   const expected = key ? key.toUpperCase() : '[A-F]';
-  return !raw || normalized === expected || normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
+  return normalized === `选项${expected}` || /^选项[A-F]$/.test(normalized);
 }
 
 function countBlankMarkers(stem: string): number {
