@@ -507,7 +507,6 @@ async function invokeGenerateQuestions(
 ): Promise<any[]> {
   // 使用 response_format JSON Output 模式（支持 thinking）
   const schemaExample = questionType === 'multiple_choice'
-  const schemaExample = questionType === 'multiple_choice'
     ? `{
   "questions": [
     {
