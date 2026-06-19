@@ -266,11 +266,34 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
 /** 尝试修复常见的 schema 校验失败 */
 function tryFixBlueprint(raw: any, targetScore: number): ExamBlueprint | null {
   try {
-    // 补全缺失的 coveragePlan / difficultyDistribution
+    // 补全根级缺失字段
+    if (!raw.title) raw.title = '综合试卷';
+    if (!raw.totalScore) raw.totalScore = targetScore;
+
+    // 补全 / 修复 sections
+    if (Array.isArray(raw.sections)) {
+      for (const sec of raw.sections) {
+        if (!sec.title) sec.title = '综合';
+        if (!sec.difficulty) sec.difficulty = 'medium';
+        // knowledgePoints：可能是字符串数组或缺失
+        if (Array.isArray(sec.knowledgePoints)) {
+          sec.knowledgePoints = sec.knowledgePoints.map((kp: any) =>
+            typeof kp === 'string' ? { title: kp, weight: 0.5 } : kp,
+          );
+        }
+        if (!Array.isArray(sec.knowledgePoints) || sec.knowledgePoints.length === 0) {
+          sec.knowledgePoints = [{ title: '综合知识', weight: 1 }];
+        }
+      }
+    }
+    // 补全 coveragePlan
     if (!raw.coveragePlan) {
-      const allKps = (raw.sections ?? []).flatMap((s: any) => (s.knowledgePoints ?? []).map((kp: any) => kp.title ?? kp));
+      const allKps = (raw.sections ?? []).flatMap((s: any) =>
+        (s.knowledgePoints ?? []).map((kp: any) => kp.title ?? kp)
+      );
       raw.coveragePlan = { must: allKps.slice(0, 3), focus: allKps.slice(0, 5), stretch: [] };
     }
+    // 补全 difficultyDistribution
     if (!raw.difficultyDistribution) {
       raw.difficultyDistribution = { easy: 0.4, medium: 0.4, hard: 0.2 };
     }
@@ -280,16 +303,6 @@ function tryFixBlueprint(raw: any, targetScore: number): ExamBlueprint | null {
       dd.easy = dd.easy / sum;
       dd.medium = dd.medium / sum;
       dd.hard = dd.hard / sum;
-    }
-    // 修复模型 output：knowledgePoints 可能是字符串数组而非对象
-    if (raw.sections) {
-      for (const sec of raw.sections) {
-        if (Array.isArray(sec.knowledgePoints)) {
-          sec.knowledgePoints = sec.knowledgePoints.map((kp: any) =>
-            typeof kp === 'string' ? { title: kp, weight: 0.5 } : kp,
-          );
-        }
-      }
     }
     const parsed = examBlueprintSchema.parse(raw);
     return validateAndFixBlueprint(parsed, targetScore);
