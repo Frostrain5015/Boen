@@ -66,7 +66,10 @@
   --accent-glow: rgba(52, 152, 219, 0.42);
 }
 
-html,
+html {
+  height: 100dvh;
+  overflow-y: scroll;
+}
 body,
 #app {
   height: 100dvh;
