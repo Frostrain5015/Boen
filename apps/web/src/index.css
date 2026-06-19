@@ -69,6 +69,20 @@
 html {
   height: 100dvh;
   overflow-y: scroll;
+  scrollbar-color: rgba(86, 64, 40, 0.18) transparent;
+}
+html::-webkit-scrollbar {
+  width: 7px;
+}
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb {
+  background: rgba(86, 64, 40, 0.18);
+  border-radius: 99px;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background: rgba(86, 64, 40, 0.32);
 }
 body,
 #app {
