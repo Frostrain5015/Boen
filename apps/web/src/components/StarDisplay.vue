@@ -40,7 +40,7 @@ function starVal(s: number): number {
       </defs>
       <path d="M10 1l2.2 4.6 5.1.7-3.7 3.6.9 5.1L10 12.7l-4.5 2.3.9-5.1L2.7 6.3l5.1-.7z" fill="#e0dcd3" />
       <path :clip-path="'url(#' + uid + '-cp-' + i + ')'" d="M10 1l2.2 4.6 5.1.7-3.7 3.6.9 5.1L10 12.7l-4.5 2.3.9-5.1L2.7 6.3l5.1-.7z"
-        :fill="score >= 80 ? '#18a558' : score >= 60 ? '#e0a92e' : score >= 40 ? '#f59e42' : '#f2557a'" />
+        :fill="score >= 80 ? '#d4a053' : score >= 60 ? '#e0a92e' : score >= 40 ? '#f59e42' : '#f2557a'" />
     </svg>
   </span>
 </template>

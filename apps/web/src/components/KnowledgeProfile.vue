@@ -276,7 +276,7 @@ watch(grade, fetchOutline);
               <div class="min-w-0 flex-1">
                 <p class="truncate text-xs font-bold text-[var(--ink)]">{{ kp.title }}</p>
                 <span v-if="kp.weightedScore >= 0" class="mt-0.5 inline-block"><StarDisplay :score="kp.weightedScore" /></span>
-                <StarDisplay :score="-1" />
+                <span v-else class="mt-0.5 inline-block"><StarDisplay :score="-1" /></span>
               </div>
               <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white opacity-0 transition-opacity group-hover:opacity-100" title="开始练习">
                 <BookOpen class="h-3.5 w-3.5" />
@@ -310,7 +310,7 @@ watch(grade, fetchOutline);
                 <component :is="expandedSections.has('ch-' + ch.title) ? ChevronDown : ChevronRight" class="h-4 w-4 shrink-0 text-[var(--ink-soft)]" />
                 <span class="flex-1 font-display text-sm font-bold text-[var(--ink)]">{{ ch.title }}</span>
                 <span v-if="ch.weightedScore >= 0"><StarDisplay :score="ch.weightedScore" /></span>
-                <StarDisplay :score="-1" />
+                <span v-else><StarDisplay :score="-1" /></span>
                 <span @click.stop="emit('exam', { subject, grade, durationMinutes: 15, notes: ch.title + ' 章节测试' })" class="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-[11px] text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]" title="章节小测">📝</span>
               </button>
 
@@ -322,7 +322,7 @@ watch(grade, fetchOutline);
                       <component :is="expandedSections.has('sec-' + sec.title) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-[var(--ink-soft)]" />
                       <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
                       <span v-if="sec.weightedScore >= 0"><StarDisplay :score="sec.weightedScore" /></span>
-                      <StarDisplay :score="-1" />
+                      <span v-else><StarDisplay :score="-1" /></span>
                     </button>
 
                     <!-- Knowledge points -->
@@ -340,7 +340,7 @@ watch(grade, fetchOutline);
                             ><BrainCircuit class="h-2 w-2" />{{ lit }}</span>
                           </div>
                           <span v-if="kp.weightedScore >= 0"><StarDisplay :score="kp.weightedScore" /></span>
-                          <StarDisplay :score="-1" />
+                          <span v-else><StarDisplay :score="-1" /></span>
                         </div>
                       </div>
                     </Transition>
@@ -390,7 +390,7 @@ watch(grade, fetchOutline);
             <div class="flex items-center gap-2">
               <span class="text-xs font-medium text-[var(--ink-soft)]">熟练度</span>
               <StarDisplay v-if="selectedKp.weightedScore >= 0" :score="selectedKp.weightedScore" />
-              <StarDisplay :score="-1" />
+              <StarDisplay v-else :score="-1" />
             </div>
 
             <div v-if="selectedKp.literacies.length" class="space-y-1">
