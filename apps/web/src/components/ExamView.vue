@@ -139,7 +139,7 @@ function stepDone(step: string): boolean {
   const p = genProgress.value.progress;
   if (step === 'blueprint') return p > 20;
   if (step === 'write') return p > 85;
-  if (step === 'review') return p > 90;
+  if (step === 'review') return p >= 100;
   if (step === 'regenerate') return p >= 100;
   if (step === 'complete') return p >= 100;
   return false;
@@ -147,6 +147,9 @@ function stepDone(step: string): boolean {
 /** 步骤当前状态: 'pending' | 'active' | 'done' */
 function stepState(step: string): 'pending' | 'active' | 'done' {
   if (stepDone(step)) return 'done';
+  // review 之后还有 regenerate/complete 阶段，但 UI 只显示三步
+  // 让 review 在 regenerate/complete 期间仍保持 active 状态
+  if (step === 'review' && ['regenerate', 'complete'].includes(genProgress.value.step)) return 'active';
   return genProgress.value.step === step ? 'active' : 'pending';
 }
 /** 步骤圆点样式 class */
