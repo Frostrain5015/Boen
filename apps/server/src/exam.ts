@@ -62,6 +62,13 @@ export interface ExamProgress {
 }
 export type ExamProgressFn = (p: ExamProgress) => void | Promise<void>;
 
+export interface ExamGradingProgress {
+  step: 'grade' | 'analyze' | 'profile' | 'save' | 'complete';
+  message: string;
+  progress: number;
+}
+export type ExamGradingProgressFn = (p: ExamGradingProgress) => void | Promise<void>;
+
 // ── 通用加固工具 ──────────────────────────
 
 /** 把 AI 可能返回的字符串格式 literacies 归一化为数组 */
@@ -159,16 +166,29 @@ function normalizeBlanks(raw: any, stem: string): { blanks: { acceptedAnswers: s
   return { blanks, blankCount };
 }
 
+function choiceWithoutOptionsToShortAnswer(q: ExamQuestion): ExamQuestion {
+  const converted: ExamQuestion = {
+    ...q,
+    type: 'short_answer',
+    referenceAnswer: q.referenceAnswer ?? '',
+    keyPoints: q.keyPoints ?? [],
+    explanation: q.explanation || '原题选项结构不完整，已自动转为简答题作答。',
+  };
+  delete converted.options;
+  delete converted.correctKeys;
+  delete converted.multiSelect;
+  return converted;
+}
+
 /** 本地格式兜底：补齐必填字段、修复残缺选项 */
 function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
-  const q2 = { ...q, index: i };
+  let q2 = { ...q, index: i };
   if (q2.type === 'multiple_choice') {
     const normalized = normalizeOptions(q2.stem ?? '', q2.options);
     q2.stem = normalized.stem || q2.stem;
     q2.options = normalized.options;
     if (!q2.options || q2.options.length < 2) {
-      q2.options = [{ key: 'A', text: '正确' }, { key: 'B', text: '错误' }];
-      q2.correctKeys = ['A'];
+      return localFormatFix(choiceWithoutOptionsToShortAnswer(q2), i);
     }
     if (!q2.correctKeys?.length) q2.correctKeys = [q2.options[0].key];
     q2.correctKeys = q2.correctKeys.filter((k) => q2.options!.some((o) => o.key === k));
@@ -476,7 +496,9 @@ function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion 
     const normalized = normalizeOptions(base.stem, raw.options);
     base.stem = normalized.stem || base.stem;
     base.options = normalized.options;
-    while (base.options!.length < 2) base.options!.push({ key: String.fromCharCode(65 + base.options!.length), text: '选项' + String.fromCharCode(65 + base.options!.length) });
+    if (!base.options || base.options.length < 2) {
+      return localFormatFix(choiceWithoutOptionsToShortAnswer(base), index);
+    }
     base.correctKeys = (raw.correctKeys ?? []).filter((k: string) => base.options!.some(o => o.key === k));
     if (!base.correctKeys!.length) base.correctKeys = [base.options![0].key];
     base.multiSelect = raw.multiSelect ?? false;
@@ -668,14 +690,16 @@ export async function gradeExam(
   answers: Array<{ questionIndex: number; answer: AnswerPayload }>,
   model?: BaseChatModel,
   examInfo?: { subject?: string; grade?: string },
+  onProgress?: ExamGradingProgressFn,
 ): Promise<ExamResults> {
+  await onProgress?.({ step: 'grade', message: '正在批改客观题与主观题', progress: 12 });
   const answerMap = new Map(answers.map(a => [a.questionIndex, a.answer]));
   const shortAnswerGrader = model ? createShortAnswerGrader(model) : undefined;
 
   const questionResults: ExamQuestionResult[] = await Promise.all(questions.map(async (q) => {
     const answer = answerMap.get(q.index);
     if (!answer) {
-      return { index: q.index, correct: false, score: 0, maxScore: q.points, reference: '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, literacy: normalizeLiteracies(q.literacies) };
+      return { index: q.index, correct: false, score: 0, maxScore: q.points, reference: '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId, literacy: normalizeLiteracies(q.literacies) };
     }
 
     const toolName = questionTypeToToolName(q.type);
@@ -695,9 +719,12 @@ export async function gradeExam(
       reference: result.reference,
       explanation: result.explanation,
       knowledgePoint: q.knowledgePoint,
+      knowledgePointId: q.knowledgePointId,
       literacy: normalizeLiteracies(q.literacies),
     };
   }));
+
+  await onProgress?.({ step: 'grade', message: `已完成 ${questionResults.length} 道题评分`, progress: 58 });
 
   const totalScore = questionResults.reduce((s, r) => s + r.score, 0);
   const maxScore = questionResults.reduce((s, r) => s + r.maxScore, 0);
@@ -716,11 +743,15 @@ export async function gradeExam(
   // 生成综合分析（有模型时）
   if (model) {
     try {
+      await onProgress?.({ step: 'analyze', message: '正在生成综合判卷分析', progress: 68 });
       const analysis = await generateExamAnalysis(model, questions, examResults, { subject: examInfo?.subject ?? '', grade: examInfo?.grade ?? '' });
       if (analysis) examResults.analysis = analysis;
+      await onProgress?.({ step: 'analyze', message: '综合分析已生成', progress: 78 });
     } catch (err) {
       console.warn('[grading] analysis failed:', err);
     }
+  } else {
+    await onProgress?.({ step: 'analyze', message: '已跳过模型分析', progress: 78 });
   }
 
   return examResults;
@@ -863,14 +894,20 @@ export function listExamSessions(userId: string): ExamSummary[] {
   });
 }
 
-export async function submitExamSession(examId: string, userId: string, answers: Array<{ questionIndex: number; answer: AnswerPayload }>, model?: BaseChatModel): Promise<ExamResults> {
+export async function submitExamSession(
+  examId: string,
+  userId: string,
+  answers: Array<{ questionIndex: number; answer: AnswerPayload }>,
+  model?: BaseChatModel,
+  onProgress?: ExamGradingProgressFn,
+): Promise<ExamResults> {
   const session = getExamSession(examId, userId);
   if (!session) throw new Error('考试会话未找到');
   if (session.status === 'completed') throw new Error('该考试已提交');
 
-  const results = await gradeExam(session.questions, answers, model, { subject: session.subject, grade: session.grade });
-  const now = Math.floor(Date.now() / 1000);
-  db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
+  await onProgress?.({ step: 'grade', message: '准备开始判卷', progress: 4 });
+  const results = await gradeExam(session.questions, answers, model, { subject: session.subject, grade: session.grade }, onProgress);
+  await onProgress?.({ step: 'profile', message: '正在写入知识图谱画像', progress: 84 });
 
   // 更新知识画像并记录变化（优先用 knowledgePointId 直连节点）
   const proficiencyChanges: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }> = [];
@@ -897,6 +934,11 @@ export async function submitExamSession(examId: string, userId: string, answers:
     }
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
+
+  await onProgress?.({ step: 'save', message: '正在保存成绩与判卷详情', progress: 94 });
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
+  await onProgress?.({ step: 'complete', message: '判卷完成', progress: 100 });
 
   return results;
 }

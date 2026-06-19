@@ -659,6 +659,33 @@ app.post('/api/exam/submit', async (c) => {
   }
 });
 
+/** POST /api/exam/submit/stream - stream real grading progress */
+app.post('/api/exam/submit/stream', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
+  if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
+  const answers = Array.isArray(body.answers) ? body.answers : [];
+
+  return streamSSE(c, async (stream) => {
+    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    try {
+      const results = await submitExamSession(
+        body.examId,
+        userId,
+        answers as any,
+        model,
+        (p) => send({ type: 'exam_grading_progress', step: p.step, message: p.message, progress: p.progress }),
+      );
+      await send({ type: 'exam_graded', examId: body.examId, results });
+      await send({ type: 'done' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      try { await send({ type: 'error', message: msg }); } catch {}
+    }
+  });
+});
+
 /** GET /api/exams — 当前用户的考试历史列表（概要） */
 app.get('/api/exams', async (c) => {
   const userId = await resolveUserId(c);

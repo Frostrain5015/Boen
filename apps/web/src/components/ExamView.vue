@@ -4,10 +4,11 @@ import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
-import { streamExamGenerate } from '@/services/chat';
-import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
+import { streamExamGenerate, streamExamSubmit } from '@/services/chat';
+import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
+import StarDisplay from '@/components/StarDisplay.vue';
 
 const toast = useToast();
 
@@ -80,6 +81,21 @@ const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
+type GenerationStep = 'kg' | 'blueprint' | 'write' | 'review';
+const generationSteps: Array<{ step: GenerationStep }> = [
+  { step: 'kg' },
+  { step: 'blueprint' },
+  { step: 'write' },
+  { step: 'review' },
+];
+type GradingStep = 'grade' | 'analyze' | 'profile' | 'save' | 'complete';
+const gradingProgress = ref<{ step: GradingStep; message: string; progress: number }>({ step: 'grade', message: '准备开始判卷', progress: 0 });
+const gradingSteps: Array<{ step: GradingStep; label: string }> = [
+  { step: 'grade', label: '批改评分' },
+  { step: 'analyze', label: '生成分析' },
+  { step: 'profile', label: '写入画像' },
+  { step: 'save', label: '保存结果' },
+];
 const scoreRevealed = ref(false);
 const currentQuestionIndex = ref(0);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
@@ -188,7 +204,6 @@ function masteryColor(ws: number): string {
   if (ws < 40) return '#f2557a'; if (ws < 60) return '#f59e42'; if (ws < 80) return '#e0a92e'; return '#18a558';
 }
 
-/** 步骤是否已完成（依据进度阈值） */
 function stepDone(step: string): boolean {
   const p = genProgress.value.progress;
   if (step === 'blueprint') return p > 20;
@@ -198,6 +213,8 @@ function stepDone(step: string): boolean {
   if (step === 'complete') return p >= 100;
   return false;
 }
+
+/** 步骤是否已完成（依据进度阈值） */
 /** 步骤当前状态: 'pending' | 'active' | 'done' */
 function stepState(step: string): 'pending' | 'active' | 'done' {
   if (stepDone(step)) return 'done';
@@ -218,6 +235,68 @@ function dotIcon(step: string): string {
   return stepDone(step) ? '✓' : '●';
 }
 /** 步骤标签文字：pending → 待…  active → 正在…  done → …已完成 */
+function generationStepState(step: GenerationStep): 'pending' | 'active' | 'done' {
+  const current = genProgress.value.step;
+  const p = genProgress.value.progress;
+  if (step === 'kg') {
+    if (current === 'blueprint' && p < 10) return 'active';
+    if (p >= 10 || current !== 'blueprint') return 'done';
+    return 'pending';
+  }
+  if (step === 'blueprint') {
+    if (current === 'blueprint' && p >= 20) return 'done';
+    if (current === 'blueprint' && p >= 10) return 'active';
+    if (['write', 'review', 'regenerate', 'complete'].includes(current)) return 'done';
+    return 'pending';
+  }
+  if (step === 'write') {
+    if (current === 'write') return 'active';
+    if (['review', 'regenerate', 'complete'].includes(current)) return 'done';
+    return 'pending';
+  }
+  if (step === 'review') {
+    if (current === 'complete') return 'done';
+    if (['review', 'regenerate'].includes(current)) return 'active';
+    return 'pending';
+  }
+  return 'pending';
+}
+function generationDotCls(step: GenerationStep): string {
+  const s = generationStepState(step);
+  if (s === 'done') return 'dot-done';
+  if (s === 'active') return 'dot-active';
+  return 'dot-pending';
+}
+function generationDotIcon(step: GenerationStep): string {
+  return generationStepState(step) === 'done' ? '✓' : '●';
+}
+function generationStepLabel(step: GenerationStep): string {
+  const labels: Record<GenerationStep, string> = {
+    kg: '知识图谱扫描',
+    blueprint: '试卷蓝图设计',
+    write: '试题编写',
+    review: '质量审核',
+  };
+  return labels[step];
+}
+
+function gradingStepState(step: GradingStep): 'pending' | 'active' | 'done' {
+  const order: GradingStep[] = ['grade', 'analyze', 'profile', 'save', 'complete'];
+  const current = gradingProgress.value.step;
+  if (current === 'complete') return 'done';
+  const currentIndex = order.indexOf(current);
+  const stepIndex = order.indexOf(step);
+  if (stepIndex < currentIndex) return 'done';
+  if (step === current) return 'active';
+  return 'pending';
+}
+function gradingDotClass(step: GradingStep): string {
+  const s = gradingStepState(step);
+  if (s === 'done') return 'dot-done';
+  if (s === 'active') return 'dot-active';
+  return 'dot-pending';
+}
+
 function stepLabel(step: string): string {
   const s = stepState(step);
   const labels: Record<string, [string, string, string]> = {
@@ -372,14 +451,21 @@ async function submitExam() {
     if (payload) answerArray.push({ questionIndex: q.index, answer: payload });
   }
   try {
-    const res = await fetch('/api/exam/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ examId: session.value.examId, answers: answerArray }),
+    gradingProgress.value = { step: 'grade', message: '准备开始判卷', progress: 0 };
+    let gradedResults: ExamResultsData | null = null;
+    let errMsg = '';
+    await streamExamSubmit({ examId: session.value.examId, answers: answerArray }, (e) => {
+      if (e.type === 'exam_grading_progress' && 'progress' in e) {
+        gradingProgress.value = { step: e.step, message: e.message, progress: e.progress };
+      } else if (e.type === 'exam_graded') {
+        gradedResults = e.results as ExamResultsData;
+      } else if (e.type === 'error') {
+        errMsg = e.message;
+      }
     });
-    const data = await res.json();
-    if (data.results) { results.value = data.results; examState.value = 'graded'; emit('refresh'); }
-    else throw new Error(data.error || '提交失败');
+    if (errMsg) throw new Error(errMsg);
+    if (gradedResults) { results.value = gradedResults; examState.value = 'graded'; emit('refresh'); }
+    else throw new Error('提交失败：未收到判卷结果');
   } catch (err) {
     toast.error('提交失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'taking';
@@ -393,7 +479,10 @@ watch(examState, (s) => {
     centerCurrentDot();
   }
 });
-watch(currentQuestionIndex, () => centerCurrentDot());
+watch(currentQuestionIndex, () => {
+  centerCurrentDot();
+  nextTick(() => processTikzDiagrams());
+});
 
 function startExam() {
   if (!session.value) return;
@@ -514,14 +603,17 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
         <h2 class="brand-text text-xl font-bold tracking-tight">博文正在出卷</h2>
         <div class="w-80 space-y-0.5">
-          <div v-for="st in ['blueprint','write','review']" :key="st">
-            <div class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
-              <span class="step-dot" :class="dotCls(st)">{{ dotIcon(st) }}</span>
-              <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ stepLabel(st) }}</span>
-              <span v-if="stepState(st) === 'active'" class="step-active-dot"></span>
-              <span v-if="stepState(st) === 'done'" class="text-[11px] font-medium text-[#18a558]">完成</span>
-            </div>
+          <div
+            v-for="item in generationSteps"
+            :key="item.step"
+            class="step-row step-row-timeline"
+            :class="[`step-row-${generationStepState(item.step)}`, generationStepState(item.step) === 'pending' ? 'opacity-45' : '']"
+          >
+            <span class="step-dot" :class="generationDotCls(item.step)"><span class="step-dot-core"></span></span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ generationStepLabel(item.step) }}</span>
+            <span v-if="generationStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
+          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ genProgress.message }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill" :style="{ width: genProgress.progress + '%' }"></div>
@@ -602,7 +694,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                       :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-selected' : 'exam-opt-idle'"
                     >
                       <span class="exam-opt-key" :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-key-selected' : ''">{{ opt.key }}</span>
-                      <span class="md-body flex-1 text-left" v-html="renderMarkdownInline(opt.text)"></span>
+                      <div class="md-body min-w-0 flex-1 text-left" v-html="renderMarkdown(opt.text)"></div>
                     </button>
                     <p v-if="currentQuestion?.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
                   </div>
@@ -654,22 +746,20 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
         <h2 class="brand-text text-xl font-bold tracking-tight">博文正在评分</h2>
         <div class="w-80 space-y-1">
-          <div class="step-row">
-            <span class="step-dot dot-active">✦</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">批改评分</span>
-            <span class="step-active-dot"></span>
+          <div
+            v-for="item in gradingSteps"
+            :key="item.step"
+            class="step-row step-row-timeline"
+            :class="[`step-row-${gradingStepState(item.step)}`, gradingStepState(item.step) === 'pending' ? 'opacity-45' : '']"
+          >
+            <span class="step-dot" :class="gradingDotClass(item.step)"><span class="step-dot-core"></span></span>
+            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ item.label }}</span>
+            <span v-if="gradingStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <div class="step-row">
-            <span class="step-dot dot-pending">✦</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">生成分析报告</span>
-          </div>
-          <div class="step-row">
-            <span class="step-dot dot-pending">✦</span>
-            <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">写入知识图谱</span>
-          </div>
+          <p class="pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ gradingProgress.message }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
-          <div class="loading-bar-inner h-full rounded-full"></div>
+          <div class="progress-fill h-full rounded-full" :style="{ width: gradingProgress.progress + '%' }"></div>
         </div>
       </div>
     </div>
@@ -731,11 +821,12 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <div v-for="kp in results.kpBreakdown" :key="kp.kp" class="mb-2 flex items-center gap-3 last:mb-0">
             <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
             <span class="flex-1 min-w-0 truncate text-xs font-medium text-[var(--ink)]">{{ kp.kp }}</span>
-            <div class="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--line)]"><div class="h-full rounded-full" :style="{ width: kp.percentage + '%', background: masteryColor(kp.percentage) }"></div></div>
-            <span class="shrink-0 text-xs font-bold" :style="{ color: masteryColor(kp.percentage) }">{{ kp.percentage }}%</span>
+            <div class="shrink-0"><StarDisplay :score="kp.percentage" /></div>
+            <span class="shrink-0 text-[10px] font-semibold text-[var(--ink-soft)]">{{ kp.score }}/{{ kp.maxScore }}</span>
             <span v-if="proficiencyMap[kp.kp]" class="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" :class="proficiencyMap[kp.kp].after >= proficiencyMap[kp.kp].before ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fdeaef] text-[#f2557a]'">
               <span v-if="proficiencyMap[kp.kp].after > proficiencyMap[kp.kp].before">↑</span>
               <span v-else-if="proficiencyMap[kp.kp].after < proficiencyMap[kp.kp].before">↓</span>
+              <StarDisplay :score="proficiencyMap[kp.kp].after" :animateFrom="proficiencyMap[kp.kp].before" />
               <span>{{ proficiencyMap[kp.kp].before }}→{{ proficiencyMap[kp.kp].after }}</span>
             </span>
           </div>
@@ -747,7 +838,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <div class="flex flex-wrap gap-3">
             <div v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3 min-w-[100px]">
               <span class="text-xs font-semibold text-[var(--ink)]">{{ lit.literacy }}</span>
-              <span class="font-display text-xl font-bold" :style="{ color: masteryColor(lit.percentage) }">{{ lit.percentage }}<span class="text-xs">%</span></span>
+              <StarDisplay :score="lit.percentage" />
+              <span class="text-[10px] font-semibold text-[var(--ink-soft)]">{{ lit.score }}/{{ lit.maxScore }}</span>
               <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" :class="
                 lit.percentage >= 80 ? 'bg-[#e7f7ee] text-[#18a558]' :
                 lit.percentage >= 60 ? 'bg-[#fef7e6] text-[#e0a92e]' :
@@ -920,12 +1012,23 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 }
 
 /* ── 步骤列表 ── */
-.step-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.375rem 0; transition: opacity 0.4s ease; }
-.step-dot { display: flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 999px; font-size: 0.5rem; flex-shrink: 0; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.dot-active { background: var(--accent); color: white; box-shadow: 0 0 0 4px var(--accent-soft); }
-.dot-pending { background: var(--accent-soft); color: var(--accent-strong); opacity: 0.5; }
+.step-row { position: relative; display: flex; min-height: 2rem; align-items: center; gap: 0.75rem; padding: 0.35rem 0; transition: opacity 0.28s ease, transform 0.28s ease; }
+.step-row-timeline:not(:last-of-type)::before { content: ''; position: absolute; left: 0.675rem; top: 1.65rem; bottom: -0.42rem; width: 2px; border-radius: 999px; background: var(--line); transform: translateX(-50%); transition: background-color 0.35s ease, box-shadow 0.35s ease; }
+.step-row-done::before { background: #bde8c7; box-shadow: 0 0 0 1px rgba(24, 165, 88, 0.08); }
+.step-row-active { transform: translateX(2px); }
+.step-dot { position: relative; display: grid; place-items: center; width: 1.35rem; height: 1.35rem; flex-shrink: 0; border: 1.5px solid var(--line); border-radius: 999px; background: #fffdf8; box-shadow: inset 0 -1px 0 rgba(92, 74, 50, 0.08), 0 5px 12px -12px rgba(92, 74, 50, 0.65); transition: background-color 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.step-dot-core { width: 0.38rem; height: 0.38rem; border-radius: 999px; background: currentColor; opacity: 0.9; transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.32s ease, opacity 0.32s ease; }
+.dot-active { border-color: #f97316; background: linear-gradient(145deg, #ffb15d 0%, #f97316 100%); color: #fff; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14), 0 10px 20px -14px rgba(249, 115, 22, 0.7); }
+.dot-active::after { content: ''; position: absolute; inset: -0.34rem; border-radius: inherit; border: 1px solid rgba(249, 115, 22, 0.38); animation: stepRing 1.5s ease-in-out infinite; }
+.dot-active .step-dot-core { background: #fff; transform: scale(0.92); }
+.dot-done { border-color: #bde8c7; background: linear-gradient(145deg, #e8f6ed 0%, #c8efd4 100%); color: #18a558; box-shadow: 0 0 0 3px rgba(24, 165, 88, 0.1), inset 0 1px 0 rgba(255,255,255,0.85), 0 9px 18px -14px rgba(24, 165, 88, 0.55); animation: stepDonePop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.dot-done .step-dot-core { width: 0.52rem; height: 0.52rem; background: #18a558; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3); }
+.dot-pending { color: var(--accent-strong); background: #fffaf2; }
+.dot-pending .step-dot-core { opacity: 0.35; transform: scale(0.72); }
 .step-active-dot { width: 0.375rem; height: 0.375rem; border-radius: 999px; background: var(--accent); animation: stepPulse 1.6s ease-in-out infinite; }
 @keyframes stepPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.6); } }
+@keyframes stepRing { 0%,100% { opacity: 0.35; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.06); } }
+@keyframes stepDonePop { from { transform: scale(0.72); } to { transform: scale(1); } }
 
 /* ── 成绩揭开动画 ── */
 .circle-reveal { transition: stroke-dashoffset 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
@@ -966,6 +1069,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
   transition: background-color 0.25s, color 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .exam-opt-key-selected { background: var(--accent); color: #fff; transform: scale(1.1); }
+.exam-opt :deep(.md-body > :first-child) { margin-top: 0; }
+.exam-opt :deep(.md-body > :last-child) { margin-bottom: 0; }
 
 /* ── 单题考试：判断题 ── */
 .exam-tf {
@@ -1013,11 +1118,11 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .question-prev-leave-to { opacity: 0; transform: translateX(35px) scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
-  .exam-opt, .exam-tf, .exam-nav-btn, .question-dot, .question-dot::after { transition: none; }
+  .exam-opt, .exam-tf, .exam-nav-btn, .question-dot, .question-dot::after, .step-row, .step-dot, .step-dot-core, .step-row-timeline::before { transition: none; }
   .question-next-enter-active, .question-next-leave-active,
   .question-prev-enter-active, .question-prev-leave-active { transition: none; }
   .exam-opt-key-selected { transform: none; }
-  .question-dot-current span { animation: none; }
+  .question-dot-current span, .dot-active::after, .dot-done, .step-active-dot { animation: none; }
   .dot-nav-scroll { scroll-behavior: auto; }
 }
 </style>

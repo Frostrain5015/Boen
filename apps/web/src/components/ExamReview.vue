@@ -4,8 +4,9 @@ import { ArrowLeft, GraduationCap, BrainCircuit, CheckCircle2, XCircle, ChevronD
 import Mascot from '@/components/Mascot.vue';
 import type { ExamReviewDetail, ExamQuestion, ExamQuestionResult, AnswerPayload } from '@boen/shared';
 import { getExamReview } from '@/services/chat';
-import { renderMarkdown, renderMarkdownInline } from '@/lib/markdown';
+import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
+import StarDisplay from '@/components/StarDisplay.vue';
 
 const props = defineProps<{ examId: string | null }>();
 const emit = defineEmits<{ (e: 'back'): void }>();
@@ -191,11 +192,12 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               <div v-for="kp in detail.results.kpBreakdown" :key="kp.kp" class="mb-2 flex items-center gap-3 last:mb-0">
                 <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
                 <span class="min-w-0 flex-1 truncate text-xs font-medium text-[var(--ink)]">{{ kp.kp }}</span>
-                <div class="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-[var(--line)]"><div class="score-bar h-full rounded-full" :style="{ width: kp.percentage + '%', background: masteryColor(kp.percentage) }"></div></div>
-                <span class="shrink-0 text-xs font-bold" :style="{ color: masteryColor(kp.percentage) }">{{ kp.percentage }}%</span>
+                <div class="shrink-0"><StarDisplay :score="kp.percentage" /></div>
+                <span class="shrink-0 text-[10px] font-semibold text-[var(--ink-soft)]">{{ kp.score }}/{{ kp.maxScore }}</span>
                 <span v-if="proficiencyMap[kp.kp]" class="flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold" :class="proficiencyMap[kp.kp].after >= proficiencyMap[kp.kp].before ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fdeaef] text-[#f2557a]'">
                   <span v-if="proficiencyMap[kp.kp].after > proficiencyMap[kp.kp].before">↑</span>
                   <span v-else-if="proficiencyMap[kp.kp].after < proficiencyMap[kp.kp].before">↓</span>
+                  <StarDisplay :score="proficiencyMap[kp.kp].after" :animateFrom="proficiencyMap[kp.kp].before" />
                   <span>{{ proficiencyMap[kp.kp].before }}→{{ proficiencyMap[kp.kp].after }}</span>
                 </span>
               </div>
@@ -206,7 +208,8 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               <div class="flex flex-wrap gap-3">
                 <div v-for="lit in detail.results.literacyBreakdown" :key="lit.literacy" class="flex min-w-[100px] flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3">
                   <span class="text-xs font-semibold text-[var(--ink)]">{{ lit.literacy }}</span>
-                  <span class="font-display text-xl font-bold" :style="{ color: masteryColor(percent(lit.score, lit.maxScore)) }">{{ percent(lit.score, lit.maxScore) }}<span class="text-xs">%</span></span>
+                  <StarDisplay :score="percent(lit.score, lit.maxScore)" />
+                  <span class="text-[10px] font-semibold text-[var(--ink-soft)]">{{ lit.score }}/{{ lit.maxScore }}</span>
                   <span class="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold" :class="percent(lit.score, lit.maxScore) >= 80 ? 'bg-[#e7f7ee] text-[#18a558]' : percent(lit.score, lit.maxScore) >= 60 ? 'bg-[#fef7e6] text-[#e0a92e]' : percent(lit.score, lit.maxScore) >= 40 ? 'bg-[#fef3e2] text-[#f59e42]' : 'bg-[#fdeaef] text-[#f2557a]'">
                     {{ percent(lit.score, lit.maxScore) >= 80 ? '优秀' : percent(lit.score, lit.maxScore) >= 60 ? '良好' : percent(lit.score, lit.maxScore) >= 40 ? '待加强' : '薄弱' }}
                   </span>
@@ -241,13 +244,13 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
                 <!-- 选择题 -->
                 <div v-if="q.type === 'multiple_choice'" class="space-y-1.5">
                   <div v-for="opt in displayOptions(q)" :key="opt.key"
-                    class="flex items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-sm"
+                    class="review-option flex items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-sm"
                     :class="(q.correctKeys || []).includes(opt.key) ? 'border-[#18a558] bg-[#e7f7ee]'
                       : selectedKeys(q).includes(opt.key) ? 'border-[#f2557a] bg-[#fdeaef]'
                       : 'border-[var(--line)] bg-white'">
                     <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                       :class="(q.correctKeys || []).includes(opt.key) ? 'bg-[#18a558] text-white' : selectedKeys(q).includes(opt.key) ? 'bg-[#f2557a] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span>
-                    <span class="md-body flex-1 text-[var(--ink)]" v-html="renderMarkdownInline(opt.text)"></span>
+                    <div class="md-body min-w-0 flex-1 text-[var(--ink)]" v-html="renderMarkdown(opt.text)"></div>
                     <span v-if="(q.correctKeys || []).includes(opt.key)" class="text-[11px] font-semibold text-[#18a558]">正确答案</span>
                     <span v-else-if="selectedKeys(q).includes(opt.key)" class="text-[11px] font-semibold text-[#f2557a]">你的选择</span>
                   </div>
@@ -307,6 +310,8 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
 
 <style scoped>
 .review-root { display: flex; flex-direction: column; height: 100%; background: transparent; }
+.review-option :deep(.md-body > :first-child) { margin-top: 0; }
+.review-option :deep(.md-body > :last-child) { margin-bottom: 0; }
 .circle-reveal { transition: stroke-dashoffset 0.9s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .score-bar { transition: width 0.75s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .analysis-body :deep(h1),

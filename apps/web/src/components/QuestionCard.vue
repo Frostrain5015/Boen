@@ -212,7 +212,7 @@ watch(
           :enter="{ opacity: 1, x: 0, transition: { delay: 120 + i * 70 } }"
         >
           <span class="opt-key">{{ opt.key }}</span>
-          <span class="md-body flex-1 text-left" v-html="renderMarkdownInline(opt.text)"></span>
+          <div class="md-body min-w-0 flex-1 text-left" v-html="renderMarkdown(opt.text)"></div>
           <CheckCircle2 v-if="answered && correctKeys.includes(opt.key)" class="h-5 w-5 shrink-0 text-[var(--success)]" />
           <XCircle v-else-if="answered && selectedKeys.includes(opt.key)" class="h-5 w-5 shrink-0 text-[var(--error)]" />
         </button>
@@ -382,6 +382,8 @@ watch(
 .opt-selected .opt-key { background: var(--accent); color: #fff; }
 .opt-correct .opt-key { background: var(--success); color: #fff; }
 .opt-wrong .opt-key { background: var(--error); color: #fff; }
+.opt :deep(.md-body > :first-child) { margin-top: 0; }
+.opt :deep(.md-body > :last-child) { margin-bottom: 0; }
 
 .tf {
   padding: 0.8rem;

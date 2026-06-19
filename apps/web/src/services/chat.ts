@@ -1,5 +1,6 @@
 import type {
   AnalyzeMistakeEvent,
+  AnswerPayload,
   ChatRequest,
   AnswerRequest,
   SseEvent,
@@ -66,6 +67,11 @@ export const streamExamGenerate = (
   config: { subject: string; grade: string; durationMinutes: number; notes?: string; totalScore?: number },
   onEvent: (e: SseEvent) => void,
 ) => streamSse('/api/exam/generate', config, onEvent);
+
+export const streamExamSubmit = (
+  req: { examId: string; answers: Array<{ questionIndex: number; answer: AnswerPayload }> },
+  onEvent: (e: SseEvent) => void,
+) => streamSse('/api/exam/submit/stream', req, onEvent);
 
 // ── 对话管理 API ────────────────────────────
 

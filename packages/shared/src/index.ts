@@ -261,6 +261,7 @@ export interface ExamQuestionResult {
   reference: string;
   explanation: string;
   knowledgePoint?: string;
+  knowledgePointId?: number;
   literacy?: string[];
 }
 
@@ -283,7 +284,7 @@ export interface ExamResults {
   questionResults: ExamQuestionResult[];
   tierBreakdown: Array<{ tier: string; correct: number; total: number; percentage: number }>;
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
-  literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number }>;
+  literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number; percentage: number }>;
   /** 博文对本次考试的综合分析总结（Markdown），包括考查知识点、答题情况、失分点与薄弱点 */
   analysis?: string;
   /** 各知识点熟练度变化 */
@@ -411,6 +412,7 @@ export type SseEvent =
   | { type: 'exam_generating' }
   | { type: 'exam_progress'; step: 'blueprint' | 'write' | 'review' | 'regenerate' | 'analyze' | 'complete'; message: string; progress: number }
   | { type: 'exam_ready'; examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
+  | { type: 'exam_grading_progress'; step: 'grade' | 'analyze' | 'profile' | 'save' | 'complete'; message: string; progress: number }
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }
   | { type: 'loading_knowledge_base' }
