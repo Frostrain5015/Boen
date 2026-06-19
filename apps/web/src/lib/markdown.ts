@@ -1,7 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
 
-const md = new MarkdownIt({ breaks: false, linkify: true });
+const md = new MarkdownIt({ breaks: false, linkify: true, html: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
 
 // ── 前端竖式渲染：\opadd / \opsub / \opmul / \opdiv → KaTeX array ─────
@@ -142,8 +142,8 @@ export function renderMarkdown(text: string): string {
   const normalized = (text ?? '')
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`)
-    // 画线句支持：'被引用的句子' → <u>被引用的句子</u>（语文阅读常见）
-    .replace(/'([^']{4,})'/g, (_, s) => `<u>${s}</u>`)
+    // 画线句支持：'被引用的句子' / '被引用的句子' → <u>被引用的句子</u>（语文阅读常见）
+    .replace(/[''']([^''']{4,})[''']/g, (_, s) => `<u>${s}</u>`)
     // 修复模型常见 KaTeX 格式错误
     .replace(/\$(.+?)\$\$/g, (_, inner) => `$$${inner}$$`) // $...$$ → $$...$$（混用定界符）
     .replace(/\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}\s*\$\$/g, (_, body) => `\n$$\\begin{array}${body}\\end{array}\n$$`) // \begin{array}...\end{array}$$ → 补开头 $$
