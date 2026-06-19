@@ -337,7 +337,8 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
       }
     }
 
-    return { title, knowledgePoints: kpNodes };
+    const secAvg = weightedAvg(kpNodes);
+    return { title, weightedScore: secAvg, knowledgePoints: kpNodes };
   }
 
   /** 数据丰富度阈值：低于此练习次数的知识点在聚合时权重打折 */
@@ -388,10 +389,16 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
     });
   }
 
+  // 全局聚合也统一用加权平均（考虑数据丰富度）
+  const allKps = textbookNodes.flatMap((t: any) =>
+    t.chapters.flatMap((c: any) => c.children.flatMap((s: any) => s.knowledgePoints))
+  );
+  const overallWeighted = weightedAvg(allKps);
+
   return {
     subject, grade,
     overall: {
-      weightedScore: overallCount > 0 ? Math.round(overallSum / overallCount) : -1,
+      weightedScore: overallWeighted,
       weakCount, goodCount, masteredCount,
       totalKps: overallCount,
     },
