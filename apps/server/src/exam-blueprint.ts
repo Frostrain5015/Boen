@@ -245,18 +245,26 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
   const newDiff = targetScore - newScore;
   if (Math.abs(newDiff) / targetScore < 0.05 && newDiff !== 0) {
-    // 微调最后一种题型的 count 精确命中
-    const allQtTypes = fixedSections.flatMap(s => s.questionTypes);
-    for (let i = allQtTypes.length - 1; i >= 0; i--) {
-      const qt = allQtTypes[i];
-      const adjust = Math.round(newDiff / qt.pointsPer);
-      const newC = qt.count + adjust;
-      if (newC >= 1 && newC <= 20) {
-        qt.count = newC;
-        newScore = fixedSections.reduce((s, sec) =>
-          s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
-        break;
+    // 按 pointsPer 升序排列（细粒度优先），微调 count 精确命中总分
+    const allQts = fixedSections.flatMap(s => s.questionTypes).sort((a, b) => a.pointsPer - b.pointsPer);
+    for (const qt of allQts) {
+      for (let delta = 1; delta <= 5; delta++) {
+        const adjustment = newDiff > 0 ? delta : -delta;
+        if (Math.abs(adjustment * qt.pointsPer) > Math.abs(newDiff)) break;
+        const newC = qt.count + adjustment;
+        if (newC >= 1 && newC <= 20) {
+          const trial = qt.count + adjustment;
+          const trialScore = fixedSections.reduce((s, sec) =>
+            s + sec.questionTypes.reduce((ss, q) => ss + q.count * q.pointsPer, 0), 0) -
+            qt.count * qt.pointsPer + trial * qt.pointsPer;
+          if (trialScore === targetScore) {
+            qt.count = trial;
+            newScore = targetScore;
+            break;
+          }
+        }
       }
+      if (newScore === targetScore) break;
     }
   }
 
