@@ -233,9 +233,9 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
     '4. 简答题的 referenceAnswer 和 keyPoints 是否准确',
     '5. explanation 中是否有知识性错误、计算错误或逻辑矛盾',
     '',
-    '=== 输出格式 ===',
-    '通过 review_correctness 工具输出，每题给出 0-100 分和具体问题。',
-    '100 分 = 完全正确；60 分 = 有小瑕疵但不影响答题；<60 分 = 有实质性错误。',
+    '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
+    '{"scores":[{"index":0,"score":100,"issues":[],"similarTo":[]}]}',
+    '其中 score=100 完全正确, 60=有小瑕疵, <60=有实质性错误。',
   ].join('\n');
 }
 
@@ -257,10 +257,9 @@ export function reviewSimilarityPrompt(questions: ExamQuestion[]): string {
     '',
     '注意：不同题型的题目可以用同一知识点，但情景、数据和设问必须差异化。',
     '',
-    '=== 输出格式 ===',
-    '通过 review_similarity 工具输出，每题给出 0-100 分。',
-    '100 分 = 与其他题完全不同；<60 分 = 与至少一道题严重雷同。',
-    '雷同的题在 similarTo 中列出雷同的题号（从0开始）。',
+    '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
+    '{"scores":[{"index":0,"score":100,"issues":[],"similarTo":[1]}]}',
+    '其中 score=100 完全不同, <60=严重雷同, similarTo 列出雷同题号。',
   ].join('\n');
 }
 
@@ -292,10 +291,9 @@ export function reviewBlueprintMatchPrompt(questions: ExamQuestion[], blueprint:
     '3. 是否遗漏了必考知识点',
     '4. 是否有超出蓝图范围的题目',
     '',
-    '=== 输出格式 ===',
-    '通过 review_blueprint_match 工具输出，每题给出 0-100 分。',
-    '100 分 = 完全匹配蓝图；<60 分 = 严重偏离蓝图。',
-    '另输出 overallMatchScore（0-100）表示全卷蓝图匹配度。',
+    '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
+    '{"scores":[{"index":0,"score":100,"issues":[]}],"overallMatchScore":85}',
+    '其中 score=100 完全匹配, <60=偏离蓝图；overallMatchScore 为全卷匹配度。',
   ].join('\n');
 }
 
@@ -317,9 +315,9 @@ export function reviewFormatPrompt(questions: ExamQuestion[]): string {
     '6. explanation 是否有实质内容',
     '7. \\opadd 等 op 命令语法是否正确',
     '',
-    '=== 输出格式 ===',
-    '通过 review_format 工具输出，每题给出 0-100 分。',
-    '100 分 = 格式完美；<60 分 = 有严重格式错误导致无法渲染或作答。',
+    '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
+    '{"scores":[{"index":0,"score":100,"issues":[]}]}',
+    '其中 score=100 格式完美, <60=严重错误。',
   ].join('\n');
 }
 
@@ -339,9 +337,9 @@ export function reviewDiscriminationPrompt(questions: ExamQuestion[], config: Pr
     '4. 题目是否能区分不同水平的学生',
     '5. 题目难度是否与标注的 difficulty 一致',
     '',
-    '=== 输出格式 ===',
-    '通过 review_discrimination 工具输出，每题给出 0-100 分。',
-    '100 分 = 区分度优秀；<60 分 = 太简单或太偏导致无区分度。',
+    '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
+    '{"scores":[{"index":0,"score":100,"issues":[]}]}',
+    '其中 score=100 区分度优秀, <60=无区分度。',
   ].join('\n');
 }
 
