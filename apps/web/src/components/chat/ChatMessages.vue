@@ -89,7 +89,6 @@ onMounted(() => {
                   <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                 </div>
               </div>
-              <span v-if="i === chatStore.items.length - 1 && chatStore.knowledgeBaseLoading" class="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-strong)]">查阅知识库</span>
               <TypingDots v-else-if="i === chatStore.items.length - 1 && chatStore.showTyping && !m.text" />
             </div>
           </div>

@@ -214,14 +214,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
       if (model.bindTools) tools = model.bindTools(qaTools as any);
     } else if (state.mode === 'weakness') {
       system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      if (!model.bindTools) { /* no tool support */ }
-      else if (state.reviewPhase === 'quizzing') {
+      // 集中练习必须绑出题工具，让模型自主决定何时讲解、何时出题
+      if (model.bindTools) {
         tools = model.bindTools(reviewTools as any);
-      }
-      else {
-        const teachTools: any[] = [completeReviewTool];
-        if (deps.lookupKnowledgePoint) teachTools.push(lookupKnowledgePointTool);
-        tools = model.bindTools(teachTools);
       }
     } else {
       system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));

@@ -46,7 +46,7 @@ export const useChatStore = defineStore('chat', () => {
   const busy = ref(false);
   const threadId = `web-${Date.now()}`;
   const isGeneratingQuiz = ref(false);
-  const knowledgeBaseLoading = ref(false);
+  // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
   const reaction = ref<MascotState | null>(null);
@@ -97,7 +97,6 @@ export const useChatStore = defineStore('chat', () => {
   // ── SSE event handler ────────────────────────────────────
   function handleEvent(e: SseEvent, idx: { value: number }) {
     if (e.type === 'token') {
-      knowledgeBaseLoading.value = false;
       let cur = items.value[idx.value];
       if (!cur || cur.kind !== 'assistant') {
         items.value.push(newAssistant());
@@ -108,10 +107,7 @@ export const useChatStore = defineStore('chat', () => {
         cur.text += e.value;
         if (e.value.includes('`')) nextTick(() => runTikz(document));
       }
-    } else if (e.type === 'loading_knowledge_base') {
-      knowledgeBaseLoading.value = true;
     } else if (e.type === 'quiz_generating') {
-      knowledgeBaseLoading.value = false;
       isGeneratingQuiz.value = true;
     } else if (e.type === 'question') {
       isGeneratingQuiz.value = false;

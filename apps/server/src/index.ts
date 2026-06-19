@@ -1030,8 +1030,6 @@ app.post('/api/chat', async (c) => {
         }
       }
 
-      await send({ type: 'loading_knowledge_base' }).catch(() => {});
-
       const last = await runGraph(
         {
           messages: [...skipMsgs, new HumanMessage(body.message)],
