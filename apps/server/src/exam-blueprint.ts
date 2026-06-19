@@ -179,20 +179,44 @@ export async function stepBlueprintArchitect(
 
 /** 校验总分一致性，若不符则按比例调整 count */
 function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBlueprint {
-  // 计算实际总分
-  let actualScore = 0;
-  for (const section of bp.sections) {
-    for (const qt of section.questionTypes) {
-      actualScore += qt.count * qt.pointsPer;
+  // 展平所有 questionType 以便调整
+  type FlatQt = import('@boen/shared').BlueprintQuestionTypePlan & { sectionIdx: number };
+  const allQts: FlatQt[] = [];
+  for (let si = 0; si < bp.sections.length; si++) {
+    for (const qt of bp.sections[si].questionTypes) {
+      allQts.push({ ...qt, sectionIdx: si });
     }
   }
 
-  // 总分偏差 < 5% → 可接受，更新 totalScore 字段
-  if (Math.abs(actualScore - targetScore) / targetScore < 0.05) {
+  let actualScore = allQts.reduce((s, qt) => s + qt.count * qt.pointsPer, 0);
+  const diff = targetScore - actualScore;
+  const deviation = Math.abs(diff) / targetScore;
+
+  // 偏差 < 5% → 微调最后一个题型 count，精确命中目标总分
+  if (deviation < 0.05) {
+    if (diff === 0) return { ...bp, totalScore: actualScore };
+    // 从后往前找 pointsPer 最小的题型来调整（粒度最细）
+    for (let i = allQts.length - 1; i >= 0; i--) {
+      const qt = allQts[i];
+      const adjustment = Math.round(diff / qt.pointsPer);
+      const newCount = qt.count + adjustment;
+      if (newCount >= 1 && newCount <= 20) {
+        // 直接在 allQts 上修改，最后写回 section
+        qt.count = newCount;
+        actualScore = allQts.reduce((s, q) => s + q.count * q.pointsPer, 0);
+        if (actualScore === targetScore) break;
+      }
+    }
+    // 写回 sections
+    for (const qt of allQts) {
+      const sec = bp.sections[qt.sectionIdx];
+      const target = sec.questionTypes.find(t => t.type === qt.type);
+      if (target) target.count = qt.count;
+    }
     return { ...bp, totalScore: actualScore };
   }
 
-  // 偏差较大 → 按比例调整每个 section 的 count
+  // 偏差 ≥ 5% → 按比例调整每个 section 的 count
   const ratio = targetScore / actualScore;
   console.warn(`[blueprint] 总分偏差较大（实际 ${actualScore} vs 目标 ${targetScore}），按比例 ${ratio.toFixed(2)} 调整题量`);
 
@@ -204,7 +228,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     })),
   }));
 
-  // 重新计算
+  // 重新计算，若仍偏差则递归修正
   const newScore = fixedSections.reduce((s, sec) =>
     s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
 
