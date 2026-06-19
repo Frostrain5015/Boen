@@ -28,12 +28,17 @@ function xlopToKatex(code: string): string | null {
   if (sub) return buildArray(sub[1].trim(), sub[2].trim(), '-');
   const mul = code.match(/\\opmul\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (mul) return buildMul(mul[1].trim(), mul[2].trim());
-  // 除法简单展示
+  // 除法 → 竖式（长除格式）
   const div = code.match(/\\opdiv\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (div) {
     const d = parseInt(div[1]), v = parseInt(div[2]);
     if (v === 0) return `$${d} \\div ${v}$$`;
-    return `$${d} \\div ${v} = ${(d / v).toFixed(1)}$$`;
+    const quotient = Math.floor(d / v);
+    const remainder = d % v;
+    const result = remainder === 0
+      ? `$$\n\\begin{array}{r}\n  ${quotient}\\\\\n\\hline\n${v})${d}\n\\end{array}\n$$`
+      : `$$\n\\begin{array}{r}\n  ${quotient}\\ \\text{余}\\ ${remainder}\\\\\n\\hline\n${v})${d}\n\\end{array}\n$$`;
+    return result;
   }
   return null;
 }
