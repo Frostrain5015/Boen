@@ -43,11 +43,11 @@ const colorMap: Record<ToastType, string> = {
 <style scoped>
 .toast-stack {
   position: fixed;
-  top: 1.25rem;
+  bottom: 1.25rem;
   right: 1.25rem;
   z-index: 99999;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 0.6rem;
   pointer-events: none;
   max-width: min(400px, calc(100vw - 2.5rem));

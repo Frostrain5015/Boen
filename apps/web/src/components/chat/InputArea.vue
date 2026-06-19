@@ -4,6 +4,7 @@ import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic } from 'l
 import { useChatStore } from '@/stores/chat';
 import { useUiStore } from '@/stores/ui';
 import { useVoiceInput } from '@/composables/useVoiceInput';
+import Mascot from '@/components/Mascot.vue';
 
 const chatStore = useChatStore();
 const uiStore = useUiStore();
@@ -47,37 +48,90 @@ onMounted(() => {
           </Transition>
         </div>
       </div>
-      <div class="clay flex items-end gap-2 p-2">
-        <textarea
-          :ref="setInputEl"
-          v-model="chatStore.input"
-          @keydown="onKeydown"
-          rows="1"
-          placeholder="今天想学习什么？"
-          class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
-        />
-        <button
-          @click="toggleVoiceInput"
-          :disabled="chatStore.busy || !speechSupported"
-          class="grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border transition-all active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
-          :class="voiceListening ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-[0_0_0_4px_var(--accent-soft)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
-          :aria-label="voiceButtonLabel"
-          :aria-pressed="voiceListening"
-          :title="voiceButtonLabel"
-        >
-          <Mic class="h-5 w-5" :class="{ 'animate-pulse': voiceListening }" />
-        </button>
-        <span class="sr-only" aria-live="polite">{{ voiceButtonLabel }}</span>
-        <button
-          @click="chatStore.send(chatStore.input)"
-          :disabled="chatStore.busy || !chatStore.input.trim()"
-          class="btn-accent grid h-11 w-11 shrink-0 place-items-center rounded-[18px]"
-          aria-label="发送"
-        >
-          <Sparkles v-if="chatStore.busy" class="h-5 w-5 animate-spin" />
-          <Send v-else class="h-5 w-5" />
-        </button>
+      <div class="relative">
+        <!-- 吉祥物踩在输入框右上角 -->
+        <Transition name="mascot-pop">
+          <div
+            v-if="chatStore.hasItems"
+            class="absolute -top-12 right-0 z-10 pointer-events-none select-none"
+            :class="chatStore.busy ? 'mascot-bounce' : ''"
+          >
+            <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
+          </div>
+        </Transition>
+        <div class="clay flex items-end gap-2 p-2">
+          <textarea
+            :ref="setInputEl"
+            v-model="chatStore.input"
+            @keydown="onKeydown"
+            rows="1"
+            placeholder="今天想学习什么？"
+            class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
+          />
+          <button
+            @click="toggleVoiceInput"
+            :disabled="chatStore.busy || !speechSupported"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border transition-all active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
+            :class="voiceListening ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)] shadow-[0_0_0_4px_var(--accent-soft)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+            :aria-label="voiceButtonLabel"
+            :aria-pressed="voiceListening"
+            :title="voiceButtonLabel"
+          >
+            <Mic class="h-5 w-5" :class="{ 'animate-pulse': voiceListening }" />
+          </button>
+          <span class="sr-only" aria-live="polite">{{ voiceButtonLabel }}</span>
+          <button
+            @click="chatStore.send(chatStore.input)"
+            :disabled="chatStore.busy || !chatStore.input.trim()"
+            class="btn-accent grid h-11 w-11 shrink-0 place-items-center rounded-[18px]"
+            aria-label="发送"
+          >
+            <Sparkles v-if="chatStore.busy" class="h-5 w-5 animate-spin" />
+            <Send v-else class="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </div>
   </footer>
 </template>
+
+<style scoped>
+/* ── 吉祥物弹入动画 ── */
+.mascot-pop-enter-active {
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+}
+.mascot-pop-leave-active {
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+.mascot-pop-enter-from {
+  transform: scale(0.4) translateY(20px);
+  opacity: 0;
+}
+.mascot-pop-leave-to {
+  transform: scale(0.6) translateY(10px);
+  opacity: 0;
+}
+
+/* 吉祥物忙碌时轻弹 */
+.mascot-bounce {
+  animation: mascot-hop 1.8s ease-in-out infinite;
+}
+@keyframes mascot-hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-pop-enter-active,
+  .mascot-pop-leave-active {
+    transition: opacity 0.2s ease;
+  }
+  .mascot-pop-enter-from,
+  .mascot-pop-leave-to {
+    transform: none;
+  }
+  .mascot-bounce {
+    animation: none;
+  }
+}
+</style>
