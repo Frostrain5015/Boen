@@ -26,7 +26,7 @@ function handleContact() {
     <!-- 毛玻璃遮罩 -->
     <div class="premium-overlay">
       <div
-        class="clay flex w-full max-w-[380px] flex-col items-center px-8 py-10"
+        class="clay clay-glass flex w-full max-w-[380px] flex-col items-center px-8 py-10"
         v-motion
         :initial="{ opacity: 0, scale: 0.92, y: 16 }"
         :enter="{ opacity: 1, scale: 1, y: 0, transition: { duration: 500, ease: [0.34, 1.56, 0.64, 1] } }"

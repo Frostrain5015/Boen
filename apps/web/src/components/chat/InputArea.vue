@@ -64,7 +64,7 @@ onMounted(() => {
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
           </div>
         </Transition>
-        <div class="clay flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
+        <div class="clay clay-glass flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
           <!-- 免费用户用量环 -->
           <div
             v-if="authStore.authenticated && !authStore.isPremium"

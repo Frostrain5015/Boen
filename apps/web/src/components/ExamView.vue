@@ -573,7 +573,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
   <div class="exam-root" :data-subject="config.subject" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 300 } }">
     <!-- ═══ CONFIG ═══ -->
     <div v-if="examState === 'config'" class="flex h-full flex-col items-center justify-center p-6">
-      <div class="clay w-full max-w-lg overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+      <div class="clay clay-glass w-full max-w-lg overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
         <div class="border-b border-[var(--line)] px-6 py-4">
           <div class="flex items-center gap-2">
             <button @click="$emit('back')" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"><ArrowLeft class="h-4 w-4 text-[var(--ink-soft)]" /></button>
@@ -691,7 +691,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
             </div>
             <!-- 题目卡片 -->
             <div class="mx-auto w-full max-w-2xl pb-6">
-              <div class="clay overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+              <div class="clay clay-glass overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
                 <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5 sm:px-5">
                   <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ (currentQuestion?.index ?? 0) + 1 }}</span>
                   <span class="font-display text-xs font-semibold text-[var(--accent-strong)]">{{ { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' }[currentQuestion?.type ?? 'multiple_choice'] }}</span>
@@ -791,7 +791,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'results' && results" class="flex h-full flex-col overflow-y-auto">
       <div class="mx-auto w-full max-w-2xl space-y-4 p-4">
         <!-- Score Hero（带展开动画） -->
-        <div class="clay p-6 text-center" :class="{ 'score-reveal': scoreRevealed }" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
+        <div class="clay clay-glass p-6 text-center" :class="{ 'score-reveal': scoreRevealed }" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
           <div class="relative mx-auto mb-3 h-28 w-28">
             <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="8" />
@@ -807,7 +807,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- 博文综合分析 -->
-        <div v-if="results.analysis" class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 120 } }">
+        <div v-if="results.analysis" class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 120 } }">
           <div class="flex items-start gap-3 p-4">
             <div class="shrink-0"><Mascot :size="44" state="happy" /></div>
             <div class="min-w-0 flex-1">
@@ -818,7 +818,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- Tier Breakdown -->
-        <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
+        <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
           <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">权重层级得分</h3>
           <div v-for="t in results.tierBreakdown" :key="t.tier" class="mb-2 last:mb-0">
             <div class="mb-1 flex items-center justify-between text-xs">
@@ -830,7 +830,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- 知识点分析 + 熟练度变化（合并） -->
-        <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
+        <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
           <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">知识点分析</h3>
           <div v-for="kp in results.kpBreakdown" :key="kp.kp" class="mb-2 flex items-center gap-3 last:mb-0">
             <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
@@ -847,7 +847,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- 核心素养（主指标，优先展示） -->
-        <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+        <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
           <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养 <span class="font-normal text-[var(--ink-soft)]/60">— 综合能力评价</span></h3>
           <div class="flex flex-wrap gap-3">
             <div v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3 min-w-[100px]">
@@ -865,7 +865,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         </div>
 
         <!-- Per-Question Details -->
-        <div class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 300 } }">
+        <div class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 300 } }">
           <div class="border-b border-[var(--line)] px-4 py-3"><h3 class="font-display text-xs font-bold text-[var(--ink-soft)]">逐题详情</h3></div>
           <div v-for="qr in results.questionResults" :key="qr.index" class="border-b border-[var(--line)] last:border-b-0">
             <button @click="toggleResult(qr.index)" class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--accent-soft)]/30">

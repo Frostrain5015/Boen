@@ -309,7 +309,7 @@ onBeforeUnmount(() => {
 
     <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 pb-4 lg:grid-cols-[360px_minmax(0,1fr)]">
       <aside class="panel-scroll flex min-h-0 flex-col gap-4 overflow-y-auto">
-        <section class="clay p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
+        <section class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
           <div class="mb-3 flex items-center gap-2">
             <NotebookPen class="h-4 w-4 text-[var(--accent)]" />
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">记录新错题</h2>
@@ -359,7 +359,7 @@ onBeforeUnmount(() => {
           <p v-if="error" class="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
         </section>
 
-        <section class="clay min-h-[220px] overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 140 } }">
+        <section class="clay clay-glass min-h-[220px] overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 140 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-3">
             <FileImage class="h-4 w-4 text-[var(--accent)]" />
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">最近错题</h2>
@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
         </section>
       </aside>
 
-      <section class="clay relative min-h-0 overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+      <section class="clay clay-glass relative min-h-0 overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
         <div v-if="busy || progress > 0" class="border-b border-[var(--line)] px-5 py-4">
           <div class="mb-3 flex items-center gap-2">
             <ScanText class="h-4 w-4 text-[var(--accent)]" />

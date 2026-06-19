@@ -185,7 +185,7 @@ watch(grade, fetchOutline);
       <!-- ═══ Left panel: Stats + Recommendations ═══ -->
       <div class="panel-scroll flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
         <!-- Subject selector + back button -->
-        <div class="clay overflow-hidden">
+        <div class="clay clay-glass overflow-hidden">
           <div class="flex items-center gap-2 p-3">
             <button
               @click="$emit('back')"
@@ -213,7 +213,7 @@ watch(grade, fetchOutline);
         </div>
 
         <!-- Overall big stars -->
-        <div class="clay p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+        <div class="clay clay-glass p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
           <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合熟练度</p>
           <div class="flex justify-center">
             <span class="inline-flex gap-1">
@@ -245,7 +245,7 @@ watch(grade, fetchOutline);
         </div>
 
         <!-- 诊断报告 -->
-        <button @click="generateReport" class="clay flex w-full items-center gap-3 p-3 text-left transition-all hover:opacity-80 active:scale-[0.98]" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+        <button @click="generateReport" class="clay clay-glass flex w-full items-center gap-3 p-3 text-left transition-all hover:opacity-80 active:scale-[0.98]" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
           <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
             <FileText class="h-4 w-4 text-[var(--accent-strong)]" />
           </div>
@@ -257,7 +257,7 @@ watch(grade, fetchOutline);
         </button>
 
         <!-- Recommendations -->
-        <div class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
+        <div class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
             <Target class="h-4 w-4 text-[var(--accent)]" />
             <span class="font-display text-xs font-bold text-[var(--ink)]">推荐练习</span>
@@ -362,7 +362,7 @@ watch(grade, fetchOutline);
     <!-- ═══ 诊断报告 Modal ═══ -->
     <Transition name="panel-scale">
       <div v-if="report !== null || reportLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="reportLoading ? null : report = null">
-        <div class="clay mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
+        <div class="clay clay-glass mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
           <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
             <div class="flex items-center gap-2">
               <FileText class="h-4 w-4 text-[var(--accent)]" />
@@ -384,7 +384,7 @@ watch(grade, fetchOutline);
     <!-- ═══ KP Detail Floating Panel ═══ -->
     <Transition name="panel-scale">
       <div v-if="selectedKp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="closeKpDetail">
-        <div class="clay mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
+        <div class="clay clay-glass mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
           <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
             <div class="flex items-center gap-2">
               <GraduationCap class="h-4 w-4 text-[var(--accent)]" />

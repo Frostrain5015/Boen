@@ -160,7 +160,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
         <template v-else-if="detail">
           <!-- 完整判卷总览 -->
           <div v-if="detail.results" class="mb-4 space-y-3">
-            <div class="clay p-5 text-center" v-motion :initial="{ opacity: 0, scale: 0.95 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
+            <div class="clay clay-glass p-5 text-center" v-motion :initial="{ opacity: 0, scale: 0.95 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
               <div class="relative mx-auto mb-3 h-24 w-24">
                 <svg class="h-full w-full -rotate-90" viewBox="0 0 120 120">
                   <circle cx="60" cy="60" r="54" fill="none" stroke="var(--line)" stroke-width="9" />
@@ -176,7 +176,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               <p class="text-xs text-[var(--ink-soft)]">{{ subjectInfo(detail.subject).label }} · {{ gradeLabel(detail.grade) }} · {{ formatDateTime(detail.submittedAt ?? detail.createdAt) }}</p>
             </div>
 
-            <div v-if="detail.results.analysis" class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 90 } }">
+            <div v-if="detail.results.analysis" class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 90 } }">
               <div class="flex items-start gap-3 p-4">
                 <Mascot :size="44" state="happy" class="shrink-0" />
                 <div class="min-w-0 flex-1">
@@ -186,7 +186,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               </div>
             </div>
 
-            <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 130 } }">
+            <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 130 } }">
               <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">权重层级得分</h3>
               <div v-for="t in detail.results.tierBreakdown" :key="t.tier" class="mb-2 last:mb-0">
                 <div class="mb-1 flex items-center justify-between text-xs">
@@ -197,7 +197,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               </div>
             </div>
 
-            <div class="clay p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 170 } }">
+            <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 170 } }">
               <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">知识点分析</h3>
               <div v-for="kp in detail.results.kpBreakdown" :key="kp.kp" class="mb-2 flex items-center gap-3 last:mb-0">
                 <GraduationCap class="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
@@ -213,7 +213,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               </div>
             </div>
 
-            <div v-if="detail.results.literacyBreakdown.length" class="clay p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 210 } }">
+            <div v-if="detail.results.literacyBreakdown.length" class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 210 } }">
               <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养 <span class="font-normal text-[var(--ink-soft)]/60">— 综合能力评价</span></h3>
               <div class="flex flex-wrap gap-3">
                 <div v-for="lit in detail.results.literacyBreakdown" :key="lit.literacy" class="flex min-w-[100px] flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3">
@@ -234,7 +234,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
             <span class="text-xs font-medium text-[var(--ink-soft)]">共 {{ detail.questions.length }} 题</span>
           </div>
           <div class="space-y-3">
-            <div v-for="q in detail.questions" :key="q.index" class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { delay: Math.min(q.index * 30, 400) } }">
+            <div v-for="q in detail.questions" :key="q.index" class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { delay: Math.min(q.index * 30, 400) } }">
               <button @click="toggle(q.index)" class="flex w-full items-center gap-2 bg-[var(--accent-soft)]/60 px-4 py-2.5 text-left transition-colors hover:bg-[var(--accent-soft)]">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                   :class="resultMap.get(q.index)?.correct === true ? 'bg-[#e7f7ee] text-[#18a558]' : resultMap.get(q.index)?.correct === false ? 'bg-[#fdeaef] text-[#f2557a]' : 'bg-[var(--accent)] text-white'">
