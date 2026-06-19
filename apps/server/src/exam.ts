@@ -341,6 +341,15 @@ export async function generateExam(
       questions = regenResult.questions.map((q, i) => localFormatFix(q, i));
 
       if (regenResult.report.regeneratedIndices.length > 0) {
+        // 重出后二次完整审核
+        await onProgress?.({ step: 'review', message: 'review', progress: 96 });
+        const secondReview = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
+        const stillFailing = secondReview.scores.filter(s => s.needsRegeneration);
+        for (const s of stillFailing) {
+          const dims = Object.entries(s.dimensions).filter(([, d]) => d.score < 60).map(([dim, d]) => `${dim}(${d.score})`);
+          console.warn(`[二次审核] Q${s.index + 1} 重出后仍未通过: ${dims.join(', ')}`);
+        }
+        console.log(`[二次审核] 重出前 ${regenCount} 题不合格 → 重出后 ${stillFailing.length} 题不合格`);
         await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: 98 });
       }
     }
