@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import Mascot from '@/components/Mascot.vue';
-import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight, LayoutGrid } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
 import { streamExamGenerate } from '@/services/chat';
@@ -81,6 +81,9 @@ const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
 const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
 const scoreRevealed = ref(false);
+const currentQuestionIndex = ref(0);
+const answerSheetExpanded = ref(false);
+const questionSwitchDirection = ref<'next' | 'prev'>('next');
 
 /** 将题目按 groupId 分组，无 groupId 的每题自成一组 */
 const groupedQuestions = computed(() => {
@@ -115,14 +118,7 @@ const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === config
 const answeredCount = computed(() => {
   let c = 0;
   for (const q of session.value?.questions ?? []) {
-    const a = answers.value.get(q.index);
-    if (a !== undefined && a !== null) {
-      if (q.type === 'fill_blank' && Array.isArray(a) && a.some((v: string) => v.trim())) c++;
-      else if (q.type === 'short_answer' && typeof a === 'string' && a.trim()) c++;
-      else if (q.type === 'true_false' && typeof a === 'boolean') c++;
-      else if (q.type === 'multiple_choice' && Array.isArray(a) && a.length > 0) c++;
-      else c++;
-    }
+    if (isQuestionAnswered(q)) c++;
   }
   return c;
 });
@@ -132,6 +128,48 @@ const timerDisplay = computed(() => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 });
 const timerUrgent = computed(() => timer.value < 300 && timer.value > 0);
+
+const currentQuestion = computed(() => session.value?.questions[currentQuestionIndex.value] ?? null);
+const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
+const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
+const nextButtonLabel = computed(() => (isLastQuestion.value ? '提交' : '下一题'));
+const nextButtonIcon = computed(() => (isLastQuestion.value ? Send : ChevronRight));
+const progressPercent = computed(() => {
+  const total = session.value?.questions.length ?? 1;
+  return ((currentQuestionIndex.value + 1) / total) * 100;
+});
+function isQuestionAnswered(q: ExamQuestionData): boolean {
+  const a = answers.value.get(q.index);
+  if (a === undefined || a === null) return false;
+  if (q.type === 'fill_blank' && Array.isArray(a)) return a.some((v: string) => String(v ?? '').trim());
+  if (q.type === 'short_answer' && typeof a === 'string') return a.trim().length > 0;
+  if (q.type === 'true_false' && typeof a === 'boolean') return true;
+  if (q.type === 'multiple_choice' && Array.isArray(a)) return a.length > 0;
+  return false;
+}
+const answeredStatus = computed(() => {
+  const m = new Map<number, boolean>();
+  for (const q of session.value?.questions ?? []) m.set(q.index, isQuestionAnswered(q));
+  return m;
+});
+
+function goToQuestion(idx: number) {
+  if (!session.value || idx < 0 || idx >= session.value.questions.length) return;
+  questionSwitchDirection.value = idx > currentQuestionIndex.value ? 'next' : 'prev';
+  currentQuestionIndex.value = idx;
+  answerSheetExpanded.value = false;
+}
+function prevQuestion() { goToQuestion(currentQuestionIndex.value - 1); }
+function nextQuestion() {
+  if (isLastQuestion.value) submitExam();
+  else goToQuestion(currentQuestionIndex.value + 1);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (examState.value !== 'taking') return;
+  if (e.key === 'ArrowLeft' && !answerSheetExpanded.value) { e.preventDefault(); prevQuestion(); }
+  if (e.key === 'ArrowRight' && !answerSheetExpanded.value) { e.preventDefault(); nextQuestion(); }
+}
 
 function gradeLabel(g: string): string {
   const n = Number(g);
@@ -193,6 +231,26 @@ function setAnswer(qIndex: number, value: any) {
 
 function getAnswer(qIndex: number) {
   return answers.value.get(qIndex);
+}
+
+/** 单题模式下 safely 设置选择题作答（currentQuestion 可能为 null 时自动忽略） */
+function setMultipleChoiceAnswer(qIndex: number | undefined, multiSelect: boolean | undefined, key: string) {
+  if (qIndex === undefined) return;
+  const prev = (getAnswer(qIndex) as string[] | undefined) ?? [];
+  const next = multiSelect ? (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]) : [key];
+  setAnswer(qIndex, next);
+}
+function setTrueFalseAnswer(qIndex: number | undefined, value: boolean) {
+  if (qIndex !== undefined) setAnswer(qIndex, value);
+}
+function setFillBlankAnswer(qIndex: number | undefined, totalBlanks: number, i: number, value: string) {
+  if (qIndex === undefined) return;
+  const v = ((getAnswer(qIndex) as string[] | undefined) ?? Array(totalBlanks).fill(''));
+  v[i] = value;
+  setAnswer(qIndex, v);
+}
+function setShortAnswerAnswer(qIndex: number | undefined, value: string) {
+  if (qIndex !== undefined) setAnswer(qIndex, value);
 }
 
 /** 把前端存储的原始作答值规整为后端期望的 AnswerPayload；留空返回 null（视为未作答） */
@@ -302,6 +360,10 @@ watch(examState, (s) => {
 
 function startExam() {
   if (!session.value) return;
+  currentQuestionIndex.value = 0;
+  answers.value = new Map();
+  answerSheetExpanded.value = false;
+  questionSwitchDirection.value = 'next';
   examState.value = 'taking';
   startTimer(session.value.durationMinutes);
 }
@@ -337,7 +399,13 @@ watch(scoreRevealed, (v) => {
     }, duration / 60);
   }
 });
-function goBack() { examState.value = 'config'; if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; } }
+function goBack() {
+  examState.value = 'config';
+  if (timerInterval.value) { clearInterval(timerInterval.value); timerInterval.value = null; }
+  currentQuestionIndex.value = 0;
+  answers.value = new Map();
+  answerSheetExpanded.value = false;
+}
 function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
   if (s.has(qIndex)) s.delete(qIndex); else s.add(qIndex);
@@ -359,7 +427,8 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value); });
+onMounted(() => { window.addEventListener('keydown', handleKeydown); });
+onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value); window.removeEventListener('keydown', handleKeydown); });
 </script>
 
 <template>
@@ -438,66 +507,137 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     </div>
 
     <!-- ═══ TAKING ═══ -->
-    <div v-if="examState === 'taking' && session" class="flex h-full flex-col">
-      <div class="flex items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-5 py-3">
+    <div v-if="examState === 'taking' && session" class="relative flex h-full flex-col">
+      <!-- 顶部栏 -->
+      <div class="flex items-center gap-3 border-b border-[var(--line)] bg-[var(--surface)] px-4 py-3 sm:px-5">
         <button @click="goBack" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"><ArrowLeft class="h-4 w-4 text-[var(--ink-soft)]" /></button>
-        <div class="flex-1 truncate font-display text-sm font-bold text-[var(--ink)]">{{ session.title }}</div>
-        <div class="flex items-center gap-3">
-          <span class="text-xs font-medium text-[var(--ink-soft)]">{{ answeredCount }}/{{ session.totalQuestions }}</span>
-          <div class="flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-display text-sm font-bold transition-colors" :class="timerUrgent ? 'bg-[#fdeaef] text-[#f2557a] animate-pulse' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">
-            <Clock class="h-4 w-4" />
+        <div class="hidden flex-1 truncate font-display text-sm font-bold text-[var(--ink)] sm:block">{{ session.title }}</div>
+        <div class="flex flex-1 items-center justify-center gap-2 sm:hidden">
+          <span class="text-xs font-bold text-[var(--ink)]">{{ currentQuestionIndex + 1 }} / {{ session.totalQuestions }}</span>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button @click="answerSheetExpanded = !answerSheetExpanded" class="group flex h-8 items-center gap-1.5 rounded-full bg-[var(--accent-soft)] px-2.5 sm:px-3 text-xs font-bold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white hover:shadow-[0_0_0_4px_var(--accent-soft)] active:scale-95" aria-label="答题卡">
+            <LayoutGrid class="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
+            <span class="hidden sm:inline">答题卡</span>
+            <span class="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-white px-1 text-[10px] text-[var(--accent-strong)] transition-colors group-hover:bg-white/20 group-hover:text-white">{{ answeredCount }}</span>
+          </button>
+          <div class="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-display text-xs font-bold transition-colors sm:px-3 sm:text-sm" :class="timerUrgent ? 'bg-[#fdeaef] text-[#f2557a] animate-pulse' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">
+            <Clock class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             <span>{{ timerDisplay }}</span>
           </div>
         </div>
       </div>
-      <div class="flex-1 overflow-y-auto px-4 py-4">
-        <div class="mx-auto max-w-2xl space-y-4">
-          <div v-for="q in session.questions" :key="q.index" class="clay overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: Math.min(q.index * 40, 500) } }">
-            <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5">
-              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white">{{ q.index + 1 }}</span>
-              <span class="font-display text-xs font-semibold text-[var(--accent-strong)]">{{ { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' }[q.type] }}</span>
-              <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ q.points }}分</span>
-            </div>
-            <div class="space-y-3 px-4 py-3">
-              <div v-if="q.passage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(q.passage)"></div>
-              <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(q.stem)"></div>
 
-              <!-- Multiple Choice -->
-              <div v-if="q.type === 'multiple_choice'" class="space-y-2">
-                <button v-for="opt in q.options" :key="opt.key" @click="setAnswer(q.index, q.multiSelect ? [...(getAnswer(q.index) || []), opt.key].filter((k, i, a) => a.indexOf(k) === i) : [opt.key])"
-                  class="flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-2.5 text-left text-sm transition-all active:scale-[0.98]"
-                  :class="(getAnswer(q.index) || []).includes(opt.key) ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white hover:border-[var(--accent)]'"
-                ><span class="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold" :class="(getAnswer(q.index) || []).includes(opt.key) ? 'bg-[var(--accent)] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span><span class="md-body" v-html="renderMarkdownInline(opt.text)"></span></button>
-                <p v-if="q.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
-              </div>
+      <!-- 进度条（题号） -->
+      <div class="h-1 w-full bg-[var(--line)]">
+        <div class="h-full bg-[var(--accent)] transition-all duration-500" :style="{ width: progressPercent + '%' }"></div>
+      </div>
+      <div class="hidden items-center justify-between bg-[var(--surface)] px-5 py-2 text-xs font-medium text-[var(--ink-soft)] sm:flex">
+        <span>第 <span class="font-bold text-[var(--accent-strong)]">{{ currentQuestionIndex + 1 }}</span> 题 / 共 {{ session.totalQuestions }} 题</span>
+        <span>已答 <span class="font-bold text-[var(--accent-strong)]">{{ answeredCount }}</span> 题</span>
+      </div>
 
-              <!-- True/False -->
-              <div v-if="q.type === 'true_false'" class="flex gap-3">
-                <button v-for="opt in [{ v: true, l: '正确' }, { v: false, l: '错误' }]" :key="String(opt.v)" @click="setAnswer(q.index, opt.v)" class="flex-1 rounded-2xl border-2 py-3 text-center font-display text-sm font-bold transition-all" :class="getAnswer(q.index) === opt.v ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'">{{ opt.l }}</button>
-              </div>
-
-              <!-- Fill Blank -->
-              <div v-if="q.type === 'fill_blank'" class="space-y-2">
-                <div v-for="i in (q.blankCount ?? q.blanks?.length ?? 1)" :key="i" class="flex items-center gap-2">
-                  <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">{{ i }}</span>
-                  <input :value="(getAnswer(q.index) || [])[i - 1] || ''" @input="(e) => { const v = getAnswer(q.index) || Array(q.blankCount ?? q.blanks?.length ?? 1).fill(''); v[i - 1] = (e.target as HTMLInputElement).value; setAnswer(q.index, v); }" class="flex-1 rounded-xl border border-[var(--line)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="填写答案" />
+      <!-- 单题区域 -->
+      <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
+        <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
+          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
+            <div class="mx-auto max-w-2xl pb-24">
+              <div class="clay overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+                <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5 sm:px-5">
+                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ (currentQuestion?.index ?? 0) + 1 }}</span>
+                  <span class="font-display text-xs font-semibold text-[var(--accent-strong)]">{{ { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' }[currentQuestion?.type ?? 'multiple_choice'] }}</span>
+                  <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ currentQuestion?.points }}分</span>
                 </div>
-              </div>
+                <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                  <div v-if="currentQuestion?.passage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(currentQuestion.passage)"></div>
+                  <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(currentQuestion?.stem ?? '')"></div>
 
-              <!-- Short Answer -->
-              <div v-if="q.type === 'short_answer'">
-                <textarea :value="getAnswer(q.index) || ''" @input="(e) => setAnswer(q.index, (e.target as HTMLTextAreaElement).value)" rows="3" class="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="写下你的答案…" />
+                  <!-- Multiple Choice -->
+                  <div v-if="currentQuestion?.type === 'multiple_choice'" class="space-y-2.5">
+                    <button v-for="opt in (currentQuestion?.options ?? [])" :key="opt.key" @click="setMultipleChoiceAnswer(currentQuestion?.index, currentQuestion?.multiSelect, opt.key)"
+                      class="exam-opt group"
+                      :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-selected' : 'exam-opt-idle'"
+                    >
+                      <span class="exam-opt-key" :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-key-selected' : ''">{{ opt.key }}</span>
+                      <span class="md-body flex-1 text-left" v-html="renderMarkdownInline(opt.text)"></span>
+                    </button>
+                    <p v-if="currentQuestion?.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
+                  </div>
+
+                  <!-- True/False -->
+                  <div v-if="currentQuestion?.type === 'true_false'" class="grid grid-cols-2 gap-3">
+                    <button v-for="opt in [{ v: true, l: '正确' }, { v: false, l: '错误' }]" :key="String(opt.v)" @click="setTrueFalseAnswer(currentQuestion?.index, opt.v)" class="exam-tf" :class="getAnswer(currentQuestion?.index ?? -1) === opt.v ? 'exam-tf-selected' : 'exam-tf-idle'">{{ opt.l }}</button>
+                  </div>
+
+                  <!-- Fill Blank -->
+                  <div v-if="currentQuestion?.type === 'fill_blank'" class="space-y-2.5">
+                    <div v-for="i in (currentQuestion?.blankCount ?? currentQuestion?.blanks?.length ?? 1)" :key="i" class="flex items-center gap-2" v-motion :initial="{ opacity: 0, x: -12 }" :enter="{ opacity: 1, x: 0, transition: { delay: 80 + i * 50 } }">
+                      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">{{ i }}</span>
+                      <input :value="(getAnswer(currentQuestion?.index ?? -1) || [])[i - 1] || ''" @input="(e) => setFillBlankAnswer(currentQuestion?.index, currentQuestion?.blankCount ?? currentQuestion?.blanks?.length ?? 1, i - 1, (e.target as HTMLInputElement).value)" class="exam-field flex-1" placeholder="填写答案" />
+                    </div>
+                  </div>
+
+                  <!-- Short Answer -->
+                  <div v-if="currentQuestion?.type === 'short_answer'" v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+                    <textarea :value="getAnswer(currentQuestion?.index ?? -1) || ''" @input="(e) => setShortAnswerAnswer(currentQuestion?.index, (e.target as HTMLTextAreaElement).value)" rows="4" class="exam-field w-full" placeholder="写下你的答案…" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        </Transition>
+      </div>
+
+      <!-- 底部导航 -->
+      <div class="absolute bottom-0 left-0 right-0 z-20 border-t border-[var(--line)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-sm">
+        <div class="mx-auto flex max-w-2xl items-center justify-between gap-3">
+          <button @click="prevQuestion" :disabled="isFirstQuestion" class="exam-nav-btn" :class="isFirstQuestion ? 'exam-nav-btn-disabled' : 'exam-nav-btn-secondary'">
+            <ArrowLeft class="h-4 w-4" /> 上一题
+          </button>
+          <div class="hidden flex-1 text-center text-xs text-[var(--ink-soft)] sm:block">
+            使用 <kbd class="rounded bg-[var(--line)] px-1.5 py-0.5 font-sans text-[10px]">←</kbd> <kbd class="rounded bg-[var(--line)] px-1.5 py-0.5 font-sans text-[10px]">→</kbd> 切换
+          </div>
+          <button @click="nextQuestion" class="exam-nav-btn" :class="isLastQuestion ? 'exam-nav-btn-submit' : 'exam-nav-btn-primary'">
+            {{ nextButtonLabel }} <component :is="nextButtonIcon" class="h-4 w-4" />
+          </button>
         </div>
       </div>
-      <div class="border-t border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-        <div class="mx-auto flex max-w-2xl items-center justify-between">
-          <span class="text-xs font-medium text-[var(--ink-soft)]">已答 {{ answeredCount }}/{{ session.totalQuestions }} 题</span>
-          <button @click="submitExam" class="btn-accent flex items-center gap-2 rounded-2xl px-6 py-2.5 font-display text-sm font-bold"><Send class="h-4 w-4" /> 提交全部</button>
+
+      <!-- 答题卡（底部弹出） -->
+      <Transition name="sheet-up">
+        <div v-if="answerSheetExpanded" class="absolute inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-[var(--line)] bg-[var(--surface)] shadow-[0_-12px_40px_rgba(0,0,0,0.1)]">
+          <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+            <div>
+              <h3 class="font-display text-sm font-bold text-[var(--ink)]">答题卡</h3>
+              <p class="text-[10px] text-[var(--ink-soft)]">已答 {{ answeredCount }} / {{ session.totalQuestions }} 题</p>
+            </div>
+            <button @click="answerSheetExpanded = false" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" aria-label="关闭答题卡"><XCircle class="h-4 w-4 text-[var(--ink-soft)]" /></button>
+          </div>
+          <div class="max-h-[45vh] overflow-y-auto p-5">
+            <div class="grid grid-cols-5 gap-2.5 sm:grid-cols-8 md:grid-cols-10">
+              <button v-for="q in session.questions" :key="q.index" @click="goToQuestion(q.index)" class="answer-sheet-cell" :class="[
+                answeredStatus.get(q.index) ? 'answer-sheet-answered' : 'answer-sheet-unanswered',
+                currentQuestionIndex === q.index ? 'answer-sheet-current' : '',
+              ]" v-motion :initial="{ opacity: 0, scale: 0.6 }" :enter="{ opacity: 1, scale: 1, transition: { delay: Math.min(q.index * 25, 500) } }">
+                <span class="answer-sheet-num">{{ q.index + 1 }}</span>
+                <span class="answer-sheet-dot"></span>
+              </button>
+            </div>
+          </div>
+          <div class="border-t border-[var(--line)] px-5 py-3">
+            <div class="flex items-center gap-4 text-xs text-[var(--ink-soft)]">
+              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded bg-[var(--accent)]"></span> 已作答</span>
+              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded border border-[var(--line)] bg-white"></span> 未作答</span>
+              <span class="flex items-center gap-1.5"><span class="h-3 w-3 rounded border-2 border-[var(--accent)] bg-white"></span> 当前题</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </Transition>
+
+      <!-- 答题卡遮罩 -->
+      <Transition name="fade">
+        <div v-if="answerSheetExpanded" @click="answerSheetExpanded = false" class="absolute inset-0 z-25 bg-black/20 backdrop-blur-[2px]"></div>
+      </Transition>
     </div>
 
     <!-- ═══ GRADING（与 GENERATING 一致布局） ═══ -->
@@ -685,4 +825,107 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .passage-block { border-radius: 14px; padding: 0.9rem 1.1rem; line-height: 1.8; font-size: 0.9rem; }
 .passage-block-chi { font-family: 'KaiTi','STKaiti',serif; background: #fff8f0; border: 1.5px solid #f0dcc0; color: #5c4a32; }
 .passage-block-eng { font-family: 'Georgia','Times New Roman',serif; background: #f5f0ff; border: 1.5px solid #d8cce8; color: #3d2e5c; }
+
+/* ── 单题考试：选项按钮 ── */
+.exam-opt {
+  display: flex; align-items: center; gap: 0.75rem;
+  width: 100%; padding: 0.75rem 1rem;
+  border-radius: 18px; border: 1.5px solid var(--line); background: #fff;
+  text-align: left; font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.exam-opt-idle:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 10px 22px -14px rgba(0,0,0,0.12); }
+.exam-opt-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); }
+.exam-opt-key {
+  display: grid; place-items: center;
+  width: 1.75rem; height: 1.75rem; border-radius: 50%;
+  font-weight: 800; font-size: 0.8rem;
+  background: var(--accent-soft); color: var(--accent-strong);
+  transition: background-color 0.25s, color 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.exam-opt-key-selected { background: var(--accent); color: #fff; transform: scale(1.1); }
+
+/* ── 单题考试：判断题 ── */
+.exam-tf {
+  padding: 0.85rem 1rem; border-radius: 18px;
+  border: 1.5px solid var(--line); background: #fff;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
+  cursor: pointer; transition: transform 0.16s ease, border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+.exam-tf-idle:hover { transform: translateY(-2px); border-color: var(--accent); }
+.exam-tf-selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── 单题考试：输入框 ── */
+.exam-field {
+  width: 100%; padding: 0.6rem 0.9rem;
+  border-radius: 14px; border: 1.5px solid var(--line); background: #fff;
+  font-size: 0.95rem; resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.exam-field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); transform: translateY(-1px); }
+
+/* ── 单题考试：底部导航 ── */
+.exam-nav-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.65rem 1.1rem; border-radius: 16px;
+  font-family: var(--font-display); font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; transition: transform 0.16s ease, box-shadow 0.2s, background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+.exam-nav-btn:active:not(:disabled) { transform: scale(0.96); }
+.exam-nav-btn-primary { border: none; background: var(--accent); color: #fff; box-shadow: 0 4px 14px -4px rgba(0,0,0,0.2); }
+.exam-nav-btn-primary:hover { background: var(--accent-strong); box-shadow: 0 6px 20px -6px rgba(0,0,0,0.25); }
+.exam-nav-btn-submit { border: none; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #fff; box-shadow: 0 4px 16px -4px rgba(0,0,0,0.25); }
+.exam-nav-btn-submit:hover { filter: brightness(1.05); box-shadow: 0 6px 22px -6px rgba(0,0,0,0.3); }
+.exam-nav-btn-secondary { border: 1.5px solid var(--line); background: #fff; color: var(--ink); }
+.exam-nav-btn-secondary:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+.exam-nav-btn-disabled { opacity: 0.35; cursor: not-allowed; border: 1.5px solid var(--line); background: #fff; color: var(--ink-soft); }
+
+/* ── 单题切换动画 ── */
+.question-next-enter-active, .question-next-leave-active,
+.question-prev-enter-active, .question-prev-leave-active {
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.question-next-enter-from { opacity: 0; transform: translateX(35px) scale(0.98); }
+.question-next-leave-to { opacity: 0; transform: translateX(-35px) scale(0.98); }
+.question-prev-enter-from { opacity: 0; transform: translateX(-35px) scale(0.98); }
+.question-prev-leave-to { opacity: 0; transform: translateX(35px) scale(0.98); }
+
+/* ── 答题卡展开动画 ── */
+.sheet-up-enter-active, .sheet-up-leave-active { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease; }
+.sheet-up-enter-from, .sheet-up-leave-to { transform: translateY(100%); opacity: 0; }
+
+/* ── 遮罩淡入 ── */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+/* ── 答题卡热力图格子 ── */
+.answer-sheet-cell {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 1 / 1; border-radius: 12px;
+  font-family: var(--font-display); font-weight: 700; font-size: 0.9rem;
+  cursor: pointer; overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.2s, border-color 0.2s, background-color 0.2s;
+}
+.answer-sheet-cell:hover { transform: translateY(-2px) scale(1.05); }
+.answer-sheet-cell:active { transform: scale(0.95); }
+.answer-sheet-answered { background: var(--accent); color: #fff; border: 1.5px solid var(--accent); box-shadow: 0 4px 10px -4px rgba(0,0,0,0.18); }
+.answer-sheet-unanswered { background: #fff; color: var(--ink-soft); border: 1.5px solid var(--line); }
+.answer-sheet-unanswered:hover { border-color: var(--accent); color: var(--accent-strong); }
+.answer-sheet-current { box-shadow: 0 0 0 3px var(--accent-soft); }
+.answer-sheet-answered.answer-sheet-current { box-shadow: 0 0 0 3px rgba(255,255,255,0.6), 0 0 0 5px var(--accent-soft); }
+.answer-sheet-dot {
+  position: absolute; bottom: 5px; right: 5px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .exam-opt, .exam-tf, .exam-nav-btn, .answer-sheet-cell { transition: none; }
+  .question-next-enter-active, .question-next-leave-active,
+  .question-prev-enter-active, .question-prev-leave-active { transition: none; }
+  .sheet-up-enter-active, .sheet-up-leave-active { transition: none; }
+  .exam-opt-key-selected { transform: none; }
+}
 </style>
