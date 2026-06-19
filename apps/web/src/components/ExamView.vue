@@ -25,10 +25,18 @@ interface ExamQuestionData {
   stem: string;
   passage?: string;
   options?: { key: string; text: string }[];
+  correctKeys?: string[];
   multiSelect?: boolean;
+  blanks?: { acceptedAnswers: string[] }[];
   blankCount?: number;
+  answer?: boolean;
+  referenceAnswer?: string;
+  keyPoints?: string[];
   knowledgePoint?: string;
+  knowledgePointId?: number;
+  literacies?: string[];
   difficulty?: string;
+  explanation?: string;
   groupId?: number;
 }
 
