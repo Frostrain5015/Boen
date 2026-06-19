@@ -238,6 +238,8 @@ export interface ExamQuestion {
   correctKeys?: string[];
   multiSelect?: boolean;
   blanks?: { acceptedAnswers: string[] }[];
+  /** 填空数量（前端渲染输入框用） */
+  blankCount?: number;
   answer?: boolean;
   referenceAnswer?: string;
   keyPoints?: string[];

@@ -470,9 +470,9 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
               <!-- Fill Blank -->
               <div v-if="q.type === 'fill_blank'" class="space-y-2">
-                <div v-for="i in q.blankCount" :key="i" class="flex items-center gap-2">
+                <div v-for="i in (q.blankCount ?? q.blanks?.length ?? 1)" :key="i" class="flex items-center gap-2">
                   <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">{{ i }}</span>
-                  <input :value="(getAnswer(q.index) || [])[i - 1] || ''" @input="(e) => { const v = getAnswer(q.index) || Array(q.blankCount).fill(''); v[i - 1] = (e.target as HTMLInputElement).value; setAnswer(q.index, v); }" class="flex-1 rounded-xl border border-[var(--line)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="填写答案" />
+                  <input :value="(getAnswer(q.index) || [])[i - 1] || ''" @input="(e) => { const v = getAnswer(q.index) || Array(q.blankCount ?? q.blanks?.length ?? 1).fill(''); v[i - 1] = (e.target as HTMLInputElement).value; setAnswer(q.index, v); }" class="flex-1 rounded-xl border border-[var(--line)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]" placeholder="填写答案" />
                 </div>
               </div>
 

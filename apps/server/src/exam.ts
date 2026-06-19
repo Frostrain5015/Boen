@@ -383,7 +383,10 @@ function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion 
     if (!base.correctKeys!.length) base.correctKeys = [base.options![0].key];
     base.multiSelect = raw.multiSelect ?? false;
   }
-  if (base.type === 'fill_blank') base.blanks = raw.blanks ?? [];
+  if (base.type === 'fill_blank') {
+    base.blanks = raw.blanks ?? [];
+    base.blankCount = base.blanks.length;
+  }
   if (base.type === 'true_false') base.answer = raw.answer ?? true;
   if (base.type === 'short_answer') { base.referenceAnswer = raw.referenceAnswer ?? ''; base.keyPoints = raw.keyPoints ?? []; }
 
