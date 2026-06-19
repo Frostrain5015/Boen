@@ -119,8 +119,13 @@ async function runSingleReview(
     const content = typeof response.content === 'string' ? response.content : '';
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-    const parsed = schema.parse(JSON.parse(jsonStr));
-    return parseReviewOutput(parsed, dimension);
+    const rawData = JSON.parse(jsonStr);
+    // safeParse：即使 schema 不完整也尽力提取可用数据
+    const parsed = schema.safeParse(rawData);
+    if (parsed.success) return parseReviewOutput(parsed.data, dimension);
+    // schema 校验失败但仍返回默认分（保留本地格式检查触发的 regeneration）
+    console.warn(`[review:${dimension}] JSON 格式不符，使用默认分:`, parsed.error.issues.slice(0, 2));
+    return parseReviewOutput(rawData, dimension);
   } catch (err) {
     console.warn(`[review:${dimension}] 审核失败，该维度降级为默认分 80:`, err instanceof Error ? err.message.slice(0, 80) : err);
     return {

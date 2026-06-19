@@ -83,7 +83,7 @@ export function blueprintArchitectPrompt(
     '',
     '⚠ 重要：各题型 pointsPer × count 之和必须等于总分。选择题不超过 10 道。',
     '⚠ 各板块的知识点不要重复——同一知识点只应出现在一个板块中。',
-    '💡 语文/英语等文科科目鼓励出综合大题：同一篇阅读材料下出 2-4 道小题（单选/判断/简答混合），设相同 groupId，材料放在第一题的 passage 字段。',
+    '💡 语文/英语等文科科目必须出综合大题：同一篇阅读材料必须出 2-4 道小题（单选/填空/简答混合），所有小题设相同 groupId（数字），阅读材料只放在第一题的 passage 字段，后续同组小题不要再重复放 passage。这是强制要求，不遵守将导致材料重复显示，整卷作废。',
     KATEX_FORMAT_GUIDE,
   ].filter(Boolean).join('\n');
 }

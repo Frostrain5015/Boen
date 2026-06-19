@@ -103,6 +103,21 @@ export function defaultBlueprint(config: { subject: string; grade: string; total
     count: Math.max(1, Math.round(qt.count * ratio)),
   }));
 
+  // 修正舍入误差，确保总分精确等于目标
+  let currentScore = questionTypes.reduce((s, qt) => s + qt.count * qt.pointsPer, 0);
+  const scoreDiff = totalScore - currentScore;
+  if (scoreDiff !== 0) {
+    for (let i = questionTypes.length - 1; i >= 0; i--) {
+      const qt = questionTypes[i];
+      const adjust = Math.round(scoreDiff / qt.pointsPer);
+      const newC = qt.count + adjust;
+      if (newC >= 1 && newC <= 20) {
+        qt.count = newC;
+        break;
+      }
+    }
+  }
+
   return {
     title: `${subjectLabel(config.subject)}${gradeLabel(config.grade)}综合试卷`,
     sections: [{
@@ -223,7 +238,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
   const ratio = targetScore / actualScore;
   console.warn(`[blueprint] 总分偏差较大（实际 ${actualScore} vs 目标 ${targetScore}），按比例 ${ratio.toFixed(2)} 调整题量`);
 
-  const fixedSections = bp.sections.map(section => ({
+  let fixedSections = bp.sections.map(section => ({
     ...section,
     questionTypes: section.questionTypes.map(qt => ({
       ...qt,
@@ -231,9 +246,25 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     })),
   }));
 
-  // 重新计算，若仍偏差则递归修正
-  const newScore = fixedSections.reduce((s, sec) =>
+  // 重新计算，若偏差 < 5% 则微调至精确命中
+  let newScore = fixedSections.reduce((s, sec) =>
     s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
+  const newDiff = targetScore - newScore;
+  if (Math.abs(newDiff) / targetScore < 0.05 && newDiff !== 0) {
+    // 微调最后一种题型的 count 精确命中
+    const allQtTypes = fixedSections.flatMap(s => s.questionTypes);
+    for (let i = allQtTypes.length - 1; i >= 0; i--) {
+      const qt = allQtTypes[i];
+      const adjust = Math.round(newDiff / qt.pointsPer);
+      const newC = qt.count + adjust;
+      if (newC >= 1 && newC <= 20) {
+        qt.count = newC;
+        newScore = fixedSections.reduce((s, sec) =>
+          s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
+        break;
+      }
+    }
+  }
 
   return { ...bp, sections: fixedSections, totalScore: newScore };
 }
