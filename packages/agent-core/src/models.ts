@@ -12,9 +12,9 @@ export interface ModelConfig {
 
 /**
  * 可插拔模型工厂。
- * - openai：OpenAI 兼容接口（讯飞 MaaS 等），换 baseURL。
+ * - openai：OpenAI 兼容接口（讯飞 MaaS / Kimi K2.6），换 baseURL。
  * - anthropic：Claude 原生。
- * - deepseek：DeepSeek API（OpenAI 兼容），baseURL = https://api.deepseek.com
+ * - deepseek：DeepSeek V4 Flash（OpenAI 兼容），baseURL = https://api.deepseek.com
  */
 export function getChatModel(cfg: ModelConfig): BaseChatModel {
   if (cfg.provider === 'anthropic') {

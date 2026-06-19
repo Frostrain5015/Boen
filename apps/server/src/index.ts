@@ -291,7 +291,7 @@ function extractQuestionPayload(last: BaseMessage | undefined): { toolCallId: st
 const app = new Hono();
 app.use('/api/*', cors());
 
-app.get('/api/health', (c) => c.json({ ok: true, provider: process.env.BOEN_PROVIDER ?? 'openai', model: process.env.BOEN_MODEL ?? 'astron-code-latest' }));
+app.get('/api/health', (c) => c.json({ ok: true, provider: process.env.BOEN_PROVIDER ?? 'openai', model: process.env.BOEN_MODEL ?? 'astron-code-latest', actual: 'Kimi K2.6' }));
 
 // ── 模型切换 API ────────────────────────────
 /** POST /api/model/switch — 切换模型提供商 */

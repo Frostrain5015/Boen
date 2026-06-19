@@ -93,12 +93,12 @@ function handleSave() {
             <div class="flex gap-2">
               <button @click="modelProvider = 'default'"
                 class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]"
-                :class="modelProvider === 'default' ? 'border-[--accent] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
-              ><span>☁️ 讯飞</span></button>
+                :class="modelProvider === 'default' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
+              ><span>Kimi K2.6</span></button>
               <button @click="modelProvider = 'deepseek'"
                 class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]"
                 :class="modelProvider === 'deepseek' ? 'border-[#4A6CF7] bg-[#e8edff] text-[#2b4ad0]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[#4A6CF7]'"
-              ><span>🧠 DeepSeek</span></button>
+              ><span>DeepSeek V4 Flash</span></button>
             </div>
           </label>
         </div>
