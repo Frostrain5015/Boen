@@ -359,7 +359,17 @@ export async function generateExam(
       return { title: blueprint.title, questions: defaultQs, totalScore: defaultQs[0].points, durationMinutes: enrichedConfig.durationMinutes ?? 20 };
     }
 
-    const totalScore = questions.reduce((s, q) => s + q.points, 0);
+    // 修正总分精确等于目标分
+    let totalScore = questions.reduce((s, q) => s + q.points, 0);
+    const targetTotal = blueprint.totalScore;
+    if (totalScore !== targetTotal && questions.length > 0) {
+      const diff = targetTotal - totalScore;
+      // 把差值调整到最后一题上
+      const last = questions[questions.length - 1];
+      last.points = Math.max(1, last.points + diff);
+      totalScore = questions.reduce((s, q) => s + q.points, 0);
+      console.warn(`[exam] 总分 ${totalScore - diff} → ${totalScore}（${diff > 0 ? '补' : '减'}${Math.abs(diff)} 分到第 ${last.index + 1} 题）`);
+    }
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
 
     // ─── TikZ 预渲染：出题阶段直接交给服务器 LaTeX 引擎编译 ────

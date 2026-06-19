@@ -99,7 +99,6 @@ const gradingSteps: Array<{ step: GradingStep; label: string }> = [
   { step: 'save', label: '保存结果' },
 ];
 const scoreRevealed = ref(false);
-const currentQuestionIndex = ref(0);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
 const dotNavRef = ref<HTMLElement | null>(null);
 
@@ -158,7 +157,61 @@ const timerDisplay = computed(() => {
 });
 const timerUrgent = computed(() => timer.value < 300 && timer.value > 0);
 
-const currentQuestion = computed(() => session.value?.questions[currentQuestionIndex.value] ?? null);
+// currentQuestion 保留供 watch 等地方使用，指向当前大题的首题
+const currentQuestion = computed(() => {
+  const g = currentGroup.value;
+  return g?.questions?.[0] ?? null;
+});
+/** 内部题号游标（用于大题定位） */
+const currentQuestionIndex = ref(0);
+/** 当前题号属于哪个大题组 */
+const currentGroupIndex = computed(() => {
+  const idx = currentQuestionIndex.value;
+  const groups = groupedQuestions.value;
+  for (let i = 0; i < groups.length; i++) {
+    if (groups[i].questions.some(q => q.index === idx)) return i;
+  }
+  return 0;
+});
+const currentGroup = computed(() => groupedQuestions.value[currentGroupIndex.value] ?? null);
+const currentGroupQuestions = computed(() => currentGroup.value?.questions ?? []);
+const groupPassage = computed(() => {
+  const g = currentGroup.value;
+  if (!g || !g.questions.length) return '';
+  const first = g.questions[0];
+  if (first.passage) return first.passage;
+  const marker = /。?\s*\*\*\s*passage\s*\*\*\s*/i;
+  const match = first.stem.match(marker);
+  if (match) {
+    const after = first.stem.slice(match.index! + match[0].length).trim();
+    const qs = after.split(/\n\s*(?:问题|Question)\s*[：:]\s*/);
+    return qs[0]?.trim() || '';
+  }
+  return '';
+});
+function subStem(q: ExamQuestionData): string {
+  if (!q) return '';
+  const marker = /。?\s*\*\*\s*passage\s*\*\*\s*/i;
+  if (marker.test(q.stem)) {
+    const parts = q.stem.split(marker);
+    return parts[parts.length - 1]?.trim() || q.stem;
+  }
+  if (q.passage && q.stem.startsWith(q.passage.slice(0, 40))) {
+    return q.stem.slice(q.passage.length).trim();
+  }
+  return q.stem;
+}
+/** 大题总数 */
+const totalGroups = computed(() => groupedQuestions.value.length);
+/** 是否大题首/末 */
+const isFirstGroup = computed(() => currentGroupIndex.value === 0);
+const isLastGroup = computed(() => currentGroupIndex.value >= totalGroups.value - 1);
+/** 大题号显示 */
+const groupLabel = computed(() => {
+  const g = currentGroup.value;
+  if (!g || !g.questions.length) return '';
+  return `第${currentGroupIndex.value + 1}题（共${g.questions.length}小题）`;
+});
 /** 去重的题干：若 stem 以 passage 开头，去掉重复部分；若 stem 含 ** passage ** 标记则提取标记后内容 */
 const displayStem = computed(() => {
   const q = currentQuestion.value;
@@ -190,29 +243,9 @@ const displayPassage = computed(() => {
   }
   return '';
 });
-const isFirstQuestion = computed(() => currentQuestionIndex.value === 0);
-const isLastQuestion = computed(() => currentQuestionIndex.value === (session.value?.questions.length ?? 1) - 1);
-/** 题号窗口：固定显示 9 个（当前居中），左右溢出时动态调整 */
-const VISIBLE_DOT_COUNT = 9;
-const visibleDots = computed(() => {
-  const qs = session.value?.questions ?? [];
-  const total = qs.length;
-  if (total <= VISIBLE_DOT_COUNT) return qs;
-  const half = Math.floor(VISIBLE_DOT_COUNT / 2);
-  let start = currentQuestionIndex.value - half;
-  start = Math.max(0, Math.min(start, total - VISIBLE_DOT_COUNT));
-  return qs.slice(start, start + VISIBLE_DOT_COUNT);
-});
-const visibleDotOffset = computed(() => {
-  // 计算当前题号在可见窗口前的偏移量（用于首尾 item 显示省略效果）
-  const qs = session.value?.questions ?? [];
-  if (qs.length <= VISIBLE_DOT_COUNT) return 0;
-  const half = Math.floor(VISIBLE_DOT_COUNT / 2);
-  let start = currentQuestionIndex.value - half;
-  return Math.max(0, Math.min(start, qs.length - VISIBLE_DOT_COUNT));
-});
-const nextButtonLabel = computed(() => (isLastQuestion.value ? '提交' : '下一题'));
-const nextButtonIcon = computed(() => (isLastQuestion.value ? Send : ChevronRight));
+const isFirstQuestion = computed(() => true); // 已迁移到大题导航
+const isLastQuestion = computed(() => false); // 已迁移到大题导航
+// visibleDots/visibleDotOffset/nextButtonLabel/nextButtonIcon 已迁移到大题导航
 function isQuestionAnswered(q: ExamQuestionData): boolean {
   const a = answers.value.get(q.index);
   if (a === undefined || a === null) return false;
@@ -228,21 +261,23 @@ const answeredStatus = computed(() => {
   return m;
 });
 
-function goToQuestion(idx: number) {
-  if (!session.value || idx < 0 || idx >= session.value.questions.length) return;
-  questionSwitchDirection.value = idx > currentQuestionIndex.value ? 'next' : 'prev';
-  currentQuestionIndex.value = idx;
+function goToGroup(idx: number) {
+  if (idx < 0 || idx >= totalGroups.value) return;
+  const g = groupedQuestions.value[idx];
+  if (!g || !g.questions.length) return;
+  questionSwitchDirection.value = idx > currentGroupIndex.value ? 'next' : 'prev';
+  currentQuestionIndex.value = g.questions[0].index;
 }
-function prevQuestion() { goToQuestion(currentQuestionIndex.value - 1); }
-function nextQuestion() {
-  if (isLastQuestion.value) submitExam();
-  else goToQuestion(currentQuestionIndex.value + 1);
+function prevGroup() { goToGroup(currentGroupIndex.value - 1); }
+function nextGroup() {
+  if (isLastGroup.value) submitExam();
+  else goToGroup(currentGroupIndex.value + 1);
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (examState.value !== 'taking') return;
-  if (e.key === 'ArrowLeft') { e.preventDefault(); prevQuestion(); }
-  if (e.key === 'ArrowRight') { e.preventDefault(); nextQuestion(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevGroup(); }
+  if (e.key === 'ArrowRight') { e.preventDefault(); nextGroup(); }
 }
 
 function centerCurrentDot() {
@@ -531,17 +566,14 @@ async function submitExam() {
 watch(examState, (s) => {
   if (s === 'taking') {
     nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
-    centerCurrentDot();
   }
 });
-watch(currentQuestionIndex, () => {
-  centerCurrentDot();
+watch(currentGroup, () => {
   nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
 });
 
 function startExam() {
   if (!session.value) return;
-  currentQuestionIndex.value = 0;
   answers.value = new Map();
   questionSwitchDirection.value = 'next';
   examState.value = 'taking';
@@ -695,11 +727,11 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
         <button @click="goBack" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"><ArrowLeft class="h-4 w-4 text-[var(--ink-soft)]" /></button>
         <div class="hidden flex-1 truncate font-display text-sm font-bold text-[var(--ink)] sm:block">{{ session.title }}</div>
         <div class="flex flex-1 items-center justify-center gap-2 sm:hidden">
-          <span class="text-xs font-bold text-[var(--ink)]">{{ currentQuestionIndex + 1 }} / {{ session.totalQuestions }}</span>
+          <span class="text-xs font-bold text-[var(--ink)]">{{ currentGroupIndex + 1 }} / {{ totalGroups }} 大题</span>
         </div>
         <div class="flex items-center gap-2 sm:gap-3">
           <div class="hidden items-center gap-1.5 rounded-xl bg-[#e8f6ed] px-2.5 py-1.5 text-xs font-bold text-[#1f8f52] sm:flex">
-            已答 {{ answeredCount }}/{{ session.totalQuestions }}
+            已答 {{ answeredCount }}/{{ session.totalQuestions }} 小题
           </div>
           <div class="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 font-display text-xs font-bold transition-colors sm:px-3 sm:text-sm" :class="timerUrgent ? 'bg-[#fdeaef] text-[#f2557a] animate-pulse' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">
             <Clock class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -712,66 +744,64 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
         <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
           <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
-            <!-- 题号轨道（固定窗口 9 个，当前居中） -->
+            <!-- 题号轨道（大题导航） -->
             <div class="shrink-0 pt-5 pb-3">
-              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex items-center justify-center gap-0.5" role="navigation" aria-label="题号导航">
-                <span v-if="visibleDotOffset > 0" class="question-dot-edge">‹‹</span>
+              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex items-center justify-center gap-0.5" role="navigation" aria-label="大题导航">
+                <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
                 <button
-                  v-for="q in visibleDots"
-                  :key="q.index"
-                  @click="goToQuestion(q.index)"
+                  v-for="(g, gi) in groupedQuestions"
+                  :key="gi"
+                  @click="goToGroup(gi)"
                   class="question-dot"
-                  :class="[
-                    currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.index) ? 'question-dot-answered' : 'question-dot-idle',
-                  ]"
-                  :aria-label="`第 ${q.index + 1} 题${answeredStatus.get(q.index) ? '，已作答' : '，未作答'}`"
-                  :aria-current="currentQuestionIndex === q.index ? 'step' : undefined"
+                  :class="currentGroupIndex === gi ? 'question-dot-current' : 'question-dot-idle'"
+                  :aria-label="`第 ${gi + 1} 大题`"
+                  :aria-current="currentGroupIndex === gi ? 'step' : undefined"
                 >
-                  <span>{{ q.index + 1 }}</span>
+                  <span>{{ gi + 1 }}</span>
                 </button>
-                <span v-if="visibleDotOffset + VISIBLE_DOT_COUNT < (session?.questions.length ?? 0)" class="question-dot-edge">››</span>
+                <span v-if="currentGroupIndex + 1 < totalGroups" class="question-dot-edge">››</span>
               </div>
             </div>
-            <!-- 题目卡片 -->
-            <div class="mx-auto w-full max-w-2xl pb-6">
-              <div class="clay clay-glass overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
+            <!-- 同组题目展示 -->
+            <div class="mx-auto w-full max-w-2xl pb-6 space-y-6">
+              <div v-if="groupPassage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(groupPassage)"></div>
+              <div v-for="(sq, si) in currentGroupQuestions" :key="sq.index" class="clay clay-glass overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
                 <div class="flex items-center gap-2 bg-[var(--accent-soft)] px-4 py-2.5 sm:px-5">
-                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ (currentQuestion?.index ?? 0) + 1 }}</span>
-                  <span class="font-display text-xs font-semibold text-[var(--accent-strong)]">{{ { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' }[currentQuestion?.type ?? 'multiple_choice'] }}</span>
-                  <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ currentQuestion?.points }}分</span>
+                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm">{{ sq.index + 1 }}</span>
+                  <span class="font-display text-xs font-semibold text-[var(--accent-strong)]">{{ { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' }[sq.type] }}</span>
+                  <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ sq.points }}分</span>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
-                  <div v-if="displayPassage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(displayPassage)"></div>
-                  <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(displayStem)"></div>
+                  <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(subStem(sq))"></div>
 
                   <!-- Multiple Choice -->
-                  <div v-if="currentQuestion?.type === 'multiple_choice'" class="space-y-2.5">
-                    <button v-for="opt in displayOptions(currentQuestion)" :key="opt.key" @click="setMultipleChoiceAnswer(currentQuestion?.index, currentQuestion?.multiSelect, opt.key)"
+                  <div v-if="sq.type === 'multiple_choice'" class="space-y-2.5">
+                    <button v-for="opt in displayOptions(sq)" :key="opt.key" @click="setMultipleChoiceAnswer(sq.index, sq.multiSelect, opt.key)"
                       class="exam-opt group"
-                      :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-selected' : 'exam-opt-idle'"
+                      :class="(getAnswer(sq.index) || []).includes(opt.key) ? 'exam-opt-selected' : 'exam-opt-idle'"
                     >
-                      <span class="exam-opt-key" :class="(getAnswer(currentQuestion?.index ?? -1) || []).includes(opt.key) ? 'exam-opt-key-selected' : ''">{{ opt.key }}</span>
+                      <span class="exam-opt-key" :class="(getAnswer(sq.index) || []).includes(opt.key) ? 'exam-opt-key-selected' : ''">{{ opt.key }}</span>
                       <div class="md-body min-w-0 flex-1 text-left" v-html="renderMarkdown(opt.text)"></div>
                     </button>
-                    <p v-if="currentQuestion?.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
+                    <p v-if="sq.multiSelect" class="text-xs text-[var(--ink-soft)]">可多选</p>
                   </div>
 
                   <!-- True/False -->
-                  <div v-if="currentQuestion?.type === 'true_false'" class="grid grid-cols-2 gap-3">
-                    <button v-for="opt in [{ v: true, l: '正确' }, { v: false, l: '错误' }]" :key="String(opt.v)" @click="setTrueFalseAnswer(currentQuestion?.index, opt.v)" class="exam-tf" :class="getAnswer(currentQuestion?.index ?? -1) === opt.v ? 'exam-tf-selected' : 'exam-tf-idle'">{{ opt.l }}</button>
+                  <div v-if="sq.type === 'true_false'" class="grid grid-cols-2 gap-3">
+                    <button v-for="opt in [{ v: true, l: '正确' }, { v: false, l: '错误' }]" :key="String(opt.v)" @click="setTrueFalseAnswer(sq.index, opt.v)" class="exam-tf" :class="getAnswer(sq.index) === opt.v ? 'exam-tf-selected' : 'exam-tf-idle'">{{ opt.l }}</button>
                   </div>
 
                   <!-- Fill Blank -->
-                  <div v-if="currentQuestion?.type === 'fill_blank'" class="space-y-2.5">
-                    <div v-for="i in blankCountForQuestion(currentQuestion)" :key="i" class="flex items-center gap-2" v-motion :initial="{ opacity: 0, x: -12 }" :enter="{ opacity: 1, x: 0, transition: { delay: 80 + i * 50 } }">
+                  <div v-if="sq.type === 'fill_blank'" class="space-y-2.5">
+                    <div v-for="i in blankCountForQuestion(sq)" :key="i" class="flex items-center gap-2" v-motion :initial="{ opacity: 0, x: -12 }" :enter="{ opacity: 1, x: 0, transition: { delay: 80 + i * 50 } }">
                       <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold text-[var(--accent-strong)]">{{ i }}</span>
-                      <input :value="(getAnswer(currentQuestion?.index ?? -1) || [])[i - 1] || ''" @input="(e) => setFillBlankAnswer(currentQuestion?.index, blankCountForQuestion(currentQuestion), i - 1, (e.target as HTMLInputElement).value)" class="exam-field flex-1" placeholder="填写答案" />
+                      <input :value="(getAnswer(sq.index) || [])[i - 1] || ''" @input="(e) => setFillBlankAnswer(sq.index, blankCountForQuestion(sq), i - 1, (e.target as HTMLInputElement).value)" class="exam-field flex-1" placeholder="填写答案" />
                     </div>
                   </div>
 
                   <!-- Short Answer -->
-                  <div v-if="currentQuestion?.type === 'short_answer'" v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
-                    <textarea :value="getAnswer(currentQuestion?.index ?? -1) || ''" @input="(e) => setShortAnswerAnswer(currentQuestion?.index, (e.target as HTMLTextAreaElement).value)" rows="4" class="exam-field w-full" placeholder="写下你的答案…" />
+                  <div v-if="sq.type === 'short_answer'" v-motion :initial="{ opacity: 0, y: 12 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+                    <textarea :value="getAnswer(sq.index) || ''" @input="(e) => setShortAnswerAnswer(sq.index, (e.target as HTMLTextAreaElement).value)" rows="4" class="exam-field w-full" placeholder="写下你的答案…" />
                   </div>
                 </div>
               </div>
@@ -783,14 +813,14 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <!-- 底部导航（无边沉浸） -->
       <div class="absolute bottom-0 left-0 right-0 z-20 px-4 py-3">
         <div class="mx-auto flex max-w-2xl items-center justify-between gap-3">
-          <button @click="prevQuestion" :disabled="isFirstQuestion" class="exam-nav-btn" :class="isFirstQuestion ? 'exam-nav-btn-disabled' : 'exam-nav-btn-secondary'">
-            <ArrowLeft class="h-4 w-4" /> 上一题
+          <button @click="prevGroup" :disabled="isFirstGroup" class="exam-nav-btn" :class="isFirstGroup ? 'exam-nav-btn-disabled' : 'exam-nav-btn-secondary'">
+            <ArrowLeft class="h-4 w-4" /> 上一大题
           </button>
           <div class="hidden flex-1 text-center text-xs text-[var(--ink-soft)] sm:block">
-            使用 <kbd class="rounded bg-[var(--line)] px-1.5 py-0.5 font-sans text-[10px]">←</kbd> <kbd class="rounded bg-[var(--line)] px-1.5 py-0.5 font-sans text-[10px]">→</kbd> 切换
+            {{ currentGroupIndex + 1 }}/{{ totalGroups }}
           </div>
-          <button @click="nextQuestion" class="exam-nav-btn" :class="isLastQuestion ? 'exam-nav-btn-submit' : 'exam-nav-btn-primary'">
-            {{ nextButtonLabel }} <component :is="nextButtonIcon" class="h-4 w-4" />
+          <button @click="nextGroup" class="exam-nav-btn" :class="isLastGroup ? 'exam-nav-btn-submit' : 'exam-nav-btn-primary'">
+            {{ isLastGroup ? '提交' : '下一大题' }} <component :is="isLastGroup ? Send : ChevronRight" class="h-4 w-4" />
           </button>
         </div>
       </div>
