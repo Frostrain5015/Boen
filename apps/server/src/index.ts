@@ -57,6 +57,9 @@ function createModel(provider: string) {
   if (provider === 'deepseek' || provider === 'default') {
     return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY });
   }
+  if (provider === 'deepseek-pro') {
+    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: DEEPSEEK_API_KEY });
+  }
   return getChatModel({
     provider: (process.env.BOEN_PROVIDER ?? 'openai') as 'openai' | 'anthropic',
     model: process.env.BOEN_MODEL ?? 'astron-code-latest',
@@ -298,7 +301,7 @@ app.get('/api/health', (c) => c.json({ ok: true, provider: process.env.BOEN_PROV
 app.post('/api/model/switch', async (c) => {
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
-  if (p !== 'deepseek' && p !== 'default') return c.json({ error: '不支持的 provider' }, 400);
+  if (p !== 'deepseek' && p !== 'deepseek-pro' && p !== 'default') return c.json({ error: '不支持的 provider' }, 400);
   const switched = switchModel(p);
   return c.json({ success: true, provider: switched });
 });
