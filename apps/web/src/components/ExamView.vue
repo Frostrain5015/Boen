@@ -679,7 +679,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                   @click="goToQuestion(q.index)"
                   class="question-dot"
                   :class="[
-                    currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.idnex) ? 'question-dot-answered' : 'question-dot-idle',
+                    currentQuestionIndex === q.index ? 'question-dot-current' : answeredStatus.get(q.index) ? 'question-dot-answered' : 'question-dot-idle',
                   ]"
                   :aria-label="`第 ${q.index + 1} 题${answeredStatus.get(q.index) ? '，已作答' : '，未作答'}`"
                   :aria-current="currentQuestionIndex === q.index ? 'step' : undefined"
