@@ -53,7 +53,8 @@ onMounted(() => {
         <Transition name="mascot-pop">
           <div
             v-if="chatStore.hasItems"
-            class="absolute bottom-full right-0 z-10 pointer-events-none select-none"
+            class="absolute right-0 z-10 pointer-events-none select-none"
+            :style="{ bottom: 'calc(100% + 6px)' }"
             :class="chatStore.busy ? 'mascot-bounce' : ''"
           >
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
