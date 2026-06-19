@@ -912,19 +912,13 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 /* ── 顶部题号轨道 ── */
-.dot-nav-wrap {
-  position: relative;
-}
 .dot-nav-scroll {
   display: flex;
   align-items: center;
-  gap: 0.28rem;
-  min-height: 3.25rem;
+  justify-content: center;
+  gap: 0.35rem;
   overflow-x: auto;
-  overscroll-behavior-x: contain;
-  padding: 0.46rem max(1rem, calc((100vw - 42rem) / 2)) 0.54rem;
   scrollbar-width: none;
-  scroll-behavior: smooth;
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
 .question-dot {
