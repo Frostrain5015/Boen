@@ -498,33 +498,15 @@ async function stepWriteQuestionsV2(
     } as ExamQuestion));
   }
 
-/** 调用 model.bindTools + generate_questions tool 获取结构化题目 */
+/** 调用模型出题：使用 DeepSeek JSON Output 模式 */
 async function invokeGenerateQuestions(
   model: BaseChatModel,
   prompt: string,
   questionType: string,
   count: number,
 ): Promise<any[]> {
-  // 先尝试 bindTools 结构化输出
-  if (model.bindTools) {
-    try {
-      const genTool = makeGenerateQuestionsTool(questionType, count);
-      const bound = model.bindTools([genTool], {
-        tool_choice: { type: 'function', function: { name: 'generate_questions' } },
-      } as any);
-      const response = await bound.invoke([new SystemMessage(prompt)]);
-      const toolCalls = (response as any)?.tool_calls ?? [];
-      const call = toolCalls.find((c: any) => c.name === 'generate_questions');
-      if (call?.args?.questions && Array.isArray(call.args.questions) && call.args.questions.length > 0) {
-        return call.args.questions;
-      }
-    } catch (err) {
-      console.warn(`[invoke:${questionType}] bindTools 失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
-      // 继续尝试文本回退
-    }
-  }
-
-  // 文本回退：带详细 JSON schema 示例
+  // 使用 response_format JSON Output 模式（支持 thinking）
+  const schemaExample = questionType === 'multiple_choice'
   const schemaExample = questionType === 'multiple_choice'
     ? `{
   "questions": [
@@ -551,34 +533,24 @@ async function invokeGenerateQuestions(
     }
   ]
 }`;
-  const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n直接输出纯净 JSON，不要 markdown 代码块，不要其他任何文字。' +
+  const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n必须输出纯净 JSON，不要 markdown 代码块，不要其他任何文字。' +
     `\nJSON schema 示例：\n${schemaExample}\n一次性输出全部 ${count} 道题。`;
-  try {
-    const response = await model.invoke([new SystemMessage(textPrompt)]);
-    const content = typeof response.content === 'string' ? response.content : '';
-    // 宽容解析：先尝试 JSON.parse；失败则剥离 thinking 杂讯后重试
-    let parsed: any;
-    try { parsed = JSON.parse(content); } catch {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      let cleaned = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      // 跳过 thinking content：找到第一个独立的花括号开始
-      const objStart = cleaned.indexOf('{');
-      if (objStart > -1) cleaned = cleaned.slice(objStart);
-      const arrStart = cleaned.indexOf('[');
-      if (arrStart > -1 && (objStart === -1 || arrStart < objStart)) cleaned = cleaned.slice(arrStart);
-      // 截掉末尾多余文本
-      const lastClose = cleaned.lastIndexOf('}') > cleaned.lastIndexOf(']') ? cleaned.lastIndexOf('}') + 1 : cleaned.lastIndexOf(']') + 1;
-      if (lastClose > 0) cleaned = cleaned.slice(0, lastClose);
-      parsed = JSON.parse(cleaned);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await model.invoke(
+        [new SystemMessage(textPrompt)],
+        { response_format: { type: 'json_object' } as any },
+      );
+      const content = typeof response.content === 'string' ? response.content : '';
+      const parsed = JSON.parse(content);
+      const questions = parsed.questions ?? (Array.isArray(parsed) ? parsed : []);
+      if (Array.isArray(questions) && questions.length > 0) {
+        return questions;
+      }
+    } catch (err) {
+      console.warn(`[invoke:${questionType}] 第 ${attempt + 1} 次失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
     }
-    const questions = parsed.questions ?? (Array.isArray(parsed) ? parsed : []);
-    if (Array.isArray(questions) && questions.length > 0) {
-      return questions;
-    }
-  } catch (err) {
-    console.warn(`[invoke:${questionType}] 文本回退解析失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
   }
-
   return [];
 }
 
