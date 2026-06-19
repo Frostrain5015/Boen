@@ -90,6 +90,13 @@ function buildMul(a: string, b: string): string {
  * 而非放到代码块里）。
  */
 function normalizeXlop(text: string): string {
+  // 先把被 $ 或 $$ 包裹的 xlop 命令整个替换（避免嵌套数学模式）
+  text = text.replace(/(\$\$?)\s*\\op(?:add|sub|mul|div)\b(?:\[.*?\])?\s*\{[^}]+\}\s*\{[^}]+\}\s*(\$\$?)/g, (_, open, close) => {
+    // 去掉 $ 包裹后裸替换
+    const inner = _.replace(open, '').replace(close, '');
+    return xlopToKatex(inner) || _;
+  });
+  // 裸 xlop 命令（无 $ 包裹）
   return text.replace(/\\op(?:add|sub|mul|div)\b(?:\[.*?\])?\s*\{[^}]+\}\s*\{[^}]+\}/g, (match) => {
     return xlopToKatex(match) || match;
   });
@@ -99,16 +106,30 @@ function normalizeXlop(text: string): string {
 
 /**
  * 预处理填空标记 ____（3+ 下划线），替换为 KaTeX 安全的空白方框。
- * 解决 LLM 输出如 $y = $______ 导致的 LaTeX 编译失败。
- * 三步处理：$____ → 移除 $ 并换空白 / ____$ → 换空白并保留 $ / 独立 ____ → 换空白
+ * 关键处理逻辑：
+ * 1. 先找出所有 $...$ 或 $$...$$ 数学模式区间，在区间内保留 KaTeX 语法
+ * 2. ____ 在数学模式内 → 替换为 \boxed{\hspace{2em}}（不引入额外 $）
+ * 3. ____ 在数学模式外 → 替换为 $\boxed{\hspace{2em}}$（包裹进数学模式）
  */
 const BLANK_RE = /\_{3,}/g;
+const MATH_SPAN_RE = /(\$\$[\s\S]*?\$\$|\$[^$\n]*?\$)/g;
 
 function normalizeBlanks(text: string): string {
-  return text
-    .replace(/\$\_{3,}/g, ' $\\boxed{\\hspace{2em}}$ ')  // $______ → 空白在数学模式外
-    .replace(/\_{3,}\$/g, ' $\\boxed{\\hspace{2em}}$ ')  // ______$ → 同上
-    .replace(BLANK_RE, ' $\\boxed{\\hspace{2em}}$ ');    // 独立 ____ → 空白在数学模式内
+  // 先提取数学区间占位
+  const mathSpans: Record<string, string> = {};
+  let mathIndex = 0;
+  const withPlaceholders = text.replace(MATH_SPAN_RE, (match) => {
+    const cleaned = match.replace(BLANK_RE, '\\boxed{\\hspace{2em}}');
+    const key = `\x00MATH${mathIndex++}\x00`;
+    mathSpans[key] = cleaned;
+    return key;
+  });
+
+  // 非数学区间的 ____ → 包裹进数学模式
+  const result = withPlaceholders.replace(BLANK_RE, ' $\\boxed{\\hspace{2em}}$ ');
+
+  // 恢复数学区间
+  return result.replace(/\x00MATH\d+\x00/g, (key) => mathSpans[key] || '');
 }
 
 /**
@@ -120,7 +141,14 @@ function normalizeBlanks(text: string): string {
 export function renderMarkdown(text: string): string {
   const normalized = (text ?? '')
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
-    .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`)
+    // 修复模型常见 KaTeX 格式错误
+    .replace(/\$(.+?)\$\$/g, (_, inner) => `$$${inner}$$`) // $...$$ → $$...$$（混用定界符）
+    .replace(/\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}\s*\$\$/g, (_, body) => `\n$$\\begin{array}${body}\\end{array}\n$$`) // \begin{array}...\end{array}$$ → 补开头 $$
+    .replace(/(^|[^$])?\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}/g, (_, prefix, body) => {
+      if (prefix?.includes('$')) return _;
+      return `${prefix || ''}\n$$\n\\begin{array}${body}\\end{array}\n$$\n`;
+    });
   return md.render(normalizeXlop(normalizeBlanks(normalized)));
 }
 

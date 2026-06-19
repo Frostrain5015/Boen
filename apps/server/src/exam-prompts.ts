@@ -34,9 +34,11 @@ export function gradeLabel(grade: string): string {
 
 /** 通用排版规范（出题/重出共用） */
 export const KATEX_FORMAT_GUIDE = [
-  '排版：公式/方程一律用 KaTeX。行内用 $...$（如 $y = 3x - 5$），行间用 $$...$$ 独占一行（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。',
-  '**$$ 必须成对出现**：开头 $$ + 内容 + 结尾 $$，绝不能只有结尾没有开头。**定理、定义、重要公式、推导必须用行间公式 $$...$$**。',
-  '题目涉及几何图形、函数图像、受力分析、电路、坐标系、统计图等可视化内容时，在 stem（或 explanation）里用 TikZ 代码块（```tikz ... ```）画示意图，前端会编译成矢量图；不要用字符拼图。',
+  '【⚠ 强制格式要求】违反以下任意一条将导致公式无法渲染，直接影响学生体验，严禁违反：',
+  '1. 公式/方程一律用 KaTeX。行内用 $...$，行间用 $$...$$ 独占一行。',
+  '2. $$ 绝对必须成对出现：有开头就必须有结尾，绝不能只有结尾没有开头，也不能只有开头没有结尾。',
+  '3. 定理、定义、重要公式、推导步骤必须用 $$...$$ 行间公式，不得使用 $...$ 行内公式。',
+  '4. 涉及几何、函数图像、坐标等可视化内容时，必须在 stem 或 explanation 里用 TikZ 代码块（```tikz）画示意图，严禁用字符拼图代替。',
 ].join('\n');
 
 /** 小学低年级竖式提示 */
@@ -134,15 +136,15 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     '⚠ 重要：各题之间的题干情景、数据、设问必须差异化。同一组数字或同一道应用题情景不能在不同题目中原样出现。',
     styleContext ? `\n=== 错题风格学习 ===\n${styleContext}\n请只学习这些错题样本的题型结构、逻辑搭建、情境选取和干扰方式，严禁照抄原题文字、数字、学生答案或隐私信息。` : '',
     '',
-    '=== 输出要求 ===',
-    `输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation。`,
+    '=== ⚠ 输出要求（硬性规定，不得违反） ===',
+    `输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation——缺一不可。`,
     questionType === 'multiple_choice'
-      ? '选择题结构要求：stem 只写题干，不要把 A/B/C/D 选项写进 stem；options 必须写真实选项文本，不允许写 "{选项A}"、"选项A"、"A" 等占位符。'
+      ? '选择题硬性要求：stem 只写题干，绝对不要把 A/B/C/D 选项写进 stem；options 必须写真实选项文本，严禁写 "{选项A}"、"选项A"、"A" 等任何占位符。违者整卷作废。'
       : '',
     questionType === 'fill_blank'
-      ? '填空题结构要求：stem 中每个空必须用 ____ 或（ ）标出；blanks 必须按空的顺序给出 acceptedAnswers，空数必须与题干空位一致。'
+      ? '填空题硬性要求：stem 中每个空必须用 ____ 或（ ）标出；blanks 必须按空的顺序给出 acceptedAnswers，空数必须与题干空位一致。空位与答案数不匹配则整题无效。'
       : '',
-    'knowledgePoint 和 literacies 必须填写，不能为空。',
+    'knowledgePoint 和 literacies 必须填写，不得为空。',
     `难度统一为 ${difficulty}。`,
     '分步设问：如果多题共享同一段阅读材料或同一个题干场景（如阅读理解、几何大题），给它们相同的 groupId（数字），并将共享内容写在第一题的 passage 字段中，后续同组题不再重复 passage。没有分组的题不填 groupId。',
     KATEX_FORMAT_GUIDE,

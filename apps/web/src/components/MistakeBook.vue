@@ -67,6 +67,7 @@ const studentAnswer = ref('');
 const note = ref('');
 const imageFile = ref<File | null>(null);
 const imagePreview = ref('');
+const imageError = ref('');
 const dragging = ref(false);
 const mistakes = ref<MistakeItem[]>([]);
 const selectedMistake = ref<MistakeItem | null>(null);
@@ -178,8 +179,16 @@ function clearImage() {
   imagePreview.value = '';
 }
 
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB（nginx 上限 20MB，前端提前拦截）
+
 function setImage(file?: File | null) {
   if (!file) return;
+  if (file.size > MAX_IMAGE_SIZE) {
+    imageError.value = '图片大小不符合要求';
+    imagePreview.value = '';
+    imageFile.value = null;
+    return;
+  }
   clearImage();
   imageFile.value = file;
   imagePreview.value = URL.createObjectURL(file);
@@ -337,6 +346,8 @@ onBeforeUnmount(() => {
                 </template>
                 <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
               </label>
+              <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
+              <p class="text-xs" style="color: var(--ink-soft)">最大 15MB · 支持 jpg/png/webp</p>
               <button v-if="imagePreview" @click="clearImage" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--paper)] px-3 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><X class="h-3.5 w-3.5" />移除图片</button>
             </div>
 

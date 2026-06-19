@@ -46,10 +46,7 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」，讲解的深度、用词与举例都要贴合该年级的课程进度，不要超纲也不要过于浅显。` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，回答时用「${userName}」称呼他/她，营造亲切的一对一辅导感。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
-  const gradeForXlop = grade ? Number(grade) : 0;
-  const xlopGuide = gradeForXlop >= 2 && gradeForXlop <= 3
-    ? '- 列竖式计算（加减乘除）：直接用 \\opadd{698}{213} 写在段落中（像 KaTeX 公式一样），前端自动渲染为竖式；不要包代码块，不要包 tikzpicture。不要用 ASCII 字符拼竖式。\n'
-    : '';
+  const xlopGuide = xlopGuideForGrade(grade);
   return [
     '你是「博文」(Boen)，兼具「学术导师」与「私人学习助理」双重身份的学习伙伴。',
     GRADE_GUIDE[gradeBand],
@@ -82,7 +79,11 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
     '- 若问题缺乏背景（没说清是哪门课、什么前置知识），先确认再回答，不要盲目猜测。',
     '- 对作业类问题，引导思路而非直接给答案；论文/写作先定大纲和核心论点再逐步展开。',
     '- 严禁学术造假：绝不代写或提供抄袭内容，但可以给大纲、修改建议、润色和逻辑梳理。',
-    '- 【KaTeX 公式规则】行内用 $...$（如 $y = 3x - 5$），行间用 $$...$$ 独立成行（如 $$\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$）。**$$ 必须成对出现**：开头 $$ + 内容 + 结尾 $$，绝不能只有结尾标记没有开头标记。**定理、定义、重要公式、推导步骤必须用行间公式 $$...$$**。',
+    '- 【⚠ KaTeX 格式强制令】以下为硬性约束，违反将导致公式无法渲染，必须严格遵守：\
+	\n  - 所有公式、符号表达式必须用 $...$ 或 $$...$$ 包裹，严禁裸写。\
+	\n  - $$ 绝对必须成对出现：有开头就必须有结尾，绝不能只有结尾没有开头，也不能只有开头没有结尾。违反一次即视为严重错误。\
+	\n  - 行内公式用 $...$，行间公式用 $$...$$ 独占一行。\
+	\n  - 定理、定义、重要公式、推导步骤必须用 $$...$$ 行间公式（独占一行），不得使用 $...$ 行内公式。',
     '',
     '【出题规则】当学生希望被测验、练习或自我检测，或你判断用题目巩固更有效时，',
     '必须调用出题工具（ask_multiple_choice / ask_fill_blank / ask_true_false / ask_short_answer）来出题，',
@@ -100,6 +101,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」，用「${userName}」称呼他/她。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
+  const xlopGuide = xlopGuideForGrade(grade);
 
   // 学科特化的诊断维度
   const diagDims: Record<string, string> = {
@@ -145,6 +147,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
     '- 【KaTeX 公式规则】行内用 $...$，行间用 $$...$$。**$$ 必须成对出现**。',
     '- 讲解涉及图形时，用 TikZ 代码块（```tikz）画示意图。',
     '- 每一章节结束时用「这一节的重点是...」做小结。',
+    xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
 }
@@ -154,6 +157,7 @@ export function systemPromptForPreview(gradeBand: GradeBand, subject?: string, u
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
+  const xlopGuide = xlopGuideForGrade(grade);
   return [
     '你是「博文」(Boen)。当前进入「预习模式」。',
     '【学习周期】预习是学习周期的第一阶段。预习完成后，建议学生进入下一阶段做同步练习来巩固，可以说「预习完了，要不要做几道同步题练练手？」',
@@ -171,8 +175,16 @@ export function systemPromptForPreview(gradeBand: GradeBand, subject?: string, u
     '- **不要提前讲解所有内容**，预习的目的是帮学生建立框架和发现疑问，不是替代课堂学习。',
     '- 使用 KaTeX 和 TikZ 的规则同日常模式。',
     '- 预习完成后，学生说「明白了」即可结束，不需要出题测试。',
+    xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
+}
+
+function xlopGuideForGrade(grade?: Grade): string {
+  const n = grade ? Number(grade) : 0;
+  return n >= 2 && n <= 3
+    ? '- 【竖式强制令】两位数以上加减乘除必须用 \\opadd{698}{213} 等命令写在题干中，前端自动渲染为竖式；不得用 ASCII 字符拼竖式，不得用 TikZ 代码块。'
+    : '';
 }
 
 /** 集中练习模式：诊断(有数据时) → 专项训练 → 复测 */
@@ -180,6 +192,7 @@ export function systemPromptForWeakness(gradeBand: GradeBand, subject?: string, 
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
+  const xlopGuide = xlopGuideForGrade(grade);
   return [
     '你是「博文」(Boen)。当前进入「集中练习模式」。',
     '【学习周期】集中练习是学习周期的第三阶段（预习→同步练习→集中练习→复习巩固→考前巩固），用于针对性地训练特定知识点或技能。',
@@ -199,6 +212,7 @@ export function systemPromptForWeakness(gradeBand: GradeBand, subject?: string, 
     '- 无历史数据时直接开始练习，不要强行要求学生提供错题。',
     '- 使用 KaTeX 和 TikZ 的规则同日常模式。',
     '- 练习完成后，调用 complete_review 提交总结。',
+    xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
 }
@@ -276,6 +290,7 @@ export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand
   const gradeInfo = grade ? `当前学生处于「${gradeLabel(grade)}」` : '';
   const greeting = userName ? `\n\n当前学生名字是「${userName}」。` : '';
   const guide = subject && SUBJECT_GUIDE[subject] ? `\n\n${SUBJECT_GUIDE[subject]}` : '';
+  const xlopGuide = xlopGuideForGrade(grade);
   return [
     `你是「博文」(Boen)。当前进入「${wf.title}」专项练习。`,
     '【学习周期】同步练习是学习周期的第二阶段（预习→同步练习→薄弱点突破→复习巩固→考前巩固）。练习完成后，如果发现某些题型反复出错，建议切换到「突破模式」；如果整体掌握良好，建议进入「复习巩固模式」做系统复习。',
@@ -291,6 +306,7 @@ export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand
     '- 必须调用出题工具出题（ask_multiple_choice / ask_fill_blank / ask_short_answer），不要把题目写在文字回复里',
     '- 每道题作答后必须标注错因，不能只打对错',
     '- 练习结束后给出本次小结和下次复习建议',
+    xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
 }
