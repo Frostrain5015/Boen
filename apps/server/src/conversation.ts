@@ -61,6 +61,7 @@ export function updateConversationTitle(id: string, title: string) {
 }
 
 export function deleteConversation(id: string) {
+  db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(id);
   db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
 }
 
