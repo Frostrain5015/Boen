@@ -51,7 +51,7 @@ onMounted(() => {
           </Transition>
         </div>
       </div>
-      <DailyLimitBanner :show="chatStore.dailyLimitReached" />
+      <DailyLimitBanner :show="chatStore.dailyLimitReached" @close="chatStore.dailyLimitReached = false" />
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
         <Transition name="mascot-pop">
@@ -68,7 +68,7 @@ onMounted(() => {
           <!-- 免费用户用量环 -->
           <div
             v-if="authStore.authenticated && !authStore.isPremium"
-            class="relative flex h-9 w-9 shrink-0 items-center justify-center"
+            class="relative flex h-9 w-9 shrink-0 items-center justify-center self-center"
             :title="`今日剩余 ${authStore.dailyRemaining ?? 0} 次`"
           >
             <svg class="h-9 w-9 -rotate-90" viewBox="0 0 36 36">

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { AlertCircle } from 'lucide-vue-next';
+import { AlertCircle, X } from 'lucide-vue-next';
 import { useToast } from '@/composables/useToast';
 
 const toast = useToast();
 defineProps<{ show: boolean }>();
+const emit = defineEmits<{ close: [] }>();
 
 function handleUpgrade() {
   toast.info('请联系管理员开通会员');
@@ -14,7 +15,7 @@ function handleUpgrade() {
   <Transition name="slide-up">
     <div
       v-if="show"
-      class="clay-sm flex w-full max-w-[480px] items-center gap-3 px-5 py-3"
+      class="clay-sm flex w-full items-center gap-3 px-5 py-3"
     >
       <AlertCircle class="h-[18px] w-[18px] shrink-0" style="color: var(--error)" />
       <span class="flex-1 text-[0.85rem]" style="color: var(--ink)">
@@ -26,6 +27,13 @@ function handleUpgrade() {
         style="color: var(--premium-gold-strong)"
       >
         升级会员
+      </button>
+      <button
+        @click="emit('close')"
+        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/10"
+        aria-label="关闭"
+      >
+        <X class="h-4 w-4" style="color: var(--ink-soft)" />
       </button>
     </div>
   </Transition>
