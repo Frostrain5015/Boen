@@ -41,9 +41,9 @@ export const KATEX_FORMAT_GUIDE = [
   '4. 涉及几何、函数图像、坐标等可视化内容时，必须在 stem 或 explanation 里用 TikZ 代码块（```tikz）画示意图，严禁用字符拼图代替。',
 ].join('\n');
 
-/** 小学低年级竖式提示 */
+/** 小学低年级竖式提示（仅二~四年级） */
 export function xlopGuide(grade: string): string {
-  return (grade === '2' || grade === '3')
+  return (grade === '2' || grade === '3' || grade === '4')
     ? '\n列竖式计算用 \\opadd / \\opsub / \\opmul / \\opdiv 直接写在题干文本中（如 \\opadd{698}{213}），前端自动渲染为竖式。'
     : '';
 }
@@ -234,6 +234,16 @@ export function formatQuestionSnapshot(questions: ExamQuestion[]): string {
     for (const code of tikzBlocks.slice(0, 3)) {
       lines.push(`  TikZ: ${code.slice(0, 200)}`);
     }
+    // 提取 \\op 竖式命令供审核
+    const opRe = /\\op(?:add|sub|mul|div)\s*(?:\[.*?\])?\s*\{[^}]+\}\s*\{[^}]+\}/g;
+    const opCmds = [
+      ...(q.stem ?? '').matchAll(opRe),
+      ...(q.passage ?? '').matchAll(opRe),
+      ...(q.explanation ?? '').matchAll(opRe),
+    ].map(m => m[0]).slice(0, 5);
+    for (const cmd of opCmds) {
+      lines.push(`  \\op: ${cmd}`);
+    }
     return lines.join('\n');
   }).join('\n\n');
 }
@@ -257,9 +267,14 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
       '若 TikZ 代码与题目描述严重不符（标注错误、图形画错等），在 issues 中指出并要求重写 TikZ 代码。',
       '',
       '=== \\op 竖式计算审核 ===',
-      '题目中可能包含 \\opadd、\\opsub、\\opmul、\\opdiv 等竖式计算命令。',
-      '请检查竖式计算的结果是否正确（加/减/乘/除的得数）。',
-      '若计算结果错误，在 issues 中指出并要求修正。',
+      `当前年级：${gradeLabel(config.grade)}。竖式（\\opadd/\\opsub/\\opmul/\\opdiv）仅适用于二~四年级。`,
+      ...(!(config.grade === '2' || config.grade === '3' || config.grade === '4') ? [
+        '⚠ 当前不是二~四年级，题目中不应出现 \\op 竖式命令。若发现含 \\op 命令的题，正确性维度打低分并指出。',
+      ] : [
+        '题目中可能包含 \\opadd、\\opsub、\\opmul、\\opdiv 等竖式计算命令。',
+        '请检查竖式计算的结果是否正确（加/减/乘/除的得数）。',
+        '若计算结果错误，在 issues 中指出并要求修正。',
+      ]),
     ] : []),
     '',
     '=== 试卷详情 ===',
@@ -345,6 +360,7 @@ export function reviewBlueprintMatchPrompt(questions: ExamQuestion[], blueprint:
 /** D. 格式审核 */
 export function reviewFormatPrompt(questions: ExamQuestion[], config: PromptConfig): string {
   const isMathOrScience = config.subject === 'math' || config.subject === 'science';
+  const isLowerElementary = config.grade === '2' || config.grade === '3' || config.grade === '4';
   return [
     '你是格式审核专家。请检查试卷中每道题的格式是否完整、正确。',
     ...(isMathOrScience ? [
@@ -357,11 +373,15 @@ export function reviewFormatPrompt(questions: ExamQuestion[], config: PromptConf
       '4. TikZ 代码不符合题意或语法错误 → 在 issues 中写明需重写',
       '',
       '=== \\op 竖式渲染审核 ===',
-      '题目中的 \\opadd、\\opsub、\\opmul、\\opdiv 竖式命令需要正确渲染为竖式布局。',
-      '1. 检查 \\op 命令的参数是否完整（两个花括号参数）',
-      '2. 检查竖式排版是否合理（数字对齐、进位/借位显示）',
-      '3. \\opdiv 除法竖式应呈现为长除格式，而不是简单的 "÷" 表达式',
-      '4. 若竖式格式不正确 → 在 issues 中指出需修正渲染方式',
+      `当前年级：${gradeLabel(config.grade)}。竖式（\\opadd/\\opsub/\\opmul/\\opdiv）仅适用于二~四年级。`,
+      ...(!isLowerElementary ? [
+        '⚠ 当前不是二~四年级，题目中不应出现 \\op 竖式命令。若发现含 \\op 命令的题，格式维度打低分并在 issues 中指出。',
+      ] : [
+        '1. 检查 \\op 命令的参数是否完整（两个花括号参数）',
+        '2. 检查竖式排版是否合理（数字对齐、进位/借位显示）',
+        '3. \\opdiv 除法竖式应呈现为长除格式，而不是简单的 "÷" 表达式',
+        '4. 若竖式格式不正确 → 在 issues 中指出需修正渲染方式',
+      ]),
     ] : []),
     '',
     '=== 试卷详情 ===',
