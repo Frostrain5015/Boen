@@ -95,6 +95,22 @@ function normalizeXlop(text: string): string {
   });
 }
 
+// ── 填空标记安全化 ──────────────────────────
+
+/**
+ * 预处理填空标记 ____（3+ 下划线），替换为 KaTeX 安全的空白方框。
+ * 解决 LLM 输出如 $y = $______ 导致的 LaTeX 编译失败。
+ * 三步处理：$____ → 移除 $ 并换空白 / ____$ → 换空白并保留 $ / 独立 ____ → 换空白
+ */
+const BLANK_RE = /\_{3,}/g;
+
+function normalizeBlanks(text: string): string {
+  return text
+    .replace(/\$\_{3,}/g, ' $\\boxed{\\hspace{2em}}$ ')  // $______ → 空白在数学模式外
+    .replace(/\_{3,}\$/g, ' $\\boxed{\\hspace{2em}}$ ')  // ______$ → 同上
+    .replace(BLANK_RE, ' $\\boxed{\\hspace{2em}}$ ');    // 独立 ____ → 空白在数学模式内
+}
+
 /**
  * 渲染 Markdown + 数学公式 + TikZ 图形。
  * 先把 OpenAI 系模型常用的 \( \) / \[ \] 定界符归一化为 $ / $$，
@@ -105,7 +121,7 @@ export function renderMarkdown(text: string): string {
   const normalized = (text ?? '')
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
-  return md.render(normalizeXlop(normalized));
+  return md.render(normalizeXlop(normalizeBlanks(normalized)));
 }
 
 /**
@@ -115,7 +131,7 @@ export function renderMarkdownInline(text: string): string {
   const normalized = (text ?? '')
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
-  return md.renderInline(normalizeXlop(normalized));
+  return md.renderInline(normalizeXlop(normalizeBlanks(normalized)));
 }
 
 // ── TikZ 代码块：服务端已下线，降级为占位 ──────────────
