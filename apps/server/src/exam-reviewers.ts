@@ -49,8 +49,8 @@ const DIMENSION_WEIGHTS: Record<ReviewDimension, number> = {
   discrimination: 0.15,
 };
 
-const REGEN_THRESHOLD_TOTAL = 70;       // 总分 < 70 → 重出
-const REGEN_THRESHOLD_DIMENSION = 60;   // 任一维度 < 60 → 重出
+const REGEN_THRESHOLD_TOTAL = 50;       // 总分 < 50 → 重出（原 70，防止误杀）
+const REGEN_THRESHOLD_DIMENSION = 40;   // 任一维度 < 40 → 重出（原 60，防止误杀）
 
 // ── 5 个审核维度的 Zod Schema（绑定到 model.bindTools） ──────
 
@@ -104,7 +104,7 @@ function failedReviewResult(questionCount: number, dimension: ReviewDimension, r
   return {
     scores: Array.from({ length: questionCount }, () => ({
       dimension,
-      score: 0,
+      score: 40,  // 维度执行失败给 40 分（仍低于阈值但避免 0 分连带全挂）
       issues: [reason],
     })),
     overallMatchScore: dimension === 'blueprint_match' ? 0 : undefined,
@@ -168,7 +168,7 @@ function parseReviewOutput(data: any, dimension: ReviewDimension, questionCount:
   const scores: DimensionScore[] = Array.from({ length: questionCount }, (_, index) =>
     byIndex.get(index) ?? {
       dimension,
-      score: 0,
+      score: 40,  // LLM 未返回该题评分 → 给 40 分（中性偏低，不直接判死）
       issues: [`审核维度 ${dimension} 未返回第 ${index + 1} 题评分`],
     }
   );

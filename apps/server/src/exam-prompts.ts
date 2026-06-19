@@ -224,6 +224,11 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
     `你是${subjectLabel(config.subject)}学科专家。请审核以下试卷中每道题的答案和解析是否知识性正确。`,
     `年级：${gradeLabel(config.grade)}。`,
     '',
+    '=== 校准说明 ===',
+    '这是由 AI 命题系统生成的试卷，答案和解析整体正确性较高。',
+    '请只标记有实质性知识错误的题目（如公式写错、计算错误、概念混淆等）。',
+    '表达方式不够精确、缺少细节等非知识性问题不应扣分。',
+    '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),
     '',
@@ -237,7 +242,7 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
     '',
     '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
     '{"scores":[{"index":0,"score":100,"issues":[],"similarTo":[]}]}',
-    '其中 score=100 完全正确, 60=有小瑕疵, <60=有实质性错误。',
+    '其中 score=100 完全正确, 80=表述可优化但无实质错误, <40=有实质性错误。',
   ].join('\n');
 }
 
@@ -245,6 +250,11 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
 export function reviewSimilarityPrompt(questions: ExamQuestion[]): string {
   return [
     '你是试卷质量审核专家。请检查以下试卷中各题之间是否存在雷同或过度相似的问题。',
+    '',
+    '=== 校准说明 ===',
+    '注意：同一份试卷的题目围绕同一学科和主题是正常的，这不等于雷同。',
+    '请重点检查是否在情景、数据、设问角度上实质性雷同，而不是知识点或学科主题相同。',
+    '只要题干情景不同、数据不同、设问角度不同，即使知识点相同也应给高分。',
     '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),
@@ -261,7 +271,7 @@ export function reviewSimilarityPrompt(questions: ExamQuestion[]): string {
     '',
     '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
     '{"scores":[{"index":0,"score":100,"issues":[],"similarTo":[1]}]}',
-    '其中 score=100 完全不同, <60=严重雷同, similarTo 列出雷同题号。',
+    '其中 score=100 完全不同, 80=主题相同但情景/数据/设问不同（正常）, <40=严重雷同, similarTo 列出雷同题号。',
   ].join('\n');
 }
 
@@ -328,6 +338,11 @@ export function reviewDiscriminationPrompt(questions: ExamQuestion[], config: Pr
   return [
     `你是教育测量学专家。请审核以下${subjectLabel(config.subject)}（${gradeLabel(config.grade)}）试卷的区分度。`,
     '',
+    '=== 校准说明 ===',
+    '注意：期末考试题考查的是本学期所学内容，题目必然围绕学科范围内出题。',
+    '不要因为题目专业性强或知识点集中就判低分。请侧重检查：干扰项是否明显不合理、',
+    '设问是否有效、是否真的没有区分度。正常难度的期末题应给 70-85 分。',
+    '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),
     '',
@@ -341,7 +356,7 @@ export function reviewDiscriminationPrompt(questions: ExamQuestion[], config: Pr
     '',
     '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
     '{"scores":[{"index":0,"score":100,"issues":[]}]}',
-    '其中 score=100 区分度优秀, <60=无区分度。',
+    '其中 score=100 区分度优秀, <40=无区分度。80 以上说明区分度良好。',
   ].join('\n');
 }
 
