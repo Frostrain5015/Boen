@@ -135,7 +135,7 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     styleContext ? `\n=== 错题风格学习 ===\n${styleContext}\n请只学习这些错题样本的题型结构、逻辑搭建、情境选取和干扰方式，严禁照抄原题文字、数字、学生答案或隐私信息。` : '',
     '',
     '=== 输出要求 ===',
-    `必须通过 generate_questions 工具输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation。`,
+    `输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation。`,
     'knowledgePoint 和 literacies 必须填写，不能为空。',
     `难度统一为 ${difficulty}。`,
     '分步设问：如果多题共享同一段阅读材料或同一个题干场景（如阅读理解、几何大题），给它们相同的 groupId（数字），并将共享内容写在第一题的 passage 字段中，后续同组题不再重复 passage。没有分组的题不填 groupId。',
@@ -329,7 +329,8 @@ export function regenerateQuestionPrompt(
     '⚠ 新题的情景和数据必须与上述其他题目完全不同。',
     '',
     '=== 输出要求 ===',
-    '通过 generate_questions 工具输出 1 道题。',
+    '输出 JSON 格式：{"questions": [{...}]}。直接输出 JSON，不要 markdown 代码块，不要其他文字。',
+    '每题包含: type, stem, points, knowledgePoint, literacies, difficulty, explanation。',
     KATEX_FORMAT_GUIDE,
     xlopGuide(config.grade),
   ].filter(Boolean).join('\n');

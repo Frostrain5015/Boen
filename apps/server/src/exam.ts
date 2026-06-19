@@ -265,7 +265,7 @@ async function stepWriteQuestionsV2(
     styleContext: config.styleContext,
   });
 
-  // 尝试用 bindTools 结构化输出，最多重试 2 次
+  // 尝试出题，最多重试 2 次（第 3 次走降级题量）
   for (let attempt = 0; attempt < 3; attempt++) {
     const formatRetryHint = attempt > 0 ? `第 ${attempt + 1} 次尝试，上次输出格式有误` : undefined;
     const finalPrompt = formatRetryHint
@@ -275,25 +275,25 @@ async function stepWriteQuestionsV2(
     try {
       const questions = await invokeGenerateQuestions(model, finalPrompt, task.questionType, task.count);
       if (questions.length > 0) {
-        // 补全 points 并转 ExamQuestion
         return questions.map((q: any, i: number) => toExamQuestion(q, task, i));
       }
     } catch (err) {
       console.warn(`[write:${task.questionType}] 第 ${attempt + 1} 次失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
-      if (attempt < 2) continue;
     }
 
-    // 第 3 次仍失败 → 降级题量（count-1，最少 1）
-    if (task.count > 1) {
-      console.warn(`[write:${task.questionType}] 降级题量 ${task.count} → ${Math.max(1, task.count - 1)}`);
-      task = { ...task, count: Math.max(1, task.count - 1) };
-      // 递归一次（不再重试）
-      try {
-        const reducedPrompt = questionWriterPrompt({ config, sectionTitle: task.sectionTitle, sectionKnowledgePoints: task.sectionKnowledgePoints, questionType: task.questionType, questionTypeLabel: task.questionTypeLabel, count: task.count, pointsPer: task.pointsPer, focusKps: task.focusKps, difficulty: task.difficulty, blueprintTitle: blueprint.title, crossGroupContext, existingQuestions, styleContext: config.styleContext, formatRetryHint: '已降级题量，请确保输出' });
-        const questions = await invokeGenerateQuestions(model, reducedPrompt, task.questionType, task.count);
-        if (questions.length > 0) return questions.map((q: any, i: number) => toExamQuestion(q, task, i));
-      } catch { /* 继续到兜底 */ }
-    }
+    // 还在循环内 → 本次失败，继续重试
+    console.warn(`[write:${task.questionType}] 第 ${attempt + 1} 次返回空结果，${attempt < 2 ? '继续重试' : '尝试降级题量'}`);
+  }
+
+  // 3 次全部失败 → 降级题量（count-1，最少 1）
+  if (task.count > 1) {
+    console.warn(`[write:${task.questionType}] 降级题量 ${task.count} → ${Math.max(1, task.count - 1)}`);
+    task = { ...task, count: Math.max(1, task.count - 1) };
+    try {
+      const questions = await invokeGenerateQuestions(model, prompt, task.questionType, task.count);
+      if (questions.length > 0) return questions.map((q: any, i: number) => toExamQuestion(q, task, i));
+    } catch { /* 继续到兜底 */ }
+  }
 
     // 最终兜底：标记 __needs_review__，审核阶段强制重出
     console.warn(`[write:${task.questionType}] 全部失败，生成占位题等待重出`);
@@ -310,9 +310,6 @@ async function stepWriteQuestionsV2(
     } as ExamQuestion));
   }
 
-  return [];
-}
-
 /** 调用 model.bindTools + generate_questions tool 获取结构化题目 */
 async function invokeGenerateQuestions(
   model: BaseChatModel,
@@ -320,28 +317,47 @@ async function invokeGenerateQuestions(
   questionType: string,
   count: number,
 ): Promise<any[]> {
-  const genTool = makeGenerateQuestionsTool(questionType, count);
-
+  // 先尝试 bindTools 结构化输出
   if (model.bindTools) {
-    const bound = model.bindTools([genTool], {
-      tool_choice: { type: 'function', function: { name: 'generate_questions' } },
-    } as any);
-    const response = await bound.invoke([new SystemMessage(prompt)]);
-    const toolCalls = (response as any)?.tool_calls ?? [];
-    const call = toolCalls.find((c: any) => c.name === 'generate_questions');
-    if (call?.args?.questions && Array.isArray(call.args.questions)) {
-      return call.args.questions;
+    try {
+      const genTool = makeGenerateQuestionsTool(questionType, count);
+      const bound = model.bindTools([genTool], {
+        tool_choice: { type: 'function', function: { name: 'generate_questions' } },
+      } as any);
+      const response = await bound.invoke([new SystemMessage(prompt)]);
+      const toolCalls = (response as any)?.tool_calls ?? [];
+      const call = toolCalls.find((c: any) => c.name === 'generate_questions');
+      if (call?.args?.questions && Array.isArray(call.args.questions) && call.args.questions.length > 0) {
+        return call.args.questions;
+      }
+    } catch (err) {
+      console.warn(`[invoke:${questionType}] bindTools 失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
+      // 继续尝试文本回退
     }
   }
 
-  // 回退：纯文本 + JSON 解析
-  console.warn(`[write:${questionType}] bindTools 不可用，回退到文本模式`);
-  const response = await model.invoke([new SystemMessage(prompt + '\n\n请直接输出 JSON 格式：{"questions": [...]}')]);
-  const content = typeof response.content === 'string' ? response.content : '';
-  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-  const parsed = JSON.parse(jsonStr);
-  return parsed.questions ?? [];
+  // 文本回退：使用专为文本模式设计的 prompt（不含"通过工具输出"的指令）
+  const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n直接输出 JSON 数组 {"questions": [...]}，不要 markdown 代码块，不要其他文字。' +
+    `\n一次性输出全部 ${count} 道题。`;
+  try {
+    const response = await model.invoke([new SystemMessage(textPrompt)]);
+    const content = typeof response.content === 'string' ? response.content : '';
+    // 宽容解析：先尝试 JSON.parse，再尝试提取代码块
+    let parsed: any;
+    try { parsed = JSON.parse(content); } catch {
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleaned = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+      parsed = JSON.parse(cleaned);
+    }
+    const questions = parsed.questions ?? (Array.isArray(parsed) ? parsed : []);
+    if (Array.isArray(questions) && questions.length > 0) {
+      return questions;
+    }
+  } catch (err) {
+    console.warn(`[invoke:${questionType}] 文本回退解析失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
+  }
+
+  return [];
 }
 
 /** 把 LLM 输出的单题转换为 ExamQuestion（补全 points/index） */
