@@ -398,6 +398,19 @@ export interface ExamQualityReport {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 订阅系统
+// ─────────────────────────────────────────────────────────────
+
+export interface SubscriptionStatus {
+  tier: 'free' | 'premium';
+  isPremium: boolean;
+  expiresAt: number | null;
+  dailyLimit: number | null;
+  dailyUsed: number | null;
+  dailyRemaining: number | null;
+}
+
+// ─────────────────────────────────────────────────────────────
 // SSE 事件
 // ─────────────────────────────────────────────────────────────
 
@@ -416,5 +429,6 @@ export type SseEvent =
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }
   | { type: 'loading_knowledge_base' }
+  | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'done' }
   | { type: 'error'; message: string };

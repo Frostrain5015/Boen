@@ -1016,7 +1016,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 .step-row { position: relative; display: flex; min-height: 2rem; align-items: center; gap: 0.75rem; padding: 0.35rem 0; transition: opacity 0.28s ease, transform 0.28s ease; }
 .step-row-timeline:not(:last-of-type)::before { content: ''; position: absolute; left: 0.675rem; top: 1.65rem; bottom: -0.42rem; width: 2px; border-radius: 999px; background: var(--line); transform: translateX(-50%); transition: background-color 0.35s ease, box-shadow 0.35s ease; }
 .step-row-done::before { background: #bde8c7; box-shadow: 0 0 0 1px rgba(24, 165, 88, 0.08); }
-.step-row-active { transform: translateX(2px); }
+.step-row-active { }
 .step-dot { position: relative; display: grid; place-items: center; width: 1.35rem; height: 1.35rem; flex-shrink: 0; border: 1.5px solid var(--line); border-radius: 999px; background: #fffdf8; box-shadow: inset 0 -1px 0 rgba(92, 74, 50, 0.08), 0 5px 12px -12px rgba(92, 74, 50, 0.65); transition: background-color 0.32s ease, border-color 0.32s ease, box-shadow 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .step-dot-core { width: 0.38rem; height: 0.38rem; border-radius: 999px; background: currentColor; opacity: 0.9; transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.32s ease, opacity 0.32s ease; }
 .dot-active { border-color: #f97316; background: linear-gradient(145deg, #ffb15d 0%, #f97316 100%); color: #fff; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14), 0 10px 20px -14px rgba(249, 115, 22, 0.7); }

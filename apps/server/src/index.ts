@@ -79,7 +79,7 @@ const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
 const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
 
 // 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
-const userIdCache = new Map<string, { sub: string; exp: number }>();
+const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null } }>();
 async function resolveUserId(c: Context): Promise<string | null> {
   const authz = c.req.header('authorization');
   if (!authz?.startsWith('Bearer ')) return null;
@@ -97,6 +97,77 @@ async function resolveUserId(c: Context): Promise<string | null> {
     console.error('[auth] userinfo failed:', err);
     return null;
   }
+}
+
+// ── 订阅系统辅助函数 ──────────────────────────────
+const FREE_DAILY_LIMIT = 10;
+
+interface SubscriptionInfo {
+  tier: 'free' | 'premium';
+  isPremium: boolean;
+  expiresAt: number | null;
+}
+
+/** 解析用户 ID 并查询订阅状态（复用 userIdCache，5 分钟 TTL） */
+async function resolveSubscription(c: Context): Promise<{ userId: string; sub: SubscriptionInfo } | null> {
+  const authz = c.req.header('authorization');
+  if (!authz?.startsWith('Bearer ')) return null;
+  const token = authz.slice(7);
+  const cached = userIdCache.get(token);
+  // 若缓存中有 userId 且有订阅信息且未过期，直接返回
+  if (cached && cached.exp > Date.now() && cached.subscription) {
+    return { userId: cached.sub, sub: cached.subscription as SubscriptionInfo };
+  }
+  // 先拿到 userId（可能已缓存但未含 subscription）
+  const userId = await resolveUserId(c);
+  if (!userId) return null;
+  // 查订阅表
+  const row = db.prepare('SELECT tier, expires_at FROM subscriptions WHERE user_id = ?').get(userId) as
+    | { tier: string; expires_at: number | null }
+    | undefined;
+  const now = Math.floor(Date.now() / 1000);
+  const sub: SubscriptionInfo = {
+    tier: (row?.tier === 'premium' ? 'premium' : 'free') as 'free' | 'premium',
+    isPremium: row?.tier === 'premium' && row?.expires_at != null && row.expires_at > now,
+    expiresAt: row?.expires_at ?? null,
+  };
+  // 回写缓存
+  const entry = userIdCache.get(token);
+  if (entry) {
+    entry.subscription = sub;
+  }
+  return { userId, sub };
+}
+
+/** 守卫：要求 premium 订阅，否则返回 403 */
+function requirePremium(c: Context, result: { userId: string; sub: SubscriptionInfo } | null) {
+  if (!result) return c.json({ error: 'unauthorized' }, 401);
+  if (!result.sub.isPremium) {
+    return c.json({ error: 'premium_required', message: '此功能需要订阅会员才能使用' }, 403);
+  }
+  return null;
+}
+
+/** 查询当日消息用量 */
+function getDailyUsage(userId: string): number {
+  const today = new Date().toISOString().slice(0, 10);
+  const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id = ? AND date = ?').get(userId, today) as
+    | { message_count: number }
+    | undefined;
+  return row?.message_count ?? 0;
+}
+
+/** 检查并递增每日用量，返回是否允许 + 剩余条数 */
+function checkAndIncrementUsage(userId: string): { allowed: boolean; remaining: number } {
+  const today = new Date().toISOString().slice(0, 10);
+  const current = getDailyUsage(userId);
+  if (current >= FREE_DAILY_LIMIT) return { allowed: false, remaining: 0 };
+  db.prepare(`
+    INSERT INTO daily_chat_usage (user_id, date, message_count)
+    VALUES (?, ?, 1)
+    ON CONFLICT(user_id, date) DO UPDATE SET message_count = message_count + 1
+  `).run(userId, today);
+  return { allowed: true, remaining: FREE_DAILY_LIMIT - current - 1 };
 }
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
@@ -380,8 +451,10 @@ app.get('/api/profile/outline', async (c) => {
 
 /** GET /api/profile/proficiency — 用户熟练度数据 */
 app.get('/api/profile/proficiency', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const profs = getAllProficiencies(userId, subject, grade);
@@ -390,8 +463,10 @@ app.get('/api/profile/proficiency', async (c) => {
 
 /** GET /api/profile/report — LLM 生成诊断报告 */
 app.get('/api/profile/report', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade') || '7';
   const profs = getAllProficiencies(userId, subject, grade);
@@ -423,8 +498,10 @@ app.get('/api/profile/report', async (c) => {
 
 /** GET /api/profile/weak-points — 薄弱知识点 */
 app.get('/api/profile/weak-points', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const threshold = c.req.query('threshold') ? Number(c.req.query('threshold')) : 60;
@@ -727,6 +804,21 @@ app.get('/api/exam/:examId', async (c) => {
 
 
 
+// ── 订阅状态 API ────────────────────────────
+app.get('/api/subscription/status', async (c) => {
+  const result = await resolveSubscription(c);
+  if (!result) return c.json({ error: 'unauthorized' }, 401);
+  const dailyUsed = result.sub.isPremium ? null : getDailyUsage(result.userId);
+  return c.json({
+    tier: result.sub.tier,
+    isPremium: result.sub.isPremium,
+    expiresAt: result.sub.expiresAt,
+    dailyLimit: result.sub.isPremium ? null : FREE_DAILY_LIMIT,
+    dailyUsed,
+    dailyRemaining: result.sub.isPremium ? null : Math.max(0, FREE_DAILY_LIMIT - (dailyUsed ?? 0)),
+  });
+});
+
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
 
 /** POST /api/auth/token - 用授权码换 access_token（携带 client_secret + code_verifier）*/
@@ -833,10 +925,23 @@ app.delete('/api/conversations/:id', async (c) => {
 
 app.post('/api/chat', async (c) => {
   const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject: string };
-  // 仅在 conversationId 属于当前登录用户时才落库，避免串写他人对话
-  const userId = await resolveUserId(c);
+  // 硬认证：必须登录才能对话
+  const result = await resolveSubscription(c);
+  if (!result) return c.json({ error: 'unauthorized' }, 401);
+  const userId = result.userId;
+
+  // 免费用户每日限额检查
+  let usageInfo: { dailyLimit: number; dailyUsed: number; dailyRemaining: number } | null = null;
+  if (!result.sub.isPremium) {
+    const usage = checkAndIncrementUsage(userId);
+    if (!usage.allowed) {
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或订阅会员', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+    }
+    usageInfo = { dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT - usage.remaining, dailyRemaining: usage.remaining };
+  }
+
   const owned =
-    !!body.conversationId && !!userId && getConversation(body.conversationId)?.userId === userId;
+    !!body.conversationId && getConversation(body.conversationId)?.userId === userId;
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
@@ -918,6 +1023,8 @@ app.post('/api/chat', async (c) => {
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
+      // 发送每日用量信息（供前端更新剩余次数）
+      if (usageInfo) await send({ type: 'usage', ...usageInfo });
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
