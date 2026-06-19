@@ -171,7 +171,8 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     styleContext ? `\n=== 错题风格学习 ===\n${styleContext}\n请只学习这些错题样本的题型结构、逻辑搭建、情境选取和干扰方式，严禁照抄原题文字、数字、学生答案或隐私信息。` : '',
     '',
     '=== ⚠ 输出要求（硬性规定，不得违反） ===',
-    `输出 ${count} 道题。每道题必须包含: stem, knowledgePoint, literacies, difficulty, explanation——缺一不可。`,
+    `输出 ${count} 道题。严格按以下 JSON 结构输出，字段名不能改：`,
+    `{"questions":[{"stem":"题干","type":"${questionType}","points":${pointsPer},"knowledgePoint":"考点","literacies":["核心素养"],"difficulty":"${difficulty}","explanation":"解析"${questionType === 'multiple_choice' ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false' : ''}${questionType === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["标准答案1"]},{"acceptedAnswers":["标准答案2"]}]' : ''}${questionType === 'short_answer' && config.subject !== 'math' ? ',"referenceAnswer":"参考答案","keyPoints":["要点1","要点2"]' : ''}${['multiple_choice', 'fill_blank', 'true_false', 'short_answer'].includes(questionType) ? ',"groupId":1' : ''},"passage":"（有阅读材料时填写，无则省略此字段）"}]}`,
     questionType === 'multiple_choice'
       ? '选择题硬性要求：stem 只写题干，绝对不要把 A/B/C/D 选项写进 stem；options 必须写真实选项文本，严禁写 "{选项A}"、"选项A"、"A" 等任何占位符。违者整卷作废。'
       : '',
@@ -179,7 +180,7 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
       ? '填空题硬性要求：stem 中每个空必须用 ____ 或（ ）标出；blanks 必须按空的顺序给出 acceptedAnswers，空数必须与题干空位一致。空位与答案数不匹配则整题无效。'
       : '',
     'knowledgePoint 和 literacies 必须填写，不得为空。',
-    `难度统一为 ${difficulty}。`,
+    `难度统一为 ${difficulty}。同一篇阅读材料的多道小题必须设相同 groupId。`,
     '【⚠ 阅读材料强制令】阅读理解/完形填空等有原文的题型，原文必须且只能写在 passage 字段中，严禁将原文写进 stem 字段，严禁在 stem 中使用 ** passage ** 等标记来代替 passage 字段。stem 字段只写提问/题干本身。违反此规则将导致学生看不到阅读材料，整题作废。\
 	\n   passage 开头可用 `# 标题` 标注文章标题（如有），前端会以标题样式渲染。',
     KATEX_FORMAT_GUIDE,
@@ -369,9 +370,9 @@ export function regenerateQuestionPrompt(
     crossGroupContext || '（无其他组）',
     '⚠ 新题的情景和数据必须与上述其他题目完全不同。',
     '',
-    '=== 输出要求 ===',
-    '输出 JSON 格式：{"questions": [{...}]}。直接输出 JSON，不要 markdown 代码块，不要其他文字。',
-    '每题包含: type, stem, points, knowledgePoint, literacies, difficulty, explanation。',
+    '=== 输出要求（必须严格按此 JSON 结构） ===',
+    `{"questions":[{"stem":"题干","type":"${question.type}","points":${question.points},"knowledgePoint":"考点","literacies":["核心素养"],"difficulty":"medium","explanation":"解析"${question.options ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"}],"correctKeys":["A"],"multiSelect":false' : ''}${question.type === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["答案"]}]' : ''}${question.type === 'short_answer' ? ',"referenceAnswer":"参考答案","keyPoints":["要点"]' : ''}]}`,
+    '直接输出 JSON，不要 markdown 代码块，不要其他文字。',
     KATEX_FORMAT_GUIDE,
     xlopGuide(config.grade),
   ].filter(Boolean).join('\n');

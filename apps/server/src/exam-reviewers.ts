@@ -347,7 +347,14 @@ export async function regenerateQuestions(
     };
   }
 
-  console.log(`[regenerate] ${regenPool.length} 题需要重出，最多 5 路并发执行中…`);
+  // 打印每道题被标记重出的具体原因
+  for (const s of regenPool) {
+    const failed = Object.entries(s.dimensions)
+      .filter(([, d]) => d.score < 60)
+      .map(([dim, d]) => `${dim}(${d.score}分:${d.issues?.join(';')?.slice(0, 60) || '低分'})`);
+    console.log(`[regenerate] Q${s.index + 1} 触发重出: ${failed.join(', ')}`);
+  }
+  console.log(`[regenerate] 共 ${regenPool.length} 题需要重出，最多 5 路并发执行中…`);
 
   // 并发重出（限 5 路，429 退避重试）
   const regenResults = await withConcurrencyLimit(
@@ -382,9 +389,10 @@ export async function regenerateQuestions(
       // 替换原题（保留 index 和 points）
       questions[index] = { ...regenerated, index, points: original.points };
       regeneratedIndices.push(index);
-      console.log(`[regenerate] Q${index + 1} 重出成功并替换`);
+      const newStem = questions[index]?.stem?.slice(0, 60) || '';
+      const oldStem = original?.stem?.slice(0, 60) || '';
+      console.log(`[regenerate] Q${index + 1} 重出成功并替换: "${oldStem}..." → "${newStem}..."`);
     } else {
-      // 二次校验不通过 → 保留原题 + warn
       qualityWarnings.push(index);
       console.warn(`[regenerate] Q${index + 1} 重出后二次校验仍不通过，保留原题`);
     }
