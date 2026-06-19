@@ -692,8 +692,8 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
           <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
             <!-- 题号轨道（固定窗口 9 个，当前居中） -->
             <div class="shrink-0 pt-5 pb-3">
-              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex max-w-sm items-center justify-center gap-0.5" role="navigation" aria-label="题号导航">
-                <button v-if="visibleDotOffset > 0" disabled class="question-dot-edge">‹‹</button>
+              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex items-center justify-center gap-0.5" role="navigation" aria-label="题号导航">
+                <span v-if="visibleDotOffset > 0" class="question-dot-edge">‹‹</span>
                 <button
                   v-for="q in visibleDots"
                   :key="q.index"
@@ -707,7 +707,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
                 >
                   <span>{{ q.index + 1 }}</span>
                 </button>
-                <button v-if="visibleDotOffset + VISIBLE_DOT_COUNT < (session?.questions.length ?? 0)" disabled class="question-dot-edge">››</button>
+                <span v-if="visibleDotOffset + VISIBLE_DOT_COUNT < (session?.questions.length ?? 0)" class="question-dot-edge">››</span>
               </div>
             </div>
             <!-- 题目卡片 -->
@@ -941,11 +941,12 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
   gap: 0.35rem;
   overflow-x: auto;
   scrollbar-width: none;
+  min-height: 3rem;
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
 .question-dot-edge {
   display: grid; place-items: center;
-  width: 1.2rem; height: 2.75rem;
+  width: 1.2rem; height: 2.25rem;
   border: none; background: transparent;
   font-size: 0.7rem; color: var(--ink-soft);
   opacity: 0.4; cursor: default;
