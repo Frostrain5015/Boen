@@ -107,23 +107,20 @@ async function runSingleReview(
   schema: z.ZodObject<any, any, any>,
   dimension: ReviewDimension,
 ): Promise<ReviewResult> {
-  // 审核不走 bindTools / tool_choice — 讯飞 API 不支持结构化输出 schema 中的
-  // .optional() / .nullable() 等修饰符，会导致 invoke 卡死（不报错也不返回）。
-  // 直接走文本模式，prompt 已要求输出 JSON。
+  // 使用 DeepSeek JSON Output 模式（response_format），prompt 已要求输出 JSON
   try {
     const response = await withTimeout(
-      model.invoke([new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON，不要 markdown 代码块，不要其他文字。')]),
+      model.invoke(
+        [new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON，不要 markdown 代码块，不要其他文字。')],
+        { response_format: { type: 'json_object' } as any },
+      ),
       REVIEW_TIMEOUT,
       dimension,
     );
     const content = typeof response.content === 'string' ? response.content : '';
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-    const rawData = JSON.parse(jsonStr);
-    // safeParse：即使 schema 不完整也尽力提取可用数据
+    const rawData = JSON.parse(content);
     const parsed = schema.safeParse(rawData);
     if (parsed.success) return parseReviewOutput(parsed.data, dimension);
-    // schema 校验失败但仍返回默认分（保留本地格式检查触发的 regeneration）
     console.warn(`[review:${dimension}] JSON 格式不符，使用默认分:`, parsed.error.issues.slice(0, 2));
     return parseReviewOutput(rawData, dimension);
   } catch (err) {

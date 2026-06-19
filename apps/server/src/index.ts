@@ -53,26 +53,23 @@ loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
 
-function createModel(provider: string, opts?: { enableThinking?: boolean }) {
-  const thinking = opts?.enableThinking ?? true;
-  if (provider === 'deepseek') {
-    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-flash', apiKey: DEEPSEEK_API_KEY, enableThinking: thinking });
-  }
-  if (provider === 'deepseek-pro') {
-    return getChatModel({ provider: 'deepseek', model: 'deepseek-v4-pro', apiKey: DEEPSEEK_API_KEY, enableThinking: thinking });
-  }
-  // 'default' → 环境变量配置（当前为讯飞 MaaS / Kimi K2.6）
+// DeepSeek 模型列表
+const DEEPSEEK_MODELS: Record<string, string> = {
+  default: 'deepseek-v4-flash',
+  deepseek: 'deepseek-v4-flash',
+  'deepseek-pro': 'deepseek-v4-pro',
+};
+
+function createModel(provider: string): BaseChatModel {
+  const modelName = DEEPSEEK_MODELS[provider] ?? 'deepseek-v4-flash';
   return getChatModel({
-    provider: (process.env.BOEN_PROVIDER ?? 'openai') as 'openai' | 'anthropic',
-    model: process.env.BOEN_MODEL ?? 'astron-code-latest',
-    apiKey: process.env.BOEN_API_KEY ?? '',
-    baseUrl: process.env.BOEN_BASE_URL,
-    enableThinking: thinking,
+    provider: 'deepseek',
+    model: modelName,
+    apiKey: DEEPSEEK_API_KEY,
+    enableThinking: true,
   });
 }
 let model = createModel('default');
-/** 不带 thinking 的模型（用于出卷/审核等需要 tool_choice 的场景） */
-const structuredModel = createModel('default', { enableThinking: false });
 let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
 
 /** 切换模型并重建 LangGraph 图 */
@@ -299,14 +296,14 @@ function extractQuestionPayload(last: BaseMessage | undefined): { toolCallId: st
 const app = new Hono();
 app.use('/api/*', cors());
 
-app.get('/api/health', (c) => c.json({ ok: true, provider: process.env.BOEN_PROVIDER ?? 'openai', model: process.env.BOEN_MODEL ?? 'astron-code-latest', actual: 'Kimi K2.6' }));
+app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (model as any)?.modelName ?? 'deepseek-v4-flash' }));
 
 // ── 模型切换 API ────────────────────────────
 /** POST /api/model/switch — 切换模型提供商 */
 app.post('/api/model/switch', async (c) => {
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
-  if (p !== 'deepseek' && p !== 'deepseek-pro' && p !== 'default') return c.json({ error: '不支持的 provider' }, 400);
+  if (!DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
   const switched = switchModel(p);
   return c.json({ success: true, provider: switched });
 });
@@ -315,9 +312,9 @@ app.post('/api/model/switch', async (c) => {
 app.get('/api/model/status', (c) => {
   const current = model as any;
   return c.json({
-    provider: process.env.BOEN_PROVIDER ?? 'openai',
-    model: current.modelName ?? 'unknown',
-    deepseekAvailable: !!DEEPSEEK_API_KEY,
+    provider: 'deepseek',
+    model: current.modelName ?? 'deepseek-v4-flash',
+    models: DEEPSEEK_MODELS,
   });
 });
 
@@ -734,7 +731,7 @@ app.post('/api/exam/generate', async (c) => {
     try {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
-        structuredModel,
+        model,
         { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes, totalScore: body.totalScore },
         (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
         userId,

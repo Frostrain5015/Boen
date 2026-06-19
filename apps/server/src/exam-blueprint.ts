@@ -164,43 +164,27 @@ export async function stepBlueprintArchitect(
   const constraintBoundary = buildConstraintBoundary(config.grade, mode, totalScore);
   const prompt = blueprintArchitectPrompt(config, weightGuide, profileContext, constraintBoundary);
 
-  // 先尝试 bindTools 结构化输出（包在自己的 try-catch 中，失败后走文本回退）
-  if (model.bindTools) {
+  // 使用 DeepSeek JSON Output 模式（response_format），支持 thinking 模式
+  for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const bound = model.bindTools([designBlueprintTool], {
-        tool_choice: { type: 'function', function: { name: 'design_blueprint' } },
-      } as any);
-      const response = await bound.invoke([new SystemMessage(prompt)]);
-      const toolCalls = (response as any)?.tool_calls ?? [];
-      const blueprintCall = toolCalls.find((c: any) => c.name === 'design_blueprint');
-
-      if (blueprintCall?.args) {
-        const parsed = examBlueprintSchema.safeParse(blueprintCall.args);
-        if (parsed.success) {
-          return validateAndFixBlueprint(parsed.data, totalScore);
-        }
-        console.warn('[blueprint] schema 校验失败，尝试手动修复:', parsed.error.issues.slice(0, 3));
-        const fixed = tryFixBlueprint(blueprintCall.args, totalScore);
-        if (fixed) return fixed;
-      }
+      const response = await model.invoke(
+        [new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON 格式的蓝图，不要 markdown 代码块，不要其他文字。')],
+        { response_format: { type: 'json_object' } as any },
+      );
+      const content = typeof response.content === 'string' ? response.content : '';
+      const parsed = JSON.parse(content);
+      const validated = examBlueprintSchema.safeParse(parsed);
+      if (validated.success) return validateAndFixBlueprint(validated.data, totalScore);
+      // schema 不匹配：尝试修复
+      console.warn('[blueprint] schema 不匹配，尝试修复:', validated.error.issues.slice(0, 2));
+      const fixed = tryFixBlueprint(parsed, totalScore);
+      if (fixed) return fixed;
     } catch (err) {
-      console.warn('[blueprint] bindTools 调用失败，降级到文本模式:', err instanceof Error ? err.message.slice(0, 80) : err);
+      console.warn(`[blueprint] 第 ${attempt + 1} 次尝试失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
     }
   }
-
-  // 文本回退
-  try {
-    console.warn('[blueprint] 回退到文本模式');
-    const response = await model.invoke([new SystemMessage(prompt + '\n\n请直接输出 JSON 格式的蓝图，不要有其他文字。')]);
-    const content = typeof response.content === 'string' ? response.content : '';
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonStr = (jsonMatch ? jsonMatch[1].trim() : content.trim()).replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
-    const parsed = JSON.parse(jsonStr);
-    return validateAndFixBlueprint(examBlueprintSchema.parse(parsed), totalScore);
-  } catch (err) {
-    console.error('[blueprint] 蓝图生成失败，使用默认蓝图:', err instanceof Error ? err.message.slice(0, 100) : err);
-    return defaultBlueprint(config, mode);
-  }
+  console.error('[blueprint] 蓝图生成失败，使用默认蓝图');
+  return defaultBlueprint(config, mode);
 }
 
 // ── 蓝图校验与修复 ─────────────────────────────────────────
