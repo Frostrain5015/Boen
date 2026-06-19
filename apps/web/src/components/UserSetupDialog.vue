@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { Grade } from '@boen/shared';
-import { Sparkles, User, GraduationCap } from 'lucide-vue-next';
+import { Sparkles, User, GraduationCap, X } from 'lucide-vue-next';
 
 const props = defineProps<{
   profile: { name: string; grade: Grade } | null;
@@ -9,6 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [profile: { name: string; grade: Grade }];
+  close: [];
 }>();
 
 /** 分组年级选择：小学 1–6 / 初中 7–9 细化，高中、大学为粗档 */
@@ -40,13 +41,16 @@ function handleSave() {
 
 <template>
   <Teleport to="body">
-    <div class="setup-overlay">
+    <div class="setup-overlay" @click.self="emit('close')">
       <div
         class="setup-card clay"
         v-motion
         :initial="{ opacity: 0, scale: 0.92, y: 20 }"
         :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 22 } }"
       >
+        <button v-if="props.profile" class="setup-x" @click="emit('close')" aria-label="关闭">
+          <X :size="16" :stroke-width="2.5" />
+        </button>
         <!-- 头部 -->
         <div class="setup-header">
           <div class="setup-avatar">
@@ -140,6 +144,7 @@ function handleSave() {
   padding: 1rem;
 }
 .setup-card {
+  position: relative;
   width: 100%;
   max-width: 380px;
   overflow: hidden;
@@ -243,6 +248,26 @@ function handleSave() {
 .setup-option {
   font-size: 0.9rem;
   font-weight: 500;
+  color: var(--ink);
+}
+.setup-x {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  z-index: 1;
+}
+.setup-x:hover {
+  background: var(--accent-soft);
   color: var(--ink);
 }
 .setup-footer {

@@ -50,6 +50,7 @@ onMounted(() => {
     v-if="authStore.showSetupDialog"
     :profile="authStore.userProfile"
     @save="authStore.saveProfile"
+    @close="authStore.showSetupDialog = false"
   />
 
   <!-- 主应用 -->
