@@ -192,6 +192,17 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
 
 // ── 阶段三：审核委员会 5 维度 prompt ──────
 
+/** 提取文本中的 TikZ 代码块 */
+function extractTikzBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  const re = /```tikz\s*\n([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    blocks.push(m[1].trim());
+  }
+  return blocks;
+}
+
 /** 构造每道题的详细快照供审核 */
 export function formatQuestionSnapshot(questions: ExamQuestion[]): string {
   return questions.map((q) => {
@@ -214,12 +225,22 @@ export function formatQuestionSnapshot(questions: ExamQuestion[]): string {
       lines.push(`  要点: ${(q.keyPoints ?? []).join('、') || '（无）'}`);
     }
     if (q.explanation) lines.push(`  解析: ${q.explanation.slice(0, 150)}`);
+    // 提取 TikZ 代码供审核
+    const tikzBlocks = [
+      ...extractTikzBlocks(q.stem ?? ''),
+      ...extractTikzBlocks(q.passage ?? ''),
+      ...extractTikzBlocks(q.explanation ?? ''),
+    ];
+    for (const code of tikzBlocks.slice(0, 3)) {
+      lines.push(`  TikZ: ${code.slice(0, 200)}`);
+    }
     return lines.join('\n');
   }).join('\n\n');
 }
 
 /** A. 正确性审核 */
 export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: PromptConfig): string {
+  const isMathOrScience = config.subject === 'math' || config.subject === 'science';
   return [
     `你是${subjectLabel(config.subject)}学科专家。请审核以下试卷中每道题的答案和解析是否知识性正确。`,
     `年级：${gradeLabel(config.grade)}。`,
@@ -228,6 +249,13 @@ export function reviewCorrectnessPrompt(questions: ExamQuestion[], config: Promp
     '这是由 AI 命题系统生成的试卷，答案和解析整体正确性较高。',
     '请只标记有实质性知识错误的题目（如公式写错、计算错误、概念混淆等）。',
     '表达方式不够精确、缺少细节等非知识性问题不应扣分。',
+    ...(isMathOrScience ? [
+      '',
+      '=== TikZ 示意图审核 ===',
+      '数学/科学题目常附带 ```tikz 代码块用于绘制示意图（几何图形、函数图像、实验装置等）。',
+      '请逐题检查 TikZ 代码绘制的图形是否符合题意（如标注的数值、角度、变量名是否正确）。',
+      '若 TikZ 代码与题目描述严重不符（标注错误、图形画错等），在 issues 中指出并要求重写 TikZ 代码。',
+    ] : []),
     '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),
@@ -310,9 +338,19 @@ export function reviewBlueprintMatchPrompt(questions: ExamQuestion[], blueprint:
 }
 
 /** D. 格式审核 */
-export function reviewFormatPrompt(questions: ExamQuestion[]): string {
+export function reviewFormatPrompt(questions: ExamQuestion[], config: PromptConfig): string {
+  const isMathOrScience = config.subject === 'math' || config.subject === 'science';
   return [
     '你是格式审核专家。请检查试卷中每道题的格式是否完整、正确。',
+    ...(isMathOrScience ? [
+      '',
+      '=== TikZ 代码质量审核 ===',
+      '数学/科学题目中 ```tikz 代码块的示意图必须符合题目意图：',
+      '1. 图形元素（线段、角度、标注等）与题干描述一致',
+      '2. 数值标注（如边长、角度值）与实际计算相符',
+      '3. 代码语法正确（\\draw, \\node, \\path 等命令使用正确）',
+      '4. TikZ 代码不符合题意或语法错误 → 在 issues 中写明需重写',
+    ] : []),
     '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),
@@ -335,6 +373,11 @@ export function reviewFormatPrompt(questions: ExamQuestion[]): string {
 
 /** E. 区分度审核 */
 export function reviewDiscriminationPrompt(questions: ExamQuestion[], config: PromptConfig): string {
+  const isChineseOrEnglish = config.subject === 'chinese' || config.subject === 'english';
+  // 计算整卷 passage 总字数
+  const totalPassageChars = isChineseOrEnglish
+    ? questions.reduce((sum, q) => sum + (q.passage?.length ?? 0) + (q.stem?.length ?? 0), 0)
+    : 0;
   return [
     `你是教育测量学专家。请审核以下${subjectLabel(config.subject)}（${gradeLabel(config.grade)}）试卷的区分度。`,
     '',
@@ -342,6 +385,15 @@ export function reviewDiscriminationPrompt(questions: ExamQuestion[], config: Pr
     '注意：期末考试题考查的是本学期所学内容，题目必然围绕学科范围内出题。',
     '不要因为题目专业性强或知识点集中就判低分。请侧重检查：干扰项是否明显不合理、',
     '设问是否有效、是否真的没有区分度。正常难度的期末题应给 70-85 分。',
+    ...(isChineseOrEnglish ? [
+      '',
+      `=== 阅读量审核 ===`,
+      `当前整卷题干+材料总字数约 ${totalPassageChars} 字。`,
+      '语文/英语考试需评估整卷阅读量是否适中：',
+      `- 阅读量过大（总字数过多）→ 学生负担太重，应在 issues 中注明需精简材料`,
+      `- 阅读量过小（总字数过少）→ 起不到考查阅读能力的作用，应在 issues 中注明需补充阅读材料`,
+      '评分标准：阅读量适中不扣分；明显过多或过少时在该维度酌情扣分（总分仍可高于 60）。',
+    ] : []),
     '',
     '=== 试卷详情 ===',
     formatQuestionSnapshot(questions),

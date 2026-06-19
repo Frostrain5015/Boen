@@ -200,7 +200,7 @@ export async function reviewBoard(
     () => runSingleReview(model, reviewCorrectnessPrompt(questions, config), 'review_correctness', correctnessReviewSchema, 'correctness', questions.length),
     () => runSingleReview(model, reviewSimilarityPrompt(questions), 'review_similarity', similarityReviewSchema, 'similarity', questions.length),
     () => runSingleReview(model, reviewBlueprintMatchPrompt(questions, blueprint), 'review_blueprint_match', blueprintMatchReviewSchema, 'blueprint_match', questions.length),
-    () => runSingleReview(model, reviewFormatPrompt(questions), 'review_format', formatReviewSchema, 'format', questions.length),
+    () => runSingleReview(model, reviewFormatPrompt(questions, config), 'review_format', formatReviewSchema, 'format', questions.length),
     () => runSingleReview(model, reviewDiscriminationPrompt(questions, config), 'review_discrimination', discriminationReviewSchema, 'discrimination', questions.length),
   ];
   const reviewResults = await withConcurrencyLimit(reviewTaskBuilders, { limit: 5, verbose: true });
