@@ -9,12 +9,8 @@ const chatStore = useChatStore();
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <Transition name="view-fade" mode="out-in">
-      <div class="flex min-h-0 flex-1 flex-col" key="chat-content">
-        <AppHeader />
-        <ChatMessages />
-        <InputArea />
-      </div>
-    </Transition>
+    <AppHeader />
+    <ChatMessages />
+    <InputArea />
   </div>
 </template>
