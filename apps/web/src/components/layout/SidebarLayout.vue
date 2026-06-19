@@ -102,7 +102,7 @@ function startNewExam() {
   >
     <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
       <!-- 品牌 + 折叠 -->
-      <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
+      <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' || currentView === 'exam' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
         <div class="flex items-center gap-2">
           <Mascot :size="28" :float="false" :animated="false" />
           <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>

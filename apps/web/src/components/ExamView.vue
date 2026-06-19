@@ -912,8 +912,6 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 /* ── 顶部题号轨道 ── */
 .dot-nav-wrap {
   position: relative;
-  border-top: 1px solid rgba(236, 224, 207, 0.62);
-  border-bottom: 1px solid var(--line);
   background:
     linear-gradient(90deg, var(--surface) 0%, rgba(255,255,255,0.74) 48%, var(--surface) 100%);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 8px 22px -22px rgba(92, 74, 50, 0.45);
