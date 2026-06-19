@@ -71,7 +71,7 @@ const answers = ref<Map<number, any>>(new Map());
 const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
-const genProgress = ref({ step: 'analyze' as 'analyze' | 'write' | 'review', message: '', progress: 0 });
+const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
 const scoreRevealed = ref(false);
 
 /** 将题目按 groupId 分组，无 groupId 的每题自成一组 */
@@ -137,9 +137,11 @@ function masteryColor(ws: number): string {
 /** 步骤是否已完成（依据进度阈值） */
 function stepDone(step: string): boolean {
   const p = genProgress.value.progress;
-  if (step === 'analyze') return p > 20;
+  if (step === 'blueprint') return p > 20;
   if (step === 'write') return p > 85;
-  if (step === 'review') return p >= 100;
+  if (step === 'review') return p > 90;
+  if (step === 'regenerate') return p >= 100;
+  if (step === 'complete') return p >= 100;
   return false;
 }
 /** 步骤当前状态: 'pending' | 'active' | 'done' */
@@ -162,9 +164,11 @@ function dotIcon(step: string): string {
 function stepLabel(step: string): string {
   const s = stepState(step);
   const labels: Record<string, [string, string, string]> = {
-    analyze: ['待分析知识点', '正在分析知识图谱', '分析已完成'],
+    blueprint: ['待分析知识图谱', '正在分析知识图谱', '分析已完成'],
     write: ['待编写试题', '正在编写试题', '编写已完成'],
     review: ['待审核试题', '正在审核试题', '审核已完成'],
+    regenerate: ['待修正试题', '正在修正试题', '修正已完成'],
+    complete: ['准备就绪', '即将完成', '已完成'],
   };
   const idx = s === 'pending' ? 0 : s === 'active' ? 1 : 2;
   return labels[step]?.[idx] ?? step;
@@ -223,7 +227,7 @@ function totalScoreForDuration(minutes: number): number {
 
 async function generateExamPaper() {
   examState.value = 'generating';
-  genProgress.value = { step: 'analyze', message: '正在准备…', progress: 0 };
+  genProgress.value = { step: 'blueprint', message: '正在准备…', progress: 0 };
   let ready: ExamReadyData | undefined;
   let errMsg = '';
   try {
@@ -394,7 +398,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
         <div class="w-80 space-y-0.5">
-          <div v-for="st in ['analyze','write','review']" :key="st">
+          <div v-for="st in ['blueprint','write','review']" :key="st">
             <div class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
               <span class="step-dot" :class="dotCls(st)">{{ dotIcon(st) }}</span>
               <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ stepLabel(st) }}</span>
