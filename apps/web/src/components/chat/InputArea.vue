@@ -29,7 +29,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <footer class="px-4 pb-4 pt-1">
+  <footer class="px-4 pb-4 pt-16">
     <div class="mx-auto w-full max-w-2xl">
       <!-- 学习模式按钮 -->
       <div class="mb-2 flex items-center gap-1.5 px-1">
@@ -53,7 +53,7 @@ onMounted(() => {
         <Transition name="mascot-pop">
           <div
             v-if="chatStore.hasItems"
-            class="absolute -top-12 right-0 z-10 pointer-events-none select-none"
+            class="absolute bottom-full right-0 z-10 pointer-events-none select-none"
             :class="chatStore.busy ? 'mascot-bounce' : ''"
           >
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
