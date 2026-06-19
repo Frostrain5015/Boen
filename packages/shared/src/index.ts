@@ -319,6 +319,82 @@ export interface ExamReviewDetail {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 试卷蓝图（重构后三阶段流水线产物）
+// ─────────────────────────────────────────────────────────────
+
+export interface BlueprintKnowledgePoint {
+  id?: number;
+  title: string;
+  /** 本 section 内的权重 (0-1) */
+  weight: number;
+}
+
+export interface BlueprintQuestionTypePlan {
+  type: QuestionType;
+  count: number;
+  pointsPer: number;
+  focusKps: string[];
+}
+
+export interface BlueprintSection {
+  title: string;
+  knowledgePoints: BlueprintKnowledgePoint[];
+  difficulty: Difficulty;
+  questionTypes: BlueprintQuestionTypePlan[];
+}
+
+export interface BlueprintCoveragePlan {
+  must: string[];
+  focus: string[];
+  stretch?: string[];
+}
+
+export interface BlueprintDifficultyDistribution {
+  easy: number;
+  medium: number;
+  hard: number;
+}
+
+export interface ExamBlueprint {
+  title: string;
+  sections: BlueprintSection[];
+  totalScore: number;
+  coveragePlan: BlueprintCoveragePlan;
+  difficultyDistribution: BlueprintDifficultyDistribution;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 试卷质量审核评分
+// ─────────────────────────────────────────────────────────────
+
+/** 审核维度标识 */
+export type ReviewDimension = 'correctness' | 'similarity' | 'blueprint_match' | 'format' | 'discrimination';
+
+/** 单题单维度的审核结果 */
+export interface DimensionScore {
+  dimension: ReviewDimension;
+  score: number;       // 0-100
+  issues: string[];    // 具体问题描述
+  similarTo?: number[]; // 仅 similarity 维度：与哪些题号雷同
+}
+
+/** 单题的综合质量评分 */
+export interface QuestionQualityScore {
+  index: number;
+  total: number;                    // 加权总分 0-100
+  dimensions: Record<ReviewDimension, DimensionScore>;
+  needsRegeneration: boolean;       // total < 70 或任一维度 < 60
+  regenerationFeedback?: string;    // 注入重出 prompt 的反馈
+}
+
+/** 全卷质量报告 */
+export interface ExamQualityReport {
+  scores: QuestionQualityScore[];
+  regeneratedIndices: number[];     // 实际重出的题号
+  qualityWarnings: number[];        // 重出后仍不达标的题号
+}
+
+// ─────────────────────────────────────────────────────────────
 // SSE 事件
 // ─────────────────────────────────────────────────────────────
 
@@ -331,7 +407,7 @@ export type SseEvent =
   | { type: 'title_updated'; conversationId: string; title: string }
   | { type: 'review_complete'; summary: string; score: number; totalQuestions: number; correctAnswers: number }
   | { type: 'exam_generating' }
-  | { type: 'exam_progress'; step: 'analyze' | 'write' | 'review'; message: string; progress: number }
+  | { type: 'exam_progress'; step: 'blueprint' | 'write' | 'review' | 'regenerate' | 'analyze' | 'complete'; message: string; progress: number }
   | { type: 'exam_ready'; examId: string; title: string; totalQuestions: number; totalScore: number; durationMinutes: number }
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }

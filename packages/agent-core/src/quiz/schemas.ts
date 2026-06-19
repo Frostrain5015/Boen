@@ -104,3 +104,48 @@ export type MultipleChoiceArgs = z.infer<typeof multipleChoiceSchema>;
 export type FillBlankArgs = z.infer<typeof fillBlankSchema>;
 export type TrueFalseArgs = z.infer<typeof trueFalseSchema>;
 export type ShortAnswerArgs = z.infer<typeof shortAnswerSchema>;
+
+// ── 考试批量出题工具（按题型选 schema，一次输出多道题） ──────────
+
+/** 按题型获取对应的 batch question schema */
+function batchQuestionSchema(questionType: string): z.ZodArray<z.ZodTypeAny, 'many'> {
+  let itemSchema: z.ZodTypeAny;
+  switch (questionType) {
+    case 'multiple_choice':
+      itemSchema = multipleChoiceSchema;
+      break;
+    case 'fill_blank':
+      itemSchema = fillBlankSchema;
+      break;
+    case 'true_false':
+      itemSchema = trueFalseSchema;
+      break;
+    case 'short_answer':
+      itemSchema = shortAnswerSchema;
+      break;
+    default:
+      throw new Error(`不支持的题型: ${questionType}`);
+  }
+  return z.array(itemSchema).min(1).max(15);
+}
+
+/**
+ * 构造一个 batch 出题 tool（按题型动态 schema）。
+ * 考试出题阶段用 model.bindTools + tool_choice 强制结构化输出，
+ * 消除 regex 提取 + 手动 fallback 的脆弱链路。
+ */
+export function makeGenerateQuestionsTool(questionType: string, count: number) {
+  const itemSchema = batchQuestionSchema(questionType);
+  return tool(async () => '', {
+    name: 'generate_questions',
+    description: `按蓝图生成 ${count} 道 ${questionType} 题目。必须通过本工具输出，不要把题目写进普通文字回复。`,
+    schema: z.object({
+      questions: itemSchema,
+    }),
+  });
+}
+
+/** batch 出题工具的输出类型 */
+export type GenerateQuestionsResult = {
+  questions: MultipleChoiceArgs[] | FillBlankArgs[] | TrueFalseArgs[] | ShortAnswerArgs[];
+};
