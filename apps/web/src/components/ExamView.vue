@@ -615,7 +615,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <h2 class="brand-text text-xl font-bold tracking-tight" :style="{ color: currentSubjectColor }">博文正在出卷</h2>
+        <h2 class="brand-text text-xl font-bold tracking-tight" style="color: var(--accent-strong)">博文正在出卷</h2>
         <div class="w-80 space-y-0.5">
           <div
             v-for="item in generationSteps"
