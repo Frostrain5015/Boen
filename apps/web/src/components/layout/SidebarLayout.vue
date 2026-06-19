@@ -182,7 +182,7 @@ function startNewExam() {
               </div>
             </div>
             <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] group-hover:hidden">{{ ex.result.percentage }}</span>
-            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">未完�?/span>
+            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">未完成</span>
             <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="hidden shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:block" title="删除考试">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
