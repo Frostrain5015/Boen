@@ -4,6 +4,7 @@ import type { Grade, SubscriptionStatus } from '@boen/shared';
 import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { useChatStore } from './chat';
 import { useExamStore } from './exam';
+import router from '@/router';
 
 // ── User Profile types & helpers ────────────────────────────
 const PROFILE_KEY = 'boen_user_profile';
@@ -82,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function handleOAuthSuccess() {
-    window.history.replaceState({}, '', '/');
+    router.replace('/');
     isOAuthCallback.value = false;
     authenticated.value = true;
     authChecked.value = true;
@@ -99,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function handleOAuthError() {
-    window.history.replaceState({}, '', '/');
+    router.replace('/');
     isOAuthCallback.value = false;
     authChecked.value = true;
     authenticated.value = false;
