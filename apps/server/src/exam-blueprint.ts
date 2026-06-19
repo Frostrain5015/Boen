@@ -139,9 +139,9 @@ export async function stepBlueprintArchitect(
   const constraintBoundary = buildConstraintBoundary(config.grade, mode, totalScore);
   const prompt = blueprintArchitectPrompt(config, weightGuide, profileContext, constraintBoundary);
 
-  try {
-    // 尝试用 bindTools 做结构化输出
-    if (model.bindTools) {
+  // 先尝试 bindTools 结构化输出（包在自己的 try-catch 中，失败后走文本回退）
+  if (model.bindTools) {
+    try {
       const bound = model.bindTools([designBlueprintTool], {
         tool_choice: { type: 'function', function: { name: 'design_blueprint' } },
       } as any);
@@ -155,14 +155,17 @@ export async function stepBlueprintArchitect(
           return validateAndFixBlueprint(parsed.data, totalScore);
         }
         console.warn('[blueprint] schema 校验失败，尝试手动修复:', parsed.error.issues.slice(0, 3));
-        // 尝试修复常见问题后重试
         const fixed = tryFixBlueprint(blueprintCall.args, totalScore);
         if (fixed) return fixed;
       }
+    } catch (err) {
+      console.warn('[blueprint] bindTools 调用失败，降级到文本模式:', err instanceof Error ? err.message.slice(0, 80) : err);
     }
+  }
 
-    // bindTools 不支持或失败 → 回退到纯文本 + JSON 解析
-    console.warn('[blueprint] bindTools 不可用或失败，回退到文本模式');
+  // 文本回退
+  try {
+    console.warn('[blueprint] 回退到文本模式');
     const response = await model.invoke([new SystemMessage(prompt + '\n\n请直接输出 JSON 格式的蓝图，不要有其他文字。')]);
     const content = typeof response.content === 'string' ? response.content : '';
     const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
