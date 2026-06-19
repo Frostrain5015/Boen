@@ -4,6 +4,7 @@ import Mascot from '@/components/Mascot.vue';
 import StarDisplay from '@/components/StarDisplay.vue';
 import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
+import { getToken } from '@/services/auth';
 
 interface KpNode {
   title: string;
@@ -53,11 +54,16 @@ const animatingNumbers = ref(false);
 const report = ref<string | null>(null);
 const reportLoading = ref(false);
 
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function generateReport() {
   reportLoading.value = true;
   report.value = null;
   try {
-    const res = await fetch(`/api/profile/report?subject=${subject.value}&grade=${grade.value}`);
+    const res = await fetch(`/api/profile/report?subject=${subject.value}&grade=${grade.value}`, { headers: authHeaders() });
     const data = await res.json();
     report.value = data.report || '生成失败';
   } catch { report.value = '报告生成失败，请稍后再试。'; }
@@ -118,7 +124,7 @@ async function fetchOutline() {
   loading.value = true;
   selectedKp.value = null;
   try {
-    const res = await fetch(`/api/profile/outline?subject=${subject.value}&grade=${grade.value}`);
+    const res = await fetch(`/api/profile/outline?subject=${subject.value}&grade=${grade.value}`, { headers: authHeaders() });
     const data = await res.json();
     outline.value = data;
     setTimeout(() => { animatingNumbers.value = true; }, 100);
