@@ -397,6 +397,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
+        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在出卷</h2>
         <div class="w-80 space-y-0.5">
           <div v-for="st in ['blueprint','write','review']" :key="st">
             <div class="step-row" :class="stepState(st) === 'done' || stepState(st) === 'active' ? '' : 'opacity-30'">
@@ -492,6 +493,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
     <div v-if="examState === 'grading'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
+        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在评分</h2>
         <div class="w-80 space-y-1">
           <div class="step-row">
             <span class="step-dot dot-active">✦</span>
@@ -642,7 +644,7 @@ onUnmounted(() => { if (timerInterval.value) clearInterval(timerInterval.value);
 
 /* ── 进度条 ── */
 .loading-bar-inner { width: 40%; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent-soft), var(--accent), var(--accent-strong)); animation: loadingSlide 1.4s ease-in-out infinite; }
-@keyframes loadingSlide { 0% { transform: translateX(-30%); } 100% { transform: translateX(260%); } }
+@keyframes loadingSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 .progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 /* ── 步骤列表 ── */
