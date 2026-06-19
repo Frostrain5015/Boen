@@ -1,9 +1,8 @@
 /**
- * TikZ 渲染降级模块
+ * TikZ 渲染模块
  *
- * 服务端 /api/render-tikz 已下线（安全审计 C2）。
- * 竖式运算（\opadd / \opsub / \opmul / \opdiv）保留前端轻量渲染器。
- * 真正的 TikZ 图形显示为"渲染服务暂不可用"的降级提示。
+ * - 竖式运算（\opadd / \opsub / \opmul / \opdiv）保留前端轻量渲染器。
+ * - 真正的 TikZ 图形调用服务端 /api/render-tikz 渲染为 SVG。
  */
 
 const errBox = (msg: string) =>
@@ -95,7 +94,7 @@ function escapeHtml(s: string): string {
 /**
  * 处理 DOM 中的 TikZ 占位块：
  * - xlop 竖式命令 → 前端 HTML 渲染
- * - 其他 TikZ 图形 → 降级提示（服务端已下线）
+ * - 其他 TikZ 图形 → 调用服务端 /api/render-tikz 渲染为 SVG
  */
 export async function processTikzDiagrams(
   root: ParentNode = document,
@@ -115,8 +114,25 @@ export async function processTikzDiagrams(
       continue;
     }
 
-    // TikZ 服务端渲染已下线，显示降级提示
-    wrap.innerHTML = `<details class="tikz-fallback"><summary>\uD83D\uDCD0 TikZ \u56FE\u8868\uFF08\u6E32\u67D3\u670D\u52A1\u5DF2\u4E0B\u7EBF\uFF09</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
-    wrap.dataset.tikzState = 'done';
+    // 服务端渲染
+    try {
+      const token = localStorage.getItem('boen_access_token');
+      const res = await fetch('/api/render-tikz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json() as { svg?: string; error?: string };
+      if (data.svg) {
+        wrap.innerHTML = data.svg;
+        wrap.dataset.tikzState = 'done';
+      } else {
+        wrap.innerHTML = `<details class="tikz-fallback"><summary>\uD83D\uDCD0 TikZ \u6E32\u67D3\u5931\u8D25</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
+        wrap.dataset.tikzState = 'done';
+      }
+    } catch {
+      wrap.innerHTML = `<details class="tikz-fallback"><summary>\uD83D\uDCD0 TikZ \u6E32\u67D3\u5931\u8D25</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;
+      wrap.dataset.tikzState = 'done';
+    }
   }
 }

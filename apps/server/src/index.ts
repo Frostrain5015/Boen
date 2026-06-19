@@ -1,5 +1,8 @@
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
+import { writeFileSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { config as loadEnv } from 'dotenv';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -246,6 +249,78 @@ function formString(form: FormData, key: string): string | undefined {
 function isFormFile(value: unknown): value is { name?: string; type?: string; arrayBuffer: () => Promise<ArrayBuffer> } {
   return !!value && typeof value === 'object' && 'arrayBuffer' in value && typeof (value as any).arrayBuffer === 'function';
 }
+
+// ── TiKZ 渲染 API（安全加固版） ──────────────
+
+/** POST /api/render-tikz — 安全加固的 TikZ → SVG 渲染 */
+app.post('/api/render-tikz', async (c) => {
+  // 1. 鉴权
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+
+  const { code } = await c.req.json<{ code?: string }>();
+  if (!code?.trim()) return c.json({ error: 'TikZ code required' }, 400);
+
+  // 2. 代码长度限制
+  if (code.length > 10000) return c.json({ error: 'code too long' }, 400);
+
+  // 3. 代码黑名单：禁用危险 LaTeX 命令
+  const DANGEROUS_PATTERNS = [
+    /\\input\s*\{/i,
+    /\\write18/i,
+    /\\openout/i,
+    /\\readline/i,
+    /\\catcode/i,
+    /\\immediate\s*\\write/i,
+    /\\def\s*\\shell/i,
+    /\\lstinputlisting/i,
+    /\\include\s*\{/i,
+  ];
+  for (const pat of DANGEROUS_PATTERNS) {
+    if (pat.test(code)) return c.json({ error: 'dangerous code rejected' }, 400);
+  }
+
+  // 4. 跨平台临时目录
+  const tmpDir = mkdtempSync(join(tmpdir(), 'tikz-'));
+  const texPath = join(tmpDir, 'tikz.tex');
+  const pdfPath = join(tmpDir, 'tikz.pdf');
+  const svgPath = join(tmpDir, 'tikz.svg');
+
+  const tex = `\\documentclass{standalone}
+\\usepackage{fontspec}
+\\usepackage{xeCJK}
+\\setCJKmainfont{Noto Sans CJK SC}
+\\usepackage{tikz}
+\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
+\\usepackage{pgfplots}
+\\pgfplotsset{compat=1.18}
+\\usepackage{xlop}
+\\begin{document}
+${code}
+\\end{document}`;
+
+  try {
+    writeFileSync(texPath, tex, 'utf-8');
+    // 5. -no-shell-escape 禁用 RCE
+    execSync(`xelatex -no-shell-escape -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
+
+    const pdfExists = existsSync(pdfPath);
+    if (!pdfExists) return c.json({ error: 'pdflatex failed' }, 500);
+
+    execSync(`dvisvgm --pdf --no-fonts -o "${svgPath}" "${pdfPath}"`, { timeout: 15000, stdio: 'pipe' });
+    const svg = existsSync(svgPath) ? execSync(`cat "${svgPath}"`, { encoding: 'utf-8', timeout: 5000 }) : '';
+    if (!svg) return c.json({ error: 'dvisvgm produced empty output' }, 500);
+
+    // 6. 只返回 SVG，不返回编译日志
+    return c.json({ svg });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message.slice(0, 200) : String(err);
+    console.error('[tikz] render failed:', msg);
+    return c.json({ error: 'tikz render failed' }, 500);
+  } finally {
+    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理临时目录 */ }
+  }
+});
 
 // ── 知识图谱 API ────────────────────────────
 // 初始化表（幂等）

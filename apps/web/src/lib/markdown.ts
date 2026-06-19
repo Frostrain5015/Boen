@@ -136,7 +136,7 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   // tikz 图形 → 占位，processTikzDiagrams 会渲染 xlop 或显示降级提示
   if (info === 'tikz' || (info === 'latex' && /\\begin\s*\{tikzpicture\}/.test(content))) {
     const encoded = encodeURIComponent(content);
-    return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">\uD83D\uDCD0</span><span class="tikz-gen-label">TikZ \u6E32\u67D3\u6682\u4E0D\u53EF\u7528</span></div></div>\n`;
+    return `<div class="tikz-wrap" data-tikz="${encoded}"><div class="tikz-gen"><span class="tikz-gen-icon">\uD83D\uDCD0</span><span class="tikz-gen-label">TikZ \u6E32\u67D3\u4E2D\u2026</span></div></div>\n`;
   }
   return defaultFence!(tokens, idx, options, env, self);
 };
