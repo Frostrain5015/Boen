@@ -314,7 +314,6 @@ export const useChatStore = defineStore('chat', () => {
     busy,
     threadId,
     isGeneratingQuiz,
-    knowledgeBaseLoading,
     conversations,
     currentConversationId,
     reaction,
