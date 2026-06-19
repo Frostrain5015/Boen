@@ -9,6 +9,7 @@ const difficulty = z.preprocess(
 const knowledgePoint = z.string().nullish().describe('对应考点（仅填主要考点标题，如"解一元一次方程"）');
 const knowledgePointId = z.number().nullish().describe('知识点 ID（来自课程知识库，优先使用 knowledgePointId 而非 knowledgePoint 文本）');
 const literacies = z.array(z.string()).nullish().describe('本题考查的核心素养，如"数感""符号意识""运算能力""推理意识""模型意识""空间观念""几何直观""数据意识""应用意识""创新意识"等，选 1-3 个');
+const richTextDescription = 'Markdown text; math questions may include KaTeX formulas and fenced ```tikz ...``` diagrams.';
 const explanation = z.string().describe(
   '答案解析。请用以下结构（Markdown 格式）：\n' +
   '### 📖 解析\n' +
@@ -22,12 +23,14 @@ const explanation = z.string().describe(
 );
 
 export const passageField = z.string().nullish().describe('阅读材料（语文/英语阅读理解题专用），在此提供文章或对话原文，前端会以特殊字体块渲染');
+const groupId = z.number().int().nullish().describe('同一材料或分步设问的小题分组 ID');
 
 export const multipleChoiceSchema = z.object({
-  stem: z.string().describe('题干'),
+  stem: z.string().describe(`题干。${richTextDescription}`),
   passage: passageField,
+  groupId,
   options: z
-    .array(z.object({ key: z.string().describe('选项编号，如 A'), text: z.string() }))
+    .array(z.object({ key: z.string().describe('选项编号，如 A'), text: z.string().describe(`选项文本。${richTextDescription}`) }))
     .min(2)
     .describe('选项列表'),
   correctKeys: z.array(z.string()).min(1).default(['A']).describe('正确选项的 key；多选时填多个'),
@@ -36,42 +39,47 @@ export const multipleChoiceSchema = z.object({
   knowledgePointId,
   literacies,
   difficulty,
-  explanation: z.string().default('详见解析。').describe('答案解析'),
+  explanation: z.string().default('详见解析。').describe(`答案解析。${richTextDescription}`),
 });
 
 export const fillBlankSchema = z.object({
-  stem: z.string().describe('题干，每个空用连续四个下划线 ____ 表示'),
+  stem: z.string().describe(`题干，每个空用连续四个下划线 ____ 表示。${richTextDescription}`),
   passage: passageField,
+  groupId,
   blanks: z
     .array(z.object({ acceptedAnswers: z.array(z.string()).min(1).describe('该空的可接受答案') }))
     .min(1)
     .describe('按题干中空的先后顺序排列'),
   knowledgePoint,
   knowledgePointId,
+  literacies,
   difficulty,
-  explanation: z.string().default('详见解析。').describe('答案解析'),
+  explanation: z.string().default('详见解析。').describe(`答案解析。${richTextDescription}`),
 });
 
 export const trueFalseSchema = z.object({
-  stem: z.string().describe('判断题陈述'),
+  stem: z.string().describe(`判断题陈述。${richTextDescription}`),
   passage: passageField,
+  groupId,
   answer: z.boolean().describe('该陈述是否正确'),
   knowledgePoint,
   knowledgePointId,
   literacies,
   difficulty,
-  explanation: z.string().default('详见解析。').describe('答案解析'),
+  explanation: z.string().default('详见解析。').describe(`答案解析。${richTextDescription}`),
 });
 
 export const shortAnswerSchema = z.object({
-  stem: z.string().describe('简答题题干'),
+  stem: z.string().describe(`简答题题干。${richTextDescription}`),
   passage: passageField,
-  referenceAnswer: z.string().nullish().describe('参考答案（可选，模型可后续在回复中补充）'),
+  groupId,
+  referenceAnswer: z.string().nullish().describe(`参考答案。${richTextDescription}`),
   keyPoints: z.array(z.string()).nullish().describe('评分要点'),
   knowledgePoint,
   knowledgePointId,
+  literacies,
   difficulty,
-  explanation: z.string().nullish().describe('解析与作答点评（可选，模型可在后续回复中给出）'),
+  explanation: z.string().nullish().describe(`解析与作答点评。${richTextDescription}`),
 });
 
 /** 四个出题工具（仅作结构化输出契约用于绑定；执行由服务端「人类作答」完成，故 func 为空） */

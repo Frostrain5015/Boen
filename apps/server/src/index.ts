@@ -9,6 +9,7 @@ import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
 import { HumanMessage, SystemMessage, ToolMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   getChatModel,
   buildBoenGraph,
@@ -303,7 +304,7 @@ app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (m
 app.post('/api/model/switch', async (c) => {
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
-  if (!DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
+  if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
   const switched = switchModel(p);
   return c.json({ success: true, provider: switched });
 });
@@ -844,7 +845,25 @@ app.get('/api/exam/:examId', async (c) => {
         blankCount: q.type === 'fill_blank' ? (q.blankCount ?? q.blanks?.length ?? 1) : undefined,
         tikzSvgs: q.tikzSvgs,
       }));
-  return c.json({ exam: { id: session.id, title: session.title, subject: session.subject, grade: session.grade, totalScore: session.totalScore, durationMinutes: session.durationMinutes, status: session.status, createdAt: session.createdAt, submittedAt: session.submittedAt, questions, answers: completed ? session.answers : undefined, results: session.results } });
+  return c.json({
+    exam: {
+      id: session.id,
+      examId: session.id,
+      title: session.title,
+      subject: session.subject,
+      grade: session.grade,
+      totalScore: session.totalScore,
+      durationMinutes: session.durationMinutes,
+      status: session.status,
+      createdAt: session.createdAt,
+      submittedAt: session.submittedAt,
+      questions,
+      answers: completed ? session.answers : undefined,
+      results: session.results,
+      blueprint: session.blueprint,
+      qualityReport: session.qualityReport,
+    },
+  });
 });
 
 

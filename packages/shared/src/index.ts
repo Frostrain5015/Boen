@@ -321,6 +321,8 @@ export interface ExamReviewDetail {
   questions: ExamQuestion[];
   answers?: Array<{ questionIndex: number; answer: AnswerPayload }>;
   results?: ExamResults;
+  blueprint?: ExamBlueprint;
+  qualityReport?: ExamQualityReport;
 }
 
 // ─────────────────────────────────────────────────────────────

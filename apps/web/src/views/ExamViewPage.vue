@@ -10,6 +10,7 @@ const examStore = useExamStore();
 
 function handleBack() {
   examStore.pendingExamNotes = null;
+  examStore.pendingExamConfig = null;
   router.push('/');
 }
 
@@ -24,6 +25,7 @@ function handleRefresh() {
       :key="`exam-${examStore.examViewKey}`"
       class="flex-1"
       :auto-notes="examStore.pendingExamNotes ?? undefined"
+      :initial-config="examStore.pendingExamConfig ?? undefined"
       @back="handleBack"
       @refresh="handleRefresh"
     />

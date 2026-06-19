@@ -74,8 +74,12 @@ const examState = ref<'config' | 'generating' | 'ready' | 'taking' | 'grading' |
 const config = ref<ExamConfigData>({ subject: 'math', grade: '7', durationMinutes: 45, notes: '' });
 
 // 从档案传入的考试备注（章节测试/卷册测试），组件挂载时自动填入
-const props = defineProps<{ autoNotes?: string }>();
-if (props.autoNotes) { config.value.notes = props.autoNotes; }
+const props = defineProps<{ autoNotes?: string; initialConfig?: Partial<ExamConfigData> }>();
+if (props.initialConfig) {
+  config.value = { ...config.value, ...props.initialConfig };
+} else if (props.autoNotes) {
+  config.value.notes = props.autoNotes;
+}
 const session = ref<ExamSessionData | null>(null);
 const results = ref<ExamResultsData | null>(null);
 const answers = ref<Map<number, any>>(new Map());
@@ -101,6 +105,12 @@ const gradingSteps: Array<{ step: GradingStep; label: string }> = [
 const scoreRevealed = ref(false);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
 const dotNavRef = ref<HTMLElement | null>(null);
+
+const EXAM_TRACE_PREFIX = '[Boen Exam]';
+function examTrace(event: string, payload?: unknown) {
+  if (payload === undefined) console.info(`${EXAM_TRACE_PREFIX} ${event}`);
+  else console.info(`${EXAM_TRACE_PREFIX} ${event}`, payload);
+}
 
 /** 将题目按 groupId 分组，无 groupId 的每题自成一组 */
 const groupedQuestions = computed(() => {
@@ -503,15 +513,21 @@ async function generateExamPaper() {
   let errMsg = '';
   try {
     const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes) };
+    examTrace('generate:start', examRequest);
     await streamExamGenerate(examRequest, (e) => {
+      examTrace(`sse:${e.type}`, e);
       if (e.type === 'exam_progress') {
         genProgress.value = { step: e.step, message: e.message, progress: e.progress };
+        examTrace(`generate:progress:${e.step}`, { message: e.message, progress: e.progress });
       } else if (e.type === 'exam_ready') {
         ready = { examId: e.examId, title: e.title, totalQuestions: e.totalQuestions, totalScore: e.totalScore, durationMinutes: e.durationMinutes };
+        examTrace('generate:ready', ready);
       } else if (e.type === 'error') {
         errMsg = e.message;
+        console.error(`${EXAM_TRACE_PREFIX} generate:error`, e.message);
       }
     });
+    examTrace('generate:stream-complete');
     if (errMsg) throw new Error(errMsg);
     const r = ready as ExamReadyData | undefined;
     if (!r) throw new Error('生成试卷失败：未收到试卷数据');
@@ -520,11 +536,19 @@ async function generateExamPaper() {
       totalQuestions: r.totalQuestions, totalScore: r.totalScore,
       durationMinutes: r.durationMinutes, questions: [],
     };
+    examTrace('questions:load:start', { examId: r.examId });
     await loadQuestions(r.examId);
     examState.value = 'ready';
+    examTrace('generate:complete', {
+      examId: r.examId,
+      totalQuestions: session.value?.questions.length ?? 0,
+      totalScore: r.totalScore,
+      durationMinutes: r.durationMinutes,
+    });
     // 计时器在用户点击「开始考试」后才启动
     emit('refresh'); // 新试卷已入库，刷新侧栏考试列表
   } catch (err) {
+    console.error(`${EXAM_TRACE_PREFIX} generate:failed`, err);
     toast.error('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
     examState.value = 'config';
   }
@@ -564,7 +588,8 @@ async function submitExam() {
 
 // 进入答题页后编译题面里的 TikZ 示意图
 watch(examState, (s) => {
-  if (s === 'taking') {
+  examTrace('state', s);
+  if (s === 'taking' || s === 'results') {
     nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
   }
 });
@@ -621,6 +646,7 @@ function toggleResult(qIndex: number) {
   const s = new Set(expandedResults.value);
   if (s.has(qIndex)) s.delete(qIndex); else s.add(qIndex);
   expandedResults.value = s;
+  nextTick(() => processTikzDiagrams(document, tikzSvgsMap.value));
 }
 
 async function loadQuestions(examId: string) {
@@ -629,8 +655,21 @@ async function loadQuestions(examId: string) {
     const data = await res.json();
     if (data.exam?.questions && session.value) {
       session.value = { ...session.value, questions: data.exam.questions };
+      const typeCounts = data.exam.questions.reduce((acc: Record<string, number>, q: ExamQuestionData) => {
+        acc[q.type] = (acc[q.type] ?? 0) + 1;
+        return acc;
+      }, {});
+      examTrace('questions:load:success', {
+        examId,
+        totalQuestions: data.exam.questions.length,
+        typeCounts,
+        blueprint: data.exam.blueprint,
+        qualityReport: data.exam.qualityReport,
+      });
     }
-  } catch {}
+  } catch (err) {
+    console.error(`${EXAM_TRACE_PREFIX} questions:load:failed`, err);
+  }
 }
 
 function authHeaders(): Record<string, string> {

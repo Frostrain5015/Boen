@@ -6,5 +6,15 @@ export type { LookupKnowledgePointArgs } from './curriculum-tools.js';
 export { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness, systemPromptForPractice } from './prompts.js';
 export type { PracticeType } from './prompts.js';
 export type { GradeBand, Grade } from '@boen/shared';
-export { quizTools, QUIZ_TOOL_NAMES, toQuestionPayload, gradeAnswer, makeGenerateQuestionsTool } from './quiz/index.js';
+export {
+  quizTools,
+  QUIZ_TOOL_NAMES,
+  toQuestionPayload,
+  gradeAnswer,
+  makeGenerateQuestionsTool,
+  multipleChoiceSchema,
+  fillBlankSchema,
+  trueFalseSchema,
+  shortAnswerSchema,
+} from './quiz/index.js';
 export type { ShortAnswerGraderParams, ShortAnswerGraderResult, ShortAnswerGrader, GenerateQuestionsResult } from './quiz/index.js';

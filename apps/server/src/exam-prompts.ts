@@ -75,7 +75,7 @@ export function blueprintArchitectPrompt(
     '1. 试卷标题',
     '2. 试卷板块（sections）：按知识点大类划分 2-4 个板块（如"数与代数""图形与几何""统计与概率"），每个板块包含：',
     '   - 板块标题',
-    '   - 涉及的知识点列表（含权重）',
+    '   - 涉及的知识点列表（含 ID 和权重；如果上下文给出了知识点 ID，必须原样填入 id）',
     '   - 该板块的难度倾向',
     '   - 该板块下的题型配比（题型/数量/每题分值/重点知识点）',
     '3. 知识点覆盖计划（coveragePlan）：必考 / 重点 / 拓展',
@@ -94,7 +94,7 @@ export function blueprintArchitectPrompt(
     {
       "title": "板块标题",
       "knowledgePoints": [
-        {"title": "知识点名", "weight": 0.5}
+        {"id": 123, "title": "知识点名", "weight": 0.5}
       ],
       "difficulty": "easy|medium|hard",
       "questionTypes": [
@@ -126,7 +126,7 @@ export function blueprintArchitectPrompt(
 export interface QuestionWriterContext {
   config: PromptConfig;
   sectionTitle: string;
-  sectionKnowledgePoints: Array<{ title: string; weight: number }>;
+  sectionKnowledgePoints: Array<{ id?: number; title: string; weight: number }>;
   questionType: string;
   questionTypeLabel: string;
   count: number;
@@ -153,7 +153,7 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     `每题 ${pointsPer} 分。难度要求：${difficulty}。`,
     '',
     '=== 本板块知识点 ===',
-    sectionKnowledgePoints.map(kp => `  - ${kp.title}（权重 ${Math.round(kp.weight * 100)}%）`).join('\n'),
+    sectionKnowledgePoints.map(kp => `  - ${kp.id ? `#${kp.id} ` : ''}${kp.title}（权重 ${Math.round(kp.weight * 100)}%）`).join('\n'),
     focusKps.length ? `\n重点考查：${focusKps.join('、')}` : '',
     '',
     '=== 试卷信息 ===',
@@ -172,14 +172,14 @@ export function questionWriterPrompt(ctx: QuestionWriterContext): string {
     '',
     '=== ⚠ 输出要求（硬性规定，不得违反） ===',
     `输出 ${count} 道题。严格按以下 JSON 结构输出，字段名不能改：`,
-    `{"questions":[{"stem":"题干","type":"${questionType}","points":${pointsPer},"knowledgePoint":"考点","literacies":["核心素养"],"difficulty":"${difficulty}","explanation":"解析"${questionType === 'multiple_choice' ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false' : ''}${questionType === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["标准答案1"]},{"acceptedAnswers":["标准答案2"]}]' : ''}${questionType === 'short_answer' && config.subject !== 'math' ? ',"referenceAnswer":"参考答案","keyPoints":["要点1","要点2"]' : ''}${['multiple_choice', 'fill_blank', 'true_false', 'short_answer'].includes(questionType) ? ',"groupId":1' : ''},"passage":"（有阅读材料时填写，无则省略此字段）"}]}`,
+    `{"questions":[{"stem":"题干","passage":"（有阅读材料时填写，无则省略此字段）","type":"${questionType}","points":${pointsPer},"knowledgePoint":"考点","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"${difficulty}","explanation":"解析"${questionType === 'multiple_choice' ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false' : ''}${questionType === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["标准答案1"]},{"acceptedAnswers":["标准答案2"]}]' : ''}${questionType === 'true_false' ? ',"answer":true' : ''}${questionType === 'short_answer' ? ',"referenceAnswer":"参考答案","keyPoints":["要点1","要点2"]' : ''}${['multiple_choice', 'fill_blank', 'true_false', 'short_answer'].includes(questionType) ? ',"groupId":1' : ''}]}`,
     questionType === 'multiple_choice'
       ? '选择题硬性要求：stem 只写题干，绝对不要把 A/B/C/D 选项写进 stem；options 必须写真实选项文本，严禁写 "{选项A}"、"选项A"、"A" 等任何占位符。违者整卷作废。'
       : '',
     questionType === 'fill_blank'
       ? '填空题硬性要求：stem 中每个空必须用 ____ 或（ ）标出；blanks 必须按空的顺序给出 acceptedAnswers，空数必须与题干空位一致。空位与答案数不匹配则整题无效。'
       : '',
-    'knowledgePoint 和 literacies 必须填写，不得为空。',
+    'knowledgePoint 和 literacies 必须填写，不得为空；如果本板块知识点列表带有 #ID，必须填写对应的 knowledgePointId。',
     `难度统一为 ${difficulty}。同一篇阅读材料的多道小题必须设相同 groupId。`,
     '【⚠ 阅读材料强制令】阅读理解/完形填空等有原文的题型，原文必须且只能写在 passage 字段中，严禁将原文写进 stem 字段，严禁在 stem 中使用 ** passage ** 等标记来代替 passage 字段。stem 字段只写提问/题干本身。违反此规则将导致学生看不到阅读材料，整题作废。\
 	\n   passage 开头可用 `# 标题` 标注文章标题（如有），前端会以标题样式渲染。',
@@ -371,7 +371,7 @@ export function regenerateQuestionPrompt(
     '⚠ 新题的情景和数据必须与上述其他题目完全不同。',
     '',
     '=== 输出要求（必须严格按此 JSON 结构） ===',
-    `{"questions":[{"stem":"题干","type":"${question.type}","points":${question.points},"knowledgePoint":"考点","literacies":["核心素养"],"difficulty":"medium","explanation":"解析"${question.options ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"}],"correctKeys":["A"],"multiSelect":false' : ''}${question.type === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["答案"]}]' : ''}${question.type === 'short_answer' ? ',"referenceAnswer":"参考答案","keyPoints":["要点"]' : ''}]}`,
+    `{"questions":[{"stem":"题干","passage":"（有阅读材料时填写，无则省略此字段）","type":"${question.type}","points":${question.points},"knowledgePoint":"考点","knowledgePointId":${question.knowledgePointId ?? 123},"literacies":["核心素养"],"difficulty":"medium","explanation":"解析"${question.type === 'multiple_choice' ? ',"options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false' : ''}${question.type === 'fill_blank' ? ',"blanks":[{"acceptedAnswers":["答案"]}]' : ''}${question.type === 'true_false' ? ',"answer":true' : ''}${question.type === 'short_answer' ? ',"referenceAnswer":"参考答案","keyPoints":["要点"]' : ''}]}`,
     '直接输出 JSON，不要 markdown 代码块，不要其他文字。',
     KATEX_FORMAT_GUIDE,
     xlopGuide(config.grade),

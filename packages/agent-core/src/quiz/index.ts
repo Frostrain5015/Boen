@@ -6,7 +6,15 @@ import {
   trueFalseSchema,
 } from './schemas.js';
 
-export { quizTools, QUIZ_TOOL_NAMES, makeGenerateQuestionsTool } from './schemas.js';
+export {
+  quizTools,
+  QUIZ_TOOL_NAMES,
+  makeGenerateQuestionsTool,
+  multipleChoiceSchema,
+  fillBlankSchema,
+  trueFalseSchema,
+  shortAnswerSchema,
+} from './schemas.js';
 export type { GenerateQuestionsResult } from './schemas.js';
 
 // ── 简答题 LLM 评分器类型 ──────────────────────

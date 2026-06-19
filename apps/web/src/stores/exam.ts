@@ -17,6 +17,7 @@ export const useExamStore = defineStore('exam', () => {
   const selectedExamId = ref<string | null>(null);
   const examViewKey = ref(0);
   const pendingExamNotes = ref<string | null>(null);
+  const pendingExamConfig = ref<{ subject: Subject; grade: string; durationMinutes: number; notes: string } | null>(null);
 
   // ── Actions ───────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ export const useExamStore = defineStore('exam', () => {
 
   function startNewExam() {
     selectedExamId.value = null;
+    pendingExamNotes.value = null;
+    pendingExamConfig.value = null;
     examViewKey.value++;
   }
 
@@ -41,8 +44,10 @@ export const useExamStore = defineStore('exam', () => {
   function handleExam(detail: { subject: Subject; grade: string; durationMinutes: number; notes: string }) {
     const uiStore = useUiStore();
     pendingExamNotes.value = detail.notes;
+    pendingExamConfig.value = detail;
     uiStore.subject = detail.subject;
-    startNewExam();
+    selectedExamId.value = null;
+    examViewKey.value++;
   }
 
   async function handleDeleteExam(examId: string, event: Event) {
@@ -66,6 +71,7 @@ export const useExamStore = defineStore('exam', () => {
     selectedExamId,
     examViewKey,
     pendingExamNotes,
+    pendingExamConfig,
     loadExams,
     startNewExam,
     openExamReview,

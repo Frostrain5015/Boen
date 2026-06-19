@@ -156,12 +156,12 @@ export function getWeightInfo(nodeId: number): {
 
 /** 获取某学科某年级所有知识点的权重分布 */
 export function getWeightDistribution(subject: string, grade?: string): Array<{
-  title: string; weight: number; tier: string; classHours: number | null;
+  id: number; title: string; weight: number; tier: string; classHours: number | null;
 }> {
   let rows: any[];
   if (grade) {
     rows = db.prepare(`
-      SELECT n.title, n.weight, d.class_hours
+      SELECT n.id, n.title, n.weight, d.class_hours
       FROM kg_weight_dims d
       JOIN kg_nodes n ON n.id = d.node_id
       JOIN curriculum_kg_map m ON m.node_id = n.id
@@ -173,7 +173,7 @@ export function getWeightDistribution(subject: string, grade?: string): Array<{
     `).all(subject, grade) as any[];
   } else {
     rows = db.prepare(`
-      SELECT n.title, n.weight, d.class_hours
+      SELECT n.id, n.title, n.weight, d.class_hours
       FROM kg_weight_dims d
       JOIN kg_nodes n ON n.id = d.node_id AND n.subject=?
       ORDER BY n.weight DESC, d.class_hours DESC
@@ -181,6 +181,7 @@ export function getWeightDistribution(subject: string, grade?: string): Array<{
   }
 
   return rows.map((r: any) => ({
+    id: r.id,
     title: r.title,
     weight: r.weight,
     tier: (WEIGHT_TIERS.find((t) => t.level === r.weight)?.label) || '',

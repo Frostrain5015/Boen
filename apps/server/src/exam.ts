@@ -13,8 +13,9 @@
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { SystemMessage } from '@langchain/core/messages';
-import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint } from '@boen/shared';
-import { gradeAnswer, makeGenerateQuestionsTool } from '@boen/agent-core';
+import { z } from 'zod';
+import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint, ExamQualityReport } from '@boen/shared';
+import { gradeAnswer, multipleChoiceSchema, fillBlankSchema, trueFalseSchema, shortAnswerSchema } from '@boen/agent-core';
 import type { ShortAnswerGrader } from '@boen/agent-core';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,7 @@ import { tmpdir } from 'node:os';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
+import { retrieveCurriculum } from './curriculum.js';
 import { retrieveMistakeStyleSamples } from './mistakes.js';
 import { withConcurrencyLimit } from './concurrency.js';
 import { stepBlueprintArchitect, flattenBlueprint, type WriteTask } from './exam-blueprint.js';
@@ -57,6 +59,17 @@ export interface ExamSession {
   submittedAt?: number;
   answers?: Array<{ questionIndex: number; answer: AnswerPayload }>;
   results?: ExamResults;
+  blueprint?: ExamBlueprint;
+  qualityReport?: ExamQualityReport;
+}
+
+export interface GeneratedExam {
+  title: string;
+  questions: ExamQuestion[];
+  totalScore: number;
+  durationMinutes: number;
+  blueprint: ExamBlueprint;
+  qualityReport: ExamQualityReport;
 }
 
 /** 进度回调：每步执行时通知前端（可返回 Promise 以保证 SSE 写入有序） */
@@ -227,6 +240,81 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
   return q2;
 }
 
+const GENERATED_QUESTION_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  multiple_choice: multipleChoiceSchema,
+  fill_blank: fillBlankSchema,
+  true_false: trueFalseSchema,
+  short_answer: shortAnswerSchema,
+};
+
+function getGeneratedQuestionSchema(questionType: string): z.ZodTypeAny {
+  const schema = GENERATED_QUESTION_SCHEMAS[questionType];
+  if (!schema) throw new Error(`不支持的题型: ${questionType}`);
+  return schema;
+}
+
+function parseJsonObject(content: string): unknown {
+  const sanitized = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  const jsonStart = sanitized.indexOf('{');
+  const jsonEnd = sanitized.lastIndexOf('}');
+  const cleanJson = jsonStart !== -1 && jsonEnd > jsonStart
+    ? sanitized.slice(jsonStart, jsonEnd + 1)
+    : sanitized;
+  return JSON.parse(cleanJson);
+}
+
+function parseGeneratedQuestionList(raw: unknown, questionType: string, count: number): any[] {
+  const rawQuestions = (raw as any)?.questions ?? (Array.isArray(raw) ? raw : []);
+  if (!Array.isArray(rawQuestions)) {
+    throw new Error('结构化输出缺少 questions 数组');
+  }
+  if (rawQuestions.length < count) {
+    throw new Error(`结构化输出题量不足：期望 ${count} 道，实际 ${rawQuestions.length} 道`);
+  }
+
+  const schema = getGeneratedQuestionSchema(questionType);
+  return rawQuestions.slice(0, count).map((q, i) => {
+    const parsed = schema.safeParse(q);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      throw new Error(`第 ${i + 1} 道题 schema 不合格：${issue?.path.join('.') || 'root'} ${issue?.message || ''}`.trim());
+    }
+    return parsed.data;
+  });
+}
+
+function validateExamQuestionForDelivery(q: ExamQuestion): string | null {
+  if (!q.stem || q.stem.trim().length < 5) return '题干过短或缺失';
+  if (!q.explanation || q.explanation.trim().length < 5) return '解析过短或缺失';
+  if (!q.knowledgePoint || q.knowledgePoint.trim().length === 0) return 'knowledgePoint 缺失';
+  if (!normalizeLiteracies(q.literacies).length) return 'literacies 缺失';
+
+  if (q.type === 'multiple_choice') {
+    if (!q.options || q.options.length < 3) return `选择题选项不足（${q.options?.length ?? 0} 个）`;
+    if (!q.correctKeys?.length) return '选择题正确答案缺失';
+    if (q.options.some(o => isPlaceholderOptionText(o.text, o.key))) return '选择题选项存在占位符';
+  }
+  if (q.type === 'fill_blank') {
+    const markerCount = countBlankMarkers(q.stem);
+    if (markerCount < 1) return '填空题题干缺少空位标记';
+    if (!q.blanks?.length) return '填空题答案结构缺失';
+    if (q.blanks.length !== markerCount) return `填空题空位数与答案数不一致（空位 ${markerCount}，答案 ${q.blanks.length}）`;
+  }
+  if (q.type === 'true_false' && typeof q.answer !== 'boolean') return '判断题 answer 缺失';
+  if (q.type === 'short_answer') {
+    if (!q.referenceAnswer?.trim() && !(q.keyPoints?.length)) return '简答题缺少 referenceAnswer/keyPoints';
+  }
+  return null;
+}
+
+function normalizeOptionalPassage(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const text = raw.trim();
+  if (!text) return undefined;
+  if (/有阅读材料时填写|无则省略|阅读材料时填写|无则省略此字段/.test(text)) return undefined;
+  return text;
+}
+
 // ── 考试生成（四阶段并发流水线） ──────────────
 
 /** 简易哈希（用于 TikZ 代码块去重） */
@@ -255,6 +343,16 @@ function extractTikzBlocks(text: string): Array<{ code: string; start: number; e
   return blocks;
 }
 
+function tikzSourceTexts(q: ExamQuestion): string[] {
+  return [
+    q.stem,
+    q.passage,
+    q.explanation,
+    q.referenceAnswer,
+    ...(q.options ?? []).map((o) => o.text),
+  ].filter((text): text is string => typeof text === 'string' && text.length > 0);
+}
+
 /**
  * 重构后的考试生成流水线：
  *   1. 蓝图架构师（stepBlueprintArchitect）— bindTools 结构化输出
@@ -267,7 +365,7 @@ export async function generateExam(
   config: ExamConfig,
   onProgress?: ExamProgressFn,
   userId?: string,
-): Promise<{ title: string; questions: ExamQuestion[]; totalScore: number; durationMinutes: number }> {
+): Promise<GeneratedExam> {
   try {
     const weightDist = getWeightDistribution(config.subject, config.grade);
     const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
@@ -276,7 +374,9 @@ export async function generateExam(
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 5 });
     const weightGuide = buildWeightGuideForPrompt(weightDist);
     const profileContext = userId ? await buildProfileContext(userId, config) : '';
-    const styleContext = userId ? await retrieveMistakeStyleSamples(userId, config.subject, config.grade, config.notes ?? '', [], 3).catch(() => '') : '';
+    const scopeQuery = [config.chapters?.join(' '), config.notes].filter(Boolean).join('\n');
+    const curriculumContext = await retrieveCurriculum({ subject: config.subject, grade: config.grade, query: scopeQuery }).catch(() => '');
+    const styleContext = userId ? await retrieveMistakeStyleSamples(userId, config.subject, config.grade, scopeQuery, [], 3).catch(() => '') : '';
     const enrichedConfig: ExamConfig = { ...config, styleContext };
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 10 });
@@ -284,7 +384,7 @@ export async function generateExam(
       model,
       { subject: enrichedConfig.subject, grade: enrichedConfig.grade, totalScore: enrichedConfig.totalScore, notes: enrichedConfig.notes },
       weightGuide,
-      [profileContext, styleContext].filter(Boolean).join('\n\n'),
+      [curriculumContext, profileContext, styleContext].filter(Boolean).join('\n\n'),
       mode,
     );
 
@@ -321,14 +421,16 @@ export async function generateExam(
 
     // ─── 阶段三：审核委员会（5 维度并发） ──────
     await onProgress?.({ step: 'review', message: 'review', progress: 85 });
-    const { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
+    let { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
+    const regeneratedIndices = new Set<number>();
+    const qualityWarnings = new Set<number>();
 
-    const regenCount = scores.filter(s => s.needsRegeneration).length;
+    let regenCount = scores.filter(s => s.needsRegeneration).length;
     await onProgress?.({ step: 'review', message: 'review', progress: 90 });
 
-    // ─── 阶段四：重出闭环（并发 + 反馈注入 + 二次校验） ────
-    if (regenCount > 0) {
-      await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: 92 });
+    const maxRegenerationRounds = 3;
+    for (let round = 1; regenCount > 0 && round <= maxRegenerationRounds; round++) {
+      await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(98, 90 + round * 2) });
       const crossGroupContext = buildCrossGroupContext(questions);
       const regenResult = await regenerateQuestions(
         model,
@@ -339,33 +441,41 @@ export async function generateExam(
         writeSingleQuestion,
       );
       questions = regenResult.questions.map((q, i) => localFormatFix(q, i));
+      for (const index of regenResult.report.regeneratedIndices) regeneratedIndices.add(index);
+      for (const index of regenResult.report.qualityWarnings) qualityWarnings.add(index);
 
-      if (regenResult.report.regeneratedIndices.length > 0) {
-        // 重出后二次完整审核
-        await onProgress?.({ step: 'review', message: 'review', progress: 96 });
-        const secondReview = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
-        const stillFailing = secondReview.scores.filter(s => s.needsRegeneration);
-        for (const s of stillFailing) {
-          const dims = Object.entries(s.dimensions).filter(([, d]) => d.score < 60).map(([dim, d]) => `${dim}(${d.score})`);
-          console.warn(`[二次审核] Q${s.index + 1} 重出后仍未通过: ${dims.join(', ')}`);
-        }
-        console.log(`[二次审核] 重出前 ${regenCount} 题不合格 → 重出后 ${stillFailing.length} 题不合格`);
-        await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: 98 });
+      await onProgress?.({ step: 'review', message: 'review', progress: Math.min(99, 92 + round * 2) });
+      const nextReview = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
+      scores = nextReview.scores;
+      regenCount = scores.filter(s => s.needsRegeneration).length;
+      if (regenCount > 0) {
+        console.warn(`[exam] 第 ${round} 轮重出后仍有 ${regenCount} 题未通过质量审核`);
       }
+    }
+
+    const stillFailing = scores.filter(s => s.needsRegeneration);
+    for (const s of stillFailing) qualityWarnings.add(s.index);
+    const qualityReport: ExamQualityReport = {
+      scores,
+      regeneratedIndices: [...regeneratedIndices].sort((a, b) => a - b),
+      qualityWarnings: [...qualityWarnings].sort((a, b) => a - b),
+    };
+
+    if (stillFailing.length > 0) {
+      const summary = stillFailing.slice(0, 5).map((s) => {
+        const dims = Object.entries(s.dimensions)
+          .filter(([, d]) => d.score < 60)
+          .map(([dim, d]) => `${dim}:${d.score}`)
+          .join(',');
+        return `Q${s.index + 1}(${dims || s.total})`;
+      }).join('；');
+      throw new Error(`试卷质量审核未通过：${summary}`);
     }
 
     await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
 
-    // 安全兜底：极端情况下 0 道题 → 注入一道默认题
     if (questions.length === 0) {
-      const defaultQs: ExamQuestion[] = [{
-        index: 0, type: 'multiple_choice', points: Math.max(blueprint.totalScore || 100, 10),
-        stem: '请选出正确答案。', knowledgePoint: '综合', literacies: ['综合素养'],
-        difficulty: 'medium', explanation: '本题为备选题目。',
-        options: [{ key: 'A', text: 'A' }, { key: 'B', text: 'B' }, { key: 'C', text: 'C' }, { key: 'D', text: 'D' }],
-        correctKeys: ['A'], multiSelect: false,
-      }];
-      return { title: blueprint.title, questions: defaultQs, totalScore: defaultQs[0].points, durationMinutes: enrichedConfig.durationMinutes ?? 20 };
+      throw new Error('试卷生成失败：没有生成任何有效题目');
     }
 
     // 修正总分精确等于目标分
@@ -383,11 +493,11 @@ export async function generateExam(
 
     // ─── TikZ 预渲染：出题阶段直接交给服务器 LaTeX 引擎编译 ────
     {
-      const tikzQS = questions.filter(q => hasTikzBlocks(q.stem) || hasTikzBlocks(q.passage ?? '') || q.options?.some(o => hasTikzBlocks(o.text)));
+      const tikzQS = questions.filter(q => tikzSourceTexts(q).some(hasTikzBlocks));
       if (tikzQS.length > 0) {
         await Promise.all(tikzQS.map(async (q) => {
           const svgs: Record<string, string> = {};
-          const blocks = [...extractTikzBlocks(q.stem), ...extractTikzBlocks(q.passage ?? ''), ...(q.options ?? []).flatMap(o => extractTikzBlocks(o.text))];
+          const blocks = tikzSourceTexts(q).flatMap((text) => extractTikzBlocks(text));
           for (const block of blocks) {
             const hash = simpleHash(block.code);
             if (svgs[hash]) continue;
@@ -407,7 +517,7 @@ export async function generateExam(
       }
     }
 
-    return { title: blueprint.title, questions, totalScore, durationMinutes: estMinutes };
+    return { title: blueprint.title, questions, totalScore, durationMinutes: estMinutes, blueprint, qualityReport };
   } catch (e: any) {
     console.error('生成试卷失败:', e?.message?.slice(0, 200));
     throw new Error(`生成试卷失败：${e?.message || '未知错误'}`);
@@ -429,7 +539,7 @@ function buildCrossGroupContext(allQuestions: ExamQuestion[]): string {
 }
 
 /**
- * 按 section × questionType 出题，用 bindTools + generate_questions tool 强制结构化输出。
+ * 按 section × questionType 出题，用 DeepSeek JSON Output + 本地 schema 强制结构化输出。
  * 失败 → 重试 2 次 → 降级题量 → 标记 __needs_review__ 强制进入重出池。
  */
 async function stepWriteQuestionsV2(
@@ -472,7 +582,7 @@ async function stepWriteQuestionsV2(
     try {
       const questions = await invokeGenerateQuestions(model, finalPrompt, task.questionType, task.count);
       if (questions.length > 0) {
-        return questions.map((q: any, i: number) => toExamQuestion(q, task, i));
+        return toValidatedExamQuestions(questions, task);
       }
     } catch (err) {
       console.warn(`[write:${task.questionType}] 第 ${attempt + 1} 次失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
@@ -488,13 +598,13 @@ async function stepWriteQuestionsV2(
     task = { ...task, count: Math.max(1, task.count - 1) };
     try {
       const questions = await invokeGenerateQuestions(model, prompt, task.questionType, task.count);
-      if (questions.length > 0) return questions.map((q: any, i: number) => toExamQuestion(q, task, i));
+      if (questions.length > 0) return toValidatedExamQuestions(questions, task);
     } catch { /* 继续到兜底 */ }
   }
 
     // 最终兜底：标记 __needs_review__，审核阶段强制重出
     console.warn(`[write:${task.questionType}] 全部失败，生成占位题等待重出`);
-    return Array.from({ length: task.count }, (_, i) => ({
+  return Array.from({ length: task.count }, (_, i) => ({
       index: i,
       type: task.questionType as ExamQuestion['type'],
       points: task.pointsPer,
@@ -507,6 +617,21 @@ async function stepWriteQuestionsV2(
     } as ExamQuestion));
   }
 
+function toValidatedExamQuestions(rawQuestions: any[], task: WriteTask): ExamQuestion[] {
+  if (rawQuestions.length !== task.count) {
+    throw new Error(`出题数量不匹配：期望 ${task.count} 道，实际 ${rawQuestions.length} 道`);
+  }
+  const questions = rawQuestions.map((q: any, i: number) => localFormatFix(toExamQuestion(q, task, i), i));
+  const issues = questions
+    .map((q) => ({ index: q.index, issue: validateExamQuestionForDelivery(q) }))
+    .filter((x): x is { index: number; issue: string } => Boolean(x.issue));
+  if (issues.length > 0) {
+    const summary = issues.slice(0, 3).map((x) => `Q${x.index + 1}: ${x.issue}`).join('；');
+    throw new Error(`生成题目未通过本地校验：${summary}`);
+  }
+  return questions;
+}
+
 /** 调用模型出题：使用 DeepSeek JSON Output 模式 */
 async function invokeGenerateQuestions(
   model: BaseChatModel,
@@ -514,47 +639,23 @@ async function invokeGenerateQuestions(
   questionType: string,
   count: number,
 ): Promise<any[]> {
-  // 使用 response_format JSON Output 模式（支持 thinking）
-  const schemaExample = questionType === 'multiple_choice'
-    ? `{
-  "questions": [
-    {
-      "stem": "题干（不要含选项字母）",
-      "options": [{"key": "A", "text": "选项1"}, {"key": "B", "text": "选项2"}, {"key": "C", "text": "选项3"}, {"key": "D", "text": "选项4"}],
-      "correctKeys": ["A"],
-      "multiSelect": false,
-      "knowledgePoint": "考点名称",
-      "literacies": ["核心素养1", "核心素养2"],
-      "difficulty": "medium",
-      "explanation": "解析内容"
-    }
-  ]
-}`
-    : `{
-  "questions": [
-    {
-      "stem": "题干内容",
-      "knowledgePoint": "考点名称",
-      "literacies": ["核心素养"],
-      "difficulty": "medium",
-      "explanation": "解析内容"
-    }
-  ]
-}`;
+  const examples: Record<string, string> = {
+    multiple_choice: `{"questions":[{"stem":"题干（不要含选项字母）","options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false,"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养1"],"difficulty":"medium","explanation":"解析内容"}]}`,
+    fill_blank: `{"questions":[{"stem":"题干 ____","blanks":[{"acceptedAnswers":["标准答案"]}],"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
+    true_false: `{"questions":[{"stem":"判断题陈述","answer":true,"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
+    short_answer: `{"questions":[{"stem":"题干内容","referenceAnswer":"参考答案","keyPoints":["要点1","要点2"],"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
+  };
+  const schemaExample = examples[questionType] ?? examples.short_answer;
   const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n必须输出纯净 JSON，不要 markdown 代码块，不要其他任何文字。' +
     `\nJSON schema 示例：\n${schemaExample}\n一次性输出全部 ${count} 道题。`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const response = await model.invoke(
         [new SystemMessage(textPrompt)],
-        { response_format: { type: 'json_object' } as any },
+        { response_format: { type: 'json_object' } } as any,
       );
       const content = typeof response.content === 'string' ? response.content : '';
-      const parsed = JSON.parse(content);
-      const questions = parsed.questions ?? (Array.isArray(parsed) ? parsed : []);
-      if (Array.isArray(questions) && questions.length > 0) {
-        return questions;
-      }
+      return parseGeneratedQuestionList(parseJsonObject(content), questionType, count);
     } catch (err) {
       console.warn(`[invoke:${questionType}] 第 ${attempt + 1} 次失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
     }
@@ -569,7 +670,7 @@ function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion 
     type: task.questionType as ExamQuestion['type'],
     points: task.pointsPer,
     stem: raw.stem ?? '',
-    passage: raw.passage,
+    passage: normalizeOptionalPassage(raw.passage),
     knowledgePoint: raw.knowledgePoint ?? task.focusKps[0] ?? '综合',
     knowledgePointId: raw.knowledgePointId,
     literacies: normalizeLiteracies(raw.literacies),
@@ -644,7 +745,7 @@ function buildWeightGuideForPrompt(dist: any[]): string {
     const ratio = t ? `（建议占比 ${t.paperRatio}%）` : '';
     lines.push(`\n${tier}${ratio}:`);
     for (const item of items) {
-      lines.push(`  - ${item.title} (${item.classHours}课时)`);
+      lines.push(`  - #${item.id} ${item.title} (${item.classHours}课时)`);
     }
   }
   lines.push('\n严格按此比例分配题目数量。核心+重要应占 70% 以上。');
@@ -928,11 +1029,36 @@ function buildRawArgs(q: ExamQuestion): Record<string, unknown> {
 
 // ── 会话管理 ─────────────────────────────────
 
-export function createExamSession(userId: string, config: ExamConfig, data: { title: string; questions: ExamQuestion[]; totalScore: number; durationMinutes: number }): ExamSession {
+export function createExamSession(userId: string, config: ExamConfig, data: GeneratedExam): ExamSession {
   const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = Math.floor(Date.now() / 1000);
-  db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`).run(id, userId, config.subject, config.grade, data.title, JSON.stringify(data.questions), data.totalScore, data.durationMinutes, now);
-  return { id, userId, subject: config.subject, grade: config.grade, title: data.title, questions: data.questions, totalScore: data.totalScore, durationMinutes: data.durationMinutes, status: 'pending', createdAt: now };
+  db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at, blueprint, quality_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`).run(
+    id,
+    userId,
+    config.subject,
+    config.grade,
+    data.title,
+    JSON.stringify(data.questions),
+    data.totalScore,
+    data.durationMinutes,
+    now,
+    JSON.stringify(data.blueprint),
+    JSON.stringify(data.qualityReport),
+  );
+  return {
+    id,
+    userId,
+    subject: config.subject,
+    grade: config.grade,
+    title: data.title,
+    questions: data.questions,
+    totalScore: data.totalScore,
+    durationMinutes: data.durationMinutes,
+    status: 'pending',
+    createdAt: now,
+    blueprint: data.blueprint,
+    qualityReport: data.qualityReport,
+  };
 }
 
 export function getExamSession(examId: string, userId: string): ExamSession | null {
@@ -945,6 +1071,8 @@ export function getExamSession(examId: string, userId: string): ExamSession | nu
     status: row.status, createdAt: row.created_at, submittedAt: row.submitted_at,
     answers: row.answers ? JSON.parse(row.answers) : undefined,
     results: row.results ? JSON.parse(row.results) : undefined,
+    blueprint: row.blueprint ? JSON.parse(row.blueprint) : undefined,
+    qualityReport: row.quality_report ? JSON.parse(row.quality_report) : undefined,
   };
 }
 

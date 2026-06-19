@@ -169,7 +169,7 @@ export async function stepBlueprintArchitect(
     try {
       const response = await model.invoke(
         [new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON 格式的蓝图，不要 markdown 代码块，不要其他文字。')],
-        { response_format: { type: 'json_object' } as any },
+        { response_format: { type: 'json_object' } } as any,
       );
       const content = typeof response.content === 'string' ? response.content : '';
       const parsed = JSON.parse(content);
@@ -324,7 +324,7 @@ function tryFixBlueprint(raw: any, targetScore: number): ExamBlueprint | null {
 /** 蓝图中的单个出题任务（section × questionType） */
 export interface WriteTask {
   sectionTitle: string;
-  sectionKnowledgePoints: Array<{ title: string; weight: number }>;
+  sectionKnowledgePoints: Array<{ id?: number; title: string; weight: number }>;
   questionType: string;
   questionTypeLabel: string;
   count: number;
@@ -344,7 +344,7 @@ export function flattenBlueprint(blueprint: ExamBlueprint): WriteTask[] {
     for (const qt of section.questionTypes) {
       tasks.push({
         sectionTitle: section.title,
-        sectionKnowledgePoints: section.knowledgePoints.map(kp => ({ title: kp.title, weight: kp.weight })),
+        sectionKnowledgePoints: section.knowledgePoints.map(kp => ({ id: kp.id, title: kp.title, weight: kp.weight })),
         questionType: qt.type,
         questionTypeLabel: TYPE_LABELS[qt.type] ?? qt.type,
         count: qt.count,

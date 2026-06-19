@@ -100,19 +100,31 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   ]);
 }
 
+function failedReviewResult(questionCount: number, dimension: ReviewDimension, reason: string): ReviewResult {
+  return {
+    scores: Array.from({ length: questionCount }, () => ({
+      dimension,
+      score: 0,
+      issues: [reason],
+    })),
+    overallMatchScore: dimension === 'blueprint_match' ? 0 : undefined,
+  };
+}
+
 async function runSingleReview(
   model: BaseChatModel,
   prompt: string,
   _toolName: string,
   schema: z.ZodObject<any, any, any>,
   dimension: ReviewDimension,
+  questionCount: number,
 ): Promise<ReviewResult> {
   // 使用 DeepSeek JSON Output 模式（response_format），prompt 已要求输出 JSON
   try {
     const response = await withTimeout(
       model.invoke(
         [new SystemMessage(prompt + '\n\n必须直接输出纯净 JSON，不要 markdown 代码块，不要其他文字。')],
-        { response_format: { type: 'json_object' } as any },
+        { response_format: { type: 'json_object' } } as any,
       ),
       REVIEW_TIMEOUT,
       dimension,
@@ -127,37 +139,43 @@ async function runSingleReview(
       : sanitized;
     const rawData = JSON.parse(cleanJson);
     const parsed = schema.safeParse(rawData);
-    if (parsed.success) return parseReviewOutput(parsed.data, dimension);
-    console.warn(`[review:${dimension}] JSON 格式不符，使用默认分:`, parsed.error.issues.slice(0, 2));
-    return parseReviewOutput(rawData, dimension);
+    if (parsed.success) return parseReviewOutput(parsed.data, dimension, questionCount);
+    console.warn(`[review:${dimension}] JSON 格式不符，按缺失项不通过处理:`, parsed.error.issues.slice(0, 2));
+    return parseReviewOutput(rawData, dimension, questionCount);
   } catch (err) {
-    console.warn(`[review:${dimension}] 审核失败，该维度降级为默认分 80:`, err instanceof Error ? err.message.slice(0, 80) : err);
-    return {
-      scores: [],
-      overallMatchScore: dimension === 'blueprint_match' ? 80 : undefined,
-    };
+    const message = err instanceof Error ? err.message.slice(0, 120) : String(err);
+    console.warn(`[review:${dimension}] 审核失败，该维度按不通过处理:`, message);
+    return failedReviewResult(questionCount, dimension, `审核维度 ${dimension} 执行失败：${message}`);
   }
 }
 
 /** 把 LLM 输出转为 DimensionScore[] */
-function parseReviewOutput(data: any, dimension: ReviewDimension): ReviewResult {
+function parseReviewOutput(data: any, dimension: ReviewDimension, questionCount: number): ReviewResult {
   const rawScores = Array.isArray(data?.scores) ? data.scores : [];
-  const scores: DimensionScore[] = rawScores.map((s: any) => ({
-    dimension,
-    score: Math.max(0, Math.min(100, typeof s?.score === 'number' ? s.score : 80)),
-    issues: Array.isArray(s?.issues) ? s.issues : [],
-    similarTo: Array.isArray(s?.similarTo) ? s.similarTo : undefined,
-  }));
-  // 如果没有有效评分，给所有题默认 80 分
-  if (scores.length === 0) {
-    return {
-      scores: [],
-      overallMatchScore: dimension === 'blueprint_match' ? 80 : undefined,
-    };
+  const byIndex = new Map<number, DimensionScore>();
+
+  for (const s of rawScores) {
+    const index = Number(s?.index);
+    if (!Number.isInteger(index) || index < 0 || index >= questionCount) continue;
+    byIndex.set(index, {
+      dimension,
+      score: Math.max(0, Math.min(100, typeof s?.score === 'number' ? s.score : 0)),
+      issues: Array.isArray(s?.issues) ? s.issues.map((issue: unknown) => String(issue)) : [],
+      similarTo: Array.isArray(s?.similarTo) ? s.similarTo.filter((i: unknown) => Number.isInteger(i)) : undefined,
+    });
   }
+
+  const scores: DimensionScore[] = Array.from({ length: questionCount }, (_, index) =>
+    byIndex.get(index) ?? {
+      dimension,
+      score: 0,
+      issues: [`审核维度 ${dimension} 未返回第 ${index + 1} 题评分`],
+    }
+  );
+
   return {
     scores,
-    overallMatchScore: typeof data.overallMatchScore === 'number' ? data.overallMatchScore : undefined,
+    overallMatchScore: typeof data?.overallMatchScore === 'number' ? data.overallMatchScore : undefined,
   };
 }
 
@@ -165,7 +183,7 @@ function parseReviewOutput(data: any, dimension: ReviewDimension): ReviewResult 
 
 /**
  * 并发执行 5 个维度的审核，聚合为每题的综合质量评分。
- * 任一维度失败独立降级（该维度默认 80 分），不阻断其他维度。
+ * 任一维度失败独立按不通过处理，避免审核器失效时放行坏题。
  */
 export async function reviewBoard(
   model: BaseChatModel,
@@ -179,30 +197,30 @@ export async function reviewBoard(
 
   // 5 维度并发（限 5 路，429 退避重试）
   const reviewTaskBuilders: Array<() => Promise<ReviewResult>> = [
-    () => runSingleReview(model, reviewCorrectnessPrompt(questions, config), 'review_correctness', correctnessReviewSchema, 'correctness'),
-    () => runSingleReview(model, reviewSimilarityPrompt(questions), 'review_similarity', similarityReviewSchema, 'similarity'),
-    () => runSingleReview(model, reviewBlueprintMatchPrompt(questions, blueprint), 'review_blueprint_match', blueprintMatchReviewSchema, 'blueprint_match'),
-    () => runSingleReview(model, reviewFormatPrompt(questions), 'review_format', formatReviewSchema, 'format'),
-    () => runSingleReview(model, reviewDiscriminationPrompt(questions, config), 'review_discrimination', discriminationReviewSchema, 'discrimination'),
+    () => runSingleReview(model, reviewCorrectnessPrompt(questions, config), 'review_correctness', correctnessReviewSchema, 'correctness', questions.length),
+    () => runSingleReview(model, reviewSimilarityPrompt(questions), 'review_similarity', similarityReviewSchema, 'similarity', questions.length),
+    () => runSingleReview(model, reviewBlueprintMatchPrompt(questions, blueprint), 'review_blueprint_match', blueprintMatchReviewSchema, 'blueprint_match', questions.length),
+    () => runSingleReview(model, reviewFormatPrompt(questions), 'review_format', formatReviewSchema, 'format', questions.length),
+    () => runSingleReview(model, reviewDiscriminationPrompt(questions, config), 'review_discrimination', discriminationReviewSchema, 'discrimination', questions.length),
   ];
   const reviewResults = await withConcurrencyLimit(reviewTaskBuilders, { limit: 5, verbose: true });
   const [correctnessRes, similarityRes, blueprintRes, formatRes, discriminationRes] = reviewResults;
 
-  // 提取各维度结果（失败维度用空数组 + 默认分）
-  const correctness = correctnessRes.status === 'fulfilled' ? correctnessRes.value : { scores: [] };
-  const similarity = similarityRes.status === 'fulfilled' ? similarityRes.value : { scores: [] };
-  const blueprintMatch = blueprintRes.status === 'fulfilled' ? blueprintRes.value : { scores: [], overallMatchScore: 80 };
-  const format = formatRes.status === 'fulfilled' ? formatRes.value : { scores: [] };
-  const discrimination = discriminationRes.status === 'fulfilled' ? discriminationRes.value : { scores: [] };
+  // 提取各维度结果（失败维度按不通过处理）
+  const correctness = correctnessRes.status === 'fulfilled' ? correctnessRes.value : failedReviewResult(questions.length, 'correctness', '正确性审核任务异常退出');
+  const similarity = similarityRes.status === 'fulfilled' ? similarityRes.value : failedReviewResult(questions.length, 'similarity', '相似性审核任务异常退出');
+  const blueprintMatch = blueprintRes.status === 'fulfilled' ? blueprintRes.value : failedReviewResult(questions.length, 'blueprint_match', '蓝图匹配审核任务异常退出');
+  const format = formatRes.status === 'fulfilled' ? formatRes.value : failedReviewResult(questions.length, 'format', '格式审核任务异常退出');
+  const discrimination = discriminationRes.status === 'fulfilled' ? discriminationRes.value : failedReviewResult(questions.length, 'discrimination', '区分度审核任务异常退出');
 
   // 聚合为每题的综合评分
   const scores: QuestionQualityScore[] = questions.map((q, i) => {
     const dimScores: Record<ReviewDimension, DimensionScore> = {
-      correctness: correctness.scores[i] ?? { dimension: 'correctness', score: 80, issues: [] },
-      similarity: similarity.scores[i] ?? { dimension: 'similarity', score: 80, issues: [] },
-      blueprint_match: blueprintMatch.scores[i] ?? { dimension: 'blueprint_match', score: 80, issues: [] },
-      format: format.scores[i] ?? { dimension: 'format', score: 80, issues: [] },
-      discrimination: discrimination.scores[i] ?? { dimension: 'discrimination', score: 80, issues: [] },
+      correctness: correctness.scores[i] ?? { dimension: 'correctness', score: 0, issues: ['正确性审核缺失'] },
+      similarity: similarity.scores[i] ?? { dimension: 'similarity', score: 0, issues: ['相似性审核缺失'] },
+      blueprint_match: blueprintMatch.scores[i] ?? { dimension: 'blueprint_match', score: 0, issues: ['蓝图匹配审核缺失'] },
+      format: format.scores[i] ?? { dimension: 'format', score: 0, issues: ['格式审核缺失'] },
+      discrimination: discrimination.scores[i] ?? { dimension: 'discrimination', score: 0, issues: ['区分度审核缺失'] },
     };
 
     // 覆盖：本地格式预检命中的题，格式维度强制低分

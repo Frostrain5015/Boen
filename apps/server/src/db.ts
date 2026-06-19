@@ -171,6 +171,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_exam_user ON exam_sessions(user_id);
 `);
 
+const examSessionColumns = db.prepare(`PRAGMA table_info(exam_sessions)`).all() as Array<{ name: string }>;
+const hasExamSessionColumn = (name: string) => examSessionColumns.some((col) => col.name === name);
+if (!hasExamSessionColumn('blueprint')) {
+  db.exec(`ALTER TABLE exam_sessions ADD COLUMN blueprint TEXT`);
+}
+if (!hasExamSessionColumn('quality_report')) {
+  db.exec(`ALTER TABLE exam_sessions ADD COLUMN quality_report TEXT`);
+}
+
 // ── Mistake notebook ─────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS mistake_items (
