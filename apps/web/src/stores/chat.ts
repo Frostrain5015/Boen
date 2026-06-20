@@ -133,12 +133,11 @@ export const useChatStore = defineStore('chat', () => {
       triggerReaction(e.result.correct ? 'happy' : 'surprise');
     } else if (e.type === 'todo_step') {
       if (e.action === 'advance') {
-        const match = e.detail.match(/第(\d+)步完成/);
-        const step = match ? parseInt(match[1]) : _lastLoggedStep + 1;
-        _lastLoggedStep = step;
+        _lastLoggedStep++;
         const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
-        console.log(`[Boen 类课堂] 🎯 第${step}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
+        console.log(`[Boen 类课堂] 🎯 第${_lastLoggedStep}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
+      if (e.detail) toast.info(e.detail);
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
       if (authStore.subscription && !authStore.subscription.isPremium) {
