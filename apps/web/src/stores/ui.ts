@@ -57,11 +57,13 @@ export const useUiStore = defineStore('ui', () => {
   /** 开始类课堂会话（锁定模式按钮、播放跑马灯） */
   function startSession() {
     sessionActive.value = true;
+    console.log(`[Boen 类课堂] 🔒 会话开始 — 模式: ${activeMode.value} | ${new Date().toLocaleTimeString()}`);
   }
 
   /** 结束类课堂会话（解锁模式按钮、停止跑马灯） */
   function endSession() {
     sessionActive.value = false;
+    console.log(`[Boen 类课堂] ✅ 会话结束 — 耗时: ${new Date().toLocaleTimeString()}`);
     activeMode.value = 'none';
   }
 

@@ -106,6 +106,14 @@ export const useChatStore = defineStore('chat', () => {
       if (cur.kind === 'assistant') {
         cur.text += e.value;
         if (e.value.includes('`')) nextTick(() => runTikz(document));
+        // 类课堂 TODO 步骤日志
+        if (uiStore.sessionActive) {
+          const stepMatch = e.value.match(/第[一二三四五六七八九十]+步[：:]\s*/);
+          if (stepMatch) {
+            const stepNum = '一二三四五六七八九十'.indexOf(stepMatch[0].charAt(1)) + 1;
+            console.log(`[Boen 类课堂] 🎯 第${stepNum}步开始 — ${new Date().toLocaleTimeString()}`);
+          }
+        }
       }
     } else if (e.type === 'quiz_generating') {
       isGeneratingQuiz.value = true;
@@ -135,6 +143,7 @@ export const useChatStore = defineStore('chat', () => {
       }
     } else if (e.type === 'settlement') {
       learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps };
+      console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | ${new Date().toLocaleTimeString()}`);
       const { useUiStore } = await import('@/stores/ui');
       useUiStore().endSession();
     } else if (e.type === 'error') {
@@ -159,6 +168,7 @@ export const useChatStore = defineStore('chat', () => {
     const uiStore = useUiStore();
     // 发送第一条消息时锁定类课堂模式
     if (uiStore.activeMode !== 'none' && !uiStore.sessionActive) {
+      console.log(`[Boen 类课堂] 📤 发送消息 — 主题: "${t.slice(0, 30)}" | ${new Date().toLocaleTimeString()}`);
       uiStore.startSession();
     }
 
