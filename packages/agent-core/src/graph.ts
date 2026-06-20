@@ -40,6 +40,12 @@ export const BoenState = Annotation.Root({
   practiceType: Annotation<string | undefined>(),
   /** LLM 发起的模式切换建议，等待用户确认 */
   pendingModeSwitch: Annotation<string | undefined>(),
+  /**
+   * 类课堂 TODO 状态机（JSON 序列化）
+   * 格式：{"steps":[{"id":1,"label":"了解学情","status":"completed"},...],"currentStep":2}
+   * status: 'pending' | 'in_progress' | 'completed'
+   */
+  todoState: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
@@ -74,6 +80,22 @@ function detectWeaknessIntent(text: string): boolean {
 
 /** 复习完成工具 */
 export const COMPLETE_REVIEW_TOOL = 'complete_review';
+
+/** TODO 步骤推进工具 */
+export const ADVANCE_STEP_TOOL = 'advance_step';
+
+const advanceStepSchema = z.object({
+  stepId: z.number().int().min(1).describe('已完成步骤的编号（如 1 表示第一步已完成）'),
+  note: z.string().optional().describe('完成该步骤的备注，如学生表现等'),
+});
+
+const advanceStepTool = tool(async ({ stepId }) => {
+  return `步骤 ${stepId} 已标记完成。请继续下一步。`;
+}, {
+  name: ADVANCE_STEP_TOOL,
+  description: '完成当前教学步骤后调用此工具，系统会自动推进到下一步。每次只推进一步。',
+  schema: advanceStepSchema,
+});
 
 const completeReviewSchema = z.object({
   summary: z.string().describe('本次复习总结'),
@@ -125,8 +147,9 @@ const switchModeTools: any[] = [
  * 构建博文主图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, checkpointer?: BaseCheckpointSaver) {
+  const structuredTools: any[] = [advanceStepTool];
   const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools] : [...quizTools, ...switchModeTools];
-  const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools];
+  const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
 
   /** 用户确认切换的意图检测 */
@@ -195,30 +218,41 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };
 
+  /** 格式化 TODO 状态为文字清单 */
+  function formatTodoState(todoJson: string): string {
+    try {
+      const todo = JSON.parse(todoJson);
+      if (!todo.steps?.length) return '';
+      const lines = todo.steps.map((s: any) => {
+        const icon = s.status === 'completed' ? '✅' : s.status === 'in_progress' ? '▶️' : '⬜';
+        return `${icon} 第${s.id}步：${s.label}${s.status === 'in_progress' ? '（当前步骤）' : ''}`;
+      });
+      return '\n\n## 📋 教学步骤进度\n' + lines.join('\n') + '\n\n完成当前步骤后，请调用 advance_step 工具推进到下一步。';
+    } catch { return ''; }
+  }
+
   const qaNode = async (state: State): Promise<Partial<State>> => {
     const last = state.messages[state.messages.length - 1];
 
     let system: SystemMessage;
     let tools: ReturnType<NonNullable<typeof model.bindTools>> | undefined;
 
+    // 注入 TODO 步进工具（仅结构化模式）
+    const isStructured = ['review', 'preview', 'weakness', 'practice'].includes(state.mode ?? '');
+    const todoAppend = (state.todoState && isStructured) ? formatTodoState(state.todoState) : '';
+
     if (state.mode === 'review') {
-      system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      // 所有阶段都绑出题工具 + 完成工具，LLM 自主决定何时讲解、何时出题
-      if (model.bindTools) {
-        tools = model.bindTools(reviewTools as any);
-      }
+      system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
+      if (model.bindTools) tools = model.bindTools([...reviewTools, ...structuredTools] as any);
     } else if (state.mode === 'preview') {
-      system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      tools = model.bindTools ? model.bindTools(qaTools as any) : undefined;
+      system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
+      if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
     } else if (state.practiceType) {
-      system = new SystemMessage(systemPromptForPractice(state.practiceType as PracticeType, state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      if (model.bindTools) tools = model.bindTools(qaTools as any);
+      system = new SystemMessage(systemPromptForPractice(state.practiceType as PracticeType, state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
+      if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
     } else if (state.mode === 'weakness') {
-      system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
-      // 集中练习必须绑出题工具，让模型自主决定何时讲解、何时出题
-      if (model.bindTools) {
-        tools = model.bindTools(reviewTools as any);
-      }
+      system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
+      if (model.bindTools) tools = model.bindTools([...reviewTools, ...structuredTools] as any);
     } else {
       system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (last && isToolMessage(last)) {
@@ -293,9 +327,25 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
     if (calls.length > 0) {
       if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL)) return 'end';
+      if (calls.some((c) => c.name === ADVANCE_STEP_TOOL)) return 'advanceStepTodo';
       if (calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) return 'lookupKnowledgePoint';
     }
     return 'end';
+  };
+
+  /** TODO 步进节点：推进到下一步，继续对话 */
+  const advanceStepTodoNode = async (state: State): Promise<Partial<State>> => {
+    if (!state.todoState) return {};
+    try {
+      const todo = JSON.parse(state.todoState);
+      const completedId = todo.currentStep;
+      const step = todo.steps.find((s: any) => s.id === completedId);
+      if (step) step.status = 'completed';
+      todo.currentStep = Math.min(todo.currentStep + 1, todo.steps.length + 1);
+      const nextStep = todo.steps.find((s: any) => s.status === 'in_progress' || s.status === 'pending');
+      if (nextStep) nextStep.status = 'in_progress';
+      return { todoState: JSON.stringify(todo) };
+    } catch { return {}; }
   };
 
   const graph = new StateGraph(BoenState)
@@ -303,14 +353,17 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     .addNode('loadCurriculum', loadCurriculum)
     .addNode('qa', qaNode)
     .addNode('lookupKnowledgePoint', lookupKnowledgePointNode)
+    .addNode('advanceStepTodo', advanceStepTodoNode)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'qa')
     .addConditionalEdges('qa', routeAfterQa, {
       lookupKnowledgePoint: 'lookupKnowledgePoint',
+      advanceStepTodo: 'advanceStepTodo',
       end: '__end__',
     })
-    .addEdge('lookupKnowledgePoint', 'qa');
+    .addEdge('lookupKnowledgePoint', 'qa')
+    .addEdge('advanceStepTodo', 'qa');
 
   return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });
 }

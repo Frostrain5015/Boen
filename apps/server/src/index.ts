@@ -1162,14 +1162,24 @@ app.post('/api/chat', async (c) => {
         }
       }
 
-      // 结构化模式 prompt：非探索/非普通模式时注入 TODO 教学步骤
+      // 结构化模式：初始化 TODO 状态机 + 注入教学 prompt
       let modeSystemMsg: SystemMessage | undefined;
+      let todoState: string | undefined;
       if (body.mode && !['qa', 'explore'].includes(body.mode) && userId) {
-        const { getModePrompt } = await import('./mode-prompts.js');
-        const modePrompt = getModePrompt(body.mode, body.message);
-        if (modePrompt) {
-          modeSystemMsg = new SystemMessage(modePrompt);
+        const { getModePrompt, getModeSteps } = await import('./mode-prompts.js');
+        const steps = getModeSteps(body.mode, body.message);
+        if (steps && steps.length > 0) {
+          todoState = JSON.stringify({
+            steps: steps.map((label: string, i: number) => ({
+              id: i + 1,
+              label,
+              status: i === 0 ? 'in_progress' : 'pending',
+            })),
+            currentStep: 1,
+          });
         }
+        const modePrompt = getModePrompt(body.mode, body.message);
+        if (modePrompt) modeSystemMsg = new SystemMessage(modePrompt);
       }
 
       const last = await runGraph(
@@ -1183,6 +1193,7 @@ app.post('/api/chat', async (c) => {
           styleExamples,
           practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
+          ...(todoState ? { todoState } : {}),
         },
         body.threadId,
         send,
