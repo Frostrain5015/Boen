@@ -541,15 +541,29 @@ body {
   .panel-enter-from, .panel-leave-to { transform: none; }
 }
 
-/* 品牌渐变文字 */
-.brand-text {
+/* 品牌渐变文字（双层：下层固定色，上层随 subject 通过 opacity 交叉淡变） */
+.brand-text-bg,
+.brand-text-overlay {
   font-family: var(--font-display);
+  background: linear-gradient(95deg, #0e9b76, #14b48a 55%, #ff9d5c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: shimmer 6s linear infinite;
+}
+.brand-text-overlay {
+  position: absolute;
+  inset: 0;
   background: linear-gradient(95deg, var(--accent-strong), var(--accent) 55%, #ff9d5c);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   background-size: 200% auto;
   animation: shimmer 6s linear infinite;
+  transition: opacity 0.7s ease;
+  /* 默认完全覆盖下层 */
+  opacity: 1;
 }
 
 /* ── Markdown 排版（.md-body） ─────────────── */

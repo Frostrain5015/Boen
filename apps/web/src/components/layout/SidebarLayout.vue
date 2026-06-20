@@ -124,15 +124,19 @@ watch(() => route.path, () => {
 <template>
   <!-- 侧边栏 -->
   <aside
-    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-[width] duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0"
-    :class="uiStore.sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)] lg:rounded-none' : 'w-0'"
+    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-all duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)] lg:rounded-none lg:shadow-none"
+    :class="uiStore.sidebarOpen ? 'w-64' : 'w-0'"
   >
     <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
-      <!-- 品牌 + 折叠 -->
-      <div class="flex items-center justify-between overflow-hidden border-b border-[var(--line)] px-3 py-2.5 transition-all duration-400 ease-in-out" :class="currentView === 'chat' ? 'opacity-0 max-h-0 border-transparent py-0' : 'opacity-100 max-h-14'">
+      <!-- 品牌 + 折叠（常驻显示，不随视图隐藏） -->
+      <div class="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-3 py-2.5">
         <div class="flex items-center gap-2">
           <Mascot :size="28" :float="false" :animated="false" />
-          <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
+          <!-- 双层渐变文字：下层固定色，上层随 subject 变化并通过 opacity 交叉淡变 -->
+          <span class="relative inline-block text-lg font-bold tracking-tight">
+            <span class="brand-text-bg">博文 Boen</span>
+            <span class="brand-text-overlay">博文 Boen</span>
+          </span>
           <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.1</span>
         </div>
         <button @click="uiStore.sidebarOpen = false" class="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">

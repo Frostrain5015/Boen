@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { createConversation } from '@/services/chat';
 import { useToast } from '@/composables/useToast';
 import { useChatStore, type Subject } from './chat';
@@ -123,6 +123,8 @@ export const useUiStore = defineStore('ui', () => {
         chatStore.items = [];
       } catch { toast.error('\u5207\u6362\u5b66\u79d1\u521b\u5efa\u5bf9\u8bdd\u5931\u8d25'); }
     }
+    // 等待上一帧 DOM 更新完成（清空对话）后再切换学科，保证 CSS transition 不被合并跳过
+    await nextTick();
     subject.value = newSubject;
   }
 
