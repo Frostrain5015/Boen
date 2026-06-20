@@ -97,6 +97,17 @@ html[data-fontsize="lg"] { font-size: 18px; }
   opacity: 0.55;
   animation-duration: 17s;
 }
+/* 类课堂冷/暖切换：广谱过渡（与学科切换 0.5s 对齐，取较长 0.7s 与背景动画同步） */
+body,
+.clay, .clay-glass, .clay-sm,
+input, textarea, select,
+.sidebar-link, .sidebar-section-title,
+h1, h2, h3, h4, p, span, a, label {
+  transition:
+    background-color 0.7s ease,
+    color 0.7s ease,
+    border-color 0.7s ease;
+}
 
 html {
   height: 100dvh;
@@ -160,7 +171,7 @@ body {
   filter: blur(70px);
   opacity: 0.5;
   background: var(--accent);
-  transition: background 0.7s ease;
+  transition: background 0.7s ease, opacity 0.7s ease;
 }
 .app-bg::before {
   width: 42vw;
