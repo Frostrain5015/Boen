@@ -447,49 +447,85 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="rightView === 'create'" class="panel-scroll h-full overflow-y-auto p-5">
-          <div class="mx-auto max-w-xl space-y-4">
-            <div class="rounded-[24px] bg-[var(--paper)]/70 p-5">
-              <div class="mb-4 flex items-center gap-3">
-                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><NotebookPen class="h-5 w-5" /></div>
-                <div>
-                  <h2 class="font-display text-xl font-bold text-[var(--ink)]">新增错题</h2>
-                  <p class="text-xs font-semibold text-[var(--ink-soft)]">拍照或手动录入，系统自动分析错因</p>
-                </div>
-              </div>
-
-              <div class="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--paper)] p-1">
-                <button @click="mode = 'image'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'image' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ImagePlus class="h-3.5 w-3.5" />拍照上传</button>
-                <button @click="mode = 'text'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'text' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ScanText class="h-3.5 w-3.5" />手动输入</button>
-              </div>
-
-              <Transition name="panel" mode="out-in">
-                <div v-if="mode === 'image'" key="image" class="space-y-3">
-                  <label
-                    class="group flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed p-4 text-center transition-all"
-                    :class="dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/60 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/60'"
-                    @dragover.prevent="dragging = true"
-                    @dragleave.prevent="dragging = false"
-                    @drop.prevent="onDrop"
-                  >
-                    <img v-if="imagePreview" :src="imagePreview" alt="错题图片预览" class="max-h-44 rounded-2xl object-contain shadow-sm" />
-                    <template v-else>
-                      <UploadCloud class="mb-2 h-10 w-10 text-[var(--accent)] transition-transform group-hover:-translate-y-1" />
-                      <p class="text-sm font-bold text-[var(--ink)]">上传整页试卷或单题照片</p>
-                      <p class="mt-1 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
-                    </template>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
-                  </label>
-                  <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
-                  <div class="flex items-center justify-between">
-                    <p class="text-xs text-[var(--ink-soft)]">最大 15MB · 支持 jpg/png/webp</p>
-                    <button v-if="imagePreview" @click="clearImage" class="inline-flex h-8 items-center gap-1 rounded-xl bg-[var(--paper)] px-2.5 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><X class="h-3 w-3" />移除</button>
+          <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <article class="space-y-4">
+              <div class="rounded-[24px] bg-[var(--paper)]/70 p-4">
+                <div class="mb-3 flex items-start gap-3">
+                  <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><NotebookPen class="h-5 w-5" /></div>
+                  <div class="min-w-0 flex-1">
+                    <h2 class="font-display text-xl font-bold text-[var(--ink)]">新增错题</h2>
+                    <p class="text-xs font-semibold text-[var(--ink-soft)]">拍照或手动录入，系统自动分析错因并归入知识画像</p>
                   </div>
                 </div>
 
-                <div v-else key="text" class="space-y-2">
-                  <div class="flex items-center gap-2">
-                    <label class="text-xs font-bold text-[var(--ink-soft)]" for="mistake-text">题面</label>
-                    <select v-model="questionType" class="ml-auto h-7 rounded-lg border border-[var(--line)] bg-white/75 px-2 text-[11px] font-bold text-[var(--ink-soft)] outline-none transition-all focus:border-[var(--accent)]">
+                <div class="space-y-4">
+                  <section v-if="mode === 'image'">
+                    <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">题面图片</p>
+                    <label
+                      class="group flex min-h-[240px] cursor-pointer flex-col items-center justify-center rounded-[20px] border-2 border-dashed p-4 text-center transition-all"
+                      :class="dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/60 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/60'"
+                      @dragover.prevent="dragging = true"
+                      @dragleave.prevent="dragging = false"
+                      @drop.prevent="onDrop"
+                    >
+                      <img v-if="imagePreview" :src="imagePreview" alt="错题图片预览" class="max-h-[300px] rounded-2xl object-contain shadow-sm" />
+                      <template v-else>
+                        <UploadCloud class="mb-3 h-12 w-12 text-[var(--accent)] transition-transform group-hover:-translate-y-1" />
+                        <p class="text-sm font-bold text-[var(--ink)]">上传整页试卷或单题照片</p>
+                        <p class="mt-1.5 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
+                        <p class="mt-0.5 text-[11px] text-[var(--ink-soft)] opacity-60">最大 15MB</p>
+                      </template>
+                      <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
+                    </label>
+                    <div class="mt-2 flex items-center justify-between">
+                      <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
+                      <button v-if="imagePreview" @click="clearImage" class="ml-auto inline-flex h-8 items-center gap-1 rounded-xl bg-white/80 px-2.5 text-xs font-bold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--line)]"><X class="h-3 w-3" />移除图片</button>
+                    </div>
+                  </section>
+
+                  <section>
+                    <div class="mb-1 flex items-center gap-2">
+                      <p class="text-xs font-bold text-[var(--ink-soft)]">{{ mode === 'image' ? '补充题面（可选）' : '题面' }}</p>
+                      <span v-if="mode === 'image'" class="text-[10px] text-[var(--ink-soft)] opacity-60">OCR 识别后自动填入，可手动修正</span>
+                    </div>
+                    <textarea v-model="textPrompt" rows="6" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" :placeholder="mode === 'image' ? 'OCR 识别后将自动填入，也可在此补充...' : '粘贴或输入题面、选项、原始作答...'" />
+                  </section>
+
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <section class="rounded-2xl bg-white/75 p-4">
+                      <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">学生答案</p>
+                      <input v-model="studentAnswer" class="w-full border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none" placeholder="输入学生的作答（可选）" />
+                    </section>
+                    <section class="rounded-2xl bg-white/75 p-4">
+                      <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">来源备注</p>
+                      <input v-model="note" class="w-full border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none" placeholder="如：单元测验第 8 题（可选）" />
+                    </section>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <aside class="space-y-4">
+              <div class="rounded-[24px] bg-[var(--accent-soft)] p-4">
+                <div class="mb-3 flex items-center gap-2">
+                  <ImagePlus class="h-4 w-4 text-[var(--accent-strong)]" />
+                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">录入方式</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-1 rounded-2xl bg-white/60 p-1">
+                  <button @click="mode = 'image'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'image' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ImagePlus class="h-3.5 w-3.5" />拍照</button>
+                  <button @click="mode = 'text'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'text' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ScanText class="h-3.5 w-3.5" />文本</button>
+                </div>
+              </div>
+
+              <div class="rounded-[24px] bg-white/75 p-4">
+                <div class="mb-3 flex items-center gap-2">
+                  <BookOpenCheck class="h-4 w-4 text-[var(--accent-strong)]" />
+                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">题目设置</h3>
+                </div>
+                <div class="space-y-3">
+                  <div>
+                    <p class="mb-1 text-[11px] font-bold text-[var(--ink-soft)]">题型</p>
+                    <select v-model="questionType" class="h-10 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm font-bold text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]">
                       <option value="">自动识别题型</option>
                       <option value="选择题">选择题</option>
                       <option value="填空题">填空题</option>
@@ -497,22 +533,23 @@ onBeforeUnmount(() => {
                       <option value="解答题">解答题</option>
                     </select>
                   </div>
-                  <textarea id="mistake-text" v-model="textPrompt" rows="8" class="w-full resize-none rounded-[20px] border border-[var(--line)] bg-white/75 px-3 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="粘贴或输入题面、选项、原始作答..." />
+                  <div class="rounded-2xl bg-[var(--paper)] p-3">
+                    <p class="text-[11px] leading-relaxed text-[var(--ink-soft)]">
+                      <template v-if="mode === 'image'">拍照后系统自动 OCR 识别题面，LLM 分析错因、定位知识点，并写入知识画像。一页照片可包含多道题，系统会逐题归档。</template>
+                      <template v-else>手动输入题面文本，系统将调用 LLM 分析错因、匹配知识点，并更新学生的知识画像熟练度。</template>
+                    </p>
+                  </div>
                 </div>
-              </Transition>
-
-              <div class="mt-4 space-y-2">
-                <input v-model="studentAnswer" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="学生答案/错解（可选）" />
-                <input v-model="note" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="来源备注，如单元测验第 8 题（可选）" />
               </div>
 
-              <button @click="submitMistake" :disabled="busy" class="btn-accent mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold disabled:cursor-not-allowed">
+              <button @click="submitMistake" :disabled="busy" class="btn-accent flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold disabled:cursor-not-allowed">
                 <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
                 <Sparkles v-else class="h-4 w-4" />
                 {{ busy ? '正在分析' : '识别并归档' }}
               </button>
-              <p v-if="error" class="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
-            </div>
+
+              <p v-if="error" class="flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
+            </aside>
           </div>
         </div>
 
