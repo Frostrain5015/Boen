@@ -203,8 +203,8 @@ function formatTodoState(todoJson: string): string {
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, checkpointer?: BaseCheckpointSaver) {
   const qaTools: any[] = deps.lookupKnowledgePoint
-    ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools]
-    : [...quizTools, ...switchModeTools];
+    ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools, switchSubjectTool]
+    : [...quizTools, ...switchModeTools, switchSubjectTool];
   const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
 

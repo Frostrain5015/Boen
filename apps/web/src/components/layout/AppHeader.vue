@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useChatStore } from '@/stores/chat';
-import SubjectSwitcher from './SubjectSwitcher.vue';
 
 const chatStore = useChatStore();
 </script>
@@ -13,10 +12,6 @@ const chatStore = useChatStore();
     <div class="leading-tight">
       <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>
       <p class="text-xs font-semibold text-[var(--ink-soft)]">你的学习小伙伴</p>
-    </div>
-
-    <div class="ml-auto flex items-center gap-3">
-      <SubjectSwitcher />
     </div>
   </header>
 </template>

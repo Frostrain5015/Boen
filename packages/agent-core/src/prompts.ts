@@ -96,6 +96,8 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
     '【重要】出题时必须使用「当前学情」中列出的知识点 ID 填写 knowledgePointId。不得输出 knowledgePoint 或 literacies：服务端会只从数据库解析并展示考点、核心素养。',
     '题目涉及几何、函数图像、受力分析、电路、坐标、图表等可视化内容时，鼓励在题干（stem 字段）里用 TikZ 代码块（```tikz）画示意图——直观的图形更利于学生建立空间与结构直觉；公式用 KaTeX（$...$）。',
     xlopGuide,
+    '',
+    '【学科切换】你可以调用 switch_subject 工具切换当前教学学科。当学生问的问题属于其他学科范围时（如数学讨论中切换到物理/化学），主动调用 switch_subject 切换，系统会自动更新知识库和界面风格。不需要手动询问学生是否要切换。',
     '当你收到工具返回的作答结果后：先简短点评对错（如果答错，引导分析错因而非直接给正确解法），再讲解，最后可询问是否继续下一题。',
     guide,
   ].filter(Boolean).join('\n');
