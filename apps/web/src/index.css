@@ -73,7 +73,7 @@ html[data-fontsize="lg"] { font-size: 18px; }
 }
 
 /* ── 类课堂模式：冷色氛围覆盖 ────────────────────── */
-[data-session="active"] {
+.boen-session {
   --paper: #f1f4f9;
   --paper-2: #e5eaf3;
   --surface: #f7f9fd;
@@ -93,13 +93,13 @@ html[data-fontsize="lg"] { font-size: 18px; }
 }
 
 /* ── 类课堂光斑：入场轨道动画 + 过渡（必须在 * 之后，层叠优先级才够） ── */
-[data-session="active"] .app-bg::before {
+.boen-session .app-bg::before {
   background: var(--accent);
   opacity: 0.62;
   transition: background 0.7s ease, opacity 0.7s ease;
   animation: blob-journey 1.4s cubic-bezier(0.22, 1, 0.36, 1) 1, blob 14s ease-in-out infinite 1.4s;
 }
-[data-session="active"] .app-bg::after {
+.boen-session .app-bg::after {
   background: #74b9ff;
   opacity: 0.6;
   transition: background 0.7s ease, opacity 0.7s ease;
