@@ -434,17 +434,8 @@ const generationDetailText = computed(() => {
   if (step === 'blueprint' && progress < 10) return '正在扫描知识图谱';
   if (step === 'blueprint') return '正在订立大纲';
   if (step === 'write') return '正在编写试题';
-  if (step === 'review') {
-    if (progress >= 90) return '正在进行终审（三轮）';
-    if (progress >= 85) return '正在进行第二轮复核';
-    if (progress >= 80) return '正在进行第一轮复核';
-    return '正在审核初稿';
-  }
-  if (step === 'regenerate') {
-    if (progress >= 91) return '正在第三次修订试题';
-    if (progress >= 86) return '正在第二次修订试题';
-    return '正在修订试题';
-  }
+  if (step === 'review') return '正在进行复核';
+  if (step === 'regenerate') return '正在修订试题';
   if (step === 'complete') return '正在整理试卷';
   return '正在准备生成';
 });
@@ -956,7 +947,7 @@ onUnmounted(() => {
           <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
             <!-- 题号轨道（大题导航） -->
             <div class="shrink-0 pt-5 pb-3">
-              <div ref="dotNavRef" class="dot-nav-scroll mx-auto flex items-center justify-center gap-0.5" role="navigation" aria-label="大题导航">
+              <div ref="dotNavRef" class="dot-nav-scroll mx-auto" role="navigation" aria-label="大题导航">
                 <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
                 <button
                   v-for="(g, gi) in groupedQuestions"
@@ -1330,11 +1321,11 @@ onUnmounted(() => {
 /* ── 顶部题号轨道 ── */
 .dot-nav-scroll {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  overflow-x: auto;
-  scrollbar-width: none;
+  max-width: 100%;
   min-height: 3rem;
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
