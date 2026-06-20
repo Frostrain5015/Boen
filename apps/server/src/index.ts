@@ -261,6 +261,7 @@ async function runGraph(
         }
         if (name === SWITCH_SUBJECT_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
+          await send({ type: 'todo_step', action: 'switch' });
           const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
           const subject = args?.subject ?? 'math';
           await send({ type: 'subject_changed', subject });
@@ -301,6 +302,9 @@ async function runGraph(
         if (todoStepSent.has(EXIT_SESSION_TOOL)) {
           await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
         }
+        if (todoStepSent.has(SWITCH_SUBJECT_TOOL)) {
+          await send({ type: 'todo_done', action: 'switch', detail: '学科已切换' });
+        }
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
         }
@@ -319,6 +323,9 @@ async function runGraph(
         }
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_fail', action: 'query', error: '教材库查询失败' });
+        }
+        if (todoStepSent.has(SWITCH_SUBJECT_TOOL)) {
+          await send({ type: 'todo_fail', action: 'switch', error: '学科切换失败' });
         }
       }
     }

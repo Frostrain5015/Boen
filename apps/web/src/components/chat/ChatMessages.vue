@@ -67,10 +67,10 @@ onMounted(() => {
                     :class="m.kind === 'tool_result' ? 'quiz-gen-icon-done' : m.kind === 'tool_error' ? 'quiz-gen-icon-err' : ''">
                     <template v-if="m.kind === 'tool_error'">⚠️</template>
                     <Wrench v-else-if="m.kind === 'tool_pending'" class="h-4 w-4" />
-                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : '🎓' }}</template>
+                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : m.action === 'switch' ? '🔄' : '🎓' }}</template>
                   </span>
                   <span class="quiz-gen-label">
-                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : '课堂即将结束' }}</template>
+                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : m.action === 'switch' ? '正在切换学科...' : '课堂即将结束' }}</template>
                     <template v-else-if="m.kind === 'tool_result'">{{ (m as any).detail }}</template>
                     <template v-else>{{ (m as any).error }}</template>
                   </span>
