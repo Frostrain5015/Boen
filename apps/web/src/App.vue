@@ -56,10 +56,10 @@ onMounted(() => {
       <SidebarLayout />
 
       <!-- 主内容区 -->
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col" :data-subject="uiStore.subject">
+      <div class="relative min-h-0 min-w-0 flex-1 overflow-hidden" :data-subject="uiStore.subject">
         <router-view v-slot="{ Component }">
           <Transition name="view-fade">
-            <component :is="Component" />
+            <component :is="Component" class="absolute inset-0 flex flex-col" />
           </Transition>
         </router-view>
       </div>
