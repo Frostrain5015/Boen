@@ -68,7 +68,10 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function activateMode(mode: 'review' | 'preview' | 'weakness') {
-    if (sessionActive.value) return; // 发送第一条消息后锁定
+    if (sessionActive.value) {
+      toast.warning('当前有进行中的学习，结束后可切换模式');
+      return;
+    }
     if (activeMode.value === mode) { activeMode.value = 'none'; return; }
     activeMode.value = mode;
     modeTagSent.value = false;

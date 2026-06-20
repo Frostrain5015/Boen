@@ -46,6 +46,8 @@ export const useChatStore = defineStore('chat', () => {
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
   const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number } | null>(null);
+  /** 类课堂是否进行中（用于步骤日志检测，避免跨 store 引用） */
+  let _sessionActive = false;
   // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
@@ -107,11 +109,11 @@ export const useChatStore = defineStore('chat', () => {
         cur.text += e.value;
         if (e.value.includes('`')) nextTick(() => runTikz(document));
         // 类课堂 TODO 步骤日志
-        if (uiStore.sessionActive) {
-          const stepMatch = e.value.match(/第[一二三四五六七八九十]+步[：:]\s*/);
+        if (_sessionActive) {
+          const stepMatch = e.value.match(/第[一二三四五六七八九十]+步[：:]/);
           if (stepMatch) {
-            const stepNum = '一二三四五六七八九十'.indexOf(stepMatch[0].charAt(1)) + 1;
-            console.log(`[Boen 类课堂] 🎯 第${stepNum}步开始 — ${new Date().toLocaleTimeString()}`);
+            const idx = '一二三四五六七八九十'.indexOf(stepMatch[0].charAt(1));
+            if (idx >= 0) console.log(`[Boen 类课堂] 🎯 第${idx + 1}步开始 — ${new Date().toLocaleTimeString()}`);
           }
         }
       }
@@ -144,6 +146,7 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'settlement') {
       learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps };
       console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | ${new Date().toLocaleTimeString()}`);
+      _sessionActive = false;
       const { useUiStore } = await import('@/stores/ui');
       useUiStore().endSession();
     } else if (e.type === 'error') {
@@ -169,6 +172,7 @@ export const useChatStore = defineStore('chat', () => {
     // 发送第一条消息时锁定类课堂模式
     if (uiStore.activeMode !== 'none' && !uiStore.sessionActive) {
       console.log(`[Boen 类课堂] 📤 发送消息 — 主题: "${t.slice(0, 30)}" | ${new Date().toLocaleTimeString()}`);
+      _sessionActive = true;
       uiStore.startSession();
     }
 
