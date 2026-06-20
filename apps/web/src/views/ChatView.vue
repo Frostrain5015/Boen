@@ -11,20 +11,21 @@ const uiStore = useUiStore();
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <!-- 类课堂跑马灯 - 独立 DOM 元素，不受 scoped 伪元素限制 -->
-    <div v-if="uiStore.sessionActive" class="session-beam"></div>
-    <!-- 类课堂步骤进度条 -->
-    <Transition name="todo-fade">
-      <div v-if="uiStore.sessionActive && chatStore.todoProgress" class="todo-progress-bar">
-        <div class="todo-progress-inner">
-          <span class="todo-step-label">{{ chatStore.todoProgress.detail }}</span>
-          <div class="todo-track">
-            <div class="todo-fill" :style="{ width: `${(chatStore.todoProgress.completed / 5) * 100}%` }"></div>
+    <!-- 类课堂跑马灯 + 步骤进度条：Teleport 到 body，避免 App.vue overflow-hidden 裁切 fixed 元素 -->
+    <Teleport to="body">
+      <div v-if="uiStore.sessionActive" class="session-beam"></div>
+      <Transition name="todo-fade">
+        <div v-if="uiStore.sessionActive && chatStore.todoProgress" class="todo-progress-bar">
+          <div class="todo-progress-inner">
+            <span class="todo-step-label">{{ chatStore.todoProgress.detail }}</span>
+            <div class="todo-track">
+              <div class="todo-fill" :style="{ width: `${(chatStore.todoProgress.completed / 5) * 100}%` }"></div>
+            </div>
+            <span class="todo-count">{{ chatStore.todoProgress.completed }} / 5</span>
           </div>
-          <span class="todo-count">{{ chatStore.todoProgress.completed }} / 5</span>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
     <AppHeader />
     <ChatMessages />
     <InputArea />
