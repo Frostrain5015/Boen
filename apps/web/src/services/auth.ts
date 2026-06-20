@@ -82,19 +82,19 @@ function clearPkceParams() {
   sessionStorage.removeItem('boen_oauth_pkce');
 }
 
-/** 保存 access token */
+/** 保存 access token（sessionStorage：关闭标签页即失效） */
 export function saveToken(token: string) {
-  localStorage.setItem('boen_access_token', token);
+  sessionStorage.setItem('boen_access_token', token);
 }
 
 /** 获取 access token */
 export function getToken(): string | null {
-  return localStorage.getItem('boen_access_token');
+  return sessionStorage.getItem('boen_access_token');
 }
 
 /** 清除 token */
 export function clearToken() {
-  localStorage.removeItem('boen_access_token');
+  sessionStorage.removeItem('boen_access_token');
 }
 
 /** 检查是否已登录 */

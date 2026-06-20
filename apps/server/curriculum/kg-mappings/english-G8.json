@@ -1,0 +1,423 @@
+{
+  "subject": "english",
+  "grade": "8",
+  "generatedAt": "2026-06-20T06:24:58.172Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "英语元音与辅音的发音规则",
+      "to": "单词重读与句子重音规律"
+    },
+    {
+      "from": "单词重读与句子重音规律",
+      "to": "连读与失去爆破等语音现象"
+    },
+    {
+      "from": "形容词比较级与最高级",
+      "to": "一般过去时的叙事用法"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "过去进行时与时间标记"
+    },
+    {
+      "from": "一般将来时与计划表达",
+      "to": "条件句if引导的真实条件"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "现在完成时的用法"
+    },
+    {
+      "from": "一般将来时与计划表达",
+      "to": "动词不定式与动名词作宾语"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "假期与旅游经历表达"
+    },
+    {
+      "from": "形容词比较级与最高级",
+      "to": "外貌与性格比较描述"
+    },
+    {
+      "from": "形容词比较级与最高级",
+      "to": "自然与动植物描述"
+    },
+    {
+      "from": "how/what感叹句与疑问词派生",
+      "to": "饮食与烹饪方式表达"
+    },
+    {
+      "from": "频度副词与习惯表达",
+      "to": "运动与健康生活方式"
+    },
+    {
+      "from": "过去进行时与时间标记",
+      "to": "天气与自然灾害描述"
+    },
+    {
+      "from": "情态动词should/could建议与请求",
+      "to": "志愿服务与社会参与"
+    },
+    {
+      "from": "英语元音与辅音的发音规则",
+      "to": "听力理解长对话主旨与细节"
+    },
+    {
+      "from": "情态动词should/could建议与请求",
+      "to": "口语表达观点与理由"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "口语描述经历与讲故事"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "阅读中推断词义与指代"
+    },
+    {
+      "from": "阅读中推断词义与指代",
+      "to": "阅读段落主旨概括与逻辑分析"
+    },
+    {
+      "from": "动词不定式与动名词作宾语",
+      "to": "仿写与造句练习"
+    },
+    {
+      "from": "仿写与造句练习",
+      "to": "段落写作与连贯表达"
+    },
+    {
+      "from": "段落写作与连贯表达",
+      "to": "书信与邮件写作"
+    },
+    {
+      "from": "听力理解长对话主旨与细节",
+      "to": "听力笔记与关键词捕捉策略"
+    },
+    {
+      "from": "饮食与烹饪方式表达",
+      "to": "中西方饮食文化对比"
+    },
+    {
+      "from": "情态动词should/could建议与请求",
+      "to": "跨文化交际中的礼貌用语"
+    },
+    {
+      "from": "阅读中推断词义与指代",
+      "to": "英语阅读的略读与扫读策略"
+    },
+    {
+      "from": "段落写作与连贯表达",
+      "to": "英语写作中的修改与润色"
+    },
+    {
+      "from": "阅读中推断词义与指代",
+      "to": "图表信息理解与描述"
+    },
+    {
+      "from": "情态动词should/could建议与请求",
+      "to": "日常问题与建议的书面表达"
+    },
+    {
+      "from": "自然与动植物描述",
+      "to": "自然环境保护话题表达"
+    },
+    {
+      "from": "情态动词should/could建议与请求",
+      "to": "邀请与约定的礼貌表达"
+    },
+    {
+      "from": "口语表达观点与理由",
+      "to": "简单演讲与口头报告"
+    },
+    {
+      "from": "一般过去时的叙事用法",
+      "to": "个人经历与成长故事叙述"
+    }
+  ],
+  "themes": {
+    "英语元音与辅音的发音规则": "eng_language",
+    "单词重读与句子重音规律": "eng_language",
+    "连读与失去爆破等语音现象": "eng_language",
+    "形容词比较级与最高级": "eng_language",
+    "一般过去时的叙事用法": "eng_language",
+    "过去进行时与时间标记": "eng_language",
+    "一般将来时与计划表达": "eng_language",
+    "频度副词与习惯表达": "eng_language",
+    "情态动词should/could建议与请求": "eng_language",
+    "条件句if引导的真实条件": "eng_language",
+    "现在完成时的用法": "eng_language",
+    "动词不定式与动名词作宾语": "eng_language",
+    "反身代词与不定代词的用法": "eng_language",
+    "how/what感叹句与疑问词派生": "eng_language",
+    "假期与旅游经历表达": "eng_speaking",
+    "家居环境与社区生活描述": "eng_reading",
+    "外貌与性格比较描述": "eng_speaking",
+    "自然与动植物描述": "eng_reading",
+    "饮食与烹饪方式表达": "eng_speaking",
+    "运动与健康生活方式": "eng_speaking",
+    "音乐与娱乐活动表达": "eng_speaking",
+    "天气与自然灾害描述": "eng_reading",
+    "购物与消费场景用语": "eng_speaking",
+    "志愿服务与社会参与": "eng_writing",
+    "听力理解长对话主旨与细节": "eng_listening",
+    "口语表达观点与理由": "eng_speaking",
+    "口语描述经历与讲故事": "eng_speaking",
+    "阅读中推断词义与指代": "eng_reading",
+    "阅读段落主旨概括与逻辑分析": "eng_reading",
+    "仿写与造句练习": "eng_writing",
+    "段落写作与连贯表达": "eng_writing",
+    "书信与邮件写作": "eng_writing",
+    "听力笔记与关键词捕捉策略": "eng_listening",
+    "中西方饮食文化对比": "eng_reading",
+    "中西方节日与庆祝方式对比": "eng_reading",
+    "跨文化交际中的礼貌用语": "eng_speaking",
+    "英语阅读的略读与扫读策略": "eng_reading",
+    "英语写作中的修改与润色": "eng_writing",
+    "自主学习与目标规划策略": "eng_language",
+    "图表信息理解与描述": "eng_reading",
+    "日常问题与建议的书面表达": "eng_writing",
+    "个人经历与成长故事叙述": "eng_writing",
+    "自然环境保护话题表达": "eng_reading",
+    "邀请与约定的礼貌表达": "eng_speaking",
+    "简单演讲与口头报告": "eng_speaking"
+  },
+  "literacies": {
+    "英语元音与辅音的发音规则": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "单词重读与句子重音规律": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "连读与失去爆破等语音现象": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "形容词比较级与最高级": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "一般过去时的叙事用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "过去进行时与时间标记": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "一般将来时与计划表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "频度副词与习惯表达": [
+      "lit_eng_lang"
+    ],
+    "情态动词should/could建议与请求": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "条件句if引导的真实条件": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "现在完成时的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "动词不定式与动名词作宾语": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "反身代词与不定代词的用法": [
+      "lit_eng_lang"
+    ],
+    "how/what感叹句与疑问词派生": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "假期与旅游经历表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "家居环境与社区生活描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "外貌与性格比较描述": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "自然与动植物描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "饮食与烹饪方式表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "运动与健康生活方式": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "音乐与娱乐活动表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "天气与自然灾害描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "购物与消费场景用语": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "志愿服务与社会参与": [
+      "lit_eng_lang",
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "听力理解长对话主旨与细节": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "口语表达观点与理由": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "口语描述经历与讲故事": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "阅读中推断词义与指代": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "阅读段落主旨概括与逻辑分析": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "仿写与造句练习": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "段落写作与连贯表达": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "书信与邮件写作": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "听力笔记与关键词捕捉策略": [
+      "lit_eng_lang",
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "中西方饮食文化对比": [
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "中西方节日与庆祝方式对比": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "跨文化交际中的礼貌用语": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "英语阅读的略读与扫读策略": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "英语写作中的修改与润色": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "自主学习与目标规划策略": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "图表信息理解与描述": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "日常问题与建议的书面表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "个人经历与成长故事叙述": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_culture"
+    ],
+    "自然环境保护话题表达": [
+      "lit_eng_lang",
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "邀请与约定的礼貌表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "简单演讲与口头报告": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ]
+  },
+  "blooms": {
+    "英语元音与辅音的发音规则": "bloom_apply",
+    "单词重读与句子重音规律": "bloom_apply",
+    "连读与失去爆破等语音现象": "bloom_apply",
+    "形容词比较级与最高级": "bloom_apply",
+    "一般过去时的叙事用法": "bloom_apply",
+    "过去进行时与时间标记": "bloom_apply",
+    "一般将来时与计划表达": "bloom_apply",
+    "频度副词与习惯表达": "bloom_apply",
+    "情态动词should/could建议与请求": "bloom_apply",
+    "条件句if引导的真实条件": "bloom_apply",
+    "现在完成时的用法": "bloom_apply",
+    "动词不定式与动名词作宾语": "bloom_apply",
+    "反身代词与不定代词的用法": "bloom_apply",
+    "how/what感叹句与疑问词派生": "bloom_apply",
+    "假期与旅游经历表达": "bloom_apply",
+    "家居环境与社区生活描述": "bloom_understand",
+    "外貌与性格比较描述": "bloom_apply",
+    "自然与动植物描述": "bloom_understand",
+    "饮食与烹饪方式表达": "bloom_apply",
+    "运动与健康生活方式": "bloom_apply",
+    "音乐与娱乐活动表达": "bloom_apply",
+    "天气与自然灾害描述": "bloom_understand",
+    "购物与消费场景用语": "bloom_apply",
+    "志愿服务与社会参与": "bloom_evaluate",
+    "听力理解长对话主旨与细节": "bloom_apply",
+    "口语表达观点与理由": "bloom_apply",
+    "口语描述经历与讲故事": "bloom_create",
+    "阅读中推断词义与指代": "bloom_analyze",
+    "阅读段落主旨概括与逻辑分析": "bloom_analyze",
+    "仿写与造句练习": "bloom_apply",
+    "段落写作与连贯表达": "bloom_create",
+    "书信与邮件写作": "bloom_create",
+    "听力笔记与关键词捕捉策略": "bloom_apply",
+    "中西方饮食文化对比": "bloom_analyze",
+    "中西方节日与庆祝方式对比": "bloom_understand",
+    "跨文化交际中的礼貌用语": "bloom_apply",
+    "英语阅读的略读与扫读策略": "bloom_apply",
+    "英语写作中的修改与润色": "bloom_evaluate",
+    "自主学习与目标规划策略": "bloom_evaluate",
+    "图表信息理解与描述": "bloom_analyze",
+    "日常问题与建议的书面表达": "bloom_apply",
+    "个人经历与成长故事叙述": "bloom_create",
+    "自然环境保护话题表达": "bloom_evaluate",
+    "邀请与约定的礼貌表达": "bloom_apply",
+    "简单演讲与口头报告": "bloom_create"
+  },
+  "_warnings": []
+}

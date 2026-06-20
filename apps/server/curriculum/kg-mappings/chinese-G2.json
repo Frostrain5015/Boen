@@ -1,0 +1,228 @@
+{
+  "subject": "chinese",
+  "grade": "2",
+  "generatedAt": "2026-06-20T06:51:06.508Z",
+  "kpCount": 22,
+  "prerequisites": [
+    {
+      "from": "形声字与字形分析",
+      "to": "常用偏旁部首认识"
+    },
+    {
+      "from": "多音字的辨别与运用",
+      "to": "拼音拼读规则与声调"
+    },
+    {
+      "from": "词语积累与分类整理",
+      "to": "简单词语的理解与运用"
+    },
+    {
+      "from": "成语与四字词语的积累",
+      "to": "词语积累与分类整理"
+    },
+    {
+      "from": "古诗朗读与背诵积累",
+      "to": "朗读基本技巧与停顿"
+    },
+    {
+      "from": "默读与不出声阅读",
+      "to": "朗读基本技巧与停顿"
+    },
+    {
+      "from": "联系上下文理解词义",
+      "to": "简单词语的理解与运用"
+    },
+    {
+      "from": "找出课文中的关键信息",
+      "to": "课文内容的简单复述"
+    },
+    {
+      "from": "比喻句的初步认识",
+      "to": "反义词与近义词的初步认识"
+    },
+    {
+      "from": "段落与自然段认识",
+      "to": "完整句子的认识与朗读"
+    },
+    {
+      "from": "看图写话的丰富与扩展",
+      "to": "看图写话与完整句子"
+    },
+    {
+      "from": "日记格式与观察记录",
+      "to": "观察日记与简单记录"
+    },
+    {
+      "from": "留言条与通知的写作",
+      "to": "标点符号的基本用法"
+    },
+    {
+      "from": "描写事物的简单方法",
+      "to": "看图写话的丰富与扩展"
+    },
+    {
+      "from": "口语交际与完整表达",
+      "to": "礼貌用语与口语表达"
+    },
+    {
+      "from": "童话故事阅读与想象",
+      "to": "故事理解与简单推理"
+    },
+    {
+      "from": "科学小品的阅读与理解",
+      "to": "找出课文中的关键信息"
+    },
+    {
+      "from": "标点符号的进阶运用",
+      "to": "标点符号的基本用法"
+    },
+    {
+      "from": "ABB/AABB等词语形式",
+      "to": "词语积累与分类整理"
+    },
+    {
+      "from": "简单排序与逻辑思维",
+      "to": "找出课文中的关键信息"
+    }
+  ],
+  "themes": {
+    "形声字与字形分析": "chi_literacy",
+    "查字典的方法与运用": "chi_literacy",
+    "多音字的辨别与运用": "chi_literacy",
+    "词语积累与分类整理": "chi_literacy",
+    "成语与四字词语的积累": "chi_literacy",
+    "古诗朗读与背诵积累": "chi_reading",
+    "默读与不出声阅读": "chi_reading",
+    "联系上下文理解词义": "chi_reading",
+    "找出课文中的关键信息": "chi_reading",
+    "比喻句的初步认识": "chi_reading",
+    "段落与自然段认识": "chi_reading",
+    "看图写话的丰富与扩展": "chi_writing",
+    "日记格式与观察记录": "chi_writing",
+    "留言条与通知的写作": "chi_writing",
+    "描写事物的简单方法": "chi_writing",
+    "口语交际与完整表达": "chi_comprehensive",
+    "童话故事阅读与想象": "chi_reading",
+    "科学小品的阅读与理解": "chi_reading",
+    "传统文化与节日故事": "chi_comprehensive",
+    "标点符号的进阶运用": "chi_writing",
+    "ABB/AABB等词语形式": "chi_literacy",
+    "简单排序与逻辑思维": "chi_reading"
+  },
+  "literacies": {
+    "形声字与字形分析": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "查字典的方法与运用": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "多音字的辨别与运用": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "词语积累与分类整理": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "成语与四字词语的积累": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "古诗朗读与背诵积累": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "默读与不出声阅读": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "联系上下文理解词义": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "找出课文中的关键信息": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "比喻句的初步认识": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "段落与自然段认识": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "看图写话的丰富与扩展": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "日记格式与观察记录": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "留言条与通知的写作": [
+      "lit_chi_lang"
+    ],
+    "描写事物的简单方法": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "口语交际与完整表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "童话故事阅读与想象": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "科学小品的阅读与理解": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "传统文化与节日故事": [
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "标点符号的进阶运用": [
+      "lit_chi_lang"
+    ],
+    "ABB/AABB等词语形式": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "简单排序与逻辑思维": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ]
+  },
+  "blooms": {
+    "形声字与字形分析": "bloom_analyze",
+    "查字典的方法与运用": "bloom_apply",
+    "多音字的辨别与运用": "bloom_apply",
+    "词语积累与分类整理": "bloom_apply",
+    "成语与四字词语的积累": "bloom_remember",
+    "古诗朗读与背诵积累": "bloom_remember",
+    "默读与不出声阅读": "bloom_apply",
+    "联系上下文理解词义": "bloom_analyze",
+    "找出课文中的关键信息": "bloom_analyze",
+    "比喻句的初步认识": "bloom_understand",
+    "段落与自然段认识": "bloom_understand",
+    "看图写话的丰富与扩展": "bloom_create",
+    "日记格式与观察记录": "bloom_create",
+    "留言条与通知的写作": "bloom_apply",
+    "描写事物的简单方法": "bloom_apply",
+    "口语交际与完整表达": "bloom_apply",
+    "童话故事阅读与想象": "bloom_understand",
+    "科学小品的阅读与理解": "bloom_understand",
+    "传统文化与节日故事": "bloom_understand",
+    "标点符号的进阶运用": "bloom_apply",
+    "ABB/AABB等词语形式": "bloom_understand",
+    "简单排序与逻辑思维": "bloom_analyze"
+  },
+  "_warnings": []
+}

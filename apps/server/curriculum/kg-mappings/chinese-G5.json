@@ -1,0 +1,243 @@
+{
+  "subject": "chinese",
+  "grade": "5",
+  "generatedAt": "2026-06-20T06:51:37.414Z",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "快速阅读与信息提取",
+      "to": "提高阅读速度的策略"
+    },
+    {
+      "from": "快速阅读与信息提取",
+      "to": "非连续性文本阅读"
+    },
+    {
+      "from": "概括文章主要内容",
+      "to": "对比阅读与评价方法"
+    },
+    {
+      "from": "体会课文思想感情",
+      "to": "对比阅读与评价方法"
+    },
+    {
+      "from": "体会作者描写的场景细节",
+      "to": "人物描写方法与效果"
+    },
+    {
+      "from": "说明文阅读与说明方法",
+      "to": "说明性文章写作"
+    },
+    {
+      "from": "动态与静态描写方法",
+      "to": "描写方法综合运用"
+    },
+    {
+      "from": "人物描写方法与效果",
+      "to": "描写方法综合运用"
+    },
+    {
+      "from": "非连续性文本阅读",
+      "to": "信息搜集与整合能力"
+    },
+    {
+      "from": "古典名著阅读方法",
+      "to": "文言文的词汇与句式"
+    },
+    {
+      "from": "古诗词的意境与表达",
+      "to": "课文背诵与积累方法"
+    },
+    {
+      "from": "缩写方法与内容提炼",
+      "to": "读后感写作方法"
+    },
+    {
+      "from": "书信与建议书写作",
+      "to": "研究报告的撰写方法"
+    },
+    {
+      "from": "口语交际与即兴发言",
+      "to": "辩论与有理有据表达"
+    },
+    {
+      "from": "描写方法综合运用",
+      "to": "文章修改与润色技巧"
+    },
+    {
+      "from": "民间故事的阅读与讲述",
+      "to": "古典名著阅读方法"
+    },
+    {
+      "from": "信息搜集与整合能力",
+      "to": "研究报告的撰写方法"
+    }
+  ],
+  "themes": {
+    "快速阅读与信息提取": "chi_reading",
+    "提高阅读速度的策略": "chi_reading",
+    "概括文章主要内容": "chi_reading",
+    "体会课文思想感情": "chi_reading",
+    "体会作者描写的场景细节": "chi_reading",
+    "说明文阅读与说明方法": "chi_reading",
+    "非连续性文本阅读": "chi_reading",
+    "古典名著阅读方法": "chi_reading",
+    "文言文的词汇与句式": "chi_reading",
+    "缩写方法与内容提炼": "chi_writing",
+    "读后感写作方法": "chi_writing",
+    "说明性文章写作": "chi_writing",
+    "动态与静态描写方法": "chi_writing",
+    "人物描写方法与效果": "chi_writing",
+    "书信与建议书写作": "chi_writing",
+    "研究报告的撰写方法": "chi_comprehensive",
+    "口语交际与即兴发言": "chi_comprehensive",
+    "民间故事的阅读与讲述": "chi_reading",
+    "古诗词的意境与表达": "chi_reading",
+    "课文背诵与积累方法": "chi_reading",
+    "描写方法综合运用": "chi_writing",
+    "信息搜集与整合能力": "chi_comprehensive",
+    "对比阅读与评价方法": "chi_reading",
+    "文章修改与润色技巧": "chi_writing",
+    "辩论与有理有据表达": "chi_comprehensive"
+  },
+  "literacies": {
+    "快速阅读与信息提取": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ],
+    "提高阅读速度的策略": [
+      "lit_chi_lang",
+      "lit_chi_learn"
+    ],
+    "概括文章主要内容": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "体会课文思想感情": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "体会作者描写的场景细节": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "说明文阅读与说明方法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "非连续性文本阅读": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ],
+    "古典名著阅读方法": [
+      "lit_chi_lang",
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "文言文的词汇与句式": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "缩写方法与内容提炼": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "读后感写作方法": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "说明性文章写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "动态与静态描写方法": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "人物描写方法与效果": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "书信与建议书写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "研究报告的撰写方法": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ],
+    "口语交际与即兴发言": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "民间故事的阅读与讲述": [
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "古诗词的意境与表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "课文背诵与积累方法": [
+      "lit_chi_lang",
+      "lit_chi_learn"
+    ],
+    "描写方法综合运用": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "信息搜集与整合能力": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ],
+    "对比阅读与评价方法": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "文章修改与润色技巧": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "辩论与有理有据表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ]
+  },
+  "blooms": {
+    "快速阅读与信息提取": "bloom_apply",
+    "提高阅读速度的策略": "bloom_apply",
+    "概括文章主要内容": "bloom_analyze",
+    "体会课文思想感情": "bloom_analyze",
+    "体会作者描写的场景细节": "bloom_analyze",
+    "说明文阅读与说明方法": "bloom_analyze",
+    "非连续性文本阅读": "bloom_analyze",
+    "古典名著阅读方法": "bloom_analyze",
+    "文言文的词汇与句式": "bloom_apply",
+    "缩写方法与内容提炼": "bloom_apply",
+    "读后感写作方法": "bloom_create",
+    "说明性文章写作": "bloom_create",
+    "动态与静态描写方法": "bloom_apply",
+    "人物描写方法与效果": "bloom_apply",
+    "书信与建议书写作": "bloom_create",
+    "研究报告的撰写方法": "bloom_create",
+    "口语交际与即兴发言": "bloom_apply",
+    "民间故事的阅读与讲述": "bloom_apply",
+    "古诗词的意境与表达": "bloom_analyze",
+    "课文背诵与积累方法": "bloom_remember",
+    "描写方法综合运用": "bloom_create",
+    "信息搜集与整合能力": "bloom_apply",
+    "对比阅读与评价方法": "bloom_evaluate",
+    "文章修改与润色技巧": "bloom_evaluate",
+    "辩论与有理有据表达": "bloom_evaluate"
+  },
+  "_warnings": []
+}

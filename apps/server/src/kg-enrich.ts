@@ -9,6 +9,28 @@
  */
 
 import db from './db.js';
+import { readFileSync, existsSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MAPPINGS_DIR = resolve(__dirname, '../curriculum/kg-mappings');
+
+/** 加载 JSON 映射文件（LLM 生成 + 人工审核后的数据） */
+export function loadMappingsFromJson(subject: string, grade: string) {
+  const path = join(MAPPINGS_DIR, `${subject}-G${grade}.json`);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8')) as {
+      prerequisites: Array<{ from: string; to: string }>;
+      themes: Record<string, string>;
+      literacies: Record<string, string[]>;
+      blooms: Record<string, string>;
+    };
+  } catch {
+    return null;
+  }
+}
 
 // ── 共享 DB 辅助 ─────────────────────────────────
 
@@ -698,14 +720,67 @@ function seedBloomEdges(subject: string): number {
 
 /** 注入所有语义关系边（belongs_to / reinforces / prerequisite / bloom_at） */
 export function seedAllEdges(subject: string = 'math'): number {
+  // 硬编码映射（数学）
   const belongsTo = seedBelongsToEdges(subject);
   const reinforces = seedReinforcesEdges(subject);
   const prerequisites = seedPrerequisiteEdges(subject);
   const bloom = seedBloomEdges(subject);
-  const total = belongsTo + reinforces + prerequisites + bloom;
+
+  // JSON 映射（非数学学科：从 LLM 生成 + 人工审核的 JSON 文件加载）
+  let jsonEdges = 0;
+  if (subject !== 'math') {
+    const grades = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    for (const g of grades) {
+      const mappings = loadMappingsFromJson(subject, g);
+      if (!mappings) continue;
+      jsonEdges += seedJsonMappings(subject, mappings);
+      console.log(`  [JSON] ${subject} G${g}: loaded ${jsonEdges > 0 ? 'mappings' : 'empty'}`);
+    }
+  }
+
+  const total = belongsTo + reinforces + prerequisites + bloom + jsonEdges;
   console.log(`[语义映射] 注入 ${total} 条关系`);
   console.log(`  belongs_to: ${belongsTo}, reinforces: ${reinforces}, prerequisite: ${prerequisites}, bloom_at: ${bloom}`);
+  if (jsonEdges > 0) console.log(`  JSON-loaded: ${jsonEdges}`);
   return total;
+}
+
+/** 从 JSON 映射数据注入四类边 */
+function seedJsonMappings(subject: string, mappings: NonNullable<ReturnType<typeof loadMappingsFromJson>>): number {
+  let count = 0;
+
+  // prerequisite
+  for (const edge of mappings.prerequisites) {
+    const fromNode = getNodeByTitleSubject(edge.from, subject);
+    const toNode = getNodeByTitleSubject(edge.to, subject);
+    if (fromNode && toNode) { insEdge.run(fromNode.id, toNode.id, 'prerequisite', 1.0); count++; }
+  }
+
+  // theme → belongs_to
+  for (const [title, themeCode] of Object.entries(mappings.themes)) {
+    const kpNode = getNodeByTitleSubject(title, subject);
+    const themeNode = getNode('theme', themeCode);
+    if (kpNode && themeNode) { insEdge.run(kpNode.id, themeNode.id, 'belongs_to', 1.0); count++; }
+  }
+
+  // literacy → reinforces
+  for (const [title, litCodes] of Object.entries(mappings.literacies)) {
+    const kpNode = getNodeByTitleSubject(title, subject);
+    if (!kpNode) continue;
+    for (const litCode of litCodes) {
+      const litNode = getNode('literacy', litCode);
+      if (litNode) { insEdge.run(kpNode.id, litNode.id, 'reinforces', 1.0); count++; }
+    }
+  }
+
+  // bloom → bloom_at
+  for (const [title, bloomCode] of Object.entries(mappings.blooms)) {
+    const kpNode = getNodeByTitleSubject(title, subject);
+    const bloomNode = getNode('bloom_level', bloomCode);
+    if (kpNode && bloomNode) { insEdge.run(kpNode.id, bloomNode.id, 'bloom_at', 1.0); count++; }
+  }
+
+  return count;
 }
 
 // ── CLI 执行（保持向后兼容）──────────────────────

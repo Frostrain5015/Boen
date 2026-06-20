@@ -44,7 +44,6 @@ export const useChatStore = defineStore('chat', () => {
   const items = ref<ChatItem[]>([]);
   const input = ref('');
   const busy = ref(false);
-  const threadId = `web-${Date.now()}`;
   const isGeneratingQuiz = ref(false);
   // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
@@ -182,7 +181,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await streamChat(
         {
-          threadId,
+          threadId: currentConversationId.value!,
           message: t,
           gradeBand: authStore.userProfile ? gradeToBand(authStore.userProfile.grade) : 'middle',
           grade: authStore.userProfile?.grade,
@@ -220,7 +219,7 @@ export const useChatStore = defineStore('chat', () => {
     const idx = { value: -1 };
     scrollDown(true);
     try {
-      await streamAnswer({ threadId, toolCallId: item.toolCallId, answer, conversationId: currentConversationId.value ?? undefined }, (e) => handleEvent(e, idx));
+      await streamAnswer({ threadId: currentConversationId.value!, toolCallId: item.toolCallId, answer, conversationId: currentConversationId.value ?? undefined }, (e) => handleEvent(e, idx));
     } catch (err) {
       items.value.push(newAssistant(`\u26a0\ufe0f \u63d0\u4ea4\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
     } finally {
@@ -315,7 +314,6 @@ export const useChatStore = defineStore('chat', () => {
     items,
     input,
     busy,
-    threadId,
     isGeneratingQuiz,
     conversations,
     currentConversationId,

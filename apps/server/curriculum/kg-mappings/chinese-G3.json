@@ -1,0 +1,595 @@
+{
+  "subject": "chinese",
+  "grade": "3",
+  "generatedAt": "2026-06-20T06:50:40.548Z",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "段落结构与总分关系",
+      "to": "围绕一个意思写清楚"
+    },
+    {
+      "from": "联系上下文理解词义",
+      "to": "上下文推断词义方法"
+    },
+    {
+      "from": "比喻句的初步认识",
+      "to": "比喻与拟人修辞认识"
+    },
+    {
+      "from": "段落结构与总分关系",
+      "to": "关键句的识别与作用"
+    },
+    {
+      "from": "关键句的识别与作用",
+      "to": "过渡句与段间关系"
+    },
+    {
+      "from": "关键句的识别与作用",
+      "to": "概括段落大意方法"
+    },
+    {
+      "from": "描写事物的简单方法",
+      "to": "观察方法与有序描写"
+    },
+    {
+      "from": "日记格式与观察记录",
+      "to": "日记与观察记录写作"
+    },
+    {
+      "from": "留言条与通知的写作",
+      "to": "通知与书信的基本格式"
+    },
+    {
+      "from": "古诗朗读与背诵积累",
+      "to": "古诗意境与画面感"
+    },
+    {
+      "from": "童话故事阅读与想象",
+      "to": "寓言故事的道理提炼"
+    },
+    {
+      "from": "童话故事阅读与想象",
+      "to": "神话与民间故事阅读"
+    },
+    {
+      "from": "找出课文中的关键信息",
+      "to": "略读与提取关键信息"
+    },
+    {
+      "from": "围绕一个意思写清楚",
+      "to": "习作修改与完善方法"
+    },
+    {
+      "from": "童话故事阅读与想象",
+      "to": "想象作文与创编故事"
+    },
+    {
+      "from": "成语与四字词语的积累",
+      "to": "积累好词好句好段"
+    },
+    {
+      "from": "口语交际与完整表达",
+      "to": "口语交际与清楚表达"
+    },
+    {
+      "from": "查字典的方法与运用",
+      "to": "查字典的综合运用"
+    },
+    {
+      "from": "描写事物的简单方法",
+      "to": "人物描写的初步方法"
+    },
+    {
+      "from": "观察方法与有序描写",
+      "to": "景物描写的顺序与方法"
+    },
+    {
+      "from": "传统文化与节日故事",
+      "to": "传统文化与节气知识"
+    },
+    {
+      "from": "科学小品的阅读与理解",
+      "to": "说明性文字的阅读"
+    },
+    {
+      "from": "积累好词好句好段",
+      "to": "读书笔记与批注方法"
+    }
+  ],
+  "bloomDistribution": {
+    "bloom_analyze": 5,
+    "bloom_apply": 10,
+    "bloom_understand": 6,
+    "bloom_create": 2,
+    "bloom_evaluate": 2
+  },
+  "themeDistribution": {
+    "chi_reading": 14,
+    "chi_writing": 8,
+    "chi_comprehensive": 2,
+    "chi_literacy": 1
+  },
+  "literacyDistribution": {
+    "lit_chi_lang": 24,
+    "lit_chi_think": 16,
+    "lit_chi_aesthetic": 8,
+    "lit_chi_culture": 5,
+    "lit_chi_learn": 3
+  },
+  "knowledgePoints": [
+    {
+      "code": "chi_g3_kp_1",
+      "title": "段落结构与总分关系",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [],
+      "units": [
+        12220,
+        12227,
+        12275,
+        12283
+      ]
+    },
+    {
+      "code": "chi_g3_kp_2",
+      "title": "围绕一个意思写清楚",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "段落结构与总分关系"
+      ],
+      "units": [
+        12248,
+        12305,
+        12234,
+        12292
+      ]
+    },
+    {
+      "code": "chi_g3_kp_3",
+      "title": "上下文推断词义方法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "联系上下文理解词义"
+      ],
+      "units": [
+        12220,
+        12241,
+        12275,
+        12299
+      ]
+    },
+    {
+      "code": "chi_g3_kp_4",
+      "title": "比喻与拟人修辞认识",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "比喻句的初步认识"
+      ],
+      "units": [
+        12227,
+        12283,
+        12241,
+        12299
+      ]
+    },
+    {
+      "code": "chi_g3_kp_5",
+      "title": "关键句的识别与作用",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "段落结构与总分关系"
+      ],
+      "units": [
+        12253,
+        12310,
+        12234,
+        12292
+      ]
+    },
+    {
+      "code": "chi_g3_kp_6",
+      "title": "过渡句与段间关系",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "关键句的识别与作用"
+      ],
+      "units": [
+        12260,
+        12317,
+        12267,
+        12324
+      ]
+    },
+    {
+      "code": "chi_g3_kp_7",
+      "title": "概括段落大意方法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "关键句的识别与作用"
+      ],
+      "units": [
+        12253,
+        12310,
+        12260,
+        12317
+      ]
+    },
+    {
+      "code": "chi_g3_kp_8",
+      "title": "观察方法与有序描写",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "描写事物的简单方法"
+      ],
+      "units": [
+        12248,
+        12305,
+        12220,
+        12275
+      ]
+    },
+    {
+      "code": "chi_g3_kp_9",
+      "title": "日记与观察记录写作",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "日记格式与观察记录"
+      ],
+      "units": [
+        12248,
+        12305,
+        12234,
+        12292
+      ]
+    },
+    {
+      "code": "chi_g3_kp_10",
+      "title": "通知与书信的基本格式",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "留言条与通知的写作"
+      ],
+      "units": [
+        12248,
+        12305,
+        12260,
+        12317
+      ]
+    },
+    {
+      "code": "chi_g3_kp_11",
+      "title": "古诗意境与画面感",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_aesthetic",
+        "lit_chi_culture",
+        "lit_chi_lang"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "古诗朗读与背诵积累"
+      ],
+      "units": [
+        12220,
+        12275,
+        12234,
+        12292
+      ]
+    },
+    {
+      "code": "chi_g3_kp_12",
+      "title": "寓言故事的道理提炼",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_think",
+        "lit_chi_culture"
+      ],
+      "bloom": "bloom_evaluate",
+      "prerequisites": [
+        "童话故事阅读与想象"
+      ],
+      "units": [
+        12283,
+        12299
+      ]
+    },
+    {
+      "code": "chi_g3_kp_13",
+      "title": "神话与民间故事阅读",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_culture",
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "童话故事阅读与想象"
+      ],
+      "units": [
+        12234,
+        12292,
+        12267
+      ]
+    },
+    {
+      "code": "chi_g3_kp_14",
+      "title": "文言文入门与常见词汇",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_culture"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [],
+      "units": [
+        12283,
+        12299,
+        12267,
+        12324
+      ]
+    },
+    {
+      "code": "chi_g3_kp_15",
+      "title": "略读与提取关键信息",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "找出课文中的关键信息"
+      ],
+      "units": [
+        12241,
+        12253,
+        12299,
+        12310
+      ]
+    },
+    {
+      "code": "chi_g3_kp_16",
+      "title": "习作修改与完善方法",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "prerequisites": [
+        "围绕一个意思写清楚"
+      ],
+      "units": [
+        12248,
+        12305,
+        12267,
+        12324
+      ]
+    },
+    {
+      "code": "chi_g3_kp_17",
+      "title": "想象作文与创编故事",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "童话故事阅读与想象"
+      ],
+      "units": [
+        12248,
+        12305,
+        12260,
+        12317
+      ]
+    },
+    {
+      "code": "chi_g3_kp_18",
+      "title": "积累好词好句好段",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "成语与四字词语的积累"
+      ],
+      "units": [
+        12220,
+        12227,
+        12275,
+        12283
+      ]
+    },
+    {
+      "code": "chi_g3_kp_19",
+      "title": "口语交际与清楚表达",
+      "theme": "chi_comprehensive",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "口语交际与完整表达"
+      ],
+      "units": [
+        12234,
+        12253,
+        12292,
+        12310
+      ]
+    },
+    {
+      "code": "chi_g3_kp_20",
+      "title": "查字典的综合运用",
+      "theme": "chi_literacy",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "查字典的方法与运用"
+      ],
+      "units": [
+        12227,
+        12283,
+        12241,
+        12299
+      ]
+    },
+    {
+      "code": "chi_g3_kp_21",
+      "title": "人物描写的初步方法",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "描写事物的简单方法"
+      ],
+      "units": [
+        12248,
+        12305,
+        12267,
+        12324
+      ]
+    },
+    {
+      "code": "chi_g3_kp_22",
+      "title": "景物描写的顺序与方法",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "观察方法与有序描写"
+      ],
+      "units": [
+        12220,
+        12275,
+        12253,
+        12310
+      ]
+    },
+    {
+      "code": "chi_g3_kp_23",
+      "title": "传统文化与节气知识",
+      "theme": "chi_comprehensive",
+      "literacies": [
+        "lit_chi_culture",
+        "lit_chi_lang"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "传统文化与节日故事"
+      ],
+      "units": [
+        12227,
+        12283,
+        12292
+      ]
+    },
+    {
+      "code": "chi_g3_kp_24",
+      "title": "说明性文字的阅读",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "科学小品的阅读与理解"
+      ],
+      "units": [
+        12253,
+        12310,
+        12260,
+        12317
+      ]
+    },
+    {
+      "code": "chi_g3_kp_25",
+      "title": "读书笔记与批注方法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "积累好词好句好段"
+      ],
+      "units": [
+        12241,
+        12299,
+        12267,
+        12324
+      ]
+    }
+  ]
+}

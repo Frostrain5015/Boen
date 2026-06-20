@@ -1,0 +1,422 @@
+{
+  "subject": "science",
+  "grade": "7",
+  "generatedAt": "2026-06-20T07:04:30.771Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "科学观察与记录方法",
+      "to": "科学测量与单位换算"
+    },
+    {
+      "from": "科学观察与记录方法",
+      "to": "对照实验的设计与变量控制"
+    },
+    {
+      "from": "科学测量与单位换算",
+      "to": "数据分析与图表绘制"
+    },
+    {
+      "from": "科学观察与记录方法",
+      "to": "细胞结构与功能"
+    },
+    {
+      "from": "细胞结构与功能",
+      "to": "生物体的结构层次"
+    },
+    {
+      "from": "生物体的结构层次",
+      "to": "生殖方式与遗传基础"
+    },
+    {
+      "from": "细胞结构与功能",
+      "to": "显微镜的使用与细胞观察"
+    },
+    {
+      "from": "天体系统与太阳系结构",
+      "to": "地球运动与昼夜四季"
+    },
+    {
+      "from": "地球运动与昼夜四季",
+      "to": "月球运动与月相变化"
+    },
+    {
+      "from": "地球内部结构与地壳运动",
+      "to": "地形地貌的成因与识别"
+    },
+    {
+      "from": "科学测量与单位换算",
+      "to": "参照物与运动的描述"
+    },
+    {
+      "from": "参照物与运动的描述",
+      "to": "速度的概念与计算"
+    },
+    {
+      "from": "力的概念与力的作用效果",
+      "to": "重力与弹力的认识"
+    },
+    {
+      "from": "原子与分子的基本概念",
+      "to": "元素与化学式"
+    },
+    {
+      "from": "原子与分子的基本概念",
+      "to": "物质的三态变化与分子运动"
+    },
+    {
+      "from": "科学测量与单位换算",
+      "to": "密度的概念与测量"
+    },
+    {
+      "from": "原子与分子的基本概念",
+      "to": "溶解与溶液的浓度"
+    },
+    {
+      "from": "原子与分子的基本概念",
+      "to": "物理变化与化学变化的区分"
+    },
+    {
+      "from": "力的概念与力的作用效果",
+      "to": "简单机械与工具原理"
+    },
+    {
+      "from": "密度的概念与测量",
+      "to": "材料选择与性能比较"
+    },
+    {
+      "from": "对照实验的设计与变量控制",
+      "to": "科学模型与假说的建立"
+    },
+    {
+      "from": "生物分类与分类方法",
+      "to": "生态环境与生物适应"
+    },
+    {
+      "from": "地球内部结构与地壳运动",
+      "to": "自然灾害的成因与防范"
+    },
+    {
+      "from": "溶解与溶液的浓度",
+      "to": "物质的分离与提纯方法"
+    },
+    {
+      "from": "物质的三态变化与分子运动",
+      "to": "温度与热量的基本概念"
+    },
+    {
+      "from": "力的概念与力的作用效果",
+      "to": "能量形式与能量转化"
+    },
+    {
+      "from": "物质的三态变化与分子运动",
+      "to": "水的循环与水资源保护"
+    },
+    {
+      "from": "生物分类与分类方法",
+      "to": "生物多样性与保护"
+    },
+    {
+      "from": "地球内部结构与地壳运动",
+      "to": "岩石与矿物的识别"
+    },
+    {
+      "from": "力的概念与力的作用效果",
+      "to": "摩擦力与运动的关系"
+    },
+    {
+      "from": "简单电路与电流",
+      "to": "磁现象与磁场"
+    },
+    {
+      "from": "工程设计的流程与方法",
+      "to": "技术对社会与环境的影响"
+    },
+    {
+      "from": "数据分析与图表绘制",
+      "to": "科学探究报告的撰写"
+    }
+  ],
+  "themes": {
+    "科学观察与记录方法": "sci_matter",
+    "科学测量与单位换算": "sci_matter",
+    "对照实验的设计与变量控制": "sci_matter",
+    "数据分析与图表绘制": "sci_matter",
+    "参照物与运动的描述": "sci_matter",
+    "速度的概念与计算": "sci_matter",
+    "力的概念与力的作用效果": "sci_matter",
+    "重力与弹力的认识": "sci_matter",
+    "原子与分子的基本概念": "sci_matter",
+    "元素与化学式": "sci_matter",
+    "物质的三态变化与分子运动": "sci_matter",
+    "密度的概念与测量": "sci_matter",
+    "溶解与溶液的浓度": "sci_matter",
+    "物理变化与化学变化的区分": "sci_matter",
+    "科学模型与假说的建立": "sci_matter",
+    "科学史与科学家精神": "sci_matter",
+    "物质的分离与提纯方法": "sci_matter",
+    "温度与热量的基本概念": "sci_matter",
+    "能量形式与能量转化": "sci_matter",
+    "声音的产生与传播": "sci_matter",
+    "光的直线传播与反射": "sci_matter",
+    "摩擦力与运动的关系": "sci_matter",
+    "简单电路与电流": "sci_matter",
+    "磁现象与磁场": "sci_matter",
+    "科学探究报告的撰写": "sci_matter",
+    "生物分类与分类方法": "sci_life",
+    "细胞结构与功能": "sci_life",
+    "生物体的结构层次": "sci_life",
+    "生殖方式与遗传基础": "sci_life",
+    "生物与非生物的区分": "sci_life",
+    "显微镜的使用与细胞观察": "sci_life",
+    "生态环境与生物适应": "sci_life",
+    "生物多样性与保护": "sci_life",
+    "天体系统与太阳系结构": "sci_earth",
+    "地球运动与昼夜四季": "sci_earth",
+    "月球运动与月相变化": "sci_earth",
+    "地球内部结构与地壳运动": "sci_earth",
+    "地形地貌的成因与识别": "sci_earth",
+    "自然灾害的成因与防范": "sci_earth",
+    "水的循环与水资源保护": "sci_earth",
+    "岩石与矿物的识别": "sci_earth",
+    "简单机械与工具原理": "sci_tech",
+    "工程设计的流程与方法": "sci_tech",
+    "材料选择与性能比较": "sci_tech",
+    "技术对社会与环境的影响": "sci_tech"
+  },
+  "literacies": {
+    "科学观察与记录方法": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "科学测量与单位换算": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "对照实验的设计与变量控制": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "数据分析与图表绘制": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "显微镜的使用与细胞观察": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "密度的概念与测量": [
+      "lit_sci_inquiry",
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "溶解与溶液的浓度": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "简单机械与工具原理": [
+      "lit_sci_inquiry",
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "工程设计的流程与方法": [
+      "lit_sci_inquiry",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "科学模型与假说的建立": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "物质的分离与提纯方法": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "岩石与矿物的识别": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "摩擦力与运动的关系": [
+      "lit_sci_inquiry",
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "科学探究报告的撰写": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "生物分类与分类方法": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "细胞结构与功能": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "生物体的结构层次": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "生殖方式与遗传基础": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "生物与非生物的区分": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "天体系统与太阳系结构": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "地球运动与昼夜四季": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "月球运动与月相变化": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "地球内部结构与地壳运动": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "地形地貌的成因与识别": [
+      "lit_sci_think",
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "参照物与运动的描述": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "速度的概念与计算": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "力的概念与力的作用效果": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "重力与弹力的认识": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "原子与分子的基本概念": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "元素与化学式": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "物质的三态变化与分子运动": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "物理变化与化学变化的区分": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "材料选择与性能比较": [
+      "lit_sci_think",
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "温度与热量的基本概念": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "能量形式与能量转化": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "声音的产生与传播": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "光的直线传播与反射": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "简单电路与电流": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "磁现象与磁场": [
+      "lit_sci_think",
+      "lit_sci_concept"
+    ],
+    "技术对社会与环境的影响": [
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "科学史与科学家精神": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "生态环境与生物适应": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "自然灾害的成因与防范": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "水的循环与水资源保护": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "生物多样性与保护": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ]
+  },
+  "blooms": {
+    "科学观察与记录方法": "bloom_apply",
+    "科学测量与单位换算": "bloom_apply",
+    "显微镜的使用与细胞观察": "bloom_apply",
+    "地球运动与昼夜四季": "bloom_apply",
+    "参照物与运动的描述": "bloom_apply",
+    "速度的概念与计算": "bloom_apply",
+    "力的概念与力的作用效果": "bloom_apply",
+    "重力与弹力的认识": "bloom_apply",
+    "元素与化学式": "bloom_apply",
+    "物质的三态变化与分子运动": "bloom_apply",
+    "密度的概念与测量": "bloom_apply",
+    "溶解与溶液的浓度": "bloom_apply",
+    "简单机械与工具原理": "bloom_apply",
+    "物质的分离与提纯方法": "bloom_apply",
+    "温度与热量的基本概念": "bloom_apply",
+    "光的直线传播与反射": "bloom_apply",
+    "岩石与矿物的识别": "bloom_apply",
+    "摩擦力与运动的关系": "bloom_apply",
+    "简单电路与电流": "bloom_apply",
+    "对照实验的设计与变量控制": "bloom_analyze",
+    "数据分析与图表绘制": "bloom_analyze",
+    "生物分类与分类方法": "bloom_analyze",
+    "生物与非生物的区分": "bloom_analyze",
+    "地形地貌的成因与识别": "bloom_analyze",
+    "物理变化与化学变化的区分": "bloom_analyze",
+    "生态环境与生物适应": "bloom_analyze",
+    "细胞结构与功能": "bloom_understand",
+    "生物体的结构层次": "bloom_understand",
+    "生殖方式与遗传基础": "bloom_understand",
+    "天体系统与太阳系结构": "bloom_understand",
+    "月球运动与月相变化": "bloom_understand",
+    "地球内部结构与地壳运动": "bloom_understand",
+    "原子与分子的基本概念": "bloom_understand",
+    "能量形式与能量转化": "bloom_understand",
+    "声音的产生与传播": "bloom_understand",
+    "磁现象与磁场": "bloom_understand",
+    "工程设计的流程与方法": "bloom_create",
+    "科学模型与假说的建立": "bloom_create",
+    "科学探究报告的撰写": "bloom_create",
+    "材料选择与性能比较": "bloom_evaluate",
+    "科学史与科学家精神": "bloom_evaluate",
+    "自然灾害的成因与防范": "bloom_evaluate",
+    "水的循环与水资源保护": "bloom_evaluate",
+    "生物多样性与保护": "bloom_evaluate",
+    "技术对社会与环境的影响": "bloom_evaluate"
+  }
+}

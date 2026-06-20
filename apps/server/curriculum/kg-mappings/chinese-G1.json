@@ -1,0 +1,190 @@
+{
+  "subject": "chinese",
+  "grade": "1",
+  "generatedAt": "2026-06-20T06:50:51.984Z",
+  "kpCount": 20,
+  "prerequisites": [
+    {
+      "from": "拼音拼读规则与声调",
+      "to": "声母韵母与整体认读音节"
+    },
+    {
+      "from": "常用偏旁部首认识",
+      "to": "基本笔画与笔顺规则"
+    },
+    {
+      "from": "田字格书写与间架结构",
+      "to": "基本笔画与笔顺规则"
+    },
+    {
+      "from": "识字方法与象形字认识",
+      "to": "常用偏旁部首认识"
+    },
+    {
+      "from": "朗读基本技巧与停顿",
+      "to": "拼音拼读规则与声调"
+    },
+    {
+      "from": "完整句子的认识与朗读",
+      "to": "简单词语的理解与运用"
+    },
+    {
+      "from": "课文内容的简单复述",
+      "to": "完整句子的认识与朗读"
+    },
+    {
+      "from": "看图写话与完整句子",
+      "to": "完整句子的认识与朗读"
+    },
+    {
+      "from": "标点符号的基本用法",
+      "to": "看图写话与完整句子"
+    },
+    {
+      "from": "简单疑问句与感叹句",
+      "to": "完整句子的认识与朗读"
+    },
+    {
+      "from": "反义词与近义词的初步认识",
+      "to": "简单词语的理解与运用"
+    },
+    {
+      "from": "量词的正确使用",
+      "to": "简单词语的理解与运用"
+    },
+    {
+      "from": "儿歌与韵文的朗读体验",
+      "to": "朗读基本技巧与停顿"
+    },
+    {
+      "from": "故事理解与简单推理",
+      "to": "课文内容的简单复述"
+    },
+    {
+      "from": "观察日记与简单记录",
+      "to": "看图写话与完整句子"
+    }
+  ],
+  "themes": {
+    "声母韵母与整体认读音节": "chi_literacy",
+    "拼音拼读规则与声调": "chi_literacy",
+    "基本笔画与笔顺规则": "chi_literacy",
+    "常用偏旁部首认识": "chi_literacy",
+    "田字格书写与间架结构": "chi_writing",
+    "识字方法与象形字认识": "chi_literacy",
+    "简单词语的理解与运用": "chi_reading",
+    "图文结合理解内容": "chi_reading",
+    "朗读基本技巧与停顿": "chi_reading",
+    "完整句子的认识与朗读": "chi_reading",
+    "课文内容的简单复述": "chi_reading",
+    "看图写话与完整句子": "chi_writing",
+    "标点符号的基本用法": "chi_writing",
+    "简单疑问句与感叹句": "chi_reading",
+    "反义词与近义词的初步认识": "chi_literacy",
+    "量词的正确使用": "chi_literacy",
+    "儿歌与韵文的朗读体验": "chi_reading",
+    "故事理解与简单推理": "chi_reading",
+    "观察日记与简单记录": "chi_writing",
+    "礼貌用语与口语表达": "chi_comprehensive"
+  },
+  "literacies": {
+    "声母韵母与整体认读音节": [
+      "lit_chi_lang"
+    ],
+    "拼音拼读规则与声调": [
+      "lit_chi_lang"
+    ],
+    "基本笔画与笔顺规则": [
+      "lit_chi_lang"
+    ],
+    "常用偏旁部首认识": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "田字格书写与间架结构": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "识字方法与象形字认识": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "简单词语的理解与运用": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "图文结合理解内容": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "朗读基本技巧与停顿": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "完整句子的认识与朗读": [
+      "lit_chi_lang"
+    ],
+    "课文内容的简单复述": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "看图写话与完整句子": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "标点符号的基本用法": [
+      "lit_chi_lang"
+    ],
+    "简单疑问句与感叹句": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "反义词与近义词的初步认识": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "量词的正确使用": [
+      "lit_chi_lang"
+    ],
+    "儿歌与韵文的朗读体验": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "故事理解与简单推理": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "观察日记与简单记录": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "礼貌用语与口语表达": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ]
+  },
+  "blooms": {
+    "声母韵母与整体认读音节": "bloom_remember",
+    "拼音拼读规则与声调": "bloom_apply",
+    "基本笔画与笔顺规则": "bloom_apply",
+    "常用偏旁部首认识": "bloom_understand",
+    "田字格书写与间架结构": "bloom_apply",
+    "识字方法与象形字认识": "bloom_understand",
+    "简单词语的理解与运用": "bloom_apply",
+    "图文结合理解内容": "bloom_understand",
+    "朗读基本技巧与停顿": "bloom_apply",
+    "完整句子的认识与朗读": "bloom_understand",
+    "课文内容的简单复述": "bloom_apply",
+    "看图写话与完整句子": "bloom_create",
+    "标点符号的基本用法": "bloom_apply",
+    "简单疑问句与感叹句": "bloom_understand",
+    "反义词与近义词的初步认识": "bloom_understand",
+    "量词的正确使用": "bloom_apply",
+    "儿歌与韵文的朗读体验": "bloom_apply",
+    "故事理解与简单推理": "bloom_analyze",
+    "观察日记与简单记录": "bloom_create",
+    "礼貌用语与口语表达": "bloom_apply"
+  },
+  "_warnings": []
+}

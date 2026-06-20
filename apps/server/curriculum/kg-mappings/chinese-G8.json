@@ -1,0 +1,391 @@
+{
+  "subject": "chinese",
+  "grade": "8",
+  "generatedAt": "2026-06-20T06:06:30.890Z",
+  "kpCount": 42,
+  "prerequisites": [
+    {
+      "from": "新闻文体特征与阅读策略",
+      "to": "新闻采访技巧与信息整理"
+    },
+    {
+      "from": "新闻采访技巧与信息整理",
+      "to": "新闻写作与客观表达"
+    },
+    {
+      "from": "回忆性散文的叙事线索",
+      "to": "人物传记的选材与刻画"
+    },
+    {
+      "from": "纪实作品的阅读与评价",
+      "to": "长篇小说的主题分析与人物评价"
+    },
+    {
+      "from": "文言常用虚词与句式",
+      "to": "古诗文的翻译与文意把握"
+    },
+    {
+      "from": "古诗文的翻译与文意把握",
+      "to": "文言记叙文的叙事与意境"
+    },
+    {
+      "from": "文言写景散文的艺术手法",
+      "to": "景物描写的观察与表达"
+    },
+    {
+      "from": "唐诗的意境与格律",
+      "to": "古典诗词的意象与抒情手法"
+    },
+    {
+      "from": "古典诗词的意象与抒情手法",
+      "to": "唐诗的叙事与现实关怀"
+    },
+    {
+      "from": "先秦议论文的论辩艺术",
+      "to": "议论性文章的观点提炼与论证"
+    },
+    {
+      "from": "议论性文章的观点提炼与论证",
+      "to": "演讲稿的结构与说服策略"
+    },
+    {
+      "from": "演讲稿的结构与说服策略",
+      "to": "口语交际与演讲表达"
+    },
+    {
+      "from": "口语交际与演讲表达",
+      "to": "观点论证的逻辑与感染力"
+    },
+    {
+      "from": "托物言志与象征表达",
+      "to": "散文语言的风格与赏析"
+    },
+    {
+      "from": "托物言志与象征表达",
+      "to": "文言寓言与托物寓意"
+    },
+    {
+      "from": "景物描写的观察与表达",
+      "to": "游踪景物描写与情感表达"
+    },
+    {
+      "from": "对比与衬托手法",
+      "to": "游记的视角变换与行文线索"
+    },
+    {
+      "from": "说明方法的辨识与运用",
+      "to": "说明文的顺序与条理"
+    },
+    {
+      "from": "说明文的顺序与条理",
+      "to": "事物特征的观察与说明"
+    },
+    {
+      "from": "事物特征的观察与说明",
+      "to": "说明语言的准确性与严密性"
+    },
+    {
+      "from": "说明语言的准确性与严密性",
+      "to": "科学说明文的逻辑推理"
+    },
+    {
+      "from": "科普文的阅读与信息整合",
+      "to": "科学说明文的逻辑推理"
+    },
+    {
+      "from": "民俗文化的文学呈现",
+      "to": "场景描写与氛围营造"
+    },
+    {
+      "from": "场景描写与氛围营造",
+      "to": "散文的抒情方式与语言特色"
+    },
+    {
+      "from": "散文的抒情方式与语言特色",
+      "to": "仿写与语言风格借鉴"
+    },
+    {
+      "from": "文言记叙文的叙事与意境",
+      "to": "诗经的比兴手法与情感表达"
+    },
+    {
+      "from": "先秦诸子散文的思想与风格",
+      "to": "文言寓言与托物寓意"
+    },
+    {
+      "from": "古典散文的语言艺术",
+      "to": "散文语言的风格与赏析"
+    },
+    {
+      "from": "游踪景物描写与情感表达",
+      "to": "游记中的人文情怀与思考"
+    },
+    {
+      "from": "选择性阅读与经典导读方法",
+      "to": "长篇小说的主题分析与人物评价"
+    },
+    {
+      "from": "史传文的叙事与人物塑造",
+      "to": "人物传记的选材与刻画"
+    }
+  ],
+  "themes": {
+    "新闻文体特征与阅读策略": "chi_reading",
+    "新闻采访技巧与信息整理": "chi_comprehensive",
+    "新闻写作与客观表达": "chi_writing",
+    "回忆性散文的叙事线索": "chi_reading",
+    "人物传记的选材与刻画": "chi_reading",
+    "纪实作品的阅读与评价": "chi_reading",
+    "文言写景散文的艺术手法": "chi_reading",
+    "文言常用虚词与句式": "chi_literacy",
+    "唐诗的意境与格律": "chi_reading",
+    "景物描写的观察与表达": "chi_writing",
+    "议论性文章的观点提炼与论证": "chi_reading",
+    "托物言志与象征表达": "chi_reading",
+    "散文语言的风格与赏析": "chi_reading",
+    "对比与衬托手法": "chi_reading",
+    "说明方法的辨识与运用": "chi_reading",
+    "说明文的顺序与条理": "chi_writing",
+    "事物特征的观察与说明": "chi_writing",
+    "先秦议论文的论辩艺术": "chi_reading",
+    "史传文的叙事与人物塑造": "chi_reading",
+    "古典诗词的意象与抒情手法": "chi_reading",
+    "古诗文的翻译与文意把握": "chi_literacy",
+    "民俗文化的文学呈现": "chi_reading",
+    "场景描写与氛围营造": "chi_writing",
+    "散文的抒情方式与语言特色": "chi_reading",
+    "仿写与语言风格借鉴": "chi_writing",
+    "科学说明文的逻辑推理": "chi_reading",
+    "说明语言的准确性与严密性": "chi_reading",
+    "科普文的阅读与信息整合": "chi_comprehensive",
+    "文言记叙文的叙事与意境": "chi_reading",
+    "诗经的比兴手法与情感表达": "chi_reading",
+    "选择性阅读与经典导读方法": "chi_comprehensive",
+    "古典散文的语言艺术": "chi_reading",
+    "演讲稿的结构与说服策略": "chi_writing",
+    "口语交际与演讲表达": "chi_writing",
+    "观点论证的逻辑与感染力": "chi_writing",
+    "游记的视角变换与行文线索": "chi_reading",
+    "游踪景物描写与情感表达": "chi_writing",
+    "游记中的人文情怀与思考": "chi_reading",
+    "先秦诸子散文的思想与风格": "chi_reading",
+    "文言寓言与托物寓意": "chi_reading",
+    "唐诗的叙事与现实关怀": "chi_reading",
+    "长篇小说的主题分析与人物评价": "chi_reading"
+  },
+  "literacies": {
+    "新闻文体特征与阅读策略": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "新闻采访技巧与信息整理": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "新闻写作与客观表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "回忆性散文的叙事线索": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "人物传记的选材与刻画": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "纪实作品的阅读与评价": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "文言写景散文的艺术手法": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "文言常用虚词与句式": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "唐诗的意境与格律": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "景物描写的观察与表达": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "议论性文章的观点提炼与论证": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "托物言志与象征表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "散文语言的风格与赏析": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "对比与衬托手法": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "说明方法的辨识与运用": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "说明文的顺序与条理": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "事物特征的观察与说明": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "先秦议论文的论辩艺术": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "史传文的叙事与人物塑造": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "古典诗词的意象与抒情手法": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "古诗文的翻译与文意把握": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "民俗文化的文学呈现": [
+      "lit_chi_culture",
+      "lit_chi_aesthetic"
+    ],
+    "场景描写与氛围营造": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "散文的抒情方式与语言特色": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "仿写与语言风格借鉴": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "科学说明文的逻辑推理": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "说明语言的准确性与严密性": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "科普文的阅读与信息整合": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "文言记叙文的叙事与意境": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "诗经的比兴手法与情感表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "选择性阅读与经典导读方法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "古典散文的语言艺术": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "演讲稿的结构与说服策略": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "口语交际与演讲表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "观点论证的逻辑与感染力": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "游记的视角变换与行文线索": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "游踪景物描写与情感表达": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "游记中的人文情怀与思考": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "先秦诸子散文的思想与风格": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "文言寓言与托物寓意": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "唐诗的叙事与现实关怀": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "长篇小说的主题分析与人物评价": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ]
+  },
+  "blooms": {
+    "新闻文体特征与阅读策略": "bloom_analyze",
+    "新闻采访技巧与信息整理": "bloom_apply",
+    "新闻写作与客观表达": "bloom_create",
+    "回忆性散文的叙事线索": "bloom_analyze",
+    "人物传记的选材与刻画": "bloom_analyze",
+    "纪实作品的阅读与评价": "bloom_evaluate",
+    "文言写景散文的艺术手法": "bloom_analyze",
+    "文言常用虚词与句式": "bloom_understand",
+    "唐诗的意境与格律": "bloom_analyze",
+    "景物描写的观察与表达": "bloom_create",
+    "议论性文章的观点提炼与论证": "bloom_analyze",
+    "托物言志与象征表达": "bloom_analyze",
+    "散文语言的风格与赏析": "bloom_analyze",
+    "对比与衬托手法": "bloom_apply",
+    "说明方法的辨识与运用": "bloom_apply",
+    "说明文的顺序与条理": "bloom_apply",
+    "事物特征的观察与说明": "bloom_apply",
+    "先秦议论文的论辩艺术": "bloom_analyze",
+    "史传文的叙事与人物塑造": "bloom_analyze",
+    "古典诗词的意象与抒情手法": "bloom_analyze",
+    "古诗文的翻译与文意把握": "bloom_understand",
+    "民俗文化的文学呈现": "bloom_analyze",
+    "场景描写与氛围营造": "bloom_apply",
+    "散文的抒情方式与语言特色": "bloom_analyze",
+    "仿写与语言风格借鉴": "bloom_apply",
+    "科学说明文的逻辑推理": "bloom_analyze",
+    "说明语言的准确性与严密性": "bloom_analyze",
+    "科普文的阅读与信息整合": "bloom_apply",
+    "文言记叙文的叙事与意境": "bloom_analyze",
+    "诗经的比兴手法与情感表达": "bloom_analyze",
+    "选择性阅读与经典导读方法": "bloom_apply",
+    "古典散文的语言艺术": "bloom_analyze",
+    "演讲稿的结构与说服策略": "bloom_apply",
+    "口语交际与演讲表达": "bloom_apply",
+    "观点论证的逻辑与感染力": "bloom_create",
+    "游记的视角变换与行文线索": "bloom_analyze",
+    "游踪景物描写与情感表达": "bloom_apply",
+    "游记中的人文情怀与思考": "bloom_evaluate",
+    "先秦诸子散文的思想与风格": "bloom_analyze",
+    "文言寓言与托物寓意": "bloom_analyze",
+    "唐诗的叙事与现实关怀": "bloom_analyze",
+    "长篇小说的主题分析与人物评价": "bloom_evaluate"
+  },
+  "_warnings": []
+}

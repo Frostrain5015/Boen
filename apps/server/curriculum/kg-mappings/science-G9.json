@@ -1,0 +1,438 @@
+{
+  "subject": "science",
+  "grade": "9",
+  "generatedAt": "2026-06-20T07:04:30.773Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "物质变化的类型与判断",
+      "to": "酸碱的性质与指示剂"
+    },
+    {
+      "from": "酸碱的性质与指示剂",
+      "to": "中和反应与pH值"
+    },
+    {
+      "from": "中和反应与pH值",
+      "to": "盐的性质与复分解反应"
+    },
+    {
+      "from": "物质变化的类型与判断",
+      "to": "金属的活动性与冶炼"
+    },
+    {
+      "from": "物质变化的类型与判断",
+      "to": "有机化合物与高分子材料"
+    },
+    {
+      "from": "盐的性质与复分解反应",
+      "to": "物质的鉴别与推断方法"
+    },
+    {
+      "from": "物质变化的类型与判断",
+      "to": "化学计算与化学方程式配平"
+    },
+    {
+      "from": "功与功率的计算",
+      "to": "机械效率与能量转化"
+    },
+    {
+      "from": "功与功率的计算",
+      "to": "杠杆原理与应用"
+    },
+    {
+      "from": "杠杆原理与应用",
+      "to": "滑轮组与机械优势"
+    },
+    {
+      "from": "功与功率的计算",
+      "to": "内能与比热容"
+    },
+    {
+      "from": "内能与比热容",
+      "to": "热机与热效率"
+    },
+    {
+      "from": "功与功率的计算",
+      "to": "电功率的计算与应用"
+    },
+    {
+      "from": "电功率的计算与应用",
+      "to": "焦耳定律与电热器"
+    },
+    {
+      "from": "机械效率与能量转化",
+      "to": "能量守恒定律"
+    },
+    {
+      "from": "新陈代谢的概念与类型",
+      "to": "光合作用与呼吸作用"
+    },
+    {
+      "from": "新陈代谢的概念与类型",
+      "to": "人体物质代谢与能量代谢"
+    },
+    {
+      "from": "光合作用与呼吸作用",
+      "to": "植物的水分与无机盐吸收"
+    },
+    {
+      "from": "人体物质代谢与能量代谢",
+      "to": "人体泌尿系统与排泄"
+    },
+    {
+      "from": "生物进化的证据与理论",
+      "to": "自然选择与适应"
+    },
+    {
+      "from": "生物进化的证据与理论",
+      "to": "遗传与变异的分子基础"
+    },
+    {
+      "from": "遗传与变异的分子基础",
+      "to": "DNA与基因的概念"
+    },
+    {
+      "from": "光合作用与呼吸作用",
+      "to": "生态系统的物质循环"
+    },
+    {
+      "from": "生态系统的物质循环",
+      "to": "生态系统的能量流动"
+    },
+    {
+      "from": "生态系统的能量流动",
+      "to": "生态平衡与生物多样性保护"
+    },
+    {
+      "from": "传染病的传播与防控",
+      "to": "免疫系统的类型与功能"
+    },
+    {
+      "from": "传染病的传播与防控",
+      "to": "健康生活方式与疾病预防"
+    },
+    {
+      "from": "能量守恒定律",
+      "to": "能源分类与新能源"
+    },
+    {
+      "from": "金属的活动性与冶炼",
+      "to": "资源利用与循环经济"
+    },
+    {
+      "from": "酸碱的性质与指示剂",
+      "to": "环境污染的治理技术"
+    },
+    {
+      "from": "生态平衡与生物多样性保护",
+      "to": "可持续发展战略与个人行动"
+    },
+    {
+      "from": "科学实验方案的设计与评价",
+      "to": "科学论文的写作与表达"
+    },
+    {
+      "from": "能量守恒定律",
+      "to": "核能与核安全"
+    },
+    {
+      "from": "DNA与基因的概念",
+      "to": "生物技术在农业与医学中的应用"
+    },
+    {
+      "from": "科学实验方案的设计与评价",
+      "to": "跨学科问题解决与STEM实践"
+    }
+  ],
+  "themes": {
+    "物质变化的类型与判断": "sci_matter",
+    "酸碱的性质与指示剂": "sci_matter",
+    "中和反应与pH值": "sci_matter",
+    "盐的性质与复分解反应": "sci_matter",
+    "金属的活动性与冶炼": "sci_matter",
+    "有机化合物与高分子材料": "sci_matter",
+    "物质的鉴别与推断方法": "sci_matter",
+    "化学计算与化学方程式配平": "sci_matter",
+    "功与功率的计算": "sci_matter",
+    "机械效率与能量转化": "sci_matter",
+    "杠杆原理与应用": "sci_matter",
+    "滑轮组与机械优势": "sci_matter",
+    "内能与比热容": "sci_matter",
+    "热机与热效率": "sci_matter",
+    "电功率的计算与应用": "sci_matter",
+    "焦耳定律与电热器": "sci_matter",
+    "能量守恒定律": "sci_matter",
+    "新陈代谢的概念与类型": "sci_life",
+    "光合作用与呼吸作用": "sci_life",
+    "人体物质代谢与能量代谢": "sci_life",
+    "植物的水分与无机盐吸收": "sci_life",
+    "人体泌尿系统与排泄": "sci_life",
+    "生物进化的证据与理论": "sci_life",
+    "自然选择与适应": "sci_life",
+    "遗传与变异的分子基础": "sci_life",
+    "DNA与基因的概念": "sci_life",
+    "生态系统的物质循环": "sci_life",
+    "生态系统的能量流动": "sci_life",
+    "生态平衡与生物多样性保护": "sci_life",
+    "传染病的传播与防控": "sci_life",
+    "免疫系统的类型与功能": "sci_life",
+    "健康生活方式与疾病预防": "sci_life",
+    "急救知识与基本技能": "sci_life",
+    "心理健康与社会适应": "sci_life",
+    "能源分类与新能源": "sci_earth",
+    "资源利用与循环经济": "sci_earth",
+    "环境污染的治理技术": "sci_tech",
+    "可持续发展战略与个人行动": "sci_earth",
+    "科学实验方案的设计与评价": "sci_matter",
+    "科学数据的收集与分析": "sci_matter",
+    "科学论文的写作与表达": "sci_matter",
+    "核能与核安全": "sci_matter",
+    "生物技术在农业与医学中的应用": "sci_tech",
+    "地球环境与宇宙探索": "sci_earth",
+    "跨学科问题解决与STEM实践": "sci_tech"
+  },
+  "literacies": {
+    "物质变化的类型与判断": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "酸碱的性质与指示剂": [
+      "lit_sci_concept",
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "中和反应与pH值": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "盐的性质与复分解反应": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "金属的活动性与冶炼": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "有机化合物与高分子材料": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "物质的鉴别与推断方法": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "化学计算与化学方程式配平": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "功与功率的计算": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "机械效率与能量转化": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "杠杆原理与应用": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "滑轮组与机械优势": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "内能与比热容": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "热机与热效率": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "电功率的计算与应用": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "焦耳定律与电热器": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "能量守恒定律": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "新陈代谢的概念与类型": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "光合作用与呼吸作用": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "人体物质代谢与能量代谢": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "植物的水分与无机盐吸收": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "人体泌尿系统与排泄": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "生物进化的证据与理论": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "自然选择与适应": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "遗传与变异的分子基础": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "DNA与基因的概念": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "生态系统的物质循环": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "生态系统的能量流动": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "生态平衡与生物多样性保护": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "传染病的传播与防控": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "免疫系统的类型与功能": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "健康生活方式与疾病预防": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "急救知识与基本技能": [
+      "lit_sci_inquiry",
+      "lit_sci_attitude"
+    ],
+    "心理健康与社会适应": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "能源分类与新能源": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "资源利用与循环经济": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "环境污染的治理技术": [
+      "lit_sci_concept",
+      "lit_sci_attitude",
+      "lit_sci_inquiry"
+    ],
+    "可持续发展战略与个人行动": [
+      "lit_sci_attitude",
+      "lit_sci_think"
+    ],
+    "科学实验方案的设计与评价": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "科学数据的收集与分析": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "科学论文的写作与表达": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "核能与核安全": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "生物技术在农业与医学中的应用": [
+      "lit_sci_concept",
+      "lit_sci_attitude",
+      "lit_sci_think"
+    ],
+    "地球环境与宇宙探索": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "跨学科问题解决与STEM实践": [
+      "lit_sci_inquiry",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ]
+  },
+  "blooms": {
+    "物质变化的类型与判断": "bloom_analyze",
+    "酸碱的性质与指示剂": "bloom_apply",
+    "中和反应与pH值": "bloom_apply",
+    "盐的性质与复分解反应": "bloom_apply",
+    "金属的活动性与冶炼": "bloom_apply",
+    "有机化合物与高分子材料": "bloom_understand",
+    "物质的鉴别与推断方法": "bloom_analyze",
+    "化学计算与化学方程式配平": "bloom_apply",
+    "功与功率的计算": "bloom_apply",
+    "机械效率与能量转化": "bloom_apply",
+    "杠杆原理与应用": "bloom_apply",
+    "滑轮组与机械优势": "bloom_apply",
+    "内能与比热容": "bloom_apply",
+    "热机与热效率": "bloom_apply",
+    "电功率的计算与应用": "bloom_apply",
+    "焦耳定律与电热器": "bloom_apply",
+    "能量守恒定律": "bloom_evaluate",
+    "新陈代谢的概念与类型": "bloom_understand",
+    "光合作用与呼吸作用": "bloom_apply",
+    "人体物质代谢与能量代谢": "bloom_apply",
+    "植物的水分与无机盐吸收": "bloom_understand",
+    "人体泌尿系统与排泄": "bloom_understand",
+    "生物进化的证据与理论": "bloom_analyze",
+    "自然选择与适应": "bloom_analyze",
+    "遗传与变异的分子基础": "bloom_understand",
+    "DNA与基因的概念": "bloom_understand",
+    "生态系统的物质循环": "bloom_analyze",
+    "生态系统的能量流动": "bloom_analyze",
+    "生态平衡与生物多样性保护": "bloom_evaluate",
+    "传染病的传播与防控": "bloom_apply",
+    "免疫系统的类型与功能": "bloom_understand",
+    "健康生活方式与疾病预防": "bloom_evaluate",
+    "急救知识与基本技能": "bloom_apply",
+    "心理健康与社会适应": "bloom_evaluate",
+    "能源分类与新能源": "bloom_evaluate",
+    "资源利用与循环经济": "bloom_evaluate",
+    "环境污染的治理技术": "bloom_evaluate",
+    "可持续发展战略与个人行动": "bloom_evaluate",
+    "科学实验方案的设计与评价": "bloom_create",
+    "科学数据的收集与分析": "bloom_analyze",
+    "科学论文的写作与表达": "bloom_create",
+    "核能与核安全": "bloom_evaluate",
+    "生物技术在农业与医学中的应用": "bloom_evaluate",
+    "地球环境与宇宙探索": "bloom_evaluate",
+    "跨学科问题解决与STEM实践": "bloom_create"
+  }
+}

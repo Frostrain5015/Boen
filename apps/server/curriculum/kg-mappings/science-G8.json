@@ -1,0 +1,435 @@
+{
+  "subject": "science",
+  "grade": "8",
+  "generatedAt": "2026-06-20T06:34:57.522Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "感觉器官与神经调节基础",
+      "to": "听觉与视觉的形成机制"
+    },
+    {
+      "from": "感觉器官与神经调节基础",
+      "to": "动物行为与神经调控"
+    },
+    {
+      "from": "力的合成与分解",
+      "to": "牛顿第一定律与惯性"
+    },
+    {
+      "from": "牛顿第一定律与惯性",
+      "to": "二力平衡条件"
+    },
+    {
+      "from": "力的合成与分解",
+      "to": "压强的概念与计算"
+    },
+    {
+      "from": "压强的概念与计算",
+      "to": "浮力的原理与应用"
+    },
+    {
+      "from": "二力平衡条件",
+      "to": "简单机械的力学分析"
+    },
+    {
+      "from": "电路的组成与连接方式",
+      "to": "电流电压电阻的关系"
+    },
+    {
+      "from": "电流电压电阻的关系",
+      "to": "欧姆定律的应用"
+    },
+    {
+      "from": "电路的组成与连接方式",
+      "to": "家庭电路与安全用电"
+    },
+    {
+      "from": "水的组成与性质",
+      "to": "溶液浓度的计算"
+    },
+    {
+      "from": "水的组成与性质",
+      "to": "水资源的分布与保护"
+    },
+    {
+      "from": "力的合成与分解",
+      "to": "建筑结构的受力分析"
+    },
+    {
+      "from": "空气的组成与性质",
+      "to": "氧气的制备与化学性质"
+    },
+    {
+      "from": "氧气的制备与化学性质",
+      "to": "化学方程式与质量守恒"
+    },
+    {
+      "from": "空气的组成与性质",
+      "to": "二氧化碳的性质与检验"
+    },
+    {
+      "from": "压强的概念与计算",
+      "to": "大气压强与气压变化"
+    },
+    {
+      "from": "大气压强与气压变化",
+      "to": "气候类型与影响因素"
+    },
+    {
+      "from": "气候类型与影响因素",
+      "to": "天气预报与气象观测"
+    },
+    {
+      "from": "电路的组成与连接方式",
+      "to": "电磁感应现象"
+    },
+    {
+      "from": "电磁感应现象",
+      "to": "电动机与发电机原理"
+    },
+    {
+      "from": "电磁感应现象",
+      "to": "电磁波与通信技术"
+    },
+    {
+      "from": "人体消化系统的结构与功能",
+      "to": "血液循环与心血管系统"
+    },
+    {
+      "from": "血液循环与心血管系统",
+      "to": "呼吸系统与气体交换"
+    },
+    {
+      "from": "感觉器官与神经调节基础",
+      "to": "人体的神经调节与反射"
+    },
+    {
+      "from": "人体的神经调节与反射",
+      "to": "激素调节与内分泌系统"
+    },
+    {
+      "from": "控制系统的基本概念",
+      "to": "反馈机制与自动控制"
+    },
+    {
+      "from": "生态系统的组成与功能",
+      "to": "种群与群落的概念"
+    },
+    {
+      "from": "生态系统的组成与功能",
+      "to": "食物链与食物网分析"
+    },
+    {
+      "from": "空气的组成与性质",
+      "to": "化学实验基本操作"
+    },
+    {
+      "from": "化学方程式与质量守恒",
+      "to": "物质的分类方法"
+    },
+    {
+      "from": "空气的组成与性质",
+      "to": "环境污染与防治"
+    },
+    {
+      "from": "人体的神经调节与反射",
+      "to": "人体免疫系统基础"
+    },
+    {
+      "from": "欧姆定律的应用",
+      "to": "能量转化与效率"
+    },
+    {
+      "from": "科学推理与论证方法",
+      "to": "科学调查与统计方法"
+    }
+  ],
+  "themes": {
+    "感觉器官与神经调节基础": "sci_life",
+    "听觉与视觉的形成机制": "sci_life",
+    "动物行为与神经调控": "sci_life",
+    "力的合成与分解": "sci_matter",
+    "牛顿第一定律与惯性": "sci_matter",
+    "二力平衡条件": "sci_matter",
+    "压强的概念与计算": "sci_matter",
+    "浮力的原理与应用": "sci_matter",
+    "简单机械的力学分析": "sci_tech",
+    "电路的组成与连接方式": "sci_matter",
+    "电流电压电阻的关系": "sci_matter",
+    "欧姆定律的应用": "sci_matter",
+    "家庭电路与安全用电": "sci_matter",
+    "水的组成与性质": "sci_matter",
+    "溶液浓度的计算": "sci_matter",
+    "水资源的分布与保护": "sci_earth",
+    "建筑结构的受力分析": "sci_tech",
+    "工程制图与模型制作": "sci_tech",
+    "空气的组成与性质": "sci_matter",
+    "氧气的制备与化学性质": "sci_matter",
+    "化学方程式与质量守恒": "sci_matter",
+    "二氧化碳的性质与检验": "sci_matter",
+    "大气压强与气压变化": "sci_earth",
+    "气候类型与影响因素": "sci_earth",
+    "天气预报与气象观测": "sci_earth",
+    "电磁感应现象": "sci_matter",
+    "电动机与发电机原理": "sci_matter",
+    "电磁波与通信技术": "sci_matter",
+    "人体消化系统的结构与功能": "sci_life",
+    "血液循环与心血管系统": "sci_life",
+    "呼吸系统与气体交换": "sci_life",
+    "人体的神经调节与反射": "sci_life",
+    "激素调节与内分泌系统": "sci_life",
+    "控制系统的基本概念": "sci_tech",
+    "反馈机制与自动控制": "sci_tech",
+    "生态系统的组成与功能": "sci_life",
+    "种群与群落的概念": "sci_life",
+    "食物链与食物网分析": "sci_life",
+    "化学实验基本操作": "sci_matter",
+    "物质的分类方法": "sci_matter",
+    "科学推理与论证方法": "sci_matter",
+    "环境污染与防治": "sci_earth",
+    "人体免疫系统基础": "sci_life",
+    "能量转化与效率": "sci_matter",
+    "科学调查与统计方法": "sci_matter"
+  },
+  "literacies": {
+    "感觉器官与神经调节基础": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "听觉与视觉的形成机制": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "动物行为与神经调控": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "力的合成与分解": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "牛顿第一定律与惯性": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "二力平衡条件": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "压强的概念与计算": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "浮力的原理与应用": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "简单机械的力学分析": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "电路的组成与连接方式": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "电流电压电阻的关系": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "欧姆定律的应用": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "家庭电路与安全用电": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "水的组成与性质": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "溶液浓度的计算": [
+      "lit_sci_concept",
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "水资源的分布与保护": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "建筑结构的受力分析": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "工程制图与模型制作": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "空气的组成与性质": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "氧气的制备与化学性质": [
+      "lit_sci_concept",
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ],
+    "化学方程式与质量守恒": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "二氧化碳的性质与检验": [
+      "lit_sci_concept",
+      "lit_sci_inquiry"
+    ],
+    "大气压强与气压变化": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "气候类型与影响因素": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "天气预报与气象观测": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "电磁感应现象": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "电动机与发电机原理": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "电磁波与通信技术": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "人体消化系统的结构与功能": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "血液循环与心血管系统": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "呼吸系统与气体交换": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "人体的神经调节与反射": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "激素调节与内分泌系统": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "控制系统的基本概念": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "反馈机制与自动控制": [
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "生态系统的组成与功能": [
+      "lit_sci_concept",
+      "lit_sci_think",
+      "lit_sci_attitude"
+    ],
+    "种群与群落的概念": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "食物链与食物网分析": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "化学实验基本操作": [
+      "lit_sci_inquiry",
+      "lit_sci_concept"
+    ],
+    "物质的分类方法": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "科学推理与论证方法": [
+      "lit_sci_think",
+      "lit_sci_inquiry"
+    ],
+    "环境污染与防治": [
+      "lit_sci_concept",
+      "lit_sci_attitude"
+    ],
+    "人体免疫系统基础": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "能量转化与效率": [
+      "lit_sci_concept",
+      "lit_sci_think"
+    ],
+    "科学调查与统计方法": [
+      "lit_sci_inquiry",
+      "lit_sci_think"
+    ]
+  },
+  "blooms": {
+    "感觉器官与神经调节基础": "bloom_understand",
+    "听觉与视觉的形成机制": "bloom_understand",
+    "动物行为与神经调控": "bloom_analyze",
+    "力的合成与分解": "bloom_apply",
+    "牛顿第一定律与惯性": "bloom_apply",
+    "二力平衡条件": "bloom_apply",
+    "压强的概念与计算": "bloom_apply",
+    "浮力的原理与应用": "bloom_apply",
+    "简单机械的力学分析": "bloom_apply",
+    "电路的组成与连接方式": "bloom_apply",
+    "电流电压电阻的关系": "bloom_apply",
+    "欧姆定律的应用": "bloom_apply",
+    "家庭电路与安全用电": "bloom_evaluate",
+    "水的组成与性质": "bloom_understand",
+    "溶液浓度的计算": "bloom_apply",
+    "水资源的分布与保护": "bloom_evaluate",
+    "建筑结构的受力分析": "bloom_analyze",
+    "工程制图与模型制作": "bloom_create",
+    "空气的组成与性质": "bloom_understand",
+    "氧气的制备与化学性质": "bloom_apply",
+    "化学方程式与质量守恒": "bloom_apply",
+    "二氧化碳的性质与检验": "bloom_apply",
+    "大气压强与气压变化": "bloom_apply",
+    "气候类型与影响因素": "bloom_analyze",
+    "天气预报与气象观测": "bloom_apply",
+    "电磁感应现象": "bloom_understand",
+    "电动机与发电机原理": "bloom_apply",
+    "电磁波与通信技术": "bloom_understand",
+    "人体消化系统的结构与功能": "bloom_understand",
+    "血液循环与心血管系统": "bloom_understand",
+    "呼吸系统与气体交换": "bloom_understand",
+    "人体的神经调节与反射": "bloom_apply",
+    "激素调节与内分泌系统": "bloom_understand",
+    "控制系统的基本概念": "bloom_understand",
+    "反馈机制与自动控制": "bloom_analyze",
+    "生态系统的组成与功能": "bloom_analyze",
+    "种群与群落的概念": "bloom_understand",
+    "食物链与食物网分析": "bloom_analyze",
+    "化学实验基本操作": "bloom_apply",
+    "物质的分类方法": "bloom_analyze",
+    "科学推理与论证方法": "bloom_evaluate",
+    "环境污染与防治": "bloom_evaluate",
+    "人体免疫系统基础": "bloom_understand",
+    "能量转化与效率": "bloom_apply",
+    "科学调查与统计方法": "bloom_analyze"
+  },
+  "_warnings": []
+}

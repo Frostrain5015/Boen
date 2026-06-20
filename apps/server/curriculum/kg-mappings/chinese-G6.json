@@ -1,0 +1,287 @@
+{
+  "subject": "chinese",
+  "grade": "6",
+  "generatedAt": "2026-06-20T06:51:37.560Z",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "对比阅读与评价方法",
+      "to": "小说阅读与人物形象分析"
+    },
+    {
+      "from": "体会作者描写的场景细节",
+      "to": "环境描写与人物心理"
+    },
+    {
+      "from": "小说阅读与人物形象分析",
+      "to": "小说情节与矛盾冲突"
+    },
+    {
+      "from": "古诗词的意境与表达",
+      "to": "古诗词鉴赏与手法分析"
+    },
+    {
+      "from": "文言文的词汇与句式",
+      "to": "文言文深入理解与翻译"
+    },
+    {
+      "from": "概括文章主要内容",
+      "to": "议论文阅读与观点分析"
+    },
+    {
+      "from": "描写方法综合运用",
+      "to": "点面结合的写作手法"
+    },
+    {
+      "from": "概括文章主要内容",
+      "to": "详略得当的材料安排"
+    },
+    {
+      "from": "口语交际与即兴发言",
+      "to": "演讲稿与倡议书写法"
+    },
+    {
+      "from": "书信与建议书写作",
+      "to": "毕业赠言与纪念写作"
+    },
+    {
+      "from": "古典名著阅读方法",
+      "to": "外国文学的阅读与理解"
+    },
+    {
+      "from": "小说阅读与人物形象分析",
+      "to": "鲁迅作品的阅读与理解"
+    },
+    {
+      "from": "议论文阅读与观点分析",
+      "to": "议论文写作与论据选择"
+    },
+    {
+      "from": "辩论与有理有据表达",
+      "to": "辩论与有理有据的口语"
+    },
+    {
+      "from": "信息搜集与整合能力",
+      "to": "综合性学习与毕业策划"
+    },
+    {
+      "from": "古诗词鉴赏与手法分析",
+      "to": "古诗词综合鉴赏与比较"
+    },
+    {
+      "from": "文言文深入理解与翻译",
+      "to": "文言文综合阅读与运用"
+    },
+    {
+      "from": "古典名著阅读方法",
+      "to": "名著导读与阅读规划"
+    },
+    {
+      "from": "体会课文思想感情",
+      "to": "散文阅读与情感体会"
+    },
+    {
+      "from": "非连续性文本阅读",
+      "to": "新闻与评论的阅读写作"
+    },
+    {
+      "from": "古诗词综合鉴赏与比较",
+      "to": "诗歌创作与抒情表达"
+    },
+    {
+      "from": "文章修改与润色技巧",
+      "to": "文章修改与互评能力"
+    },
+    {
+      "from": "快速阅读与信息提取",
+      "to": "小升初综合语文能力"
+    }
+  ],
+  "themes": {
+    "小说阅读与人物形象分析": "chi_reading",
+    "环境描写与人物心理": "chi_reading",
+    "小说情节与矛盾冲突": "chi_reading",
+    "古诗词鉴赏与手法分析": "chi_reading",
+    "文言文深入理解与翻译": "chi_reading",
+    "议论文阅读与观点分析": "chi_reading",
+    "点面结合的写作手法": "chi_writing",
+    "围绕中心意思写作": "chi_writing",
+    "详略得当的材料安排": "chi_writing",
+    "演讲稿与倡议书写法": "chi_writing",
+    "想象作文与科幻写作": "chi_writing",
+    "毕业赠言与纪念写作": "chi_writing",
+    "外国文学的阅读与理解": "chi_reading",
+    "鲁迅作品的阅读与理解": "chi_reading",
+    "议论文写作与论据选择": "chi_writing",
+    "辩论与有理有据的口语": "chi_comprehensive",
+    "综合性学习与毕业策划": "chi_comprehensive",
+    "古诗词综合鉴赏与比较": "chi_reading",
+    "文言文综合阅读与运用": "chi_reading",
+    "名著导读与阅读规划": "chi_reading",
+    "散文阅读与情感体会": "chi_reading",
+    "新闻与评论的阅读写作": "chi_comprehensive",
+    "诗歌创作与抒情表达": "chi_writing",
+    "文章修改与互评能力": "chi_writing",
+    "小升初综合语文能力": "chi_comprehensive"
+  },
+  "literacies": {
+    "小说阅读与人物形象分析": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "环境描写与人物心理": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "小说情节与矛盾冲突": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "古诗词鉴赏与手法分析": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "文言文深入理解与翻译": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "议论文阅读与观点分析": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "点面结合的写作手法": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "围绕中心意思写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "详略得当的材料安排": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "演讲稿与倡议书写法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "想象作文与科幻写作": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "毕业赠言与纪念写作": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "外国文学的阅读与理解": [
+      "lit_chi_lang",
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "鲁迅作品的阅读与理解": [
+      "lit_chi_lang",
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "议论文写作与论据选择": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "辩论与有理有据的口语": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "综合性学习与毕业策划": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ],
+    "古诗词综合鉴赏与比较": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "文言文综合阅读与运用": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "名著导读与阅读规划": [
+      "lit_chi_lang",
+      "lit_chi_learn",
+      "lit_chi_culture"
+    ],
+    "散文阅读与情感体会": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "新闻与评论的阅读写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "诗歌创作与抒情表达": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "文章修改与互评能力": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "小升初综合语文能力": [
+      "lit_chi_lang",
+      "lit_chi_think",
+      "lit_chi_learn"
+    ]
+  },
+  "blooms": {
+    "小说阅读与人物形象分析": "bloom_analyze",
+    "环境描写与人物心理": "bloom_analyze",
+    "小说情节与矛盾冲突": "bloom_analyze",
+    "古诗词鉴赏与手法分析": "bloom_analyze",
+    "文言文深入理解与翻译": "bloom_apply",
+    "议论文阅读与观点分析": "bloom_analyze",
+    "点面结合的写作手法": "bloom_apply",
+    "围绕中心意思写作": "bloom_apply",
+    "详略得当的材料安排": "bloom_evaluate",
+    "演讲稿与倡议书写法": "bloom_create",
+    "想象作文与科幻写作": "bloom_create",
+    "毕业赠言与纪念写作": "bloom_create",
+    "外国文学的阅读与理解": "bloom_understand",
+    "鲁迅作品的阅读与理解": "bloom_analyze",
+    "议论文写作与论据选择": "bloom_create",
+    "辩论与有理有据的口语": "bloom_evaluate",
+    "综合性学习与毕业策划": "bloom_create",
+    "古诗词综合鉴赏与比较": "bloom_evaluate",
+    "文言文综合阅读与运用": "bloom_analyze",
+    "名著导读与阅读规划": "bloom_evaluate",
+    "散文阅读与情感体会": "bloom_analyze",
+    "新闻与评论的阅读写作": "bloom_apply",
+    "诗歌创作与抒情表达": "bloom_create",
+    "文章修改与互评能力": "bloom_evaluate",
+    "小升初综合语文能力": "bloom_evaluate"
+  },
+  "_warnings": [
+    "prereq.from: \"对比阅读与评价方法\"",
+    "prereq.from: \"体会作者描写的场景细节\"",
+    "prereq.from: \"古诗词的意境与表达\"",
+    "prereq.from: \"文言文的词汇与句式\"",
+    "prereq.from: \"概括文章主要内容\"",
+    "prereq.from: \"描写方法综合运用\"",
+    "prereq.from: \"概括文章主要内容\"",
+    "prereq.from: \"口语交际与即兴发言\"",
+    "prereq.from: \"书信与建议书写作\"",
+    "prereq.from: \"古典名著阅读方法\"",
+    "prereq.from: \"辩论与有理有据表达\"",
+    "prereq.from: \"信息搜集与整合能力\"",
+    "prereq.from: \"古典名著阅读方法\"",
+    "prereq.from: \"体会课文思想感情\"",
+    "prereq.from: \"非连续性文本阅读\"",
+    "prereq.from: \"文章修改与润色技巧\"",
+    "prereq.from: \"快速阅读与信息提取\""
+  ]
+}

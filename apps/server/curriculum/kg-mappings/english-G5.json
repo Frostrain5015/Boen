@@ -1,0 +1,557 @@
+{
+  "subject": "english",
+  "grade": "5",
+  "generatedAt": "2026-06-20",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "一般现在时的基本用法",
+      "to": "一般现在时第三人称变化"
+    },
+    {
+      "from": "一般现在时的基本用法",
+      "to": "现在进行时的用法"
+    },
+    {
+      "from": "一般现在时第三人称变化",
+      "to": "频度副词always/usually/often"
+    },
+    {
+      "from": "数字1-100的表达",
+      "to": "日期与月份的表达"
+    },
+    {
+      "from": "天气与季节表达",
+      "to": "季节与天气描述"
+    },
+    {
+      "from": "食物与健康饮食词汇",
+      "to": "食物与饮食方式表达"
+    },
+    {
+      "from": "形容词与描述表达",
+      "to": "形容词比较级入门"
+    },
+    {
+      "from": "can/can't能力表达",
+      "to": "情态动词should建议"
+    },
+    {
+      "from": "How/What疑问句",
+      "to": "whose/which等疑问词"
+    },
+    {
+      "from": "听力理解对话主旨",
+      "to": "听力理解日常对话"
+    },
+    {
+      "from": "口语表达日常活动",
+      "to": "口语描述日常与感受"
+    },
+    {
+      "from": "口语描述日常与感受",
+      "to": "口语表达观点与理由"
+    },
+    {
+      "from": "阅读短文提取信息",
+      "to": "阅读理解短文信息"
+    },
+    {
+      "from": "阅读中猜测词义",
+      "to": "阅读推断与上下文"
+    },
+    {
+      "from": "短文写作与连贯表达",
+      "to": "段落写作与逻辑"
+    },
+    {
+      "from": "段落写作与逻辑",
+      "to": "书信与邮件格式写作"
+    },
+    {
+      "from": "自然与植物词汇",
+      "to": "自然与环保意识"
+    },
+    {
+      "from": "情态动词should建议",
+      "to": "健康生活方式讨论"
+    },
+    {
+      "from": "日常活动与作息时间",
+      "to": "时间管理与日程表达"
+    },
+    {
+      "from": "日期与月份的表达",
+      "to": "校园活动与日程描述"
+    },
+    {
+      "from": "段落写作与逻辑",
+      "to": "图片描述与情境写作"
+    },
+    {
+      "from": "朗读模仿与语音语调",
+      "to": "英语朗读与语音练习"
+    },
+    {
+      "from": "词汇联想与记忆策略",
+      "to": "自主学习与反思策略"
+    }
+  ],
+  "kpMap": {
+    "eng_g5_kp_1": {
+      "id": 2743,
+      "title": "一般现在时第三人称变化",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13048,
+        13052,
+        13064,
+        13080
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g5_kp_2": {
+      "id": 2744,
+      "title": "现在进行时的用法",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13077,
+        13080
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g5_kp_3": {
+      "id": 2745,
+      "title": "频度副词always/usually/often",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13048,
+        13052,
+        13064
+      ],
+      "prerequisites": [
+        "一般现在时第三人称变化"
+      ]
+    },
+    "eng_g5_kp_4": {
+      "id": 2746,
+      "title": "日期与月份的表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13070,
+        13074
+      ],
+      "prerequisites": [
+        "数字1-100的表达"
+      ]
+    },
+    "eng_g5_kp_5": {
+      "id": 2747,
+      "title": "季节与天气描述",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13067,
+        13060
+      ],
+      "prerequisites": [
+        "天气与季节表达"
+      ]
+    },
+    "eng_g5_kp_6": {
+      "id": 2748,
+      "title": "食物与饮食方式表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13056
+      ],
+      "prerequisites": [
+        "食物与健康饮食词汇"
+      ]
+    },
+    "eng_g5_kp_7": {
+      "id": 2749,
+      "title": "职业与工作内容词汇",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        13048,
+        13070
+      ],
+      "prerequisites": []
+    },
+    "eng_g5_kp_8": {
+      "id": 2750,
+      "title": "形容词比较级入门",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13040,
+        13044
+      ],
+      "prerequisites": [
+        "形容词与描述表达"
+      ]
+    },
+    "eng_g5_kp_9": {
+      "id": 2751,
+      "title": "情态动词should建议",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13052,
+        13056
+      ],
+      "prerequisites": [
+        "can/can't能力表达"
+      ]
+    },
+    "eng_g5_kp_10": {
+      "id": 2752,
+      "title": "whose/which等疑问词",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13077,
+        13074
+      ],
+      "prerequisites": [
+        "How/What疑问句"
+      ]
+    },
+    "eng_g5_kp_11": {
+      "id": 2753,
+      "title": "听力理解日常对话",
+      "theme": "eng_listening",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13040,
+        13044,
+        13048,
+        13052,
+        13056,
+        13060,
+        13064,
+        13067,
+        13070,
+        13074,
+        13077,
+        13080
+      ],
+      "prerequisites": [
+        "听力理解对话主旨"
+      ]
+    },
+    "eng_g5_kp_12": {
+      "id": 2754,
+      "title": "口语描述日常与感受",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13044,
+        13048,
+        13064
+      ],
+      "prerequisites": [
+        "口语表达日常活动"
+      ]
+    },
+    "eng_g5_kp_13": {
+      "id": 2755,
+      "title": "口语表达观点与理由",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13040,
+        13052,
+        13056,
+        13060
+      ],
+      "prerequisites": [
+        "口语描述日常与感受"
+      ]
+    },
+    "eng_g5_kp_14": {
+      "id": 2756,
+      "title": "阅读理解短文信息",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_analyze",
+      "units": [
+        13040,
+        13044,
+        13048,
+        13056,
+        13060,
+        13067,
+        13070,
+        13077
+      ],
+      "prerequisites": [
+        "阅读短文提取信息"
+      ]
+    },
+    "eng_g5_kp_15": {
+      "id": 2757,
+      "title": "阅读推断与上下文",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_analyze",
+      "units": [
+        13052,
+        13060,
+        13077,
+        13080
+      ],
+      "prerequisites": [
+        "阅读中猜测词义"
+      ]
+    },
+    "eng_g5_kp_16": {
+      "id": 2758,
+      "title": "段落写作与逻辑",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13048,
+        13052,
+        13064,
+        13067
+      ],
+      "prerequisites": [
+        "短文写作与连贯表达"
+      ]
+    },
+    "eng_g5_kp_17": {
+      "id": 2759,
+      "title": "书信与邮件格式写作",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13040,
+        13044,
+        13056
+      ],
+      "prerequisites": [
+        "段落写作与逻辑"
+      ]
+    },
+    "eng_g5_kp_18": {
+      "id": 2760,
+      "title": "中西方节日与庆祝",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        13070,
+        13074
+      ],
+      "prerequisites": []
+    },
+    "eng_g5_kp_19": {
+      "id": 2761,
+      "title": "自然与环保意识",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        13060
+      ],
+      "prerequisites": [
+        "自然与植物词汇"
+      ]
+    },
+    "eng_g5_kp_20": {
+      "id": 2762,
+      "title": "健康生活方式讨论",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        13052,
+        13056
+      ],
+      "prerequisites": [
+        "情态动词should建议"
+      ]
+    },
+    "eng_g5_kp_21": {
+      "id": 2763,
+      "title": "时间管理与日程表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13064,
+        13070,
+        13080
+      ],
+      "prerequisites": [
+        "日常活动与作息时间"
+      ]
+    },
+    "eng_g5_kp_22": {
+      "id": 2764,
+      "title": "校园活动与日程描述",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13070,
+        13074
+      ],
+      "prerequisites": [
+        "日期与月份的表达"
+      ]
+    },
+    "eng_g5_kp_23": {
+      "id": 2765,
+      "title": "图片描述与情境写作",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13060,
+        13067,
+        13077
+      ],
+      "prerequisites": [
+        "段落写作与逻辑"
+      ]
+    },
+    "eng_g5_kp_24": {
+      "id": 2766,
+      "title": "英语朗读与语音练习",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13040,
+        13044,
+        13048,
+        13064
+      ],
+      "prerequisites": [
+        "朗读模仿与语音语调"
+      ]
+    },
+    "eng_g5_kp_25": {
+      "id": 2767,
+      "title": "自主学习与反思策略",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_learn",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        13048,
+        13052,
+        13080
+      ],
+      "prerequisites": [
+        "词汇联想与记忆策略"
+      ]
+    }
+  }
+}

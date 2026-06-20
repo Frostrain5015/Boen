@@ -1,0 +1,602 @@
+{
+  "subject": "chinese",
+  "grade": "4",
+  "generatedAt": "2026-06-20T06:50:40.733Z",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "概括段落大意方法",
+      "to": "文章主旨的把握方法"
+    },
+    {
+      "from": "过渡句与段间关系",
+      "to": "过渡段与文章脉络"
+    },
+    {
+      "from": "文章主旨的把握方法",
+      "to": "体会文章思想感情"
+    },
+    {
+      "from": "读书笔记与批注方法",
+      "to": "批注阅读与提问策略"
+    },
+    {
+      "from": "人物描写的初步方法",
+      "to": "人物描写方法（动作心理）"
+    },
+    {
+      "from": "景物描写的顺序与方法",
+      "to": "环境描写与氛围烘托"
+    },
+    {
+      "from": "比喻与拟人修辞认识",
+      "to": "排比与夸张修辞手法"
+    },
+    {
+      "from": "神话与民间故事阅读",
+      "to": "神话故事的想象力"
+    },
+    {
+      "from": "古诗意境与画面感",
+      "to": "古诗词的意象与情感"
+    },
+    {
+      "from": "文言文入门与常见词汇",
+      "to": "文言文的断句与翻译"
+    },
+    {
+      "from": "说明性文字的阅读",
+      "to": "科普文的阅读与理解"
+    },
+    {
+      "from": "通知与书信的基本格式",
+      "to": "书信格式与情感表达"
+    },
+    {
+      "from": "日记与观察记录写作",
+      "to": "观察日记与连续记录"
+    },
+    {
+      "from": "想象作文与创编故事",
+      "to": "想象作文与故事创编"
+    },
+    {
+      "from": "景物描写的顺序与方法",
+      "to": "游记与场景描写写作"
+    },
+    {
+      "from": "人物描写方法（动作心理）",
+      "to": "写人作文与细节刻画"
+    },
+    {
+      "from": "习作修改与完善方法",
+      "to": "缩写与改写练习"
+    },
+    {
+      "from": "口语交际与清楚表达",
+      "to": "口语交际与观点表达"
+    },
+    {
+      "from": "略读与提取关键信息",
+      "to": "综合性学习与调查报告"
+    },
+    {
+      "from": "略读与提取关键信息",
+      "to": "略读速读与信息筛选"
+    },
+    {
+      "from": "文章主旨的把握方法",
+      "to": "叙事顺序（顺叙倒叙插叙）"
+    },
+    {
+      "from": "人物描写方法（动作心理）",
+      "to": "对比描写与衬托手法"
+    },
+    {
+      "from": "成语与四字词语的积累",
+      "to": "成语故事与语言文化"
+    },
+    {
+      "from": "读书笔记与批注方法",
+      "to": "读书笔记与摘抄整理"
+    }
+  ],
+  "bloomDistribution": {
+    "bloom_analyze": 8,
+    "bloom_apply": 7,
+    "bloom_understand": 5,
+    "bloom_create": 5
+  },
+  "themeDistribution": {
+    "chi_reading": 16,
+    "chi_writing": 6,
+    "chi_comprehensive": 3
+  },
+  "literacyDistribution": {
+    "lit_chi_lang": 24,
+    "lit_chi_think": 15,
+    "lit_chi_aesthetic": 11,
+    "lit_chi_learn": 4,
+    "lit_chi_culture": 5
+  },
+  "knowledgePoints": [
+    {
+      "code": "chi_g4_kp_1",
+      "title": "文章主旨的把握方法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "概括段落大意方法"
+      ],
+      "units": [
+        12332,
+        12347,
+        12388,
+        12405
+      ]
+    },
+    {
+      "code": "chi_g4_kp_2",
+      "title": "过渡段与文章脉络",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "过渡句与段间关系"
+      ],
+      "units": [
+        12340,
+        12354,
+        12396,
+        12412
+      ]
+    },
+    {
+      "code": "chi_g4_kp_3",
+      "title": "体会文章思想感情",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "文章主旨的把握方法"
+      ],
+      "units": [
+        12332,
+        12367,
+        12388,
+        12423
+      ]
+    },
+    {
+      "code": "chi_g4_kp_4",
+      "title": "批注阅读与提问策略",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "读书笔记与批注方法"
+      ],
+      "units": [
+        12340,
+        12396,
+        12347,
+        12405
+      ]
+    },
+    {
+      "code": "chi_g4_kp_5",
+      "title": "人物描写方法（动作心理）",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "人物描写的初步方法"
+      ],
+      "units": [
+        12354,
+        12412,
+        12374,
+        12431
+      ]
+    },
+    {
+      "code": "chi_g4_kp_6",
+      "title": "环境描写与氛围烘托",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "景物描写的顺序与方法"
+      ],
+      "units": [
+        12332,
+        12388,
+        12367,
+        12423
+      ]
+    },
+    {
+      "code": "chi_g4_kp_7",
+      "title": "排比与夸张修辞手法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "比喻与拟人修辞认识"
+      ],
+      "units": [
+        12347,
+        12405,
+        12367,
+        12423
+      ]
+    },
+    {
+      "code": "chi_g4_kp_8",
+      "title": "神话故事的想象力",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_culture",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "神话与民间故事阅读"
+      ],
+      "units": [
+        12354,
+        12412
+      ]
+    },
+    {
+      "code": "chi_g4_kp_9",
+      "title": "现代诗歌的节奏与情感",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_aesthetic",
+        "lit_chi_lang",
+        "lit_chi_culture"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [],
+      "units": [
+        12347,
+        12405
+      ]
+    },
+    {
+      "code": "chi_g4_kp_10",
+      "title": "古诗词的意象与情感",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_aesthetic",
+        "lit_chi_culture",
+        "lit_chi_lang"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "古诗意境与画面感"
+      ],
+      "units": [
+        12332,
+        12388,
+        12367,
+        12423
+      ]
+    },
+    {
+      "code": "chi_g4_kp_11",
+      "title": "文言文的断句与翻译",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_culture"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "文言文入门与常见词汇"
+      ],
+      "units": [
+        12367,
+        12423,
+        12381,
+        12439
+      ]
+    },
+    {
+      "code": "chi_g4_kp_12",
+      "title": "科普文的阅读与理解",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "说明性文字的阅读"
+      ],
+      "units": [
+        12340,
+        12396,
+        12381,
+        12439
+      ]
+    },
+    {
+      "code": "chi_g4_kp_13",
+      "title": "书信格式与情感表达",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "通知与书信的基本格式"
+      ],
+      "units": [
+        12362,
+        12418,
+        12374,
+        12431
+      ]
+    },
+    {
+      "code": "chi_g4_kp_14",
+      "title": "观察日记与连续记录",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "日记与观察记录写作"
+      ],
+      "units": [
+        12362,
+        12418,
+        12340,
+        12396
+      ]
+    },
+    {
+      "code": "chi_g4_kp_15",
+      "title": "想象作文与故事创编",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "想象作文与创编故事"
+      ],
+      "units": [
+        12362,
+        12418,
+        12354,
+        12412
+      ]
+    },
+    {
+      "code": "chi_g4_kp_16",
+      "title": "游记与场景描写写作",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "景物描写的顺序与方法"
+      ],
+      "units": [
+        12362,
+        12418,
+        12332,
+        12388
+      ]
+    },
+    {
+      "code": "chi_g4_kp_17",
+      "title": "写人作文与细节刻画",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "人物描写方法（动作心理）"
+      ],
+      "units": [
+        12362,
+        12418,
+        12374,
+        12431
+      ]
+    },
+    {
+      "code": "chi_g4_kp_18",
+      "title": "缩写与改写练习",
+      "theme": "chi_writing",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "习作修改与完善方法"
+      ],
+      "units": [
+        12362,
+        12418,
+        12381,
+        12439
+      ]
+    },
+    {
+      "code": "chi_g4_kp_19",
+      "title": "口语交际与观点表达",
+      "theme": "chi_comprehensive",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "口语交际与清楚表达"
+      ],
+      "units": [
+        12347,
+        12405,
+        12354,
+        12412
+      ]
+    },
+    {
+      "code": "chi_g4_kp_20",
+      "title": "综合性学习与调查报告",
+      "theme": "chi_comprehensive",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_create",
+      "prerequisites": [
+        "略读与提取关键信息"
+      ],
+      "units": [
+        12367,
+        12423,
+        12381,
+        12439
+      ]
+    },
+    {
+      "code": "chi_g4_kp_21",
+      "title": "略读速读与信息筛选",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "略读与提取关键信息"
+      ],
+      "units": [
+        12340,
+        12396,
+        12354,
+        12412
+      ]
+    },
+    {
+      "code": "chi_g4_kp_22",
+      "title": "叙事顺序（顺叙倒叙插叙）",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "文章主旨的把握方法"
+      ],
+      "units": [
+        12332,
+        12388,
+        12374,
+        12431
+      ]
+    },
+    {
+      "code": "chi_g4_kp_23",
+      "title": "对比描写与衬托手法",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_think",
+        "lit_chi_aesthetic"
+      ],
+      "bloom": "bloom_analyze",
+      "prerequisites": [
+        "人物描写方法（动作心理）"
+      ],
+      "units": [
+        12354,
+        12412,
+        12374,
+        12431
+      ]
+    },
+    {
+      "code": "chi_g4_kp_24",
+      "title": "成语故事与语言文化",
+      "theme": "chi_comprehensive",
+      "literacies": [
+        "lit_chi_culture",
+        "lit_chi_lang"
+      ],
+      "bloom": "bloom_understand",
+      "prerequisites": [
+        "成语与四字词语的积累"
+      ],
+      "units": [
+        12347,
+        12405,
+        12381,
+        12439
+      ]
+    },
+    {
+      "code": "chi_g4_kp_25",
+      "title": "读书笔记与摘抄整理",
+      "theme": "chi_reading",
+      "literacies": [
+        "lit_chi_lang",
+        "lit_chi_learn"
+      ],
+      "bloom": "bloom_apply",
+      "prerequisites": [
+        "读书笔记与批注方法"
+      ],
+      "units": [
+        12340,
+        12396,
+        12367,
+        12423
+      ]
+    }
+  ]
+}

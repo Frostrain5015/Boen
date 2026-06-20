@@ -1,5 +1,13 @@
 import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
+import DOMPurify from 'dompurify';
+
+// DOMPurify 配置：保留 KaTeX/MathML 渲染所需的标签和属性
+const PURIFY_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
+  ADD_TAGS: ['math', 'semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub', 'mfrac', 'mover', 'munder', 'munderover', 'mspace', 'mtext', 'merror', 'mtable', 'mtr', 'mtd', 'menclose', 'msqrt', 'mroot', 'mpadded', 'mphantom', 'mstyle'],
+  ADD_ATTR: ['encoding', 'mathvariant', 'xmlns', 'display', 'accent', 'accentunder', 'columnalign', 'rowspacing', 'columnspacing', 'data-tikz', 'data-tikz-state'],
+  ALLOW_DATA_ATTR: true,
+};
 
 const md = new MarkdownIt({ breaks: false, linkify: true, html: true });
 md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
@@ -170,7 +178,7 @@ export function renderMarkdown(text: string): string {
       if (prefix?.includes('$')) return _;
       return `${prefix || ''}\n$$\n\\begin{array}${body}\\end{array}\n$$\n`;
     });
-  return md.render(normalizeXlop(normalizeBlanks(normalized)));
+  return DOMPurify.sanitize(md.render(normalizeXlop(normalizeBlanks(normalized))), PURIFY_CONFIG);
 }
 
 /**
@@ -180,7 +188,7 @@ export function renderMarkdownInline(text: string): string {
   const normalized = sanitizeGeneratedHtml(text)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
-  return md.renderInline(normalizeXlop(normalizeBlanks(normalized)));
+  return DOMPurify.sanitize(md.renderInline(normalizeXlop(normalizeBlanks(normalized))), PURIFY_CONFIG);
 }
 
 // ── TikZ 代码块：服务端已下线，降级为占位 ──────────────

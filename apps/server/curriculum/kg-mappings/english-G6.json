@@ -1,0 +1,552 @@
+{
+  "subject": "english",
+  "grade": "6",
+  "generatedAt": "2026-06-20",
+  "kpCount": 25,
+  "prerequisites": [
+    {
+      "from": "一般现在时第三人称变化",
+      "to": "一般过去时的基本用法"
+    },
+    {
+      "from": "一般过去时的基本用法",
+      "to": "过去式规则与不规则变化"
+    },
+    {
+      "from": "一般现在时第三人称变化",
+      "to": "一般将来时be going to"
+    },
+    {
+      "from": "形容词比较级入门",
+      "to": "形容词比较级与最高级"
+    },
+    {
+      "from": "介词短语与地点描述",
+      "to": "问路与方位表达"
+    },
+    {
+      "from": "There is/are与方位",
+      "to": "交通方式与出行表达"
+    },
+    {
+      "from": "职业与工作内容词汇",
+      "to": "职业描述与理想表达"
+    },
+    {
+      "from": "形容词与描述表达",
+      "to": "情感与感受的表达"
+    },
+    {
+      "from": "书信与邮件格式写作",
+      "to": "笔友与书信交流"
+    },
+    {
+      "from": "一般现在时第三人称变化",
+      "to": "第三人称单数的描述"
+    },
+    {
+      "from": "一般过去时的基本用法",
+      "to": "then and now的对比表达"
+    },
+    {
+      "from": "听力理解日常对话",
+      "to": "听力理解对话与短文"
+    },
+    {
+      "from": "一般将来时be going to",
+      "to": "口语描述计划与打算"
+    },
+    {
+      "from": "一般过去时的基本用法",
+      "to": "口语描述过去经历"
+    },
+    {
+      "from": "阅读理解短文信息",
+      "to": "阅读理解多种题型"
+    },
+    {
+      "from": "阅读推断与上下文",
+      "to": "阅读分析与推理"
+    },
+    {
+      "from": "图片描述与情境写作",
+      "to": "看图写话与故事续写"
+    },
+    {
+      "from": "段落写作与逻辑",
+      "to": "日记与周记写作"
+    },
+    {
+      "from": "书信与邮件格式写作",
+      "to": "应用文写作（通知/海报）"
+    },
+    {
+      "from": "交通方式与出行表达",
+      "to": "中西方出行方式对比"
+    },
+    {
+      "from": "笔友与书信交流",
+      "to": "跨文化交际与笔友交流"
+    },
+    {
+      "from": "口语表达观点与理由",
+      "to": "英语演讲与口头报告"
+    },
+    {
+      "from": "一般过去时的基本用法",
+      "to": "综合语法复习与运用"
+    },
+    {
+      "from": "自主学习与反思策略",
+      "to": "阅读策略与自主学习"
+    },
+    {
+      "from": "综合语法复习与运用",
+      "to": "英语思维导图与复习"
+    }
+  ],
+  "kpMap": {
+    "eng_g6_kp_1": {
+      "id": 2788,
+      "title": "一般过去时的基本用法",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13107,
+        13110,
+        13113
+      ],
+      "prerequisites": [
+        "一般现在时第三人称变化"
+      ]
+    },
+    "eng_g6_kp_2": {
+      "id": 2789,
+      "title": "过去式规则与不规则变化",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13107,
+        13110
+      ],
+      "prerequisites": [
+        "一般过去时的基本用法"
+      ]
+    },
+    "eng_g6_kp_3": {
+      "id": 2790,
+      "title": "一般将来时be going to",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13090
+      ],
+      "prerequisites": [
+        "一般现在时第三人称变化"
+      ]
+    },
+    "eng_g6_kp_4": {
+      "id": 2791,
+      "title": "形容词比较级与最高级",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13104
+      ],
+      "prerequisites": [
+        "形容词比较级入门"
+      ]
+    },
+    "eng_g6_kp_5": {
+      "id": 2792,
+      "title": "问路与方位表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13084,
+        13087
+      ],
+      "prerequisites": [
+        "介词短语与地点描述"
+      ]
+    },
+    "eng_g6_kp_6": {
+      "id": 2793,
+      "title": "交通方式与出行表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13087,
+        13090
+      ],
+      "prerequisites": [
+        "There is/are与方位"
+      ]
+    },
+    "eng_g6_kp_7": {
+      "id": 2794,
+      "title": "职业描述与理想表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13097
+      ],
+      "prerequisites": [
+        "职业与工作内容词汇"
+      ]
+    },
+    "eng_g6_kp_8": {
+      "id": 2795,
+      "title": "情感与感受的表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13100
+      ],
+      "prerequisites": [
+        "形容词与描述表达"
+      ]
+    },
+    "eng_g6_kp_9": {
+      "id": 2796,
+      "title": "笔友与书信交流",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13094
+      ],
+      "prerequisites": [
+        "书信与邮件格式写作"
+      ]
+    },
+    "eng_g6_kp_10": {
+      "id": 2797,
+      "title": "第三人称单数的描述",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13094,
+        13097
+      ],
+      "prerequisites": [
+        "一般现在时第三人称变化"
+      ]
+    },
+    "eng_g6_kp_11": {
+      "id": 2798,
+      "title": "then and now的对比表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13113
+      ],
+      "prerequisites": [
+        "一般过去时的基本用法"
+      ]
+    },
+    "eng_g6_kp_12": {
+      "id": 2799,
+      "title": "听力理解对话与短文",
+      "theme": "eng_listening",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13084,
+        13087,
+        13090,
+        13094,
+        13097,
+        13100,
+        13104,
+        13107,
+        13110,
+        13113
+      ],
+      "prerequisites": [
+        "听力理解日常对话"
+      ]
+    },
+    "eng_g6_kp_13": {
+      "id": 2800,
+      "title": "口语描述计划与打算",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13090
+      ],
+      "prerequisites": [
+        "一般将来时be going to"
+      ]
+    },
+    "eng_g6_kp_14": {
+      "id": 2801,
+      "title": "口语描述过去经历",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13107,
+        13110
+      ],
+      "prerequisites": [
+        "一般过去时的基本用法"
+      ]
+    },
+    "eng_g6_kp_15": {
+      "id": 2802,
+      "title": "阅读理解多种题型",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_analyze",
+      "units": [
+        13084,
+        13087,
+        13090,
+        13094,
+        13097,
+        13100,
+        13104,
+        13107,
+        13110,
+        13113
+      ],
+      "prerequisites": [
+        "阅读理解短文信息"
+      ]
+    },
+    "eng_g6_kp_16": {
+      "id": 2803,
+      "title": "阅读分析与推理",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_analyze",
+      "units": [
+        13094,
+        13097,
+        13100,
+        13113
+      ],
+      "prerequisites": [
+        "阅读推断与上下文"
+      ]
+    },
+    "eng_g6_kp_17": {
+      "id": 2804,
+      "title": "看图写话与故事续写",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13107,
+        13110,
+        13113
+      ],
+      "prerequisites": [
+        "图片描述与情境写作"
+      ]
+    },
+    "eng_g6_kp_18": {
+      "id": 2805,
+      "title": "日记与周记写作",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13107,
+        13110,
+        13113
+      ],
+      "prerequisites": [
+        "段落写作与逻辑"
+      ]
+    },
+    "eng_g6_kp_19": {
+      "id": 2806,
+      "title": "应用文写作（通知/海报）",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13094,
+        13097
+      ],
+      "prerequisites": [
+        "书信与邮件格式写作"
+      ]
+    },
+    "eng_g6_kp_20": {
+      "id": 2807,
+      "title": "中西方出行方式对比",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        13087,
+        13090
+      ],
+      "prerequisites": [
+        "交通方式与出行表达"
+      ]
+    },
+    "eng_g6_kp_21": {
+      "id": 2808,
+      "title": "跨文化交际与笔友交流",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13094
+      ],
+      "prerequisites": [
+        "笔友与书信交流"
+      ]
+    },
+    "eng_g6_kp_22": {
+      "id": 2809,
+      "title": "英语演讲与口头报告",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13097,
+        13100
+      ],
+      "prerequisites": [
+        "口语表达观点与理由"
+      ]
+    },
+    "eng_g6_kp_23": {
+      "id": 2810,
+      "title": "综合语法复习与运用",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        13113,
+        13090
+      ],
+      "prerequisites": [
+        "一般过去时的基本用法"
+      ]
+    },
+    "eng_g6_kp_24": {
+      "id": 2811,
+      "title": "阅读策略与自主学习",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_learn",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        13094,
+        13113
+      ],
+      "prerequisites": [
+        "自主学习与反思策略"
+      ]
+    },
+    "eng_g6_kp_25": {
+      "id": 2812,
+      "title": "英语思维导图与复习",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_learn",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        13113
+      ],
+      "prerequisites": [
+        "综合语法复习与运用"
+      ]
+    }
+  }
+}

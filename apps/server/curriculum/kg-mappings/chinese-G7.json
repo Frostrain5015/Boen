@@ -1,0 +1,396 @@
+{
+  "subject": "chinese",
+  "grade": "7",
+  "generatedAt": "2026-06-20T05:55:33.427Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "比喻与拟人修辞手法",
+      "to": "多角度景物描写方法"
+    },
+    {
+      "from": "细节描写与情感表达",
+      "to": "细节描写的赏析与运用"
+    },
+    {
+      "from": "细节描写与情感表达",
+      "to": "细节刻画与人物精神展现"
+    },
+    {
+      "from": "多角度景物描写方法",
+      "to": "景物描写在叙事中的作用"
+    },
+    {
+      "from": "叙事要素与记事结构",
+      "to": "行文结构与叙议结合"
+    },
+    {
+      "from": "叙事要素与记事结构",
+      "to": "细节描写与情感表达"
+    },
+    {
+      "from": "对比与先抑后扬手法",
+      "to": "叙事中的情感变化与人性反思"
+    },
+    {
+      "from": "借物抒情与象征表达",
+      "to": "诗歌的抒情方式与哲理表达"
+    },
+    {
+      "from": "借物抒情与象征表达",
+      "to": "托物言志散文的阅读与写作"
+    },
+    {
+      "from": "托物言志散文的阅读与写作",
+      "to": "骈散结合与古典散文语言"
+    },
+    {
+      "from": "阅读策略与名著阅读方法",
+      "to": "古典神魔小说与名著阅读"
+    },
+    {
+      "from": "文言实词积累与志人小说",
+      "to": "文言文阅读基础"
+    },
+    {
+      "from": "文言文阅读基础",
+      "to": "文言小说的叙事与讽刺"
+    },
+    {
+      "from": "文言文阅读基础",
+      "to": "文言寓言的阅读与寓意提炼"
+    },
+    {
+      "from": "古典诗歌意象与借景抒情",
+      "to": "古典诗歌的题材与情感赏析"
+    },
+    {
+      "from": "古典诗歌意象与借景抒情",
+      "to": "古典田园诗与思乡诗意境"
+    },
+    {
+      "from": "古典诗歌的题材与情感赏析",
+      "to": "登临诗的登高望远与志向表达"
+    },
+    {
+      "from": "神话与童话的想象艺术",
+      "to": "联想与想象的写作运用"
+    },
+    {
+      "from": "寓言的阅读与寓意提炼",
+      "to": "小说中的意象与象征意义"
+    },
+    {
+      "from": "以小见大的叙事策略",
+      "to": "小说中的意象与象征意义"
+    },
+    {
+      "from": "人物传记的阅读与写作",
+      "to": "细节刻画与人物精神展现"
+    },
+    {
+      "from": "朴实语言与人物精神",
+      "to": "人物传记的阅读与写作"
+    },
+    {
+      "from": "选材原则与写作实践",
+      "to": "通讯报道与纪实文学"
+    },
+    {
+      "from": "行文结构与叙议结合",
+      "to": "议论文的论点与说理方法"
+    },
+    {
+      "from": "动物观察与体验写作",
+      "to": "细节描写的赏析与运用"
+    },
+    {
+      "from": "传统文化中的修身与处世",
+      "to": "生态伦理与生命关怀"
+    },
+    {
+      "from": "乐府民歌的叙事艺术",
+      "to": "诗歌的抒情方式与哲理表达"
+    },
+    {
+      "from": "通讯报道与纪实文学",
+      "to": "说明文语言与古代科技文献"
+    }
+  ],
+  "themes": {
+    "多角度景物描写方法": "chi_reading",
+    "比喻与拟人修辞手法": "chi_reading",
+    "古典诗歌意象与借景抒情": "chi_reading",
+    "朗读技巧与情感表达": "chi_literacy",
+    "观察与写景作文": "chi_writing",
+    "细节描写与情感表达": "chi_writing",
+    "以小见大的叙事策略": "chi_reading",
+    "借物抒情与象征表达": "chi_reading",
+    "文言实词积累与志人小说": "chi_reading",
+    "叙事要素与记事结构": "chi_writing",
+    "阅读策略与名著阅读方法": "chi_reading",
+    "传统文化中的修身与处世": "chi_comprehensive",
+    "古典诗歌的题材与情感赏析": "chi_reading",
+    "选材原则与写作实践": "chi_writing",
+    "行文结构与叙议结合": "chi_writing",
+    "朴实语言与人物精神": "chi_reading",
+    "叙事中的情感变化与人性反思": "chi_reading",
+    "文言小说的叙事与讽刺": "chi_reading",
+    "生态伦理与生命关怀": "chi_reading",
+    "动物观察与体验写作": "chi_writing",
+    "神话与童话的想象艺术": "chi_reading",
+    "寓言的阅读与寓意提炼": "chi_reading",
+    "联想与想象的写作运用": "chi_writing",
+    "古典神魔小说与名著阅读": "chi_reading",
+    "细节刻画与人物精神展现": "chi_writing",
+    "对比与先抑后扬手法": "chi_writing",
+    "人物传记的阅读与写作": "chi_reading",
+    "文言文阅读基础": "chi_reading",
+    "诗歌的抒情方式与哲理表达": "chi_writing",
+    "景物描写在叙事中的作用": "chi_reading",
+    "通讯报道与纪实文学": "chi_reading",
+    "乐府民歌的叙事艺术": "chi_reading",
+    "语文生活综合性学习": "chi_comprehensive",
+    "细节描写的赏析与运用": "chi_writing",
+    "小说中的意象与象征意义": "chi_reading",
+    "文言寓言的阅读与寓意提炼": "chi_reading",
+    "古典田园诗与思乡诗意境": "chi_reading",
+    "议论文的论点与说理方法": "chi_writing",
+    "托物言志散文的阅读与写作": "chi_writing",
+    "骈散结合与古典散文语言": "chi_reading",
+    "登临诗的登高望远与志向表达": "chi_reading",
+    "语言简明与名著精神主题": "chi_writing",
+    "说明文语言与古代科技文献": "chi_reading",
+    "科幻小说的想象力与科学精神": "chi_reading",
+    "信息搜集整理与探究表达": "chi_comprehensive"
+  },
+  "literacies": {
+    "多角度景物描写方法": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "比喻与拟人修辞手法": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "古典诗歌意象与借景抒情": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "朗读技巧与情感表达": [
+      "lit_chi_lang"
+    ],
+    "观察与写景作文": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "细节描写与情感表达": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "以小见大的叙事策略": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "借物抒情与象征表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "文言实词积累与志人小说": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "叙事要素与记事结构": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "阅读策略与名著阅读方法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "传统文化中的修身与处世": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "古典诗歌的题材与情感赏析": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "选材原则与写作实践": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "行文结构与叙议结合": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "朴实语言与人物精神": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "叙事中的情感变化与人性反思": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "文言小说的叙事与讽刺": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "生态伦理与生命关怀": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "动物观察与体验写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "神话与童话的想象艺术": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "寓言的阅读与寓意提炼": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "联想与想象的写作运用": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "古典神魔小说与名著阅读": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "细节刻画与人物精神展现": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "对比与先抑后扬手法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "人物传记的阅读与写作": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "文言文阅读基础": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "诗歌的抒情方式与哲理表达": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "景物描写在叙事中的作用": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "通讯报道与纪实文学": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "乐府民歌的叙事艺术": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "语文生活综合性学习": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "细节描写的赏析与运用": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "小说中的意象与象征意义": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "文言寓言的阅读与寓意提炼": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "古典田园诗与思乡诗意境": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "议论文的论点与说理方法": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "托物言志散文的阅读与写作": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "骈散结合与古典散文语言": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "登临诗的登高望远与志向表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "语言简明与名著精神主题": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "说明文语言与古代科技文献": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "科幻小说的想象力与科学精神": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "信息搜集整理与探究表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ]
+  },
+  "blooms": {
+    "多角度景物描写方法": "bloom_analyze",
+    "比喻与拟人修辞手法": "bloom_apply",
+    "古典诗歌意象与借景抒情": "bloom_analyze",
+    "朗读技巧与情感表达": "bloom_apply",
+    "观察与写景作文": "bloom_create",
+    "细节描写与情感表达": "bloom_apply",
+    "以小见大的叙事策略": "bloom_analyze",
+    "借物抒情与象征表达": "bloom_analyze",
+    "文言实词积累与志人小说": "bloom_understand",
+    "叙事要素与记事结构": "bloom_apply",
+    "阅读策略与名著阅读方法": "bloom_apply",
+    "传统文化中的修身与处世": "bloom_evaluate",
+    "古典诗歌的题材与情感赏析": "bloom_analyze",
+    "选材原则与写作实践": "bloom_apply",
+    "行文结构与叙议结合": "bloom_apply",
+    "朴实语言与人物精神": "bloom_analyze",
+    "叙事中的情感变化与人性反思": "bloom_analyze",
+    "文言小说的叙事与讽刺": "bloom_analyze",
+    "生态伦理与生命关怀": "bloom_evaluate",
+    "动物观察与体验写作": "bloom_create",
+    "神话与童话的想象艺术": "bloom_analyze",
+    "寓言的阅读与寓意提炼": "bloom_analyze",
+    "联想与想象的写作运用": "bloom_create",
+    "古典神魔小说与名著阅读": "bloom_analyze",
+    "细节刻画与人物精神展现": "bloom_apply",
+    "对比与先抑后扬手法": "bloom_apply",
+    "人物传记的阅读与写作": "bloom_analyze",
+    "文言文阅读基础": "bloom_understand",
+    "诗歌的抒情方式与哲理表达": "bloom_apply",
+    "景物描写在叙事中的作用": "bloom_analyze",
+    "通讯报道与纪实文学": "bloom_analyze",
+    "乐府民歌的叙事艺术": "bloom_analyze",
+    "语文生活综合性学习": "bloom_apply",
+    "细节描写的赏析与运用": "bloom_apply",
+    "小说中的意象与象征意义": "bloom_analyze",
+    "文言寓言的阅读与寓意提炼": "bloom_analyze",
+    "古典田园诗与思乡诗意境": "bloom_analyze",
+    "议论文的论点与说理方法": "bloom_apply",
+    "托物言志散文的阅读与写作": "bloom_apply",
+    "骈散结合与古典散文语言": "bloom_analyze",
+    "登临诗的登高望远与志向表达": "bloom_analyze",
+    "语言简明与名著精神主题": "bloom_evaluate",
+    "说明文语言与古代科技文献": "bloom_understand",
+    "科幻小说的想象力与科学精神": "bloom_evaluate",
+    "信息搜集整理与探究表达": "bloom_create"
+  },
+  "_warnings": []
+}

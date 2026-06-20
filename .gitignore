@@ -10,3 +10,9 @@ data/
 pnpm-lock.yaml
 AGENTS.md
 .workbuddy/
+.claude/
+
+# One-off knowledge-graph export and generation artifacts
+kp-export.json
+generate-english-mappings.cjs
+apps/server/curriculum/kg-mappings/*-weights.json

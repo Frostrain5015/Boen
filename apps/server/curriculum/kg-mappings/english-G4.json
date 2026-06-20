@@ -1,0 +1,499 @@
+{
+  "subject": "english",
+  "grade": "4",
+  "generatedAt": "2026-06-20",
+  "kpCount": 22,
+  "prerequisites": [
+    {
+      "from": "be动词与简单句型",
+      "to": "一般现在时的基本用法"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "can/can't能力表达"
+    },
+    {
+      "from": "名词单复数与冠词",
+      "to": "There is/are与方位"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "have/has的表达"
+    },
+    {
+      "from": "There is/are与方位",
+      "to": "介词短语与地点描述"
+    },
+    {
+      "from": "一般现在时的基本用法",
+      "to": "天气与季节表达"
+    },
+    {
+      "from": "一般现在时的基本用法",
+      "to": "日常活动与作息时间"
+    },
+    {
+      "from": "简单疑问句与回答",
+      "to": "购物与价格询问"
+    },
+    {
+      "from": "名词单复数与冠词",
+      "to": "形容词与描述表达"
+    },
+    {
+      "from": "简单疑问句与回答",
+      "to": "How/What疑问句"
+    },
+    {
+      "from": "听力理解短对话",
+      "to": "听力理解对话主旨"
+    },
+    {
+      "from": "一般现在时的基本用法",
+      "to": "口语表达日常活动"
+    },
+    {
+      "from": "天气与季节表达",
+      "to": "口语描述天气与感受"
+    },
+    {
+      "from": "图片理解与语境推测",
+      "to": "阅读短文提取信息"
+    },
+    {
+      "from": "阅读短文提取信息",
+      "to": "阅读中猜测词义"
+    },
+    {
+      "from": "简单句子抄写与仿写",
+      "to": "仿写与造句练习"
+    },
+    {
+      "from": "仿写与造句练习",
+      "to": "短文写作与连贯表达"
+    },
+    {
+      "from": "食物与健康饮食词汇",
+      "to": "中西方饮食文化对比"
+    },
+    {
+      "from": "一般现在时的基本用法",
+      "to": "规则与义务的英语表达"
+    },
+    {
+      "from": "单词记忆与分类策略",
+      "to": "词汇联想与记忆策略"
+    }
+  ],
+  "kpMap": {
+    "eng_g4_kp_1": {
+      "id": 2866,
+      "title": "一般现在时的基本用法",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12991,
+        12995,
+        13016,
+        13020,
+        13024
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g4_kp_2": {
+      "id": 2867,
+      "title": "can/can't能力表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13003,
+        13032
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g4_kp_3": {
+      "id": 2868,
+      "title": "There is/are与方位",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12999,
+        13003,
+        13028,
+        13032
+      ],
+      "prerequisites": [
+        "名词单复数与冠词"
+      ]
+    },
+    "eng_g4_kp_4": {
+      "id": 2869,
+      "title": "have/has的表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12995,
+        13020,
+        13032
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g4_kp_5": {
+      "id": 2870,
+      "title": "介词短语与地点描述",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12999,
+        13003,
+        13028
+      ],
+      "prerequisites": [
+        "There is/are与方位"
+      ]
+    },
+    "eng_g4_kp_6": {
+      "id": 2871,
+      "title": "天气与季节表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13007,
+        13011
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g4_kp_7": {
+      "id": 2872,
+      "title": "日常活动与作息时间",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13024,
+        13016
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g4_kp_8": {
+      "id": 2873,
+      "title": "购物与价格询问",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13028,
+        13036
+      ],
+      "prerequisites": [
+        "简单疑问句与回答"
+      ]
+    },
+    "eng_g4_kp_9": {
+      "id": 2874,
+      "title": "形容词与描述表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12995,
+        13007,
+        13011,
+        13032
+      ],
+      "prerequisites": [
+        "名词单复数与冠词"
+      ]
+    },
+    "eng_g4_kp_10": {
+      "id": 2875,
+      "title": "How/What疑问句",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13007,
+        13028,
+        13036
+      ],
+      "prerequisites": [
+        "简单疑问句与回答"
+      ]
+    },
+    "eng_g4_kp_11": {
+      "id": 2876,
+      "title": "听力理解对话主旨",
+      "theme": "eng_listening",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12991,
+        12995,
+        12999,
+        13003,
+        13007,
+        13011,
+        13016,
+        13020,
+        13024,
+        13028,
+        13032,
+        13036
+      ],
+      "prerequisites": [
+        "听力理解短对话"
+      ]
+    },
+    "eng_g4_kp_12": {
+      "id": 2877,
+      "title": "口语表达日常活动",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13024,
+        13016,
+        13020
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g4_kp_13": {
+      "id": 2878,
+      "title": "口语描述天气与感受",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13007,
+        13011
+      ],
+      "prerequisites": [
+        "天气与季节表达"
+      ]
+    },
+    "eng_g4_kp_14": {
+      "id": 2879,
+      "title": "阅读短文提取信息",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12991,
+        12995,
+        12999,
+        13003,
+        13016,
+        13020,
+        13024,
+        13032,
+        13036
+      ],
+      "prerequisites": [
+        "图片理解与语境推测"
+      ]
+    },
+    "eng_g4_kp_15": {
+      "id": 2880,
+      "title": "阅读中猜测词义",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_analyze",
+      "units": [
+        13007,
+        13011,
+        13028,
+        13036
+      ],
+      "prerequisites": [
+        "阅读短文提取信息"
+      ]
+    },
+    "eng_g4_kp_16": {
+      "id": 2881,
+      "title": "仿写与造句练习",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12991,
+        12995,
+        13016,
+        13020
+      ],
+      "prerequisites": [
+        "简单句子抄写与仿写"
+      ]
+    },
+    "eng_g4_kp_17": {
+      "id": 2882,
+      "title": "短文写作与连贯表达",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        12999,
+        13003,
+        13007,
+        13024,
+        13032
+      ],
+      "prerequisites": [
+        "仿写与造句练习"
+      ]
+    },
+    "eng_g4_kp_18": {
+      "id": 2883,
+      "title": "中西方学校生活差异",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        13024,
+        13016,
+        13020
+      ],
+      "prerequisites": []
+    },
+    "eng_g4_kp_19": {
+      "id": 2884,
+      "title": "中西方饮食文化对比",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        13036
+      ],
+      "prerequisites": [
+        "食物与健康饮食词汇"
+      ]
+    },
+    "eng_g4_kp_20": {
+      "id": 2885,
+      "title": "规则与义务的英语表达",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13016,
+        13020
+      ],
+      "prerequisites": [
+        "一般现在时的基本用法"
+      ]
+    },
+    "eng_g4_kp_21": {
+      "id": 2886,
+      "title": "英语歌曲与韵律学习",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_aesthetic",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        13007,
+        13011
+      ],
+      "prerequisites": []
+    },
+    "eng_g4_kp_22": {
+      "id": 2887,
+      "title": "词汇联想与记忆策略",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_learn",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        12995,
+        13007,
+        13032
+      ],
+      "prerequisites": [
+        "单词记忆与分类策略"
+      ]
+    }
+  }
+}

@@ -1,0 +1,398 @@
+{
+  "subject": "chinese",
+  "grade": "9",
+  "generatedAt": "2026-06-20T06:06:02.976Z",
+  "kpCount": 44,
+  "prerequisites": [
+    {
+      "from": "现代诗歌的意象与意境分析",
+      "to": "现代诗歌的象征与隐喻手法"
+    },
+    {
+      "from": "现代诗歌的意象与意境分析",
+      "to": "散文诗的意境与象征意义"
+    },
+    {
+      "from": "诗歌朗诵与情感表达技巧",
+      "to": "现代诗歌的创作方法"
+    },
+    {
+      "from": "现代诗歌的象征与隐喻手法",
+      "to": "革命诗歌的崇高美与激情表达"
+    },
+    {
+      "from": "议论文的论点提炼与论据选择",
+      "to": "议论文的论证方法与逻辑"
+    },
+    {
+      "from": "议论文的论证方法与逻辑",
+      "to": "驳论与立论的论证策略"
+    },
+    {
+      "from": "议论文的论证方法与逻辑",
+      "to": "论证的逻辑推理与严密性"
+    },
+    {
+      "from": "议论文语言的准确与严密",
+      "to": "论证的逻辑推理与严密性"
+    },
+    {
+      "from": "驳论与立论的论证策略",
+      "to": "杂文的批判精神与社会反思"
+    },
+    {
+      "from": "论证的逻辑推理与严密性",
+      "to": "杂文的批判精神与社会反思"
+    },
+    {
+      "from": "文言实词虚词与句式积累",
+      "to": "古代山水散文的意境与情怀"
+    },
+    {
+      "from": "文言实词虚词与句式积累",
+      "to": "骈散结合与文言语言之美"
+    },
+    {
+      "from": "文言实词虚词与句式积累",
+      "to": "先秦诸子的论辩思想与智慧"
+    },
+    {
+      "from": "古代山水散文的意境与情怀",
+      "to": "古代赠序文的叙事与劝勉"
+    },
+    {
+      "from": "古代讽谏艺术与外交辞令",
+      "to": "先秦诸子的论辩思想与智慧"
+    },
+    {
+      "from": "古典诗词的意象分析与情感体悟",
+      "to": "豪放词的风格特征与鉴赏"
+    },
+    {
+      "from": "古典诗词的意象分析与情感体悟",
+      "to": "古典诗词曲的体裁辨析与鉴赏"
+    },
+    {
+      "from": "古典诗词曲的体裁辨析与鉴赏",
+      "to": "古典诗词曲的多元主题与风格"
+    },
+    {
+      "from": "小说的叙事视角与情节安排",
+      "to": "小说人物的多维塑造方法"
+    },
+    {
+      "from": "小说的叙事视角与情节安排",
+      "to": "小小说的构思与创作技巧"
+    },
+    {
+      "from": "小说人物的多维塑造方法",
+      "to": "小说的社会批判与人性揭示"
+    },
+    {
+      "from": "小说中的环境描写与社会背景",
+      "to": "小说的社会批判与人性揭示"
+    },
+    {
+      "from": "杂文的批判精神与社会反思",
+      "to": "讽刺小说的夸张与对比艺术"
+    },
+    {
+      "from": "讽刺小说的夸张与对比艺术",
+      "to": "讽刺文学的阅读策略与评价"
+    },
+    {
+      "from": "小说语言的个性化与地方色彩",
+      "to": "讽刺小说的夸张与对比艺术"
+    },
+    {
+      "from": "史传文学的叙事与人物刻画",
+      "to": "战争叙事中的谋略与民本思想"
+    },
+    {
+      "from": "表章奏疏的文体与抒情特征",
+      "to": "古代忠义精神与家国情怀"
+    },
+    {
+      "from": "读书方法与批判性阅读能力",
+      "to": "文学鉴赏的审美感知与评价"
+    },
+    {
+      "from": "审题立意与文章结构安排",
+      "to": "文章修改与语言表达精要"
+    },
+    {
+      "from": "辩论的逻辑思维与口头表达",
+      "to": "戏剧表演与综合艺术实践"
+    }
+  ],
+  "themes": {
+    "现代诗歌的意象与意境分析": "chi_reading",
+    "诗歌朗诵与情感表达技巧": "chi_literacy",
+    "现代诗歌的创作方法": "chi_writing",
+    "议论文的论点提炼与论据选择": "chi_writing",
+    "议论文的论证方法与逻辑": "chi_writing",
+    "议论文语言的准确与严密": "chi_reading",
+    "文言实词虚词与句式积累": "chi_literacy",
+    "古代山水散文的意境与情怀": "chi_reading",
+    "古典诗词的意象分析与情感体悟": "chi_reading",
+    "骈散结合与文言语言之美": "chi_reading",
+    "小说的叙事视角与情节安排": "chi_reading",
+    "小说人物的多维塑造方法": "chi_reading",
+    "小说中的环境描写与社会背景": "chi_reading",
+    "小小说的构思与创作技巧": "chi_writing",
+    "驳论与立论的论证策略": "chi_writing",
+    "论证的逻辑推理与严密性": "chi_writing",
+    "杂文的批判精神与社会反思": "chi_reading",
+    "自强不息与文化精神传承": "chi_comprehensive",
+    "史传文学的叙事与人物刻画": "chi_reading",
+    "古代讽谏艺术与外交辞令": "chi_reading",
+    "表章奏疏的文体与抒情特征": "chi_reading",
+    "古典诗词曲的体裁辨析与鉴赏": "chi_literacy",
+    "现代诗歌的象征与隐喻手法": "chi_reading",
+    "革命诗歌的崇高美与激情表达": "chi_reading",
+    "散文诗的意境与象征意义": "chi_reading",
+    "扩写方法与创意表达": "chi_writing",
+    "讽刺小说的夸张与对比艺术": "chi_reading",
+    "小说的社会批判与人性揭示": "chi_reading",
+    "小说语言的个性化与地方色彩": "chi_reading",
+    "审题立意与文章结构安排": "chi_writing",
+    "先秦诸子的论辩思想与智慧": "chi_reading",
+    "古代赠序文的叙事与劝勉": "chi_reading",
+    "豪放词的风格特征与鉴赏": "chi_reading",
+    "讽刺文学的阅读策略与评价": "chi_reading",
+    "读书方法与批判性阅读能力": "chi_reading",
+    "文学鉴赏的审美感知与评价": "chi_reading",
+    "文章修改与语言表达精要": "chi_writing",
+    "辩论的逻辑思维与口头表达": "chi_writing",
+    "戏剧冲突的构建与主题表达": "chi_reading",
+    "戏剧语言的个性化与表现力": "chi_reading",
+    "戏剧表演与综合艺术实践": "chi_comprehensive",
+    "战争叙事中的谋略与民本思想": "chi_reading",
+    "古代忠义精神与家国情怀": "chi_reading",
+    "古典诗词曲的多元主题与风格": "chi_reading"
+  },
+  "literacies": {
+    "现代诗歌的意象与意境分析": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "诗歌朗诵与情感表达技巧": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "现代诗歌的创作方法": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "议论文的论点提炼与论据选择": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "议论文的论证方法与逻辑": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "议论文语言的准确与严密": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "文言实词虚词与句式积累": [
+      "lit_chi_lang",
+      "lit_chi_culture"
+    ],
+    "古代山水散文的意境与情怀": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "古典诗词的意象分析与情感体悟": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "骈散结合与文言语言之美": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "小说的叙事视角与情节安排": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "小说人物的多维塑造方法": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "小说中的环境描写与社会背景": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "小小说的构思与创作技巧": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "驳论与立论的论证策略": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "论证的逻辑推理与严密性": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "杂文的批判精神与社会反思": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "自强不息与文化精神传承": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "史传文学的叙事与人物刻画": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "古代讽谏艺术与外交辞令": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "表章奏疏的文体与抒情特征": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "古典诗词曲的体裁辨析与鉴赏": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "现代诗歌的象征与隐喻手法": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "革命诗歌的崇高美与激情表达": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "散文诗的意境与象征意义": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "扩写方法与创意表达": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "讽刺小说的夸张与对比艺术": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "小说的社会批判与人性揭示": [
+      "lit_chi_think",
+      "lit_chi_culture"
+    ],
+    "小说语言的个性化与地方色彩": [
+      "lit_chi_aesthetic",
+      "lit_chi_lang"
+    ],
+    "审题立意与文章结构安排": [
+      "lit_chi_lang",
+      "lit_chi_think"
+    ],
+    "先秦诸子的论辩思想与智慧": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "古代赠序文的叙事与劝勉": [
+      "lit_chi_culture",
+      "lit_chi_lang"
+    ],
+    "豪放词的风格特征与鉴赏": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "讽刺文学的阅读策略与评价": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "读书方法与批判性阅读能力": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "文学鉴赏的审美感知与评价": [
+      "lit_chi_aesthetic",
+      "lit_chi_think"
+    ],
+    "文章修改与语言表达精要": [
+      "lit_chi_lang"
+    ],
+    "辩论的逻辑思维与口头表达": [
+      "lit_chi_think",
+      "lit_chi_lang"
+    ],
+    "戏剧冲突的构建与主题表达": [
+      "lit_chi_think",
+      "lit_chi_aesthetic"
+    ],
+    "戏剧语言的个性化与表现力": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ],
+    "戏剧表演与综合艺术实践": [
+      "lit_chi_lang",
+      "lit_chi_aesthetic"
+    ],
+    "战争叙事中的谋略与民本思想": [
+      "lit_chi_culture",
+      "lit_chi_think"
+    ],
+    "古代忠义精神与家国情怀": [
+      "lit_chi_culture",
+      "lit_chi_aesthetic"
+    ],
+    "古典诗词曲的多元主题与风格": [
+      "lit_chi_aesthetic",
+      "lit_chi_culture"
+    ]
+  },
+  "blooms": {
+    "现代诗歌的意象与意境分析": "bloom_analyze",
+    "诗歌朗诵与情感表达技巧": "bloom_apply",
+    "现代诗歌的创作方法": "bloom_create",
+    "议论文的论点提炼与论据选择": "bloom_analyze",
+    "议论文的论证方法与逻辑": "bloom_apply",
+    "议论文语言的准确与严密": "bloom_analyze",
+    "文言实词虚词与句式积累": "bloom_remember",
+    "古代山水散文的意境与情怀": "bloom_analyze",
+    "古典诗词的意象分析与情感体悟": "bloom_analyze",
+    "骈散结合与文言语言之美": "bloom_analyze",
+    "小说的叙事视角与情节安排": "bloom_analyze",
+    "小说人物的多维塑造方法": "bloom_analyze",
+    "小说中的环境描写与社会背景": "bloom_analyze",
+    "小小说的构思与创作技巧": "bloom_create",
+    "驳论与立论的论证策略": "bloom_analyze",
+    "论证的逻辑推理与严密性": "bloom_analyze",
+    "杂文的批判精神与社会反思": "bloom_evaluate",
+    "自强不息与文化精神传承": "bloom_understand",
+    "史传文学的叙事与人物刻画": "bloom_analyze",
+    "古代讽谏艺术与外交辞令": "bloom_analyze",
+    "表章奏疏的文体与抒情特征": "bloom_understand",
+    "古典诗词曲的体裁辨析与鉴赏": "bloom_remember",
+    "现代诗歌的象征与隐喻手法": "bloom_analyze",
+    "革命诗歌的崇高美与激情表达": "bloom_analyze",
+    "散文诗的意境与象征意义": "bloom_analyze",
+    "扩写方法与创意表达": "bloom_create",
+    "讽刺小说的夸张与对比艺术": "bloom_analyze",
+    "小说的社会批判与人性揭示": "bloom_evaluate",
+    "小说语言的个性化与地方色彩": "bloom_analyze",
+    "审题立意与文章结构安排": "bloom_create",
+    "先秦诸子的论辩思想与智慧": "bloom_analyze",
+    "古代赠序文的叙事与劝勉": "bloom_understand",
+    "豪放词的风格特征与鉴赏": "bloom_analyze",
+    "讽刺文学的阅读策略与评价": "bloom_evaluate",
+    "读书方法与批判性阅读能力": "bloom_evaluate",
+    "文学鉴赏的审美感知与评价": "bloom_evaluate",
+    "文章修改与语言表达精要": "bloom_apply",
+    "辩论的逻辑思维与口头表达": "bloom_create",
+    "戏剧冲突的构建与主题表达": "bloom_analyze",
+    "戏剧语言的个性化与表现力": "bloom_analyze",
+    "戏剧表演与综合艺术实践": "bloom_create",
+    "战争叙事中的谋略与民本思想": "bloom_analyze",
+    "古代忠义精神与家国情怀": "bloom_understand",
+    "古典诗词曲的多元主题与风格": "bloom_analyze"
+  },
+  "_warnings": []
+}

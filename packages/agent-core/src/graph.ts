@@ -3,6 +3,7 @@ import {
   MessagesAnnotation,
   Annotation,
   MemorySaver,
+  BaseCheckpointSaver,
 } from '@langchain/langgraph';
 import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, type AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
@@ -123,7 +124,7 @@ const switchModeTools: any[] = [
 /**
  * 构建博文主图。
  */
-export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
+export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, checkpointer?: BaseCheckpointSaver) {
   const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools] : [...quizTools, ...switchModeTools];
   const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
@@ -311,5 +312,5 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}) {
     })
     .addEdge('lookupKnowledgePoint', 'qa');
 
-  return graph.compile({ checkpointer: new MemorySaver() });
+  return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });
 }

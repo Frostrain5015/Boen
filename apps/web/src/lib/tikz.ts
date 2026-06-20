@@ -151,7 +151,7 @@ export async function processTikzDiagrams(
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 20000);
     try {
-      const token = localStorage.getItem('boen_access_token');
+      const token = sessionStorage.getItem('boen_access_token');
       const res = await fetch('/api/render-tikz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },

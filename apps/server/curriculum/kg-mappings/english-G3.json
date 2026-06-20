@@ -1,0 +1,395 @@
+{
+  "subject": "english",
+  "grade": "3",
+  "generatedAt": "2026-06-20",
+  "kpCount": 20,
+  "prerequisites": [
+    {
+      "from": "基础问候与自我介绍",
+      "to": "家庭成员与称呼词汇"
+    },
+    {
+      "from": "英语字母书写与大小写",
+      "to": "be动词与简单句型"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "名词单复数与冠词"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "简单疑问句与回答"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "like的表达与爱好"
+    },
+    {
+      "from": "基础问候与自我介绍",
+      "to": "听力理解短对话"
+    },
+    {
+      "from": "be动词与简单句型",
+      "to": "简单句子抄写与仿写"
+    },
+    {
+      "from": "基础问候与自我介绍",
+      "to": "个人信息的简单表达"
+    },
+    {
+      "from": "基础问候与自我介绍",
+      "to": "中西方问候方式差异"
+    },
+    {
+      "from": "简单疑问句与回答",
+      "to": "角色扮演与简单对话"
+    }
+  ],
+  "kpMap": {
+    "eng_g3_kp_1": {
+      "id": 2768,
+      "title": "英语字母书写与大小写",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12946,
+        12966
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_2": {
+      "id": 2769,
+      "title": "基础问候与自我介绍",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12966
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_3": {
+      "id": 2770,
+      "title": "家庭成员与称呼词汇",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12946,
+        12966
+      ],
+      "prerequisites": [
+        "基础问候与自我介绍"
+      ]
+    },
+    "eng_g3_kp_4": {
+      "id": 2771,
+      "title": "数字1-100的表达",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12962,
+        12986
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_5": {
+      "id": 2772,
+      "title": "颜色与外观描述词汇",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12958,
+        12950
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_6": {
+      "id": 2773,
+      "title": "动物与植物词汇",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12950,
+        12954
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_7": {
+      "id": 2774,
+      "title": "食物与健康饮食词汇",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_culture"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12978,
+        12982
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_8": {
+      "id": 2775,
+      "title": "be动词与简单句型",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12946,
+        12966,
+        12970
+      ],
+      "prerequisites": [
+        "英语字母书写与大小写"
+      ]
+    },
+    "eng_g3_kp_9": {
+      "id": 2776,
+      "title": "名词单复数与冠词",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12946,
+        12950,
+        12954,
+        12966,
+        12970
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g3_kp_10": {
+      "id": 2777,
+      "title": "简单疑问句与回答",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12962,
+        12986,
+        12974
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g3_kp_11": {
+      "id": 2778,
+      "title": "like的表达与爱好",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12950,
+        12954,
+        12982
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g3_kp_12": {
+      "id": 2779,
+      "title": "听力理解短对话",
+      "theme": "eng_listening",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12946,
+        12950,
+        12954,
+        12958,
+        12962,
+        12966,
+        12970,
+        12974,
+        12978,
+        12982,
+        12986
+      ],
+      "prerequisites": [
+        "基础问候与自我介绍"
+      ]
+    },
+    "eng_g3_kp_13": {
+      "id": 2780,
+      "title": "朗读模仿与语音语调",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12946,
+        12950,
+        12966,
+        12970
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_14": {
+      "id": 2781,
+      "title": "图片理解与语境推测",
+      "theme": "eng_reading",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12950,
+        12954,
+        12958,
+        12982
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_15": {
+      "id": 2782,
+      "title": "简单句子抄写与仿写",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12946,
+        12970,
+        12982
+      ],
+      "prerequisites": [
+        "be动词与简单句型"
+      ]
+    },
+    "eng_g3_kp_16": {
+      "id": 2783,
+      "title": "个人信息的简单表达",
+      "theme": "eng_writing",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12942,
+        12966,
+        12970
+      ],
+      "prerequisites": [
+        "基础问候与自我介绍"
+      ]
+    },
+    "eng_g3_kp_17": {
+      "id": 2784,
+      "title": "中西方问候方式差异",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_culture",
+        "lit_eng_lang"
+      ],
+      "bloom": "bloom_understand",
+      "units": [
+        12942,
+        12966
+      ],
+      "prerequisites": [
+        "基础问候与自我介绍"
+      ]
+    },
+    "eng_g3_kp_18": {
+      "id": 2785,
+      "title": "学习工具与课堂用语",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_learn"
+      ],
+      "bloom": "bloom_apply",
+      "units": [
+        12974
+      ],
+      "prerequisites": []
+    },
+    "eng_g3_kp_19": {
+      "id": 2786,
+      "title": "角色扮演与简单对话",
+      "theme": "eng_speaking",
+      "literacies": [
+        "lit_eng_lang",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_create",
+      "units": [
+        12970,
+        12978,
+        12982
+      ],
+      "prerequisites": [
+        "简单疑问句与回答"
+      ]
+    },
+    "eng_g3_kp_20": {
+      "id": 2787,
+      "title": "单词记忆与分类策略",
+      "theme": "eng_language",
+      "literacies": [
+        "lit_eng_learn",
+        "lit_eng_think"
+      ],
+      "bloom": "bloom_evaluate",
+      "units": [
+        12950,
+        12954,
+        12958,
+        12962,
+        12978
+      ],
+      "prerequisites": []
+    }
+  }
+}

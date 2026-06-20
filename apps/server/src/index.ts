@@ -19,6 +19,7 @@ import {
   gradeAnswer,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
+import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
@@ -71,12 +72,16 @@ function createModel(provider: string): BaseChatModel {
   });
 }
 let model = createModel('default');
-let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
+
+// LangGraph 对话状态持久化到 SQLite（重启不丢失）
+const checkpointer = new SqliteSaver(db);
+
+let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
 
 /** 切换模型并重建 LangGraph 图 */
 function switchModel(provider: string) {
   model = createModel(provider);
-  graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint });
+  graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
   return provider;
 }
 
@@ -300,8 +305,10 @@ app.use('/api/*', cors());
 app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (model as any)?.modelName ?? 'deepseek-v4-flash' }));
 
 // ── 模型切换 API ────────────────────────────
-/** POST /api/model/switch — 切换模型提供商 */
+/** POST /api/model/switch — 切换模型提供商（需认证） */
 app.post('/api/model/switch', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);

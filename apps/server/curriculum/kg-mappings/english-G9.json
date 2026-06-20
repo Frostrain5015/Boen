@@ -1,0 +1,433 @@
+{
+  "subject": "english",
+  "grade": "9",
+  "generatedAt": "2026-06-20T06:27:08.417Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "被动语态含情态动词"
+    },
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "宾语从句that/if/whether引导"
+    },
+    {
+      "from": "宾语从句that/if/whether引导",
+      "to": "宾语从句wh-疑问词引导"
+    },
+    {
+      "from": "宾语从句wh-疑问词引导",
+      "to": "定语从句who/that/which引导"
+    },
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "过去完成时的用法"
+    },
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "过去分词作形容词与状语"
+    },
+    {
+      "from": "宾语从句that/if/whether引导",
+      "to": "文化节日与传统习俗描述"
+    },
+    {
+      "from": "宾语从句wh-疑问词引导",
+      "to": "日常问路与礼貌请求"
+    },
+    {
+      "from": "used to表达过去习惯与变化",
+      "to": "个人变化与成长描述"
+    },
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "材料与产地描述"
+    },
+    {
+      "from": "被动语态含情态动词",
+      "to": "发明创造与科技话题"
+    },
+    {
+      "from": "被动语态含情态动词",
+      "to": "青少年生活与规则讨论"
+    },
+    {
+      "from": "情态动词表推测must/might/can't",
+      "to": "推测与归属表达"
+    },
+    {
+      "from": "定语从句who/that/which引导",
+      "to": "音乐与艺术偏好表达"
+    },
+    {
+      "from": "be supposed to与文化习俗表达",
+      "to": "跨文化礼仪与习俗"
+    },
+    {
+      "from": "使役动词make/keep/let的用法",
+      "to": "情感与因果关系表达"
+    },
+    {
+      "from": "过去完成时的用法",
+      "to": "意外事件与叙事反转"
+    },
+    {
+      "from": "被动语态含情态动词",
+      "to": "环保与可持续发展话题"
+    },
+    {
+      "from": "used to表达过去习惯与变化",
+      "to": "回忆与展望未来的表达"
+    },
+    {
+      "from": "宾语从句that/if/whether引导",
+      "to": "口语表达观点并提供论据"
+    },
+    {
+      "from": "过去完成时的用法",
+      "to": "口语描述经历与情感"
+    },
+    {
+      "from": "阅读推断与深层理解",
+      "to": "阅读多种文体（说明/议论/叙事）"
+    },
+    {
+      "from": "宾语从句wh-疑问词引导",
+      "to": "应用文写作（书信/通知/报告）"
+    },
+    {
+      "from": "口语表达观点并提供论据",
+      "to": "议论性段落写作"
+    },
+    {
+      "from": "过去完成时的用法",
+      "to": "创意写作（故事/描述/续写）"
+    },
+    {
+      "from": "阅读推断与深层理解",
+      "to": "快速阅读与信息检索策略"
+    },
+    {
+      "from": "听力理解长对话与独白",
+      "to": "听力笔记与要点归纳"
+    },
+    {
+      "from": "be supposed to与文化习俗表达",
+      "to": "中西方餐桌礼仪与社交规范"
+    },
+    {
+      "from": "跨文化礼仪与习俗",
+      "to": "全球视野与多元文化理解"
+    },
+    {
+      "from": "阅读推断与深层理解",
+      "to": "考试策略与题型应对"
+    },
+    {
+      "from": "英语自主学习与反思策略",
+      "to": "英语思维导图与知识整理"
+    },
+    {
+      "from": "被动语态的一般现在时与过去时",
+      "to": "图表与数据分析的英语表达"
+    },
+    {
+      "from": "口语表达观点并提供论据",
+      "to": "辩论与说服性口语表达"
+    },
+    {
+      "from": "回忆与展望未来的表达",
+      "to": "英语日记与反思写作"
+    },
+    {
+      "from": "辩论与说服性口语表达",
+      "to": "演讲与口头报告技巧"
+    }
+  ],
+  "themes": {
+    "被动语态的一般现在时与过去时": "eng_language",
+    "被动语态含情态动词": "eng_language",
+    "宾语从句that/if/whether引导": "eng_language",
+    "宾语从句wh-疑问词引导": "eng_language",
+    "定语从句who/that/which引导": "eng_language",
+    "过去完成时的用法": "eng_language",
+    "情态动词表推测must/might/can't": "eng_language",
+    "使役动词make/keep/let的用法": "eng_language",
+    "used to表达过去习惯与变化": "eng_language",
+    "be supposed to与文化习俗表达": "eng_language",
+    "感叹句how/what的用法": "eng_language",
+    "过去分词作形容词与状语": "eng_language",
+    "学习方法与策略表达": "eng_speaking",
+    "文化节日与传统习俗描述": "eng_reading",
+    "日常问路与礼貌请求": "eng_speaking",
+    "个人变化与成长描述": "eng_writing",
+    "材料与产地描述": "eng_language",
+    "发明创造与科技话题": "eng_reading",
+    "青少年生活与规则讨论": "eng_speaking",
+    "推测与归属表达": "eng_language",
+    "音乐与艺术偏好表达": "eng_speaking",
+    "跨文化礼仪与习俗": "eng_speaking",
+    "情感与因果关系表达": "eng_writing",
+    "意外事件与叙事反转": "eng_writing",
+    "环保与可持续发展话题": "eng_reading",
+    "回忆与展望未来的表达": "eng_writing",
+    "听力理解长对话与独白": "eng_listening",
+    "口语表达观点并提供论据": "eng_speaking",
+    "口语描述经历与情感": "eng_speaking",
+    "阅读推断与深层理解": "eng_reading",
+    "阅读多种文体（说明/议论/叙事）": "eng_reading",
+    "应用文写作（书信/通知/报告）": "eng_writing",
+    "议论性段落写作": "eng_writing",
+    "创意写作（故事/描述/续写）": "eng_writing",
+    "快速阅读与信息检索策略": "eng_reading",
+    "听力笔记与要点归纳": "eng_listening",
+    "中西方餐桌礼仪与社交规范": "eng_speaking",
+    "全球视野与多元文化理解": "eng_reading",
+    "英语自主学习与反思策略": "eng_language",
+    "考试策略与题型应对": "eng_language",
+    "英语思维导图与知识整理": "eng_language",
+    "图表与数据分析的英语表达": "eng_writing",
+    "辩论与说服性口语表达": "eng_speaking",
+    "英语日记与反思写作": "eng_writing",
+    "演讲与口头报告技巧": "eng_speaking"
+  },
+  "literacies": {
+    "被动语态的一般现在时与过去时": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "被动语态含情态动词": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "宾语从句that/if/whether引导": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "宾语从句wh-疑问词引导": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "定语从句who/that/which引导": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "过去完成时的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "情态动词表推测must/might/can't": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "使役动词make/keep/let的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "used to表达过去习惯与变化": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "be supposed to与文化习俗表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "感叹句how/what的用法": [
+      "lit_eng_lang"
+    ],
+    "过去分词作形容词与状语": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "学习方法与策略表达": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "文化节日与传统习俗描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "日常问路与礼貌请求": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "个人变化与成长描述": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "材料与产地描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "发明创造与科技话题": [
+      "lit_eng_lang",
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "青少年生活与规则讨论": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_culture"
+    ],
+    "推测与归属表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "音乐与艺术偏好表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "跨文化礼仪与习俗": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "情感与因果关系表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "意外事件与叙事反转": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "环保与可持续发展话题": [
+      "lit_eng_lang",
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "回忆与展望未来的表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "听力理解长对话与独白": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "口语表达观点并提供论据": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "口语描述经历与情感": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "阅读推断与深层理解": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "阅读多种文体（说明/议论/叙事）": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "应用文写作（书信/通知/报告）": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "议论性段落写作": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "创意写作（故事/描述/续写）": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "快速阅读与信息检索策略": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "听力笔记与要点归纳": [
+      "lit_eng_lang",
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "中西方餐桌礼仪与社交规范": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "全球视野与多元文化理解": [
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "英语自主学习与反思策略": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "考试策略与题型应对": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "英语思维导图与知识整理": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "图表与数据分析的英语表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "辩论与说服性口语表达": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_culture"
+    ],
+    "英语日记与反思写作": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "演讲与口头报告技巧": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ]
+  },
+  "blooms": {
+    "被动语态的一般现在时与过去时": "bloom_apply",
+    "被动语态含情态动词": "bloom_apply",
+    "宾语从句that/if/whether引导": "bloom_apply",
+    "宾语从句wh-疑问词引导": "bloom_apply",
+    "定语从句who/that/which引导": "bloom_apply",
+    "过去完成时的用法": "bloom_apply",
+    "情态动词表推测must/might/can't": "bloom_apply",
+    "使役动词make/keep/let的用法": "bloom_apply",
+    "used to表达过去习惯与变化": "bloom_apply",
+    "be supposed to与文化习俗表达": "bloom_apply",
+    "感叹句how/what的用法": "bloom_apply",
+    "过去分词作形容词与状语": "bloom_apply",
+    "学习方法与策略表达": "bloom_apply",
+    "文化节日与传统习俗描述": "bloom_understand",
+    "日常问路与礼貌请求": "bloom_apply",
+    "个人变化与成长描述": "bloom_apply",
+    "材料与产地描述": "bloom_apply",
+    "发明创造与科技话题": "bloom_understand",
+    "青少年生活与规则讨论": "bloom_evaluate",
+    "推测与归属表达": "bloom_apply",
+    "音乐与艺术偏好表达": "bloom_apply",
+    "跨文化礼仪与习俗": "bloom_understand",
+    "情感与因果关系表达": "bloom_apply",
+    "意外事件与叙事反转": "bloom_apply",
+    "环保与可持续发展话题": "bloom_evaluate",
+    "回忆与展望未来的表达": "bloom_create",
+    "听力理解长对话与独白": "bloom_apply",
+    "口语表达观点并提供论据": "bloom_apply",
+    "口语描述经历与情感": "bloom_create",
+    "阅读推断与深层理解": "bloom_analyze",
+    "阅读多种文体（说明/议论/叙事）": "bloom_analyze",
+    "应用文写作（书信/通知/报告）": "bloom_create",
+    "议论性段落写作": "bloom_create",
+    "创意写作（故事/描述/续写）": "bloom_create",
+    "快速阅读与信息检索策略": "bloom_apply",
+    "听力笔记与要点归纳": "bloom_apply",
+    "中西方餐桌礼仪与社交规范": "bloom_understand",
+    "全球视野与多元文化理解": "bloom_evaluate",
+    "英语自主学习与反思策略": "bloom_evaluate",
+    "考试策略与题型应对": "bloom_evaluate",
+    "英语思维导图与知识整理": "bloom_create",
+    "图表与数据分析的英语表达": "bloom_analyze",
+    "辩论与说服性口语表达": "bloom_create",
+    "英语日记与反思写作": "bloom_create",
+    "演讲与口头报告技巧": "bloom_create"
+  },
+  "_warnings": []
+}

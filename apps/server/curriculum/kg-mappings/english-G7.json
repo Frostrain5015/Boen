@@ -1,0 +1,421 @@
+{
+  "subject": "english",
+  "grade": "7",
+  "generatedAt": "2026-06-20T07:04:30.768Z",
+  "kpCount": 45,
+  "prerequisites": [
+    {
+      "from": "英语音标与拼读规则",
+      "to": "英语单词拼写与发音规律"
+    },
+    {
+      "from": "问候与自我介绍",
+      "to": "日常交际用语与礼貌表达"
+    },
+    {
+      "from": "日常交际用语与礼貌表达",
+      "to": "请求帮助与表达感谢"
+    },
+    {
+      "from": "英语音标与拼读规则",
+      "to": "一般现在时的用法"
+    },
+    {
+      "from": "英语音标与拼读规则",
+      "to": "人称代词与be动词"
+    },
+    {
+      "from": "人称代词与be动词",
+      "to": "特殊疑问句的构成"
+    },
+    {
+      "from": "名词单复数与冠词",
+      "to": "介词短语与方位表达"
+    },
+    {
+      "from": "一般现在时的用法",
+      "to": "情态动词can/must的用法"
+    },
+    {
+      "from": "一般现在时的用法",
+      "to": "一般过去时的用法"
+    },
+    {
+      "from": "一般现在时的用法",
+      "to": "现在进行时的用法"
+    },
+    {
+      "from": "名词单复数与冠词",
+      "to": "There be句型与存在表达"
+    },
+    {
+      "from": "问候与自我介绍",
+      "to": "个人信息与身份描述"
+    },
+    {
+      "from": "人称代词与be动词",
+      "to": "家庭成员与人际关系词汇"
+    },
+    {
+      "from": "名词单复数与冠词",
+      "to": "食物与饮食表达"
+    },
+    {
+      "from": "一般现在时的用法",
+      "to": "日常活动与作息时间"
+    },
+    {
+      "from": "There be句型与存在表达",
+      "to": "天气与季节表达"
+    },
+    {
+      "from": "情态动词can/must的用法",
+      "to": "能力与爱好表达"
+    },
+    {
+      "from": "情态动词can/must的用法",
+      "to": "规则与义务表达"
+    },
+    {
+      "from": "一般过去时的用法",
+      "to": "故事叙述与过去经历"
+    },
+    {
+      "from": "英语音标与拼读规则",
+      "to": "听力理解短对话关键信息"
+    },
+    {
+      "from": "问候与自我介绍",
+      "to": "口语表达简单观点与感受"
+    },
+    {
+      "from": "英语音标与拼读规则",
+      "to": "朗读模仿与语音语调练习"
+    },
+    {
+      "from": "英语音标与拼读规则",
+      "to": "阅读短文提取基本信息"
+    },
+    {
+      "from": "人称代词与be动词",
+      "to": "简单句子仿写与造句"
+    },
+    {
+      "from": "简单句子仿写与造句",
+      "to": "日常话题短文写作"
+    },
+    {
+      "from": "听力理解短对话关键信息",
+      "to": "基础听力策略（预测与关键词捕捉）"
+    },
+    {
+      "from": "简单句子仿写与造句",
+      "to": "英语书信与邮件的基本格式"
+    },
+    {
+      "from": "问候与自我介绍",
+      "to": "中西方问候与社交礼仪差异"
+    },
+    {
+      "from": "阅读短文提取基本信息",
+      "to": "利用图片与语境推测词义"
+    },
+    {
+      "from": "英语单词拼写与发音规律",
+      "to": "词汇分类记忆与联想策略"
+    },
+    {
+      "from": "口语表达简单观点与感受",
+      "to": "看图说话与情境描述"
+    },
+    {
+      "from": "日常交际用语与礼貌表达",
+      "to": "角色扮演与情境对话"
+    },
+    {
+      "from": "个人信息与身份描述",
+      "to": "个人信息表格与名片填写"
+    },
+    {
+      "from": "阅读短文提取基本信息",
+      "to": "简单通知与海报阅读理解"
+    },
+    {
+      "from": "一般过去时的用法",
+      "to": "时间线与事件顺序表达"
+    }
+  ],
+  "themes": {
+    "英语音标与拼读规则": "eng_language",
+    "英语单词拼写与发音规律": "eng_language",
+    "问候与自我介绍": "eng_speaking",
+    "日常交际用语与礼貌表达": "eng_speaking",
+    "请求帮助与表达感谢": "eng_speaking",
+    "一般现在时的用法": "eng_language",
+    "人称代词与be动词": "eng_language",
+    "特殊疑问句的构成": "eng_language",
+    "名词单复数与冠词": "eng_language",
+    "介词短语与方位表达": "eng_language",
+    "情态动词can/must的用法": "eng_language",
+    "一般过去时的用法": "eng_language",
+    "现在进行时的用法": "eng_language",
+    "There be句型与存在表达": "eng_language",
+    "数字与日期时间表达": "eng_language",
+    "个人信息与身份描述": "eng_speaking",
+    "家庭成员与人际关系词汇": "eng_language",
+    "学校设施与校园生活词汇": "eng_language",
+    "食物与饮食表达": "eng_speaking",
+    "动物与自然描述": "eng_reading",
+    "颜色与外观描述": "eng_language",
+    "日常活动与作息时间": "eng_speaking",
+    "天气与季节表达": "eng_speaking",
+    "能力与爱好表达": "eng_speaking",
+    "规则与义务表达": "eng_language",
+    "故事叙述与过去经历": "eng_writing",
+    "听力理解短对话关键信息": "eng_listening",
+    "口语表达简单观点与感受": "eng_speaking",
+    "朗读模仿与语音语调练习": "eng_speaking",
+    "阅读短文提取基本信息": "eng_reading",
+    "图片与语境理解": "eng_reading",
+    "简单句子仿写与造句": "eng_writing",
+    "日常话题短文写作": "eng_writing",
+    "基础听力策略（预测与关键词捕捉）": "eng_listening",
+    "英语书信与邮件的基本格式": "eng_writing",
+    "中西方问候与社交礼仪差异": "eng_speaking",
+    "中西方节日与庆祝方式": "eng_reading",
+    "英语学习基本方法与习惯": "eng_language",
+    "利用图片与语境推测词义": "eng_reading",
+    "词汇分类记忆与联想策略": "eng_language",
+    "看图说话与情境描述": "eng_speaking",
+    "角色扮演与情境对话": "eng_speaking",
+    "个人信息表格与名片填写": "eng_writing",
+    "简单通知与海报阅读理解": "eng_reading",
+    "时间线与事件顺序表达": "eng_writing"
+  },
+  "literacies": {
+    "英语音标与拼读规则": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "英语单词拼写与发音规律": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "问候与自我介绍": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "日常交际用语与礼貌表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "请求帮助与表达感谢": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "一般现在时的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "人称代词与be动词": [
+      "lit_eng_lang"
+    ],
+    "特殊疑问句的构成": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "名词单复数与冠词": [
+      "lit_eng_lang"
+    ],
+    "介词短语与方位表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "情态动词can/must的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "一般过去时的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "现在进行时的用法": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "There be句型与存在表达": [
+      "lit_eng_lang"
+    ],
+    "数字与日期时间表达": [
+      "lit_eng_lang"
+    ],
+    "个人信息与身份描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "家庭成员与人际关系词汇": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "学校设施与校园生活词汇": [
+      "lit_eng_lang"
+    ],
+    "食物与饮食表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "动物与自然描述": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "颜色与外观描述": [
+      "lit_eng_lang"
+    ],
+    "日常活动与作息时间": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "天气与季节表达": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "能力与爱好表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "规则与义务表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "故事叙述与过去经历": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "听力理解短对话关键信息": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "口语表达简单观点与感受": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "朗读模仿与语音语调练习": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "阅读短文提取基本信息": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "图片与语境理解": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "简单句子仿写与造句": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "日常话题短文写作": [
+      "lit_eng_lang",
+      "lit_eng_think",
+      "lit_eng_learn"
+    ],
+    "基础听力策略（预测与关键词捕捉）": [
+      "lit_eng_lang",
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "英语书信与邮件的基本格式": [
+      "lit_eng_lang",
+      "lit_eng_culture"
+    ],
+    "中西方问候与社交礼仪差异": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "中西方节日与庆祝方式": [
+      "lit_eng_culture",
+      "lit_eng_lang"
+    ],
+    "英语学习基本方法与习惯": [
+      "lit_eng_learn",
+      "lit_eng_lang"
+    ],
+    "利用图片与语境推测词义": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "词汇分类记忆与联想策略": [
+      "lit_eng_learn",
+      "lit_eng_think"
+    ],
+    "看图说话与情境描述": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "角色扮演与情境对话": [
+      "lit_eng_lang",
+      "lit_eng_culture",
+      "lit_eng_think"
+    ],
+    "个人信息表格与名片填写": [
+      "lit_eng_lang",
+      "lit_eng_learn"
+    ],
+    "简单通知与海报阅读理解": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ],
+    "时间线与事件顺序表达": [
+      "lit_eng_lang",
+      "lit_eng_think"
+    ]
+  },
+  "blooms": {
+    "英语音标与拼读规则": "bloom_apply",
+    "英语单词拼写与发音规律": "bloom_apply",
+    "问候与自我介绍": "bloom_apply",
+    "日常交际用语与礼貌表达": "bloom_apply",
+    "请求帮助与表达感谢": "bloom_apply",
+    "一般现在时的用法": "bloom_apply",
+    "人称代词与be动词": "bloom_understand",
+    "特殊疑问句的构成": "bloom_apply",
+    "名词单复数与冠词": "bloom_apply",
+    "介词短语与方位表达": "bloom_apply",
+    "情态动词can/must的用法": "bloom_apply",
+    "一般过去时的用法": "bloom_apply",
+    "现在进行时的用法": "bloom_apply",
+    "There be句型与存在表达": "bloom_apply",
+    "数字与日期时间表达": "bloom_apply",
+    "个人信息与身份描述": "bloom_apply",
+    "家庭成员与人际关系词汇": "bloom_understand",
+    "学校设施与校园生活词汇": "bloom_understand",
+    "食物与饮食表达": "bloom_apply",
+    "动物与自然描述": "bloom_understand",
+    "颜色与外观描述": "bloom_understand",
+    "日常活动与作息时间": "bloom_apply",
+    "天气与季节表达": "bloom_apply",
+    "能力与爱好表达": "bloom_apply",
+    "规则与义务表达": "bloom_apply",
+    "故事叙述与过去经历": "bloom_apply",
+    "听力理解短对话关键信息": "bloom_apply",
+    "口语表达简单观点与感受": "bloom_apply",
+    "朗读模仿与语音语调练习": "bloom_apply",
+    "阅读短文提取基本信息": "bloom_understand",
+    "图片与语境理解": "bloom_understand",
+    "简单句子仿写与造句": "bloom_apply",
+    "日常话题短文写作": "bloom_create",
+    "基础听力策略（预测与关键词捕捉）": "bloom_apply",
+    "英语书信与邮件的基本格式": "bloom_apply",
+    "中西方问候与社交礼仪差异": "bloom_understand",
+    "中西方节日与庆祝方式": "bloom_understand",
+    "英语学习基本方法与习惯": "bloom_evaluate",
+    "利用图片与语境推测词义": "bloom_analyze",
+    "词汇分类记忆与联想策略": "bloom_evaluate",
+    "看图说话与情境描述": "bloom_create",
+    "角色扮演与情境对话": "bloom_create",
+    "个人信息表格与名片填写": "bloom_apply",
+    "简单通知与海报阅读理解": "bloom_analyze",
+    "时间线与事件顺序表达": "bloom_apply"
+  }
+}
