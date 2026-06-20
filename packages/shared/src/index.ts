@@ -469,6 +469,7 @@ export type SseEvent =
   | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit' | 'query'; detail: string }
   | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query'; detail: string }
   | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query'; error: string }
+  | { type: 'subject_changed'; subject: string }
   | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number }
   | { type: 'done' }
   | { type: 'error'; message: string };

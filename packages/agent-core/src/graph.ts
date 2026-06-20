@@ -156,8 +156,21 @@ const switchModeTools: any[] = [
     { type: z.enum(['mental-arithmetic', 'dictation', 'recitation', 'reading', 'writing', 'vocabulary']).describe('练习类型') }),
 ];
 
+/** 学科切换工具（模型可主动切换当前教学学科） */
+export const SWITCH_SUBJECT_TOOL = 'switch_subject';
+const switchSubjectTool = tool(async ({ subject }) => {
+  return `已切换到 ${subject} 学科。知识库已更新。`;
+}, {
+  name: SWITCH_SUBJECT_TOOL,
+  description: '将当前教学学科切换到指定学科。当用户询问其他学科内容、或教学需要跨学科知识时调用此工具。调用后系统会自动更新知识库和界面风格。',
+  schema: z.object({
+    subject: z.enum(['chinese', 'math', 'english', 'science']).describe('目标学科'),
+    reason: z.string().describe('向学生说明为什么切换学科'),
+  }),
+});
+
 // ── 工具组合 ────────────────────────────────
-const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool];
+const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool, switchSubjectTool];
 
 /** 格式化 TODO 状态为文字清单 */
 function formatTodoState(todoJson: string): string {
@@ -350,6 +363,14 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
         else { todo.currentStep = todo.steps.length + 1; }
         return { todoState: JSON.stringify(todo) };
       } catch {}
+    }
+
+    const subjectCall = aiMsg.tool_calls.find((c: any) => c.name === SWITCH_SUBJECT_TOOL);
+    if (subjectCall) {
+      const args = subjectCall.args as { subject?: string } | undefined;
+      if (args?.subject) {
+        return { subject: args.subject as any };
+      }
     }
 
     return {};

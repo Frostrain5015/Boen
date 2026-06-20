@@ -17,7 +17,7 @@ import {
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
-  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL, LOOKUP_KNOWLEDGE_POINT_TOOL,
+  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL, SWITCH_SUBJECT_TOOL, LOOKUP_KNOWLEDGE_POINT_TOOL,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -258,6 +258,13 @@ async function runGraph(
           todoStepSent.add(name);
           await send({ type: 'todo_step', action: 'query' });
           console.log(`[Boen 类课堂] 📖 lookup_knowledge_point — 查询教材库 | ${new Date().toLocaleTimeString()}`);
+        }
+        if (name === SWITCH_SUBJECT_TOOL && !todoStepSent.has(name)) {
+          todoStepSent.add(name);
+          const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
+          const subject = args?.subject ?? 'math';
+          await send({ type: 'subject_changed', subject });
+          console.log(`[Boen 类课堂] 🔄 switch_subject → ${subject} | ${new Date().toLocaleTimeString()}`);
         }
       }
 
