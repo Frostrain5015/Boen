@@ -6,6 +6,7 @@ import PremiumGate from '@/components/PremiumGate.vue';
 import { useUiStore } from '@/stores/ui';
 import { useExamStore } from '@/stores/exam';
 import { useChatStore } from '@/stores/chat';
+import { getToken } from '@/services/auth';
 import type { Subject } from '@/stores/chat';
 import type { Grade } from '@boen/shared';
 
@@ -28,12 +29,17 @@ function handleExam(detail: { subject: Subject; grade: string; durationMinutes: 
 }
 
 function handleExplore(detail: { title: string; subject: Subject; grade: string }) {
-  router.push('/');
   uiStore.subject = detail.subject as any;
-  setTimeout(() => {
-    const chatStore = useChatStore();
-    chatStore.send(`探索学习：${detail.title}`);
-  }, 100);
+  const token = getToken();
+  fetch('/api/explore', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(detail),
+  }).then(() => {
+    router.push('/');
+  }).catch(() => {
+    router.push('/');
+  });
 }
 </script>
 

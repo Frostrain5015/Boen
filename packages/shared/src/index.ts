@@ -465,5 +465,6 @@ export type SseEvent =
   | { type: 'exam_graded'; examId: string; results: ExamResults }
   | { type: 'loading_knowledge_base' }
   | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
+  | { type: 'conversation_created'; conversationId: string; title: string }
   | { type: 'done' }
   | { type: 'error'; message: string };

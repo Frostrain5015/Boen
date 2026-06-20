@@ -1202,7 +1202,63 @@ app.post('/api/chat', async (c) => {
   });
 });
 
-// ── 对话模式错题自动归集 ─────────────────────────
+// ── 探索课对话 ─────────────────────────
+app.post('/api/explore', async (c) => {
+  const body = await c.req.json<{ title: string; subject: string; grade: string }>();
+  const result = await resolveSubscription(c);
+  if (!result) return c.json({ error: 'unauthorized' }, 401);
+  const userId = result.userId;
+
+  const { getExplorePrompt } = await import('./explore-prompts.js');
+  const entry = getExplorePrompt(body.title);
+  if (!entry) return c.json({ error: 'not_found', message: '该主题暂无探索课程' }, 404);
+
+  const conversation = createConversation(userId, entry.label, body.subject ?? 'math');
+  const threadId = conversation.id;
+  addMessage(threadId, 'system', JSON.stringify({ __boen_type: 'explore_prompt', prompt: entry.prompt }));
+  addMessage(threadId, 'user', `探索学习：${body.title}`);
+
+  return streamSSE(c, async (stream) => {
+    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    await send({ type: 'conversation_created', conversationId: threadId, title: entry.label });
+    try {
+      const last = await runGraph(
+        {
+          messages: [
+            new SystemMessage(entry.prompt),
+            new HumanMessage(`我准备好探索「${body.title}」了，请开始吧。`),
+          ],
+          gradeBand: 'middle',
+          grade: body.grade,
+          subject: body.subject ?? 'math',
+          mode: 'explore',
+        },
+        threadId,
+        send,
+      );
+      if (last) {
+        let content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
+        addMessage(threadId, 'assistant', content);
+
+        // 解析探索评分 【EXPLORE_SCORE: N】，尝试匹配知识点并更新画像
+        const scoreMatch = content.match(/【EXPLORE_SCORE:\s*(\d+)】/);
+        if (scoreMatch && userId) {
+          const exploreScore = Math.max(0, Math.min(100, parseInt(scoreMatch[1])));
+          const { findKnowledgePointNode } = await import('./exam.js');
+          const node = findKnowledgePointNode(body.title, body.subject);
+          if (node) {
+            updateProficiency(userId, node.id, exploreScore, 100, 'explore');
+          }
+          // 从前端展示中移除评分标记
+          content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
+        }
+      }
+      await send({ type: 'done' });
+    } catch (err) {
+      await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  });
+});
 
 function extractStudentAnswerText(answer: AnswerPayload): string | null {
   if (answer.type === 'multiple_choice') return answer.selectedKeys?.join(', ') ?? null;

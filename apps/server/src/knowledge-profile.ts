@@ -71,6 +71,8 @@ const MODE_ELO_MULTIPLIERS: Record<string, number> = {
   review: 1.0,
   weakness: 1.3,
   exam: 1.5,
+  /** 探索课：超低权重，鼓励而非评估 */
+  explore: 0.4,
 };
 
 /** 前置依赖反向传播用的 K-factor（比主更新弱得多） */
