@@ -31,6 +31,7 @@ function handleExam(detail: { subject: Subject; grade: string; durationMinutes: 
 
 async function handleExplore(detail: { title: string; subject: Subject; grade: string }) {
   uiStore.startSession();
+  (uiStore as any).activeMode = 'explore';
   uiStore.subject = detail.subject as any;
   const token = getToken();
   try {

@@ -17,7 +17,7 @@ import {
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
-  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL,
+  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -245,6 +245,12 @@ async function runGraph(
           const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
           const total = ((Date.now() - stepTimestamps[0]) / 1000).toFixed(1);
           console.log(`[Boen 类课堂] ✅ exit_session — ${stepCount}/${args?.totalSteps ?? '?'}步 | ${args?.score ?? '?'}分 | 总耗时 ${total}s | ${new Date().toLocaleTimeString()}`);
+        }
+        if (name === PLAN_STEPS_TOOL && !todoStepSent.has(name)) {
+          todoStepSent.add(name);
+          const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
+          const count = args?.steps?.length ?? '?';
+          console.log(`[Boen 类课堂] 📋 plan_steps — 规划了 ${count} 步 | ${new Date().toLocaleTimeString()}`);
         }
       }
 
@@ -1249,31 +1255,10 @@ app.post('/api/chat', async (c) => {
         }
       }
 
-      // 结构化模式：初始化 TODO 状态机 + 注入教学 prompt
-      // 关键修复：只在首次消息时初始化，后续轮次从 checkpoint 读取已有进度
+      // 结构化模式：注入教学 prompt（TODO 由 plan_steps 工具在图中创建）
       let modeSystemMsg: SystemMessage | undefined;
-      let todoState: string | undefined;
       if (body.mode && !['qa', 'explore'].includes(body.mode) && userId) {
-        const { getModePrompt, getModeSteps } = await import('./mode-prompts.js');
-        // 检查 checkpoint 是否已有 TODO 进度（非首轮消息）
-        let existingTodo: string | undefined;
-        try {
-          const ckpt = await graph.getState(runConfig(body.threadId));
-          existingTodo = ckpt?.values?.todoState as string | undefined;
-        } catch { /* 首轮无 checkpoint */ }
-        if (!existingTodo) {
-          const steps = getModeSteps(body.mode, body.message);
-          if (steps && steps.length > 0) {
-            todoState = JSON.stringify({
-              steps: steps.map((label: string, i: number) => ({
-                id: i + 1,
-                label,
-                status: i === 0 ? 'in_progress' : 'pending',
-              })),
-              currentStep: 1,
-            });
-          }
-        }
+        const { getModePrompt } = await import('./mode-prompts.js');
         const modePrompt = getModePrompt(body.mode, body.message);
         if (modePrompt) modeSystemMsg = new SystemMessage(modePrompt);
       }

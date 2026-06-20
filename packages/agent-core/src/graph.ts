@@ -84,6 +84,9 @@ export const COMPLETE_REVIEW_TOOL = 'complete_review';
 /** 类课堂退出工具 */
 export const EXIT_SESSION_TOOL = 'exit_session';
 
+/** 步骤规划工具 */
+export const PLAN_STEPS_TOOL = 'plan_steps';
+
 const exitSessionSchema = z.object({
   summary: z.string().describe('本次学习的总结评价'),
   score: z.number().min(0).max(100).describe('综合评分(0-100)'),
@@ -111,6 +114,21 @@ const advanceStepTool = tool(async ({ stepId }) => {
   name: ADVANCE_STEP_TOOL,
   description: '当学生确认准备好进入下一步时调用此工具。调用前必须先征得学生同意。',
   schema: advanceStepSchema,
+});
+
+/** 步骤规划工具：模型根据学习内容自定 TODO */
+const planStepsSchema = z.object({
+  steps: z.array(z.object({
+    label: z.string().describe('步骤描述，如"了解学员基础"、"核心概念讲解"、"例题演练"'),
+  })).min(3).describe('TODO 步骤清单，至少 3 步'),
+});
+
+const planStepsTool = tool(async ({ steps }) => {
+  return `已规划 ${steps.length} 步学习计划。请开始第一步教学。`;
+}, {
+  name: PLAN_STEPS_TOOL,
+  description: '根据学习内容规划 TODO 步骤清单（至少 3 步）。教学开始前必须先调用此工具设定学习计划。',
+  schema: planStepsSchema,
 });
 
 const completeReviewSchema = z.object({
@@ -163,7 +181,7 @@ const switchModeTools: any[] = [
  * 构建博文主图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, checkpointer?: BaseCheckpointSaver) {
-  const structuredTools: any[] = [advanceStepTool, exitSessionTool];
+  const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool];
   const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools] : [...quizTools, ...switchModeTools];
   const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
@@ -204,7 +222,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
         return { mode: 'weakness', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
       // 学习模式中收到用户消息 → 切回讲解阶段（保留 forceQuiz 检测结果，不屏蔽）
-      if (state.mode === 'review' || state.mode === 'preview' || state.mode === 'weakness') {
+      if (state.mode === 'review' || state.mode === 'preview' || state.mode === 'weakness' || state.mode === 'explore') {
         return { mode: state.mode, reviewPhase: 'teaching', forceQuiz: force, quizTool: qTool };
       }
       return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: qTool };
@@ -259,7 +277,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     let tools: ReturnType<NonNullable<typeof model.bindTools>> | undefined;
 
     // 注入 TODO 步进工具（仅结构化模式）
-    const isStructured = ['review', 'preview', 'weakness', 'practice'].includes(state.mode ?? '');
+    const isStructured = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(state.mode ?? '');
     const todoAppend = (state.todoState && isStructured) ? formatTodoState(state.todoState) : '';
 
     if (state.mode === 'review') {
@@ -290,6 +308,10 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       } else if (model.bindTools) {
         tools = model.bindTools(reviewTools as any);
       }
+    } else if (state.mode === 'explore') {
+      // 探索模式：使用通用 prompt + structuredTools（含 plan_steps/advance_step/exit_session）
+      system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
+      if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
     } else {
       system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (last && isToolMessage(last)) {
@@ -366,6 +388,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       if (calls.some((c) => c.name === EXIT_SESSION_TOOL)) return 'exitSession';
       if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL)) return 'end';
       if (calls.some((c) => c.name === ADVANCE_STEP_TOOL)) return 'advanceStepTodo';
+      if (calls.some((c) => c.name === PLAN_STEPS_TOOL)) return 'planSteps';
       if (calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) return 'lookupKnowledgePoint';
     }
     return 'end';
@@ -423,6 +446,34 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     } catch { return { messages: toolMsgs }; }
   };
 
+  /** 步骤规划节点：从 plan_steps 工具调用创建 TODO 状态 */
+  const planStepsNode = async (state: State): Promise<Partial<State>> => {
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const allCalls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
+    const planCalls = allCalls.filter((c) => c.name === PLAN_STEPS_TOOL);
+    const toolMsgs: ToolMessage[] = planCalls.map((call) =>
+      new ToolMessage({ content: '学习计划已记录，请开始第一步教学。', tool_call_id: call.id! }),
+    );
+    for (const c of allCalls.filter((c) => c.name !== PLAN_STEPS_TOOL)) {
+      toolMsgs.push(new ToolMessage({ content: '已处理。', tool_call_id: c.id! }));
+    }
+    if (planCalls.length > 0) {
+      const args = planCalls[0]?.args as { steps?: Array<{ label: string }> } | undefined;
+      if (args?.steps?.length) {
+        const todoState = JSON.stringify({
+          steps: args.steps.map((s, i) => ({
+            id: i + 1,
+            label: s.label,
+            status: i === 0 ? 'in_progress' : 'pending',
+          })),
+          currentStep: 1,
+        });
+        return { messages: toolMsgs, todoState };
+      }
+    }
+    return { messages: toolMsgs };
+  };
+
   const graph = new StateGraph(BoenState)
     .addNode('router', router)
     .addNode('loadCurriculum', loadCurriculum)
@@ -430,10 +481,12 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     .addNode('lookupKnowledgePoint', lookupKnowledgePointNode)
     .addNode('advanceStepTodo', advanceStepTodoNode)
     .addNode('exitSession', exitSessionNode)
+    .addNode('planSteps', planStepsNode)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'qa')
     .addConditionalEdges('qa', routeAfterQa, {
+      planSteps: 'planSteps',
       lookupKnowledgePoint: 'lookupKnowledgePoint',
       advanceStepTodo: 'advanceStepTodo',
       exitSession: 'exitSession',
@@ -441,6 +494,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     })
     .addEdge('lookupKnowledgePoint', 'qa')
     .addEdge('advanceStepTodo', 'qa')
+    .addEdge('planSteps', '__end__')
     .addEdge('exitSession', '__end__');
 
   return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });

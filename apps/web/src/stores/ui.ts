@@ -11,7 +11,7 @@ export const SUBJECT_LABELS: { value: Subject; label: string; emoji: string }[] 
   { value: 'science', label: '\u79d1\u5b66', emoji: '\ud83d\udd2c' },
 ];
 
-export type ActiveMode = 'none' | 'review' | 'preview' | 'weakness' | 'practice' | 'exam';
+export type ActiveMode = 'none' | 'review' | 'preview' | 'weakness' | 'practice' | 'exam' | 'explore';
 
 export const useUiStore = defineStore('ui', () => {
   const toast = useToast();
