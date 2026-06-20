@@ -221,8 +221,12 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
   /** 构建当前模式的 system prompt */
   function buildSystem(state: State): SystemMessage {
-    const todoAppend = (state.todoState && ['review', 'preview', 'weakness', 'practice', 'explore'].includes(state.mode ?? ''))
-      ? formatTodoState(state.todoState) : '';
+    const isStructured = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(state.mode ?? '');
+    const todoAppend = isStructured
+      ? (state.todoState
+          ? formatTodoState(state.todoState)
+          : '\n\n## 📋 第一步\n\n第一步：调用 plan_steps 工具根据学习内容自行规划至少 3 步 TODO，然后 system 会显示步骤清单。')
+      : '';
     const grade = state.gradeBand ?? 'middle';
     const subject = state.subject ?? 'math';
     const user = state.userName;
