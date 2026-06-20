@@ -37,6 +37,79 @@ export interface ShortAnswerGraderResult {
 export type ShortAnswerGrader = (params: ShortAnswerGraderParams) => Promise<ShortAnswerGraderResult>;
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '');
+
+/** Level 2 规范化：全角→半角、单位归一、数学常数展开、分数↔小数 */
+const FULL_TO_HALF: Record<string, string> = {
+  '０': '0', '１': '1', '２': '2', '３': '3', '４': '4',
+  '５': '5', '６': '6', '７': '7', '８': '8', '９': '9',
+  '．': '.', '（': '(', '）': ')', '，': ',', '；': ';',
+  '：': ':', '＝': '=', '＋': '+', '－': '-', '×': '*',
+  '÷': '/', '％': '%', 'π': 'π', '√': '√',
+};
+
+const UNIT_MAP: Record<string, string> = {
+  '厘米': 'cm', '公分': 'cm', '毫米': 'mm',
+  '分米': 'dm', '米': 'm', '千米': 'km', '公里': 'km',
+  '克': 'g', '千克': 'kg', '公斤': 'kg', '吨': 't',
+  '毫升': 'ml', '升': 'l', '平方厘米': 'cm2', '平方米': 'm2',
+  '立方厘米': 'cm3', '立方米': 'm3', '度': '°', '摄氏度': '℃',
+};
+
+const FRACTION_DECIMAL: Record<string, string> = {
+  '1/2': '0.5', '1/3': '0.333', '1/4': '0.25', '1/5': '0.2',
+  '2/3': '0.667', '2/5': '0.4', '3/4': '0.75', '3/5': '0.6',
+  '1/6': '0.167', '1/8': '0.125', '5/8': '0.625', '7/8': '0.875',
+};
+
+function normAdvanced(s: string): string {
+  let t = s.trim();
+  // 全角 → 半角
+  t = t.replace(/[\uff00-\uffef]/g, (c) => FULL_TO_HALF[c] ?? c);
+  // 中文单位 → 英文
+  for (const [cn, en] of Object.entries(UNIT_MAP)) {
+    t = t.replace(new RegExp(cn, 'g'), en);
+  }
+  // 数学常数展开
+  t = t.replace(/π/g, '3.14159');
+  t = t.replace(/√2/g, '1.41421');
+  t = t.replace(/√3/g, '1.73205');
+  // 分数 ↔ 小数（双向）
+  for (const [frac, dec] of Object.entries(FRACTION_DECIMAL)) {
+    t = t.replace(frac, dec);
+  }
+  // 反向：小数 → 分数
+  for (const [frac, dec] of Object.entries(FRACTION_DECIMAL)) {
+    if (t.includes(dec)) t = t.replace(dec, frac);
+  }
+  return t.toLowerCase().replace(/\s+/g, '');
+}
+
+/** 填空题匹配结果：含匹配层级信息，供 Level 3 LLM 语义判定使用 */
+export interface BlankMatchResult {
+  matched: boolean;
+  level: 1 | 2 | 'miss';
+  userNorm: string;
+  acceptedNorms: string[];
+}
+
+/** 两级匹配：Level 1 精确 → Level 2 规范化（返回详细层级信息） */
+export function fuzzyMatchBlankDetailed(userAnswer: string, acceptedAnswers: string[]): BlankMatchResult {
+  const uNorm = norm(userAnswer);
+  // Level 1: 精确匹配
+  const acceptedNorm = acceptedAnswers.map((a) => norm(a));
+  if (acceptedNorm.some((a) => a === uNorm)) {
+    return { matched: true, level: 1, userNorm: uNorm, acceptedNorms: acceptedNorm };
+  }
+  // Level 2: 规范化匹配
+  const uAdv = normAdvanced(userAnswer);
+  const acceptedAdv = acceptedAnswers.map((a) => normAdvanced(a));
+  if (acceptedAdv.some((a) => a === uAdv)) {
+    return { matched: true, level: 2, userNorm: uAdv, acceptedNorms: acceptedAdv };
+  }
+  // Level 2 miss → 返回 miss 信息供 Level 3 LLM 语义判定
+  return { matched: false, level: 'miss', userNorm: uAdv, acceptedNorms: acceptedAdv };
+}
+
 const setEq = (a: string[], b: string[]) => {
   const sa = new Set(a.map((x) => x.trim().toUpperCase()));
   const sb = new Set(b.map((x) => x.trim().toUpperCase()));
@@ -122,9 +195,10 @@ export async function gradeAnswer(
     result = commonResult({ correct, score: correct ? 1 : 0, maxScore: 1, reference: refText, explanation: a.explanation });
   } else if (toolName === 'ask_fill_blank' && answer.type === 'fill_blank') {
     const a = fillBlankSchema.parse(rawArgs);
-    const perBlank = a.blanks.map((b, i) =>
-      b.acceptedAnswers.some((acc) => norm(acc) === norm(answer.answers[i] ?? '')),
+    const detailedResults = a.blanks.map((b, i) =>
+      fuzzyMatchBlankDetailed(answer.answers[i] ?? '', b.acceptedAnswers),
     );
+    const perBlank = detailedResults.map((r) => r.matched);
     const score = perBlank.filter(Boolean).length;
     const reference = a.blanks.map((b, i) => `空${i + 1}：${b.acceptedAnswers.join(' / ')}`).join('；');
     result = commonResult({
@@ -134,6 +208,12 @@ export async function gradeAnswer(
       reference,
       explanation: a.explanation,
       perBlank,
+      perBlankDetails: detailedResults.map((r) => ({
+        matched: r.matched,
+        level: r.level,
+        userNorm: r.userNorm,
+        acceptedNorms: r.acceptedNorms,
+      })),
     });
   } else if (toolName === 'ask_true_false' && answer.type === 'true_false') {
     const a = trueFalseSchema.parse(rawArgs);

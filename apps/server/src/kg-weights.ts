@@ -110,10 +110,270 @@ const MATH_G7_WEIGHTS: WeightSeed[] = [
   { title: '余角和补角',              weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.6, tier: '重要：中考常考概念' },
 ];
 
-/** 注入权重数据 */
-export function seedWeights(subject?: string): number {
+// ── 数学 G8 权重（基于人教社2024修订版）─────────
+const MATH_G8_WEIGHTS: WeightSeed[] = [
+  // ── 上册 第十三章 三角形（约10课时）───────────
+  { title: '三角形的概念',              weight: 0.75, classHours: 1,  examWeight: 0.6,  foundation: 0.9, tier: '重要：几何推理基础' },
+  { title: '三角形的边',                weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：三边关系常考' },
+  { title: '三角形的中线角平分线和高',  weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：重要线段概念' },
+  { title: '三角形的内角',              weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：内角和定理必考' },
+  { title: '三角形的外角',              weight: 0.75, classHours: 1,  examWeight: 0.7,  foundation: 0.8, tier: '重要：外角定理应用' },
+  { title: '多边形',                    weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：多边形基本概念' },
+  { title: '多边形的内角和',            weight: 0.75, classHours: 1,  examWeight: 0.7,  foundation: 0.6, tier: '重要：公式应用' },
+  // ── 上册 第十四章 全等三角形（约10课时）───────
+  { title: '全等三角形及其性质',        weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：全等概念基础' },
+  { title: '三角形全等的判定',          weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考必考证明题' },
+  { title: '角的平分线',                weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.7, tier: '重要：角平分线性质' },
+  // ── 上册 第十五章 轴对称（约10课时）───────────
+  { title: '轴对称及其性质',            weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：轴对称性质必考' },
+  { title: '线段的垂直平分线',          weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：垂直平分线性质' },
+  { title: '画轴对称的图形',            weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：作图技能' },
+  { title: '等腰三角形',                weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：等腰三角形性质与判定' },
+  { title: '等边三角形',                weight: 0.75, classHours: 1,  examWeight: 0.7,  foundation: 0.7, tier: '重要：特殊等腰三角形' },
+  // ── 上册 第十六章 整式的乘法（约12课时）───────
+  { title: '同底数幂的乘法',            weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.9, tier: '重要：幂运算基础' },
+  { title: '幂的乘方与积的乘方',        weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：运算法则' },
+  { title: '整式的乘法',                weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 1.0, tier: '核心：多项式乘法' },
+  { title: '平方差公式',                weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考高频公式' },
+  { title: '完全平方公式',              weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考高频公式' },
+  // ── 上册 第十七章 因式分解（约6课时）─────────
+  { title: '用提公因式法分解因式',      weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 1.0, tier: '核心：因式分解基础' },
+  { title: '用公式法分解因式',          weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：综合运用公式' },
+  // ── 上册 第十八章 分式（约14课时）─────────────
+  { title: '从分数到分式',              weight: 0.75, classHours: 1,  examWeight: 0.5,  foundation: 0.9, tier: '重要：分式概念引入' },
+  { title: '分式的基本性质',            weight: 1.0,  classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '核心：约分通分基础' },
+  { title: '分式的乘法与除法',          weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 0.9, tier: '核心：分式运算' },
+  { title: '分式的加法与减法',          weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 0.9, tier: '核心：异分母通分' },
+  { title: '整数指数幂',                weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：指数扩展' },
+  { title: '分式方程',                  weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考必考，需验根' },
+  // ── 下册 第十九章 二次根式（约8课时）─────────
+  { title: '二次根式及其性质',          weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 1.0, tier: '核心：根式运算基础' },
+  { title: '二次根式的乘法与除法',      weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：根式乘除' },
+  { title: '二次根式的加法与减法',      weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：同类根式合并' },
+  // ── 下册 第二十章 勾股定理（约6课时）─────────
+  { title: '勾股定理及其应用',          weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考必考定理' },
+  { title: '勾股定理的逆定理及其应用',  weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 0.9, tier: '核心：判定直角三角形' },
+  // ── 下册 第二十一章 四边形（约16课时）────────
+  { title: '四边形及其内角和',          weight: 0.75, classHours: 1,  examWeight: 0.5,  foundation: 0.8, tier: '重要：四边形基础' },
+  { title: '多边形及其内角和',          weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.6, tier: '标准：多边形扩展' },
+  { title: '平行四边形及其性质',        weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：性质必考' },
+  { title: '平行四边形的判定',          weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：判定证明' },
+  { title: '三角形的中位线',            weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.7, tier: '重要：中位线定理' },
+  { title: '矩形',                      weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 0.9, tier: '核心：特殊平行四边形' },
+  { title: '菱形',                      weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 0.9, tier: '核心：特殊平行四边形' },
+  { title: '正方形',                    weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 0.9, tier: '核心：综合性最强' },
+  // ── 下册 第二十二章 函数（约4课时）───────────
+  { title: '函数的概念',                weight: 1.0,  classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '核心：函数思想起点' },
+  { title: '函数的表示',                weight: 0.75, classHours: 2,  examWeight: 0.6,  foundation: 0.9, tier: '重要：三种表示法' },
+  // ── 下册 第二十三章 一次函数（约14课时）──────
+  { title: '一次函数的概念',            weight: 1.0,  classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '核心：一次函数定义' },
+  { title: '一次函数的图象和性质',      weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考压轴高频' },
+  { title: '一次函数与方程不等式',      weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：数形结合综合' },
+  { title: '实际问题与一次函数',        weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：建模与应用' },
+  // ── 下册 第二十四章 数据的分析（约10课时）────
+  { title: '平均数',                    weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.9, tier: '重要：集中趋势核心' },
+  { title: '中位数和众数',              weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：集中趋势补充' },
+  { title: '数据的离散程度',            weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：方差标准差' },
+  { title: '数据的四分位数',            weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：数据分割' },
+  { title: '数据的分组',                weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：频数分布' },
+];
+
+// ── 数学 G9 权重（基于人教社2024修订版）─────────
+const MATH_G9_WEIGHTS: WeightSeed[] = [
+  // ── 上册 第二十一章 一元二次方程（约16课时）───
+  { title: '一元二次方程',              weight: 1.0,  classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '核心：二次方程概念' },
+  { title: '配方法',                    weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 1.0, tier: '核心：重要解法' },
+  { title: '公式法',                    weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：求根公式必考' },
+  { title: '因式分解法',                weight: 0.75, classHours: 2,  examWeight: 0.8,  foundation: 0.8, tier: '重要：简便解法' },
+  { title: '一元二次方程的根与系数的关系', weight: 1.0, classHours: 2, examWeight: 1.0,  foundation: 1.0, tier: '核心：韦达定理必考' },
+  { title: '实际问题与一元二次方程',    weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：建模应用' },
+  // ── 上册 第二十二章 二次函数（约14课时）───────
+  { title: '二次函数',                  weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：二次函数概念' },
+  { title: '二次函数的图象和性质',      weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考压轴核心' },
+  { title: '二次函数与一元二次方程',    weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：函数与方程联系' },
+  { title: '实际问题与二次函数',        weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：综合应用最值' },
+  // ── 上册 第二十三章 旋转（约8课时）───────────
+  { title: '图形的旋转',                weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：旋转性质' },
+  { title: '中心对称',                  weight: 0.75, classHours: 2,  examWeight: 0.6,  foundation: 0.7, tier: '重要：对称性质' },
+  { title: '中心对称图形',              weight: 0.5,  classHours: 1,  examWeight: 0.5,  foundation: 0.6, tier: '标准：图形识别' },
+  { title: '关于原点对称的点的坐标',    weight: 0.5,  classHours: 1,  examWeight: 0.5,  foundation: 0.6, tier: '标准：坐标变换' },
+  { title: '图案设计',                  weight: 0.25, classHours: 1,  examWeight: 0.2,  foundation: 0.3, tier: '了解：综合应用' },
+  // ── 上册 第二十四章 圆（约16课时）─────────────
+  { title: '圆',                        weight: 1.0,  classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '核心：圆的基本概念' },
+  { title: '垂直于弦的直径',            weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：垂径定理必考' },
+  { title: '弧弦圆心角',                weight: 0.75, classHours: 2,  examWeight: 0.8,  foundation: 0.9, tier: '重要：关系定理' },
+  { title: '圆周角',                    weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 1.0, tier: '核心：圆周角定理' },
+  { title: '点和圆的位置关系',          weight: 0.75, classHours: 1,  examWeight: 0.6,  foundation: 0.7, tier: '重要：位置判断' },
+  { title: '直线和圆的位置关系',        weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：切线判定与性质' },
+  { title: '正多边形和圆',              weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：正多边形计算' },
+  { title: '弧长和扇形面积',            weight: 1.0,  classHours: 2,  examWeight: 1.0,  foundation: 0.8, tier: '核心：公式计算必考' },
+  // ── 上册 第二十五章 概率初步（约8课时）───────
+  { title: '随机事件',                  weight: 0.75, classHours: 1,  examWeight: 0.5,  foundation: 0.9, tier: '重要：概率概念基础' },
+  { title: '概率',                      weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：概率计算' },
+  { title: '用列举法求概率',            weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 0.9, tier: '核心：列表法树状图' },
+  { title: '用频率估计概率',            weight: 0.5,  classHours: 1,  examWeight: 0.5,  foundation: 0.6, tier: '标准：频率与概率' },
+  // ── 下册 第二十六章 反比例函数（约8课时）─────
+  { title: '反比例函数',                weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 1.0, tier: '核心：反比例函数概念' },
+  { title: '反比例函数的图象和性质',    weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：双曲线性质' },
+  { title: '实际问题与反比例函数',      weight: 1.0,  classHours: 2,  examWeight: 0.9,  foundation: 0.9, tier: '核心：建模应用' },
+  // ── 下册 第二十七章 相似（约12课时）──────────
+  { title: '图形的相似',                weight: 0.75, classHours: 1,  examWeight: 0.6,  foundation: 0.9, tier: '重要：相似概念' },
+  { title: '相似三角形的判定',          weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：中考证明高频' },
+  { title: '相似三角形的性质',          weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：比例计算' },
+  { title: '相似三角形应用举例',        weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.7, tier: '重要：实际应用' },
+  { title: '位似',                      weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：位似变换' },
+  // ── 下册 第二十八章 锐角三角函数（约10课时）──
+  { title: '锐角三角函数',              weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：sin/cos/tan定义' },
+  { title: '解直角三角形',              weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 0.9, tier: '核心：综合求解' },
+  { title: '解直角三角形的应用',        weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 0.8, tier: '核心：仰角坡度问题' },
+  // ── 下册 第二十九章 投影与视图（约6课时）─────
+  { title: '投影',                      weight: 0.5,  classHours: 1,  examWeight: 0.4,  foundation: 0.5, tier: '标准：投影概念' },
+  { title: '三视图',                    weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.6, tier: '重要：三视图画法' },
+  { title: '制作立体模型',              weight: 0.25, classHours: 1,  examWeight: 0.2,  foundation: 0.3, tier: '了解：动手实践' },
+];
+
+// ── 数学 G1 权重（一年级）─────────────────────────
+const MATH_G1_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '1~5的认识',         weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：数的认识起点' },
+  { title: '比大小',            weight: 0.75, classHours: 2,  examWeight: 0.8,  foundation: 1.0, tier: '重要：大小比较基础' },
+  { title: '第几',              weight: 0.5,  classHours: 1,  examWeight: 0.5,  foundation: 0.7, tier: '标准：序数概念' },
+  { title: '分与合',            weight: 1.0,  classHours: 3,  examWeight: 1.0,  foundation: 1.0, tier: '核心：加减法前置' },
+  { title: '加法',              weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：四则运算起点' },
+  { title: '减法',              weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：四则运算' },
+  { title: '0的认识和加减法',   weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.9, tier: '重要：零的概念' },
+  { title: '6~9的认识',         weight: 0.75, classHours: 3,  examWeight: 0.8,  foundation: 0.9, tier: '重要：数的扩展' },
+  { title: '6~9的加减法',       weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：运算熟练' },
+  { title: '10的认识和加减法',  weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 1.0, tier: '核心：十进制基础' },
+  { title: '连加连减',          weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：多步运算' },
+  { title: '加减混合',          weight: 0.75, classHours: 2,  examWeight: 0.7,  foundation: 0.8, tier: '重要：混合运算' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '20以内的退位减法',  weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：退位减法必考' },
+  { title: '100以内数的认识',   weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：数位概念' },
+  { title: '100以内的加法和减法', weight: 1.0, classHours: 8,  examWeight: 1.0,  foundation: 1.0, tier: '核心：竖式计算基础' },
+  { title: '认识人民币',        weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.7, tier: '重要：生活应用' },
+  { title: '认识钟表',          weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：时间认知' },
+];
+
+// ── 数学 G2 权重（二年级）─────────────────────────
+const MATH_G2_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '100以内的加法和减法（笔算）', weight: 1.0, classHours: 8, examWeight: 1.0, foundation: 1.0, tier: '核心：竖式计算' },
+  { title: '认识长度单位',        weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.8, tier: '重要：度量入门' },
+  { title: '角的初步认识',        weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.8, tier: '重要：角的概念' },
+  { title: '表内乘法',            weight: 1.0,  classHours: 8,  examWeight: 1.0,  foundation: 1.0, tier: '核心：乘法口诀' },
+  { title: '观察物体',            weight: 0.5,  classHours: 2,  examWeight: 0.4,  foundation: 0.5, tier: '标准：空间观念' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '表内除法',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：除法概念' },
+  { title: '混合运算',            weight: 1.0,  classHours: 4,  examWeight: 0.9,  foundation: 1.0, tier: '核心：运算顺序' },
+  { title: '有余数的除法',        weight: 0.75, classHours: 3,  examWeight: 0.8,  foundation: 0.9, tier: '重要：余数概念' },
+  { title: '万以内数的认识',      weight: 1.0,  classHours: 5,  examWeight: 0.9,  foundation: 1.0, tier: '核心：大数认识' },
+  { title: '克和千克',            weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：质量单位' },
+];
+
+// ── 数学 G3 权重（三年级）─────────────────────────
+const MATH_G3_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '万以内的加法和减法',  weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：多位数运算' },
+  { title: '多位数乘一位数',      weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：乘法笔算' },
+  { title: '倍的认识',            weight: 0.75, classHours: 3,  examWeight: 0.8,  foundation: 0.9, tier: '重要：倍数概念' },
+  { title: '长方形和正方形',      weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.8, tier: '重要：图形特征' },
+  { title: '周长的认识',          weight: 1.0,  classHours: 3,  examWeight: 0.9,  foundation: 0.9, tier: '核心：周长计算' },
+  { title: '分数的初步认识',      weight: 1.0,  classHours: 4,  examWeight: 0.9,  foundation: 1.0, tier: '核心：分数入门' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '除数是一位数的除法',  weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：除法笔算' },
+  { title: '两位数乘两位数',      weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：乘法笔算' },
+  { title: '面积',                weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：面积概念与计算' },
+  { title: '小数的初步认识',      weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.9, tier: '重要：小数入门' },
+];
+
+// ── 数学 G4 权重（四年级）─────────────────────────
+const MATH_G4_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '大数的认识',          weight: 0.75, classHours: 5,  examWeight: 0.7,  foundation: 0.9, tier: '重要：亿以内数' },
+  { title: '公顷和平方千米',      weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：面积单位' },
+  { title: '角的度量',            weight: 0.75, classHours: 3,  examWeight: 0.7,  foundation: 0.8, tier: '重要：量角器使用' },
+  { title: '三位数乘两位数',      weight: 1.0,  classHours: 5,  examWeight: 0.9,  foundation: 1.0, tier: '核心：乘法笔算' },
+  { title: '平行四边形和梯形',    weight: 0.75, classHours: 4,  examWeight: 0.7,  foundation: 0.8, tier: '重要：图形分类' },
+  { title: '除数是两位数的除法',  weight: 1.0,  classHours: 6,  examWeight: 0.9,  foundation: 1.0, tier: '核心：除法笔算' },
+  { title: '条形统计图',          weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.7, tier: '标准：统计入门' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '四则运算',            weight: 1.0,  classHours: 4,  examWeight: 0.9,  foundation: 1.0, tier: '核心：运算律综合' },
+  { title: '小数的意义和性质',    weight: 1.0,  classHours: 5,  examWeight: 0.9,  foundation: 1.0, tier: '核心：小数深入' },
+  { title: '小数的加法和减法',    weight: 1.0,  classHours: 4,  examWeight: 0.9,  foundation: 1.0, tier: '核心：小数运算' },
+  { title: '三角形',              weight: 0.75, classHours: 4,  examWeight: 0.7,  foundation: 0.8, tier: '重要：三角形分类' },
+  { title: '平均数与条形统计图',  weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.7, tier: '标准：平均数概念' },
+];
+
+// ── 数学 G5 权重（五年级）─────────────────────────
+const MATH_G5_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '小数乘法',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：小数乘法笔算' },
+  { title: '小数除法',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：小数除法笔算' },
+  { title: '简易方程',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：方程入门' },
+  { title: '多边形的面积',        weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：面积公式' },
+  { title: '植树问题',            weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：规律探索' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '因数与倍数',          weight: 1.0,  classHours: 5,  examWeight: 0.9,  foundation: 1.0, tier: '核心：整除性质' },
+  { title: '分数的意义和性质',    weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：分数深入' },
+  { title: '分数的加法和减法',    weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：分数运算' },
+  { title: '长方体和正方体',      weight: 0.75, classHours: 5,  examWeight: 0.8,  foundation: 0.9, tier: '重要：体积计算' },
+  { title: '折线统计图',          weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：统计图' },
+];
+
+// ── 数学 G6 权重（六年级）─────────────────────────
+const MATH_G6_WEIGHTS: WeightSeed[] = [
+  // ── 上册 ─────────────────────────────────────
+  { title: '分数乘法',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：分数乘法' },
+  { title: '分数除法',            weight: 1.0,  classHours: 6,  examWeight: 1.0,  foundation: 1.0, tier: '核心：分数除法' },
+  { title: '比',                  weight: 0.75, classHours: 3,  examWeight: 0.8,  foundation: 0.9, tier: '重要：比的概念' },
+  { title: '圆',                  weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：圆的周长面积' },
+  { title: '百分数',              weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：百分数应用' },
+  { title: '扇形统计图',          weight: 0.5,  classHours: 2,  examWeight: 0.5,  foundation: 0.6, tier: '标准：统计图' },
+  // ── 下册 ─────────────────────────────────────
+  { title: '负数',                weight: 0.75, classHours: 3,  examWeight: 0.6,  foundation: 1.0, tier: '重要：负数入门' },
+  { title: '百分数（应用）',      weight: 1.0,  classHours: 4,  examWeight: 1.0,  foundation: 0.9, tier: '核心：折扣利率' },
+  { title: '圆柱与圆锥',          weight: 1.0,  classHours: 5,  examWeight: 1.0,  foundation: 1.0, tier: '核心：体积表面积' },
+  { title: '比例',                weight: 1.0,  classHours: 4,  examWeight: 0.9,  foundation: 1.0, tier: '核心：正反比例' },
+];
+
+// ── 权重映射表（按 subject_grade 路由）───────────
+const WEIGHT_MAP: Record<string, WeightSeed[]> = {
+  math_G1: MATH_G1_WEIGHTS,
+  math_G2: MATH_G2_WEIGHTS,
+  math_G3: MATH_G3_WEIGHTS,
+  math_G4: MATH_G4_WEIGHTS,
+  math_G5: MATH_G5_WEIGHTS,
+  math_G6: MATH_G6_WEIGHTS,
+  math_G7: MATH_G7_WEIGHTS,
+  math_G8: MATH_G8_WEIGHTS,
+  math_G9: MATH_G9_WEIGHTS,
+};
+
+/** 回退查找：同年级的最近权重数据 */
+function findFallbackWeights(subject: string, grade: string): WeightSeed[] {
+  const gradeNum = parseInt(grade, 10);
+  if (isNaN(gradeNum)) return MATH_G7_WEIGHTS; // 默认回退到 G7
+
+  // 优先找同年级、相邻年级（先下后上）
+  for (let offset = 1; offset <= 9; offset++) {
+    const up = WEIGHT_MAP[`${subject}_G${gradeNum + offset}`];
+    if (up) return up;
+    const down = WEIGHT_MAP[`${subject}_G${gradeNum - offset}`];
+    if (down) return down;
+  }
+
+  // 最终回退：返回 G7
+  return MATH_G7_WEIGHTS;
+}
+
+/** 注入权重数据，按学科+年级路由到对应权重种子 */
+export function seedWeights(subject?: string, grade?: string): number {
   ensureWeightTable();
-  const updates = subject ? MATH_G7_WEIGHTS : MATH_G7_WEIGHTS;
+  const subj = subject || 'math';
+  const grd = grade || '7';
+  const key = `${subj}_G${grd}`;
+  const updates = WEIGHT_MAP[key] ?? findFallbackWeights(subj, grd);
   let count = 0;
 
   const updateNode = db.prepare(`UPDATE kg_nodes SET weight=? WHERE type='knowledge_point' AND subject=? AND title=?`);
@@ -123,7 +383,6 @@ export function seedWeights(subject?: string): number {
   `);
 
   for (const s of updates) {
-    const subj = subject || 'math';
     const node = db.prepare(`SELECT id FROM kg_nodes WHERE type='knowledge_point' AND subject=? AND title=?`).get(subj, s.title) as { id: number } | undefined;
     if (!node) continue;
 
@@ -217,9 +476,11 @@ export function formatWeightGuide(subject: string, grade: string): string {
 if (process.argv[1] && process.argv[1].includes('kg-weights')) {
   const subj = process.argv[2] || 'math';
   const grade = process.argv[3] || '7';
-  const count = seedWeights(subj);
+  const count = seedWeights(subj, grade);
 
-  console.log(`[权重] 已标注 ${count} 个知识点的权重（${subj} ${grade}）`);
+  const key = `${subj}_G${grade}`;
+  const hasDirect = !!WEIGHT_MAP[key];
+  console.log(`[权重] 已标注 ${count} 个知识点的权重（${subj} G${grade}）${hasDirect ? '' : ' [回退数据]'}`);
   console.log('');
 
   const dist = getWeightDistribution(subj, grade);

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, onUpdated, watch, nextTick } from 'vue';
 import Mascot from '@/components/Mascot.vue';
-import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight, Target, TrendingUp } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
 import { streamExamGenerate, streamExamSubmit } from '@/services/chat';
@@ -64,12 +64,18 @@ interface ExamResultsData {
   questionResults: Array<{
     index: number; correct: boolean | null; score: number; maxScore: number;
     reference: string; explanation: string; knowledgePoint?: string; literacy?: string[];
+    detailedExplanation?: string;
   }>;
   tierBreakdown: Array<{ tier: string; correct: number; total: number; percentage: number }>;
   kpBreakdown: Array<{ kp: string; score: number; maxScore: number; percentage: number }>;
   literacyBreakdown: Array<{ literacy: string; score: number; maxScore: number; percentage: number }>;
   analysis?: string;
   proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }>;
+  mistakesCollected?: { count: number; mistakeIds: string[] };
+  recommendation?: {
+    recommendedPractice: Array<{ kpId: number; kpTitle: string; reason: string; suggestedMode: string }>;
+    difficultyAdjustment: { currentLevel: string; suggestedLevel: string };
+  };
 }
 
 const emit = defineEmits<{ (e: 'back'): void; (e: 'refresh'): void }>();
@@ -90,6 +96,7 @@ const answers = ref<Map<number, any>>(new Map());
 const timer = ref(0);
 const timerInterval = ref<ReturnType<typeof setInterval> | null>(null);
 const expandedResults = ref<Set<number>>(new Set());
+const detailedReviewLoading = ref(false);
 const genProgress = ref({ step: 'blueprint' as 'blueprint' | 'write' | 'review' | 'regenerate' | 'complete' | 'analyze', message: '', progress: 0 });
 type GenerationStep = 'kg' | 'blueprint' | 'write' | 'review' | 'regenerate';
 const generationSteps: Array<{ step: GenerationStep }> = [
@@ -427,9 +434,17 @@ const generationDetailText = computed(() => {
   if (step === 'blueprint' && progress < 10) return '正在扫描知识图谱';
   if (step === 'blueprint') return '正在订立大纲';
   if (step === 'write') return '正在编写试题';
-  if (step === 'review' && progress >= 82) return '正在进行复核';
-  if (step === 'review') return '正在审核初稿';
-  if (step === 'regenerate') return '正在修订试题';
+  if (step === 'review') {
+    if (progress >= 90) return '正在进行终审（三轮）';
+    if (progress >= 85) return '正在进行第二轮复核';
+    if (progress >= 80) return '正在进行第一轮复核';
+    return '正在审核初稿';
+  }
+  if (step === 'regenerate') {
+    if (progress >= 91) return '正在第三次修订试题';
+    if (progress >= 86) return '正在第二次修订试题';
+    return '正在修订试题';
+  }
   if (step === 'complete') return '正在整理试卷';
   return '正在准备生成';
 });
@@ -727,6 +742,40 @@ function toggleResult(qIndex: number) {
   scheduleTikzProcessing();
 }
 
+async function requestDetailedExplanation() {
+  if (!session.value || !results.value || detailedReviewLoading.value) return;
+  detailedReviewLoading.value = true;
+  try {
+    const res = await fetch(`/api/exam/${session.value.examId}/detailed-review`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: '请求失败' }));
+      toast.error(err.message || err.error || '生成详解失败');
+      return;
+    }
+    const data = await res.json();
+    const updatedMap = new Map((data.questionResults as Array<{ index: number; detailedExplanation?: string }>)
+      .filter((r) => r.detailedExplanation)
+      .map((r) => [r.index, r.detailedExplanation!]));
+
+    if (updatedMap.size > 0 && results.value) {
+      results.value = {
+        ...results.value,
+        questionResults: results.value.questionResults.map((qr) => {
+          const detail = updatedMap.get(qr.index);
+          return detail ? { ...qr, detailedExplanation: detail } : qr;
+        }),
+      };
+    }
+  } catch (err) {
+    toast.error('生成详解失败: ' + (err instanceof Error ? err.message : String(err)));
+  } finally {
+    detailedReviewLoading.value = false;
+  }
+}
+
 async function loadQuestions(examId: string) {
   try {
     const res = await fetch(`/api/exam/${examId}`, { headers: authHeaders() });
@@ -1005,6 +1054,20 @@ onUnmounted(() => {
           <div class="mt-3 text-xs text-[var(--ink-soft)]">{{ results.totalScore }}/{{ results.maxScore }} 分</div>
         </div>
 
+        <!-- 自动错题收集通知 -->
+        <div
+          v-if="results.mistakesCollected?.count"
+          class="clay clay-glass flex items-center gap-3 px-4 py-3"
+          v-motion
+          :initial="{ opacity: 0, y: 10 }"
+          :enter="{ opacity: 1, y: 0, transition: { delay: 100, duration: 400 } }"
+        >
+          <CheckCircle2 class="h-5 w-5 shrink-0 text-[#18a558]" />
+          <span class="text-sm font-semibold text-[var(--ink)]">
+            已将 <span class="text-[#18a558]">{{ results.mistakesCollected.count }}</span> 道错题自动归入错题本
+          </span>
+        </div>
+
         <!-- 博文综合分析 -->
         <div v-if="results.analysis" class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 120 } }">
           <div class="flex items-start gap-3 p-4">
@@ -1063,6 +1126,47 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <!-- 下一步学习建议 -->
+        <div v-if="results.recommendation?.recommendedPractice?.length" class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 220 } }">
+          <div class="mb-3 flex items-center gap-2">
+            <Target class="h-4 w-4 text-[var(--accent)]" />
+            <h3 class="font-display text-xs font-bold text-[var(--ink-soft)]">下一步学习建议</h3>
+          </div>
+          <div class="space-y-2">
+            <div v-for="(rec, i) in results.recommendation.recommendedPractice" :key="i" class="flex items-start gap-2.5 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5">
+              <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" :class="
+                rec.suggestedMode === 'weakness' ? 'bg-[#fdeaef] text-[#f2557a]' :
+                rec.suggestedMode === 'preview' ? 'bg-[#e6edfa] text-[#2b5fa8]' :
+                'bg-[#fef7e6] text-[#e0a92e]'
+              ">
+                <component :is="rec.suggestedMode === 'weakness' ? AlertTriangle : rec.suggestedMode === 'preview' ? TrendingUp : GraduationCap" class="h-3 w-3" />
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-semibold text-[var(--ink)]">{{ rec.kpTitle }}</span>
+                  <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold" :class="
+                    rec.suggestedMode === 'weakness' ? 'bg-[#fdeaef] text-[#f2557a]' :
+                    rec.suggestedMode === 'preview' ? 'bg-[#e6edfa] text-[#2b5fa8]' :
+                    'bg-[#fef7e6] text-[#e0a92e]'
+                  ">{{ rec.suggestedMode === 'weakness' ? '基础补强' : rec.suggestedMode === 'preview' ? '预习进阶' : '巩固复习' }}</span>
+                </div>
+                <p class="mt-0.5 text-[10px] leading-relaxed text-[var(--ink-soft)]">{{ rec.reason }}</p>
+              </div>
+            </div>
+          </div>
+          <!-- 难度调整建议 -->
+          <div v-if="results.recommendation.difficultyAdjustment?.suggestedLevel !== 'medium'" class="mt-3 flex items-center gap-2 rounded-xl bg-[var(--accent-soft)] px-3 py-2">
+            <TrendingUp class="h-3.5 w-3.5 text-[var(--accent)]" />
+            <span class="text-[10px] font-semibold text-[var(--accent-strong)]">
+              难度建议：
+              {{ results.recommendation.difficultyAdjustment.suggestedLevel === 'hard' ? '近期表现优秀，建议挑战更高难度题目' : '近期得分偏低，建议适当降低难度巩固基础' }}
+            </span>
+          </div>
+          <button class="btn-accent mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 font-display text-xs font-bold">
+            <Sparkles class="h-3.5 w-3.5" /> 开始推荐练习
+          </button>
+        </div>
+
         <!-- Per-Question Details -->
         <div class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 300 } }">
           <div class="border-b border-[var(--line)] px-4 py-3"><h3 class="font-display text-xs font-bold text-[var(--ink-soft)]">逐题详情</h3></div>
@@ -1079,6 +1183,23 @@ onUnmounted(() => {
                 <div class="space-y-2 text-xs">
                   <p><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="text-[var(--ink)] md-body" v-html="renderMarkdown(qr.reference)"></span></p>
                   <div v-if="qr.explanation" class="rounded-xl bg-white p-3 text-[var(--ink)] md-body" v-html="renderMarkdown(qr.explanation)"></div>
+                  <!-- 针对性错误详解 -->
+                  <div v-if="qr.correct === false && !qr.detailedExplanation && !detailedReviewLoading" class="flex items-center gap-2">
+                    <button @click="requestDetailedExplanation" class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white active:scale-[0.97]">
+                      <BrainCircuit class="h-3 w-3" /> 查看详解
+                    </button>
+                    <span class="text-[10px] text-[var(--ink-soft)]">AI 针对你的答案分析错因</span>
+                  </div>
+                  <div v-if="qr.detailedExplanation" class="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-3 text-[var(--ink)] md-body">
+                    <div class="mb-1.5 flex items-center gap-1.5">
+                      <BrainCircuit class="h-3 w-3 text-[var(--accent)]" />
+                      <span class="text-[10px] font-bold text-[var(--accent-strong)]">针对性解析</span>
+                    </div>
+                    <div v-html="renderMarkdown(qr.detailedExplanation)"></div>
+                  </div>
+                  <div v-if="qr.correct === false && detailedReviewLoading && !qr.detailedExplanation" class="flex items-center gap-2 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-[10px] font-semibold text-[var(--accent-strong)]">
+                    <BrainCircuit class="h-3 w-3 animate-pulse" /> 正在生成详解...
+                  </div>
                   <div v-if="qr.knowledgePoint" class="flex flex-wrap gap-1.5">
                     <span class="inline-flex items-center gap-1 rounded-full bg-[#e6edfa] px-2 py-0.5 text-[10px] font-semibold text-[#2b5fa8]"><GraduationCap class="h-2.5 w-2.5" />{{ qr.knowledgePoint }}</span>
                     <span v-for="lit in qr.literacy" :key="lit" class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2 py-0.5 text-[10px] font-semibold text-[#7c3aae]"><BrainCircuit class="h-2.5 w-2.5" />{{ lit }}</span>

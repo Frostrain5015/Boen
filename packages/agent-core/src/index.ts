@@ -16,5 +16,6 @@ export {
   fillBlankSchema,
   trueFalseSchema,
   shortAnswerSchema,
+  fuzzyMatchBlankDetailed,
 } from './quiz/index.js';
-export type { ShortAnswerGraderParams, ShortAnswerGraderResult, ShortAnswerGrader, GenerateQuestionsResult } from './quiz/index.js';
+export type { ShortAnswerGraderParams, ShortAnswerGraderResult, ShortAnswerGrader, GenerateQuestionsResult, BlankMatchResult } from './quiz/index.js';

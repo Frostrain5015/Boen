@@ -12,22 +12,23 @@
  */
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { SystemMessage } from '@langchain/core/messages';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint, ExamQualityReport } from '@boen/shared';
-import { gradeAnswer, multipleChoiceSchema, fillBlankSchema, trueFalseSchema, shortAnswerSchema } from '@boen/agent-core';
+import { gradeAnswer, multipleChoiceSchema, fillBlankSchema, trueFalseSchema, shortAnswerSchema, fuzzyMatchBlankDetailed } from '@boen/agent-core';
 import type { ShortAnswerGrader } from '@boen/agent-core';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
-import { writeFileSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { writeFileSync, readFileSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
 import { retrieveCurriculum } from './curriculum.js';
 import { retrieveMistakeStyleSamples } from './mistakes.js';
-import { withConcurrencyLimit } from './concurrency.js';
+import { embedTexts, cosineSim } from './embeddings.js';
+import { withConcurrencyLimit, Semaphore } from './concurrency.js';
 import { stepBlueprintArchitect, flattenBlueprint, type WriteTask } from './exam-blueprint.js';
 import { reviewBoard, regenerateQuestions } from './exam-reviewers.js';
 import { questionWriterPrompt } from './exam-prompts.js';
@@ -408,6 +409,39 @@ function tikzSourceTexts(q: ExamQuestion): string[] {
   ].filter((text): text is string => typeof text === 'string' && text.length > 0);
 }
 
+// ── TikZ 异步渲染（全局最多 3 路并发，避免 xelatex 占满 CPU） ──
+const tikzRenderPool = new Semaphore(3);
+
+function execFileAsync(cmd: string, args: string[], options: { timeout: number; cwd?: string }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(cmd, args, { ...options, encoding: 'utf-8' }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout ?? '');
+    });
+  });
+}
+
+async function renderTikzBlockAsync(texCode: string): Promise<string | null> {
+  return tikzRenderPool.run(async () => {
+    const tmpDir = mkdtempSync(join(tmpdir(), 'tikz-'));
+    try {
+      const texPath = join(tmpDir, 'tikz.tex');
+      const pdfPath = join(tmpDir, 'tikz.pdf');
+      const svgPath = join(tmpDir, 'tikz.svg');
+      writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${texCode}\\end{document}`, 'utf-8');
+      await execFileAsync('xelatex', ['-no-shell-escape', '-interaction=nonstopmode', `-output-directory=${tmpDir}`, texPath], { timeout: 30000 });
+      if (!existsSync(pdfPath)) return null;
+      await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `-o=${svgPath}`, pdfPath], { timeout: 15000 });
+      if (!existsSync(svgPath)) return null;
+      return readFileSync(svgPath, 'utf-8') || null;
+    } catch {
+      return null;
+    } finally {
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理 */ }
+    }
+  });
+}
+
 /**
  * 重构后的考试生成流水线：
  *   1. 蓝图架构师（stepBlueprintArchitect）— bindTools 结构化输出
@@ -485,6 +519,7 @@ export async function generateExam(
     await onProgress?.({ step: 'review', message: 'review', progress: 76 });
 
     const maxRegenerationRounds = 3;
+    const regenHistory: number[] = [regenCount]; // 追踪每轮未通过数，用于趋势检测
     for (let round = 1; regenCount > 0 && round <= maxRegenerationRounds; round++) {
       await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(96, 78 + round * 5) });
       const crossGroupContext = buildCrossGroupContext(questions);
@@ -504,13 +539,32 @@ export async function generateExam(
       const nextReview = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
       scores = nextReview.scores;
       regenCount = scores.filter(s => s.needsRegeneration).length;
+      regenHistory.push(regenCount);
+
       if (regenCount > 0) {
         console.warn(`[exam] 第 ${round} 轮重出后仍有 ${regenCount} 题未通过质量审核`);
+      }
+
+      // 趋势检测：连续两轮未改善则提前退出，避免无效消耗 token
+      if (regenHistory.length >= 3) {
+        const prev = regenHistory[regenHistory.length - 2];
+        const curr = regenHistory[regenHistory.length - 1];
+        if (curr >= prev) {
+          console.warn(`[exam] 重出趋势无改善（${prev} → ${curr}），提前退出循环`);
+          break;
+        }
       }
     }
 
     const stillFailing = scores.filter(s => s.needsRegeneration);
     for (const s of stillFailing) qualityWarnings.add(s.index);
+
+    // 全局质量门禁：警告题占比 > 30% 时标记整卷质量待确认
+    const warningRatio = qualityWarnings.size / Math.max(questions.length, 1);
+    if (warningRatio > 0.3) {
+      console.warn(`[exam] ⚠ 质量门禁触发：${qualityWarnings.size}/${questions.length} 题（${Math.round(warningRatio * 100)}%）存在质量警告，建议人工复核`);
+    }
+
     const qualityReport: ExamQualityReport = {
       scores,
       regeneratedIndices: [...regeneratedIndices].sort((a, b) => a - b),
@@ -545,27 +599,20 @@ export async function generateExam(
     }
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
 
-    // ─── TikZ 预渲染：出题阶段直接交给服务器 LaTeX 引擎编译 ────
+    // ─── TikZ 预渲染：异步渲染，全局最多 3 路并发 ────
     {
       const tikzQS = questions.filter(q => tikzSourceTexts(q).some(hasTikzBlocks));
       if (tikzQS.length > 0) {
         await Promise.all(tikzQS.map(async (q) => {
           const svgs: Record<string, string> = {};
           const blocks = tikzSourceTexts(q).flatMap((text) => extractTikzBlocks(text));
-          for (const block of blocks) {
+          const renderTasks = blocks.map(async (block) => {
             const hash = simpleHash(block.code);
-            if (svgs[hash]) continue;
-            const tmpDir = mkdtempSync(join(tmpdir(), 'tikz-'));
-            try {
-              const texPath = join(tmpDir, 'tikz.tex'), pdfPath = join(tmpDir, 'tikz.pdf'), svgPath = join(tmpDir, 'tikz.svg');
-              writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${block.code}\\end{document}`, 'utf-8');
-              execSync(`xelatex -no-shell-escape -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
-              if (existsSync(pdfPath)) {
-                execSync(`dvisvgm --pdf --no-fonts -o "${svgPath}" "${pdfPath}"`, { timeout: 15000, stdio: 'pipe' });
-                if (existsSync(svgPath)) { const svg = execSync(`cat "${svgPath}"`, { encoding: 'utf-8', timeout: 5000 }); if (svg) svgs[hash] = svg; }
-              }
-            } catch { /* 单个 TikZ 编译失败不影响整卷 */ } finally { try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理 */ } }
-          }
+            if (svgs[hash]) return;
+            const svg = await renderTikzBlockAsync(block.code);
+            if (svg) svgs[hash] = svg;
+          });
+          await Promise.all(renderTasks);
           if (Object.keys(svgs).length) q.tikzSvgs = svgs;
         }));
       }
@@ -811,47 +858,72 @@ function buildWeightGuideForPrompt(dist: any[]): string {
 
 // ── 简答题 LLM 评分 ────────────────────────────
 
-const SHORT_ANSWER_GRADING_PROMPT = `你是一位严谨的评分老师。请根据参考答案和评分要点，对学生的答案进行评分。
-
-【题目】
-{stem}
-【参考答案】
-{referenceAnswer}
-【评分要点】
-{keyPoints}
-【满分】
-{maxScore} 分
-
-【学生答案】
-{userAnswer}
+/** 评分标准（SystemMessage，不含任何用户内容） */
+const SHORT_ANSWER_GRADING_SYSTEM = `你是一位严谨的评分老师。请根据参考答案和评分要点，对学生的答案进行评分。
 
 评分规则：
-1. 学生答案与参考答案语义一致，或覆盖全部评分要点 → 满分
-2. 只覆盖部分要点 → 按比例给分（如 2 个要点答对 1 个则给一半分）
+1. 学生答案与参考答案语义一致，或覆盖全部评分要点 → 满分（score = 1）
+2. 只覆盖部分要点 → 按比例给分（如 2 个要点答对 1 个则 score = 0.5）
 3. 完全不相关或留空白 → 0 分
 4. 语言类题目（如英语）：只要语义和用法正确即可，不要求措辞完全一致
 5. 数学/科学类：过程正确但最终答案有小错可酌情扣分
 
-请直接输出 JSON（不要 markdown 代码块标记），格式如下：
-{"correct": true/false, "score": 分数, "explanation": "用两三句话说明扣分或满分理由，引导学生"}`;
+请输出纯净 JSON，格式如下：
+{"correct": true/false, "score": 0到1之间的数字, "explanation": "用两三句话说明扣分或满分理由，引导学生"}`;
 
-/** 构建基于 LLM 的简答题评分器 */
+/** 批量评分系统 prompt（一次评多题） */
+const BATCH_GRADING_SYSTEM = `你是一位严谨的评分老师。请根据每道题的参考答案和评分要点，对学生的答案逐一评分。
+
+评分规则：
+1. 学生答案与参考答案语义一致，或覆盖全部评分要点 → 满分（score = 1）
+2. 只覆盖部分要点 → 按比例给分（如 2 个要点答对 1 个则 score = 0.5）
+3. 完全不相关或留空白 → 0 分
+4. 语言类题目（如英语）：只要语义和用法正确即可，不要求措辞完全一致
+5. 数学/科学类：过程正确但最终答案有小错可酌情扣分
+
+请输出纯净 JSON，格式如下：
+{"results": [{"questionIndex": 0, "correct": true/false, "score": 0到1之间的数字, "explanation": "理由"}]}`;
+
+/** 对学生答案做基础清洗：去除已知注入模式关键词 */
+function sanitizeUserAnswer(raw: string): string {
+  let text = String(raw ?? '').trim();
+  if (!text) return '（未作答）';
+  // 去除常见的 prompt injection 模式（defense-in-depth）
+  text = text
+    .replace(/<\s*\/?\s*system\s*>/gi, '')
+    .replace(/ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/gi, '')
+    .replace(/忽略\s*(以上|之前|上面)\s*(所有\s*)?(指令|提示|规则|要求)/g, '')
+    .replace(/给\s*(我\s*)?(满分|100分|全对)/g, '')
+    .replace(/return\s*\{?\s*"?\s*score\s*"?\s*:\s*1/gi, '');
+  return text || '（未作答）';
+}
+
+/** 构建单题评分的 HumanMessage 内容 */
+function buildGradingHumanMessage(params: { stem: string; referenceAnswer?: string | null; keyPoints?: string[] | null; maxScore: number; userAnswer: string }): string {
+  return [
+    `【题目】${params.stem}`,
+    `【参考答案】${params.referenceAnswer ?? '（未提供）'}`,
+    `【评分要点】${params.keyPoints?.length ? params.keyPoints.join('、') : '（未提供）'}`,
+    `【满分】${params.maxScore} 分`,
+    '',
+    `【学生答案】`,
+    sanitizeUserAnswer(params.userAnswer),
+  ].join('\n');
+}
+
+/** 构建基于 LLM 的简答题评分器（单题模式，JSON Output + Injection 防御） */
 export function createShortAnswerGrader(model: BaseChatModel): ShortAnswerGrader {
   return async (params) => {
-    const prompt = SHORT_ANSWER_GRADING_PROMPT
-      .replace('{stem}', params.stem)
-      .replace('{referenceAnswer}', params.referenceAnswer ?? '（未提供）')
-      .replace('{keyPoints}', params.keyPoints?.length ? params.keyPoints.join('、') : '（未提供）')
-      .replace('{maxScore}', String(params.maxScore))
-      .replace('{userAnswer}', params.userAnswer);
-
     try {
-      const response = await model.invoke([new SystemMessage(prompt)]);
-      const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
-      // 尝试提取 JSON
-      const jsonMatch = content.match(/\{[\s\S]*"correct"[\s\S]*"score"[\s\S]*"explanation"[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : content;
-      const parsed = JSON.parse(jsonStr);
+      const response = await model.invoke(
+        [
+          new SystemMessage(SHORT_ANSWER_GRADING_SYSTEM),
+          new HumanMessage(buildGradingHumanMessage(params)),
+        ],
+        { response_format: { type: 'json_object' } } as any,
+      );
+      const content = typeof response.content === 'string' ? response.content : '';
+      const parsed = JSON.parse(content);
       return {
         correct: Boolean(parsed.correct),
         score: Math.max(0, Math.min(1, Number(parsed.score))),
@@ -859,10 +931,156 @@ export function createShortAnswerGrader(model: BaseChatModel): ShortAnswerGrader
       };
     } catch (err) {
       console.error('简答题 LLM 评分失败:', err instanceof Error ? err.message : String(err));
-      // 降级：不给分但留评语
       return { correct: false, score: 0, explanation: '评分服务暂时不可用，请老师人工批阅。' };
     }
   };
+}
+
+/** 批量简答题参数 */
+interface BatchGradeItem {
+  questionIndex: number;
+  stem: string;
+  referenceAnswer?: string | null;
+  keyPoints?: string[] | null;
+  maxScore: number;
+  userAnswer: string;
+}
+
+/** 批量评分结果 */
+interface BatchGradeResult {
+  questionIndex: number;
+  correct: boolean;
+  score: number;
+  explanation: string;
+}
+
+/**
+ * 批量简答题 LLM 评分（一次调用评多题，JSON Output + Injection 防御）。
+ * 如果批量失败，回退到逐题评分。
+ */
+export async function batchGradeShortAnswers(
+  model: BaseChatModel,
+  items: BatchGradeItem[],
+): Promise<BatchGradeResult[]> {
+  if (items.length === 0) return [];
+  if (items.length === 1) {
+    // 单题直接走单题模式
+    const grader = createShortAnswerGrader(model);
+    const result = await grader(items[0]);
+    return [{ questionIndex: items[0].questionIndex, ...result }];
+  }
+
+  // 构造批量评分的 HumanMessage
+  const questionList = items.map((item, i) => ({
+    questionIndex: item.questionIndex,
+    题目: item.stem,
+    参考答案: item.referenceAnswer ?? '（未提供）',
+    评分要点: item.keyPoints?.length ? item.keyPoints.join('、') : '（未提供）',
+    满分: item.maxScore,
+    学生答案: sanitizeUserAnswer(item.userAnswer),
+  }));
+
+  const humanContent = `请对以下 ${items.length} 道题逐一评分，输出 JSON 数组包含每道题的结果：\n\n${JSON.stringify(questionList, null, 2)}`;
+
+  try {
+    const response = await model.invoke(
+      [
+        new SystemMessage(BATCH_GRADING_SYSTEM),
+        new HumanMessage(humanContent),
+      ],
+      { response_format: { type: 'json_object' } } as any,
+    );
+    const content = typeof response.content === 'string' ? response.content : '';
+    const parsed = JSON.parse(content);
+    const results: BatchGradeResult[] = Array.isArray(parsed?.results) ? parsed.results : [];
+
+    // 校验：长度必须匹配，不匹配则回退到逐题
+    if (results.length !== items.length) {
+      console.warn(`[batchGrade] 返回数量不匹配（期望 ${items.length}，实际 ${results.length}），回退到逐题评分`);
+      return fallbackBatchGrade(model, items);
+    }
+
+    return results.map((r) => ({
+      questionIndex: Number(r.questionIndex),
+      correct: Boolean(r.correct),
+      score: Math.max(0, Math.min(1, Number(r.score))),
+      explanation: String(r.explanation ?? ''),
+    }));
+  } catch (err) {
+    console.warn('[batchGrade] 批量评分失败，回退到逐题评分:', err instanceof Error ? err.message : String(err));
+    return fallbackBatchGrade(model, items);
+  }
+}
+
+/** 批量评分回退：逐题调用 */
+async function fallbackBatchGrade(model: BaseChatModel, items: BatchGradeItem[]): Promise<BatchGradeResult[]> {
+  const grader = createShortAnswerGrader(model);
+  const results: BatchGradeResult[] = [];
+  for (const item of items) {
+    const r = await grader(item);
+    results.push({ questionIndex: item.questionIndex, ...r });
+  }
+  return results;
+}
+
+// ── 填空题 Level 3 LLM 语义判定 ────────────────────────────
+
+interface BlankLevel3Item {
+  questionIndex: number;
+  blankIndex: number;
+  userAnswer: string;
+  acceptedAnswers: string[];
+}
+
+/**
+ * 填空题 Level 3：对 Level 2 规范化匹配未通过的填空题，批量提交给 LLM 做语义等价判定。
+ * 仅对未通过的空白触发，不会成为常态开销。
+ */
+async function batchCheckBlanksLevel3(
+  model: BaseChatModel,
+  items: BlankLevel3Item[],
+): Promise<Map<string, boolean>> {
+  const resultMap = new Map<string, boolean>();
+  if (items.length === 0) return resultMap;
+
+  const questionList = items.map((item) => ({
+    questionIndex: item.questionIndex,
+    blankIndex: item.blankIndex,
+    studentAnswer: item.userAnswer || '（未作答）',
+    acceptedAnswers: item.acceptedAnswers,
+  }));
+
+  const systemPrompt = `你是一位严谨的阅卷老师。请判断学生的填空题答案是否与标准答案语义等价。
+判断规则：
+1. 数学等价：1/2 = 0.5，(x+1)² = x²+2x+1，π ≈ 3.14 等均视为正确
+2. 中文同义词：光合作用 ≈ 光合效应 等同义表达视为正确
+3. 单位等价：5cm = 5厘米 视为正确
+4. 表达差异但语义一致视为正确
+5. 完全无关、意义相反或明显错误的答案视为不正确
+
+请输出 JSON：{"results": [{"questionIndex": 0, "blankIndex": 0, "match": true, "reason": "简短理由"}]}`;
+
+  const humanContent = `请判断以下 ${items.length} 个填空题答案是否与标准答案语义等价：\n\n${JSON.stringify(questionList, null, 2)}`;
+
+  try {
+    const response = await model.invoke(
+      [new SystemMessage(systemPrompt), new HumanMessage(humanContent)],
+      { response_format: { type: 'json_object' } } as any,
+    );
+    const content = typeof response.content === 'string' ? response.content : '';
+    const parsed = JSON.parse(content);
+    const results: Array<{ questionIndex: number; blankIndex: number; match: boolean }> =
+      Array.isArray(parsed?.results) ? parsed.results : [];
+
+    for (const r of results) {
+      const key = `${r.questionIndex}:${r.blankIndex}`;
+      resultMap.set(key, Boolean(r.match));
+    }
+  } catch (err) {
+    console.warn('[blankLevel3] LLM 语义判定失败，保持原结果:', err instanceof Error ? err.message : String(err));
+  }
+
+  return resultMap;
 }
 
 // ── 考试综合分析 ──────────────────────────────
@@ -935,38 +1153,177 @@ export async function gradeExam(
   model?: BaseChatModel,
   examInfo?: { subject?: string; grade?: string },
   onProgress?: ExamGradingProgressFn,
+  options?: { examId?: string; existingResults?: ExamQuestionResult[] },
 ): Promise<ExamResults> {
-  await onProgress?.({ step: 'grade', message: 'grade', progress: 12 });
-  const answerMap = new Map(answers.map(a => [a.questionIndex, a.answer]));
-  const shortAnswerGrader = model ? createShortAnswerGrader(model) : undefined;
+  // ── 断点续判：构建已判题目集合，计算进度偏移 ──
+  const existingResultsMap = new Map<number, ExamQuestionResult>();
+  if (options?.existingResults) {
+    for (const r of options.existingResults) existingResultsMap.set(r.index, r);
+  }
+  const existingCount = existingResultsMap.size;
+  const totalQuestions = questions.length;
+  // 进度偏移：已判题目占总题数的比例 × 58（客观+简答评分阶段的进度上限）
+  const resumeProgressOffset = totalQuestions > 0 ? Math.round((existingCount / totalQuestions) * 58) : 0;
+  const initialProgress = Math.max(12, 12 + resumeProgressOffset);
 
-  const questionResults: ExamQuestionResult[] = await Promise.all(questions.map(async (q) => {
+  await onProgress?.({ step: 'grade', message: 'grade', progress: initialProgress });
+  const answerMap = new Map(answers.map(a => [a.questionIndex, a.answer]));
+
+  // ── 客观题并行评分（跳过断点已判题目） ────────────────────────────
+  const objectiveQuestions = questions.filter(q => q.type !== 'short_answer' && !existingResultsMap.has(q.index));
+  const shortAnswerQuestions = questions.filter(q => q.type === 'short_answer' && !existingResultsMap.has(q.index));
+
+  const objectiveResults: ExamQuestionResult[] = await Promise.all(objectiveQuestions.map(async (q) => {
     const answer = answerMap.get(q.index);
     if (!answer) {
       return { index: q.index, correct: false, score: 0, maxScore: q.points, reference: '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId, literacy: normalizeLiteracies(q.literacies) };
     }
-
     const toolName = questionTypeToToolName(q.type);
     const rawArgs = buildRawArgs(q);
-    const { result } = await gradeAnswer(toolName, rawArgs, answer, shortAnswerGrader);
+    const { result } = await gradeAnswer(toolName, rawArgs, answer);
 
-    // 简答题 + 填空题：支持按比例计分（部分正确给部分分）
-    const scaledScore = (q.type === 'short_answer' || q.type === 'fill_blank') && result.maxScore > 0
+    // 填空题：使用详细匹配追踪 Level 2 misses（供 Level 3 LLM 语义判定）
+    let blankLevel2Misses: Array<{ blankIndex: number; userAnswer: string; acceptedAnswers: string[] }> | undefined;
+    if (q.type === 'fill_blank' && answer.type === 'fill_blank') {
+      const fillArgs = fillBlankSchema.parse(rawArgs);
+      blankLevel2Misses = [];
+      const detailedPerBlank: boolean[] = [];
+      for (let bi = 0; bi < fillArgs.blanks.length; bi++) {
+        const matchResult = fuzzyMatchBlankDetailed(answer.answers[bi] ?? '', fillArgs.blanks[bi].acceptedAnswers);
+        detailedPerBlank.push(matchResult.matched);
+        if (!matchResult.matched && matchResult.level === 'miss') {
+          blankLevel2Misses.push({ blankIndex: bi, userAnswer: answer.answers[bi] ?? '', acceptedAnswers: fillArgs.blanks[bi].acceptedAnswers });
+        }
+      }
+      // 用详细匹配结果覆盖原始 perBlank
+      const score = detailedPerBlank.filter(Boolean).length;
+      result.perBlank = detailedPerBlank;
+      result.score = score;
+      result.correct = detailedPerBlank.every(Boolean);
+      (result as any).__blankLevel2Misses = blankLevel2Misses;
+    }
+
+    const scaledScore = q.type === 'fill_blank' && result.maxScore > 0
       ? Math.round((result.score / result.maxScore) * q.points)
       : result.correct === true ? q.points : 0;
-
     return {
-      index: q.index,
-      correct: result.correct,
-      score: scaledScore,
-      maxScore: q.points,
-      reference: result.reference,
-      explanation: result.explanation,
-      knowledgePoint: q.knowledgePoint,
-      knowledgePointId: q.knowledgePointId,
+      index: q.index, correct: result.correct, score: scaledScore, maxScore: q.points,
+      reference: result.reference, explanation: result.explanation,
+      knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId,
       literacy: normalizeLiteracies(q.literacies),
+      ...(blankLevel2Misses ? { __blankLevel2Misses: blankLevel2Misses } : {}),
     };
   }));
+
+  // ── 填空题 Level 3 LLM 语义判定（仅对 Level 2 未通过的空白） ──
+  if (model) {
+    const level3Items: BlankLevel3Item[] = [];
+    for (const r of objectiveResults) {
+      const misses = (r as any).__blankLevel2Misses as Array<{ blankIndex: number; userAnswer: string; acceptedAnswers: string[] }> | undefined;
+      if (misses?.length) {
+        for (const m of misses) {
+          level3Items.push({ questionIndex: r.index, blankIndex: m.blankIndex, userAnswer: m.userAnswer, acceptedAnswers: m.acceptedAnswers });
+        }
+      }
+    }
+    if (level3Items.length > 0) {
+      const level3Results = await batchCheckBlanksLevel3(model, level3Items);
+      // 根据 Level 3 结果更新分数
+      for (const r of objectiveResults) {
+        const q = questions.find(x => x.index === r.index);
+        if (!q || q.type !== 'fill_blank') continue;
+        const misses = (r as any).__blankLevel2Misses as Array<{ blankIndex: number }> | undefined;
+        if (!misses?.length) continue;
+        const totalBlanks = q.blanks?.length ?? q.blankCount ?? 1;
+        let correctedCount = 0;
+        for (let bi = 0; bi < totalBlanks; bi++) {
+          const wasMiss = misses.find(m => m.blankIndex === bi);
+          if (wasMiss) {
+            const key = `${r.index}:${bi}`;
+            if (level3Results.get(key)) correctedCount++;
+          } else {
+            correctedCount++; // Level 1/2 passed
+          }
+        }
+        const newScaledScore = Math.round((correctedCount / totalBlanks) * r.maxScore);
+        if (newScaledScore > r.score) {
+          r.score = newScaledScore;
+          r.correct = correctedCount === totalBlanks;
+          console.log(`[blankLevel3] Q${r.index + 1} 填空题 Level 3 修正: ${r.score}/${r.maxScore}`);
+        }
+      }
+    }
+    // 清理临时字段
+    for (const r of objectiveResults) delete (r as any).__blankLevel2Misses;
+  } else {
+    for (const r of objectiveResults) delete (r as any).__blankLevel2Misses;
+  }
+
+  // ── 客观题批改完成，保存断点 ──
+  if (options?.examId && objectiveResults.length > 0) {
+    const checkpointSoFar: ExamQuestionResult[] = [
+      ...existingResultsMap.values(),
+      ...objectiveResults,
+    ];
+    saveGradingCheckpoint(options.examId, checkpointSoFar);
+  }
+
+  // ── 简答题批量评分（一次 LLM 调用） ──────────────
+  const shortAnswerResults: ExamQuestionResult[] = [];
+  if (shortAnswerQuestions.length > 0 && model) {
+    const batchItems: BatchGradeItem[] = shortAnswerQuestions.map(q => ({
+      questionIndex: q.index,
+      stem: q.stem,
+      referenceAnswer: q.referenceAnswer,
+      keyPoints: q.keyPoints,
+      maxScore: q.points,
+      userAnswer: (() => {
+        const a = answerMap.get(q.index);
+        return a && a.type === 'short_answer' ? a.text : '';
+      })(),
+    }));
+
+    const batchResults = await batchGradeShortAnswers(model, batchItems);
+    const resultMap = new Map(batchResults.map(r => [r.questionIndex, r]));
+
+    for (const q of shortAnswerQuestions) {
+      const answer = answerMap.get(q.index);
+      const gr = resultMap.get(q.index);
+      if (!answer || !gr) {
+        shortAnswerResults.push({ index: q.index, correct: false, score: 0, maxScore: q.points, reference: q.referenceAnswer ?? '', explanation: q.explanation || '', knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId, literacy: normalizeLiteracies(q.literacies) });
+      } else {
+        const scaledScore = Math.round((gr.score / 1) * q.points);
+        shortAnswerResults.push({
+          index: q.index, correct: gr.correct, score: scaledScore, maxScore: q.points,
+          reference: q.referenceAnswer ?? '', explanation: gr.explanation || q.explanation || '',
+          knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId,
+          literacy: normalizeLiteracies(q.literacies),
+        });
+      }
+    }
+  } else {
+    // 无模型时简答题不给分
+    for (const q of shortAnswerQuestions) {
+      shortAnswerResults.push({ index: q.index, correct: null as any, score: 0, maxScore: q.points, reference: q.referenceAnswer ?? '', explanation: q.explanation || '评分服务暂时不可用，请老师人工批阅。', knowledgePoint: q.knowledgePoint, knowledgePointId: q.knowledgePointId, literacy: normalizeLiteracies(q.literacies) });
+    }
+  }
+
+  // ── 简答题批改完成，保存断点 ──
+  if (options?.examId && shortAnswerResults.length > 0) {
+    const checkpointAll: ExamQuestionResult[] = [
+      ...existingResultsMap.values(),
+      ...objectiveResults,
+      ...shortAnswerResults,
+    ];
+    saveGradingCheckpoint(options.examId, checkpointAll);
+  }
+
+  // 合并结果并按原始题目顺序排列（含断点已有结果）
+  const allResultsMap = new Map<number, ExamQuestionResult>();
+  for (const r of existingResultsMap.values()) allResultsMap.set(r.index, r);
+  for (const r of objectiveResults) allResultsMap.set(r.index, r);
+  for (const r of shortAnswerResults) allResultsMap.set(r.index, r);
+  const questionResults = questions.map(q => allResultsMap.get(q.index)!).filter(Boolean);
 
   await onProgress?.({ step: 'grade', message: 'grade', progress: 58 });
 
@@ -975,6 +1332,12 @@ export async function gradeExam(
   const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
   const grade = percentage >= 90 ? '优秀' : percentage >= 75 ? '良好' : percentage >= 60 ? '及格' : '需努力';
+
+  // ── 判分结果交叉校验 ────────────────────────
+  const audit = auditGradingResults(questions, questionResults);
+  if (!audit.passed) {
+    console.warn('[gradeAudit] 判分校验发现问题:', audit.issues.join('；'));
+  }
 
   const examResults: ExamResults = {
     totalScore, maxScore, percentage, grade,
@@ -999,6 +1362,49 @@ export async function gradeExam(
   }
 
   return examResults;
+}
+
+/** 判分结果交叉校验：检查总分范围、逐题分数、客观题确定性、简答题合理性 */
+function auditGradingResults(questions: ExamQuestion[], results: ExamQuestionResult[]): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+
+  // 1. 总分范围校验
+  const totalScore = results.reduce((s, r) => s + r.score, 0);
+  const maxScore = results.reduce((s, r) => s + r.maxScore, 0);
+  if (totalScore > maxScore) issues.push(`总分 ${totalScore} 超过满分 ${maxScore}`);
+  if (totalScore < 0) issues.push(`总分 ${totalScore} 为负`);
+
+  // 2. 逐题分数范围校验
+  for (const r of results) {
+    if (r.score < 0 || r.score > r.maxScore) {
+      issues.push(`第${r.index + 1}题分数 ${r.score}/${r.maxScore} 越界`);
+    }
+  }
+
+  // 3. 客观题确定性校验
+  for (const q of questions) {
+    if (q.type === 'multiple_choice' || q.type === 'true_false') {
+      const r = results.find(x => x.index === q.index);
+      if (r) {
+        const expected = r.correct === true ? q.points : 0;
+        if (r.score !== expected) {
+          issues.push(`第${q.index + 1}题(${q.type})确定性评分不一致: expected ${expected}, got ${r.score}`);
+        }
+      }
+    }
+  }
+
+  // 4. 简答题评分合理性
+  for (const q of questions) {
+    if (q.type === 'short_answer') {
+      const r = results.find(x => x.index === q.index);
+      if (r && r.correct === true && r.maxScore > 0 && r.score < r.maxScore * 0.8) {
+        issues.push(`第${q.index + 1}题标记correct=true但得分率仅${Math.round(r.score / r.maxScore * 100)}%`);
+      }
+    }
+  }
+
+  return { passed: issues.length === 0, issues };
 }
 
 function computeTierBreakdown(questions: ExamQuestion[], results: ExamQuestionResult[]): Array<{ tier: string; correct: number; total: number; percentage: number }> {
@@ -1084,6 +1490,235 @@ function buildRawArgs(q: ExamQuestion): Record<string, unknown> {
   return base;
 }
 
+// ── 针对性错误详解（按需触发） ────────────────────────────
+
+/**
+ * 为答错的客观题生成针对性错误分析（仅在用户请求"查看详解"时触发）。
+ * 不增加默认判分流程的延迟。
+ */
+export async function generateDetailedReview(
+  model: BaseChatModel,
+  questions: ExamQuestion[],
+  answers: Array<{ questionIndex: number; answer: AnswerPayload }>,
+  results: ExamResults,
+): Promise<ExamQuestionResult[]> {
+  // Collect wrong objective questions (multiple_choice, fill_blank, true_false)
+  const wrongObjectives = results.questionResults.filter(
+    (qr) => qr.correct === false && qr.maxScore > 0,
+  );
+
+  if (wrongObjectives.length === 0) return results.questionResults;
+
+  const answerMap = new Map(answers.map((a) => [a.questionIndex, a.answer]));
+
+  // Build per-question context for the LLM
+  const questionContexts = wrongObjectives.map((qr) => {
+    const q = questions.find((x) => x.index === qr.index);
+    const answer = answerMap.get(qr.index);
+    if (!q) return null;
+
+    let studentAnswerText = '（未作答）';
+    if (answer) {
+      if (answer.type === 'multiple_choice') studentAnswerText = (answer as any).selectedKeys?.join(', ') ?? '（未作答）';
+      else if (answer.type === 'fill_blank') studentAnswerText = (answer as any).answers?.join(' / ') ?? '（未作答）';
+      else if (answer.type === 'true_false') studentAnswerText = (answer as any).value ? '正确' : '错误';
+    }
+
+    const typeLabel: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题' };
+
+    return {
+      index: qr.index,
+      type: typeLabel[q.type] ?? q.type,
+      stem: q.stem?.slice(0, 300),
+      options: q.type === 'multiple_choice' ? q.options?.map((o) => `${o.key}. ${o.text}`).join('；') : undefined,
+      correctAnswer: qr.reference || q.explanation?.slice(0, 100),
+      studentAnswer: studentAnswerText,
+      knowledgePoint: q.knowledgePoint,
+    };
+  }).filter(Boolean);
+
+  if (questionContexts.length === 0) return results.questionResults;
+
+  // Only include objective question types
+  const objectiveContexts = questionContexts.filter((ctx) =>
+    ctx!.type === '选择题' || ctx!.type === '填空题' || ctx!.type === '判断题',
+  );
+
+  if (objectiveContexts.length === 0) return results.questionResults;
+
+  const systemPrompt = `你是一位耐心的老师。请针对学生的具体错误，解释为什么答案不对以及正确答案是什么。
+
+对于每道错题：
+1. 先指出学生答案的具体错误
+2. 解释正确思路
+3. 给出学习建议
+
+输出 JSON：{"results": [{"index": 0, "explanation": "针对性解析"}]}`;
+
+  const humanContent = `请分析以下 ${objectiveContexts.length} 道错题：\n\n${JSON.stringify(objectiveContexts, null, 2)}`;
+
+  try {
+    const response = await model.invoke(
+      [new SystemMessage(systemPrompt), new HumanMessage(humanContent)],
+      { response_format: { type: 'json_object' } } as any,
+    );
+    const content = typeof response.content === 'string' ? response.content : '';
+    const parsed = JSON.parse(content);
+    const detailedResults: Array<{ index: number; explanation: string }> =
+      Array.isArray(parsed?.results) ? parsed.results : [];
+
+    // Merge detailed explanations into the existing questionResults
+    const resultMap = new Map(detailedResults.map((r) => [r.index, r.explanation]));
+    return results.questionResults.map((qr) => {
+      const explanation = resultMap.get(qr.index);
+      if (explanation) {
+        return { ...qr, detailedExplanation: String(explanation) };
+      }
+      return qr;
+    });
+  } catch (err) {
+    console.warn('[detailedReview] LLM 详解生成失败:', err instanceof Error ? err.message : String(err));
+    return results.questionResults;
+  }
+}
+
+// ── 自动错题收集 ─────────────────────────────────
+
+/**
+ * 考试提交后，将失分严重的题目（得分率 < 60%）自动归入错题本。
+ * 不需要 OCR，因为题目数据已在系统中。
+ * 用 LLM 简要分析错因，映射知识点，写入 mistake_items + mistake_kp_map。
+ */
+async function autoCollectMistakes(
+  userId: string,
+  examId: string,
+  questions: ExamQuestion[],
+  results: ExamResults,
+  subject: string,
+  grade: string,
+  model?: BaseChatModel,
+): Promise<{ count: number; mistakeIds: string[] }> {
+  const mistakeIds: string[] = [];
+
+  // 筛选得分率 < 60% 的题目
+  const penalized = results.questionResults.filter(
+    (qr) => qr.maxScore > 0 && qr.score / qr.maxScore < 0.6,
+  );
+  if (penalized.length === 0) return { count: 0, mistakeIds };
+
+  // LLM 简要分析错因（单次批量调用）
+  let analyses: Array<{ errorType: string; errorReason: string }> = [];
+  if (model && penalized.length > 0) {
+    try {
+      const prompt = [
+        '请简要分析以下考试错题的错误类型和原因。',
+        '输出 JSON 数组，每个元素包含 errorType 和 errorReason。',
+        `errorType 可选值：概念混淆 | 计算失误 | 审题遗漏 | 步骤跳步 | 表达不完整 | 其他`,
+        'errorReason：用一两句话具体说明错因，不要只写"粗心"。',
+        '',
+        ...penalized.map((qr, i) => {
+          const q = questions.find((x) => x.index === qr.index);
+          return [
+            `第${i + 1}题（${q?.type ?? '未知'}）：`,
+            `题干：${q?.stem?.slice(0, 200) ?? '（无题干）'}`,
+            `参考答案：${qr.reference?.slice(0, 150) ?? '（无）'}`,
+            `得分：${qr.score}/${qr.maxScore}`,
+          ].join('\n');
+        }),
+      ].join('\n');
+
+      const response = await model.invoke(
+        [new SystemMessage('你是错题分析助手，只输出可解析 JSON。'), new HumanMessage(prompt)],
+        { response_format: { type: 'json_object' } } as any,
+      );
+      const content = typeof response.content === 'string' ? response.content : '';
+      const parsed = JSON.parse(content);
+      analyses = (Array.isArray(parsed) ? parsed : parsed.results ?? parsed.analyses ?? []).map(
+        (a: any) => ({
+          errorType: String(a.errorType ?? '其他'),
+          errorReason: String(a.errorReason ?? ''),
+        }),
+      );
+    } catch (err) {
+      console.warn('[autoCollectMistakes] LLM 错因分析失败，跳过:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+
+  for (let i = 0; i < penalized.length; i++) {
+    const qr = penalized[i];
+    const q = questions.find((x) => x.index === qr.index);
+    if (!q) continue;
+
+    const id = `mistake-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const analysis = analyses[i];
+    const errorType = analysis?.errorType ?? undefined;
+    const errorReason = analysis?.errorReason ?? undefined;
+    const correctAnswer = qr.reference?.slice(0, 2000) ?? undefined;
+
+    // 答案匹配度
+    const matchScore = 0; // score/maxScore < 0.6, so effectively incorrect
+
+    // 创建错题记录（status 先设为 analyzed 或 needs_review，取决于知识点映射）
+    db.prepare(`
+      INSERT INTO mistake_items (
+        id, user_id, subject, grade, source_type, status, title, prompt_text,
+        student_answer, correct_answer, explanation,
+        error_type, error_reason, analysis_confidence,
+        answer_match_score, is_correct,
+        created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, 'text', 'needs_review', ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?, ?
+      )
+    `).run(
+      id,
+      userId,
+      subject,
+      grade,
+      (q.stem?.split(/\n|。|\./)[0] ?? '考试错题').slice(0, 32),
+      q.stem?.slice(0, 8000) ?? '',
+      null, // student_answer: exam doesn't carry raw text in results
+      correctAnswer ?? null,
+      q.explanation?.slice(0, 2000) ?? null,
+      errorType ?? null,
+      errorReason ?? null,
+      analysis ? 0.7 : 0.3,
+      matchScore,
+      0, // is_correct = false (heavily penalized)
+      now,
+      now,
+    );
+
+    // 知识点映射
+    let mapped = false;
+    const kpTitle = q.knowledgePoint;
+    if (kpTitle) {
+      const node = findKnowledgePointNode(kpTitle, subject);
+      if (node) {
+        db.prepare(`
+          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, evidence_json)
+          VALUES (?, ?, 'primary', 0.7, ?)
+        `).run(id, node.id, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
+        mapped = true;
+      }
+    }
+
+    // 如果映射成功，更新 status 为 analyzed
+    if (mapped) {
+      db.prepare(`UPDATE mistake_items SET status='analyzed', updated_at=? WHERE id=?`).run(now, id);
+    }
+
+    mistakeIds.push(id);
+  }
+
+  return { count: mistakeIds.length, mistakeIds };
+}
+
 // ── 会话管理 ─────────────────────────────────
 
 export function createExamSession(userId: string, config: ExamConfig, data: GeneratedExam): ExamSession {
@@ -1165,6 +1800,31 @@ export function listExamSessions(userId: string): ExamSummary[] {
   });
 }
 
+// ── 批改断点续判（Grading Checkpoint） ──────────────────
+
+/** 读取考试会话的批改断点（已判完的题目结果） */
+function readGradingCheckpoint(examId: string): ExamQuestionResult[] | null {
+  const row = db.prepare(`SELECT grading_checkpoint FROM exam_sessions WHERE id=?`).get(examId) as { grading_checkpoint: string | null } | undefined;
+  if (!row?.grading_checkpoint) return null;
+  try {
+    const parsed = JSON.parse(row.grading_checkpoint);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 将已判完的题目结果保存到批改断点 */
+function saveGradingCheckpoint(examId: string, results: ExamQuestionResult[]) {
+  db.prepare(`UPDATE exam_sessions SET grading_checkpoint=? WHERE id=?`)
+    .run(JSON.stringify(results), examId);
+}
+
+/** 考试批改完成后清除断点数据 */
+function clearGradingCheckpoint(examId: string) {
+  db.prepare(`UPDATE exam_sessions SET grading_checkpoint=NULL WHERE id=?`).run(examId);
+}
+
 export async function submitExamSession(
   examId: string,
   userId: string,
@@ -1177,7 +1837,25 @@ export async function submitExamSession(
   if (session.status === 'completed') throw new Error('该考试已提交');
 
   await onProgress?.({ step: 'grade', message: 'grade', progress: 4 });
-  const results = await gradeExam(session.questions, answers, model, { subject: session.subject, grade: session.grade }, onProgress);
+
+  // ── 断点续判：读取已有批改结果 ──
+  const checkpoint = readGradingCheckpoint(examId);
+  if (checkpoint && checkpoint.length > 0) {
+    await onProgress?.({
+      step: 'grade',
+      message: `从断点续判：已完成 ${checkpoint.length}/${session.questions.length} 题`,
+      progress: Math.round(checkpoint.length / session.questions.length * 50),
+    });
+  }
+
+  const results = await gradeExam(
+    session.questions,
+    answers,
+    model,
+    { subject: session.subject, grade: session.grade },
+    onProgress,
+    { examId, existingResults: checkpoint ?? undefined },
+  );
   await onProgress?.({ step: 'profile', message: 'profile', progress: 84 });
 
   // 更新知识画像并记录变化（优先用 knowledgePointId 直连节点）
@@ -1206,9 +1884,31 @@ export async function submitExamSession(
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
 
+  // ── 自动错题收集：将失分严重的题目归入错题本 ──
+  try {
+    await onProgress?.({ step: 'save', message: '正在收集错题…', progress: 88 });
+    const collected = await autoCollectMistakes(
+      userId,
+      examId,
+      session.questions,
+      results,
+      session.subject,
+      session.grade,
+      model,
+    );
+    if (collected.count > 0) {
+      results.mistakesCollected = { count: collected.count, mistakeIds: collected.mistakeIds };
+      console.log(`[autoCollectMistakes] 已收集 ${collected.count} 道错题到错题本`);
+    }
+  } catch (err) {
+    console.warn('[autoCollectMistakes] 错题收集失败（不影响考试提交）:', err instanceof Error ? err.message : err);
+  }
+
   await onProgress?.({ step: 'save', message: 'save', progress: 94 });
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`UPDATE exam_sessions SET status='completed', answers=?, results=?, submitted_at=? WHERE id=? AND user_id=?`).run(JSON.stringify(answers), JSON.stringify(results), now, examId, userId);
+  // 批改完成，清除断点数据
+  clearGradingCheckpoint(examId);
   await onProgress?.({ step: 'complete', message: 'complete', progress: 100 });
 
   return results;

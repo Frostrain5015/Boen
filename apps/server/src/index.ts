@@ -717,7 +717,8 @@ app.post('/api/mistakes/:id/practice', async (c) => {
   return c.json({ prompt: formatMistakePracticePrompt(detail.mistake) });
 });
 
-import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode } from './exam.js';
+import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode, generateDetailedReview } from './exam.js';
+import { postExamRecommendation } from './exam-recommendation.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
@@ -767,6 +768,16 @@ app.post('/api/exam/submit', async (c) => {
   const answers = Array.isArray(body.answers) ? body.answers : [];
   try {
     const results = await submitExamSession(body.examId, userId, answers as any, model);
+    // Attach post-exam adaptive recommendations
+    try {
+      const session = getExamSession(body.examId, userId);
+      if (session) {
+        const recommendation = postExamRecommendation(userId, session.subject, session.grade ?? '7', results);
+        (results as any).recommendation = recommendation;
+      }
+    } catch (err) {
+      console.warn('[exam] recommendation generation failed:', err instanceof Error ? err.message : String(err));
+    }
     return c.json({ success: true, results });
   } catch (err) {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
@@ -793,6 +804,16 @@ app.post('/api/exam/submit/stream', async (c) => {
         model,
         (p) => send({ type: 'exam_grading_progress', step: p.step, message: p.message, progress: p.progress }),
       );
+      // Attach post-exam adaptive recommendations
+      try {
+        const session = getExamSession(body.examId, userId);
+        if (session) {
+          const recommendation = postExamRecommendation(userId, session.subject, session.grade ?? '7', results);
+          (results as any).recommendation = recommendation;
+        }
+      } catch (err) {
+        console.warn('[exam] recommendation generation failed:', err instanceof Error ? err.message : String(err));
+      }
       await send({ type: 'exam_graded', examId: body.examId, results });
       await send({ type: 'done' });
     } catch (err) {
@@ -864,6 +885,37 @@ app.get('/api/exam/:examId', async (c) => {
       qualityReport: session.qualityReport,
     },
   });
+});
+
+/** POST /api/exam/:examId/detailed-review - Generate detailed review for wrong answers */
+app.post('/api/exam/:examId/detailed-review', async (c) => {
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
+  const examId = c.req.param('examId');
+  const session = getExamSession(examId, userId);
+  if (!session) return c.json({ error: '考试未找到' }, 404);
+  if (session.status !== 'completed') return c.json({ error: '考试尚未完成' }, 400);
+  if (!session.results || !session.answers) return c.json({ error: '暂无判分结果' }, 400);
+
+  try {
+    const enhancedResults = await generateDetailedReview(
+      model,
+      session.questions,
+      session.answers,
+      session.results,
+    );
+
+    // Update the stored results with detailed explanations
+    const updatedResults = { ...session.results, questionResults: enhancedResults };
+    db.prepare(`UPDATE exam_sessions SET results=? WHERE id=?`).run(JSON.stringify(updatedResults), examId);
+
+    return c.json({ questionResults: enhancedResults });
+  } catch (err) {
+    console.error('[detailed-review] failed:', err instanceof Error ? err.message : String(err));
+    return c.json({ error: '生成详解失败' }, 500);
+  }
 });
 
 

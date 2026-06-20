@@ -79,6 +79,13 @@ export interface GradingResult {
   reference: string;
   explanation: string;
   perBlank?: boolean[];
+  /** 填空题逐空详细匹配信息（含层级，供 Level 3 LLM 语义判定） */
+  perBlankDetails?: Array<{
+    matched: boolean;
+    level: 1 | 2 | 'miss';
+    userNorm: string;
+    acceptedNorms: string[];
+  }>;
   knowledgePoints?: string[];
   literacies?: string[];
   /** LLM 出题时直接引用的知识图谱节点 ID，优先于此 ID 更新画像 */
@@ -265,6 +272,8 @@ export interface ExamQuestionResult {
   knowledgePoint?: string;
   knowledgePointId?: number;
   literacy?: string[];
+  /** 针对性错误分析（仅在用户请求"查看详解"后由 LLM 生成） */
+  detailedExplanation?: string;
 }
 
 export interface ProficiencyChange {
@@ -291,6 +300,8 @@ export interface ExamResults {
   analysis?: string;
   /** 各知识点熟练度变化 */
   proficiencyChanges?: ProficiencyChange[];
+  /** 自动归入错题本的信息 */
+  mistakesCollected?: { count: number; mistakeIds: string[] };
 }
 
 /** 考试历史列表项（概要） */

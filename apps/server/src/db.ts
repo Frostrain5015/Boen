@@ -179,6 +179,9 @@ if (!hasExamSessionColumn('blueprint')) {
 if (!hasExamSessionColumn('quality_report')) {
   db.exec(`ALTER TABLE exam_sessions ADD COLUMN quality_report TEXT`);
 }
+if (!hasExamSessionColumn('grading_checkpoint')) {
+  db.exec(`ALTER TABLE exam_sessions ADD COLUMN grading_checkpoint TEXT`);
+}
 
 // ── Mistake notebook ─────────────────────────────────────────
 db.exec(`

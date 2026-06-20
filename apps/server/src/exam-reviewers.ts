@@ -49,8 +49,8 @@ const DIMENSION_WEIGHTS: Record<ReviewDimension, number> = {
   discrimination: 0.15,
 };
 
-const REGEN_THRESHOLD_TOTAL = 50;       // 总分 < 50 → 重出（原 70，防止误杀）
-const REGEN_THRESHOLD_DIMENSION = 40;   // 任一维度 < 40 → 重出（原 60，防止误杀）
+const REGEN_THRESHOLD_TOTAL = 55;       // 总分 < 55 → 重出（提高标准，确保质量）
+const REGEN_THRESHOLD_DIMENSION = 45;   // 任一维度 < 45 → 重出（提高单维度门槛）
 
 // ── 5 个审核维度的 Zod Schema（绑定到 model.bindTools） ──────
 
@@ -498,10 +498,43 @@ function validateKatexClosure(text: string): boolean {
   return true;
 }
 
-// ── 本地相似性预检（供 exam.ts 主流程使用） ─────────────────
+// ── 本地相似性检测（语义级 + 字符级兜底） ─────────────────
 
-/** 检测题干高度相似的题目对，返回需要标记的题号 */
-export function detectSimilarQuestions(questions: ExamQuestion[]): Set<number> {
+/**
+ * 基于语义向量的题目相似性检测，字符级匹配作为 fallback。
+ * cosine similarity > 0.85 → 标记为疑似重复。
+ * embedding 模型加载失败时自动降级到字符级检测。
+ */
+export async function detectSimilarQuestions(questions: ExamQuestion[]): Promise<Set<number>> {
+  const flagged = new Set<number>();
+
+  // Level 1: 语义向量检测
+  try {
+    const { embedTexts, cosineSim } = await import('./embeddings.js');
+    const stems = questions.map(q => q.stem?.slice(0, 100) ?? '');
+    if (stems.some(s => s.length > 0)) {
+      const vectors = await embedTexts(stems);
+      for (let i = 0; i < vectors.length; i++) {
+        for (let j = i + 1; j < vectors.length; j++) {
+          const sim = cosineSim(vectors[i], vectors[j]);
+          if (sim > 0.85) {
+            flagged.add(questions[i].index);
+            flagged.add(questions[j].index);
+          }
+        }
+      }
+      return flagged;
+    }
+  } catch (err) {
+    console.warn('[similarity] embedding 模型不可用，降级到字符级检测:', err instanceof Error ? err.message.slice(0, 80) : err);
+  }
+
+  // Level 2: 字符级 fallback
+  return detectSimilarQuestionsCharLevel(questions);
+}
+
+/** 字符级相似性检测（原始逻辑保留作为 fallback） */
+function detectSimilarQuestionsCharLevel(questions: ExamQuestion[]): Set<number> {
   const flagged = new Set<number>();
   const stems = questions.map(q => ({ index: q.index, norm: q.stem?.replace(/\s+/g, '').slice(0, 30) ?? '' }));
 

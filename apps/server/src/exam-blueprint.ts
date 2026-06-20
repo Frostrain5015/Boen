@@ -46,6 +46,25 @@ function tuneCountsToTarget<T extends { type: string; count: number; pointsPer: 
       }
     }
     dp = next;
+
+    // 提前终止：如果已有候选解偏差 < 2%，停止扩展后续题型，避免状态空间爆炸
+    for (const [score] of dp.entries()) {
+      if (Math.abs(score - targetScore) <= targetScore * 0.02) {
+        // 找到足够精确的解，直接选取最接近的
+        let earlyBest: State | undefined;
+        let earlyBestScore = targetScore;
+        for (const [s, st] of dp.entries()) {
+          if (!earlyBest) { earlyBest = st; earlyBestScore = s; continue; }
+          const curRank = Math.abs(s - targetScore) * 1000 + st.cost;
+          const bestRank = Math.abs(earlyBestScore - targetScore) * 1000 + earlyBest.cost;
+          if (curRank < bestRank) { earlyBest = st; earlyBestScore = s; }
+        }
+        if (earlyBest) {
+          earlyBest.counts.forEach((count, idx) => { items[idx].count = count; });
+          return items.reduce((sum, it) => sum + it.count * it.pointsPer, 0);
+        }
+      }
+    }
   }
 
   let bestScore = targetScore;
@@ -274,8 +293,8 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
   const diff = targetScore - actualScore;
   const deviation = Math.abs(diff) / targetScore;
 
-  // 偏差 < 5% → 微调最后一个题型 count，精确命中目标总分
-  if (deviation < 0.05) {
+  // 偏差 < 10% → 微调最后一个题型 count，精确命中目标总分
+  if (deviation < 0.10) {
     if (diff === 0) return finalizeBlueprint({ ...bp, totalScore: actualScore }, targetScore);
     // 从后往前找 pointsPer 最小的题型来调整（粒度最细）
     for (let i = allQts.length - 1; i >= 0; i--) {
@@ -298,7 +317,7 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     return finalizeBlueprint({ ...bp, totalScore: actualScore }, targetScore);
   }
 
-  // 偏差 ≥ 5% → 按比例调整每个 section 的 count
+  // 偏差 ≥ 10% → 按比例调整每个 section 的 count
   const ratio = targetScore / actualScore;
   console.warn(`[blueprint] 总分偏差较大（实际 ${actualScore} vs 目标 ${targetScore}），按比例 ${ratio.toFixed(2)} 调整题量`);
 
@@ -310,11 +329,11 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
     })),
   }));
 
-  // 重新计算，若偏差 < 5% 则微调至精确命中
+  // 重新计算，若偏差 < 10% 则微调至精确命中
   let newScore = fixedSections.reduce((s, sec) =>
     s + sec.questionTypes.reduce((ss, qt) => ss + qt.count * qt.pointsPer, 0), 0);
   const newDiff = targetScore - newScore;
-  if (Math.abs(newDiff) / targetScore < 0.05 && newDiff !== 0) {
+  if (Math.abs(newDiff) / targetScore < 0.10 && newDiff !== 0) {
     // 按 pointsPer 升序排列（细粒度优先），微调 count 精确命中总分
     const allQts = fixedSections.flatMap(s => s.questionTypes).sort((a, b) => a.pointsPer - b.pointsPer);
     for (const qt of allQts) {
@@ -336,6 +355,12 @@ function validateAndFixBlueprint(bp: ExamBlueprint, targetScore: number): ExamBl
       }
       if (newScore === targetScore) break;
     }
+  }
+
+  // 偏差仍 > 15% → 放弃 LLM 蓝图，fallback 到确定性数学计算的默认蓝图
+  if (Math.abs(targetScore - newScore) / targetScore > 0.15) {
+    console.warn(`[blueprint] 总分修正后偏差仍达 ${Math.round(Math.abs(targetScore - newScore) / targetScore * 100)}%，fallback 到默认蓝图`);
+    return defaultBlueprint({ subject: bp.sections[0]?.knowledgePoints[0]?.title === '综合知识' ? 'math' : 'math', grade: 'G7', totalScore: targetScore }, 'exam');
   }
 
   return finalizeBlueprint({ ...bp, sections: fixedSections, totalScore: newScore }, targetScore);
