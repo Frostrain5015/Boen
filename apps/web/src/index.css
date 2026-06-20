@@ -81,21 +81,16 @@ html[data-fontsize="lg"] { font-size: 18px; }
   --ink-soft: #5f7089;
   --line: #d4dde9;
 }
-[data-session="active"] .app-bg {
-  background:
-    radial-gradient(120% 80% at 100% 0%, #d0ddf0 0%, transparent 45%),
-    radial-gradient(90% 70% at 0% 100%, #dce8f5 0%, transparent 50%),
-    linear-gradient(180deg, #f1f4f9 0%, #e5eaf3 100%);
-}
+/* 光斑：类课堂入场轨道动画（加速→匀速→减速→回到原位，过程中逐渐变色） */
 [data-session="active"] .app-bg::before {
   background: var(--accent);
   opacity: 0.62;
-  animation-duration: 14s;
+  animation: blob-journey 1.4s cubic-bezier(0.22, 1, 0.36, 1) 1, blob 14s ease-in-out infinite 1.4s;
 }
 [data-session="active"] .app-bg::after {
   background: #74b9ff;
   opacity: 0.6;
-  animation-duration: 17s;
+  animation: blob-journey-reverse 1.4s cubic-bezier(0.22, 1, 0.36, 1) 1, blob 17s ease-in-out infinite reverse 1.4s;
 }
 /* 类课堂冷/暖切换：广谱过渡（* 兜底全覆盖，0.7s 与背景动画同步） */
 *, *::before, *::after {
@@ -265,6 +260,21 @@ body {
   0%, 100% { transform: translate(0, 0) scale(1); }
   33% { transform: translate(4vw, 3vw) scale(1.12); }
   66% { transform: translate(-3vw, 2vw) scale(0.92); }
+}
+/* 类课堂入场轨道（椭圆环游 → 回到原位） */
+@keyframes blob-journey {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(-10vw, 5vh) scale(1.06); }
+  50%  { transform: translate(-4vw, 10vh) scale(0.94); }
+  75%  { transform: translate(5vw, 3vh) scale(1.02); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes blob-journey-reverse {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(10vw, -5vh) scale(1.06); }
+  50%  { transform: translate(4vw, -10vh) scale(0.94); }
+  75%  { transform: translate(-5vw, -3vh) scale(1.02); }
+  100% { transform: translate(0, 0) scale(1); }
 }
 @keyframes floaty {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
