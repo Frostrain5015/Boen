@@ -88,25 +88,30 @@ html[data-fontsize="lg"] { font-size: 18px; }
     linear-gradient(180deg, #f1f4f9 0%, #e5eaf3 100%);
 }
 [data-session="active"] .app-bg::before {
-  background: #6c5ce7;
+  background: var(--accent);
   opacity: 0.62;
   animation-duration: 14s;
 }
 [data-session="active"] .app-bg::after {
-  background: #74b9ff;
-  opacity: 0.55;
+  background: var(--accent-soft);
+  opacity: 0.6;
   animation-duration: 17s;
 }
-/* 类课堂冷/暖切换：广谱过渡（与学科切换 0.5s 对齐，取较长 0.7s 与背景动画同步） */
+/* 类课堂冷/暖切换：广谱过渡（0.7s 与背景动画同步） */
 body,
 .clay, .clay-glass, .clay-sm,
 input, textarea, select,
 .sidebar-link, .sidebar-section-title,
-h1, h2, h3, h4, p, span, a, label {
+h1, h2, h3, h4, p, span, a, label,
+button, .btn-accent, .subject-tag,
+svg, circle, path, rect {
   transition:
     background-color 0.7s ease,
     color 0.7s ease,
-    border-color 0.7s ease;
+    border-color 0.7s ease,
+    fill 0.7s ease,
+    stroke 0.7s ease,
+    box-shadow 0.7s ease;
 }
 
 html {
@@ -185,7 +190,8 @@ body {
   height: 34vw;
   bottom: -12vw;
   left: -6vw;
-  background: #ffb37a;
+  background: var(--accent);
+  opacity: 0.55;
   animation: blob 26s ease-in-out infinite reverse;
 }
 /* 颗粒噪点 */

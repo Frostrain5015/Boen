@@ -46,10 +46,10 @@ export const useChatStore = defineStore('chat', () => {
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
   const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number } | null>(null);
-  /** 类课堂 TODO 进度（当前已完成步数 + 最近事件描述） */
-  const todoProgress = ref<{ completed: number; detail: string } | null>(null);
   /** 类课堂是否进行中（用于步骤日志检测，避免跨 store 引用） */
   let _sessionActive = false;
+  /** 会话开始时间戳（用于日志 elapsed 计算） */
+  let _sessionStartTime = 0;
   /** 已记录到的步骤日志位置（防重复） */
   let _lastLoggedStep = 0;
   // 已移除 knowledgeBaseLoading
@@ -134,8 +134,10 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'todo_step') {
       if (e.action === 'advance') {
         const match = e.detail.match(/第(\d+)步完成/);
-        const step = match ? parseInt(match[1]) : (todoProgress.value?.completed ?? 0) + 1;
-        todoProgress.value = { completed: step, detail: e.detail };
+        const step = match ? parseInt(match[1]) : _lastLoggedStep + 1;
+        _lastLoggedStep = step;
+        const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
+        console.log(`[Boen 类课堂] 🎯 第${step}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
@@ -149,7 +151,6 @@ export const useChatStore = defineStore('chat', () => {
       }
     } else if (e.type === 'settlement') {
       learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps };
-      todoProgress.value = null;
       console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | ${new Date().toLocaleTimeString()}`);
       _sessionActive = false;
       const { useUiStore } = await import('@/stores/ui');
@@ -178,6 +179,7 @@ export const useChatStore = defineStore('chat', () => {
     if (uiStore.activeMode !== 'none' && !uiStore.sessionActive) {
       console.log(`[Boen 类课堂] 📤 发送消息 — 主题: "${t.slice(0, 30)}" | ${new Date().toLocaleTimeString()}`);
       _sessionActive = true;
+      _sessionStartTime = Date.now();
       _lastLoggedStep = 0;
       uiStore.startSession();
     }
@@ -350,7 +352,6 @@ export const useChatStore = defineStore('chat', () => {
     reaction,
     dailyLimitReached,
     learningSettlement,
-    todoProgress,
     // getters
     hasItems,
     showTyping,

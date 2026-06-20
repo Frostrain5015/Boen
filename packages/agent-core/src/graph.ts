@@ -106,10 +106,10 @@ const advanceStepSchema = z.object({
 });
 
 const advanceStepTool = tool(async ({ stepId }) => {
-  return `步骤 ${stepId} 已标记完成。请继续下一步。`;
+  return `步骤 ${stepId} 已完成记录。请先询问学生是否准备好进入下一步，等学生明确回复后再继续。不要直接开始下一步内容。`;
 }, {
   name: ADVANCE_STEP_TOOL,
-  description: '完成当前教学步骤后调用此工具，系统会自动推进到下一步。每次只推进一步。',
+  description: '当学生确认准备好进入下一步时调用此工具。调用前必须先征得学生同意。',
   schema: advanceStepSchema,
 });
 
