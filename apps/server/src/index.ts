@@ -308,6 +308,8 @@ async function runGraph(
           await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
         }
         if (todoStepSent.has(SWITCH_SUBJECT_TOOL)) {
+          // 等待 CSS 渐变动画播放完毕（0.7s）再结束 pending
+          await new Promise(r => setTimeout(r, 800));
           await send({ type: 'todo_done', action: 'switch', detail: '学科已切换' });
         }
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
