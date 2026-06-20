@@ -56,7 +56,9 @@ export const useUiStore = defineStore('ui', () => {
 
   function activateMode(mode: 'review' | 'preview' | 'weakness') {
     if (sessionActive.value) return; // 学习中不允许切换模式
-    activeMode.value = activeMode.value === mode ? 'none' : mode;
+    if (activeMode.value === mode) { activeMode.value = 'none'; return; }
+    sessionActive.value = true;
+    activeMode.value = mode;
     modeTagSent.value = false;
     const chatStore = useChatStore();
     const hints: Record<string, string> = { review: '\u5e2e\u6211\u590d\u4e60\u5de9\u56fa ', preview: '\u5e2e\u6211\u9884\u4e60 ', weakness: '\u5e2e\u6211\u96c6\u4e2d\u7ec3\u4e60 ' };
@@ -74,6 +76,7 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function startPractice(type: string, hint: string) {
+    sessionActive.value = true;
     practiceType.value = type;
     const chatStore = useChatStore();
     chatStore.input = hint;
@@ -98,6 +101,7 @@ export const useUiStore = defineStore('ui', () => {
 
   // Navigate from practice/profile into chat context
   async function handlePractice(detail: { kp?: string; subject: Subject; grade: string; mode?: string }) {
+    sessionActive.value = true;
     const chatStore = useChatStore();
     expandedSection.value = 'chat';
     activeMode.value = (detail.mode as ActiveMode) || (detail.kp ? 'weakness' : 'review');
@@ -118,6 +122,7 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   async function handleMistakePractice(detail: { prompt: string; subject: Subject; grade: string }) {
+    sessionActive.value = true;
     const chatStore = useChatStore();
     const authStore = useAuthStore();
     expandedSection.value = 'chat';
