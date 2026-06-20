@@ -14,6 +14,7 @@ interface KpNode {
   totalCount: number;
   literacies: string[];
   prerequisites: string[];
+  isExplore?: boolean;
 }
 
 interface SectionNode {
@@ -139,6 +140,25 @@ function openKpDetail(kp: KpNode, sectionTitle: string) {
 }
 
 function closeKpDetail() {
+  selectedKp.value = null;
+}
+
+function openExploreDetail(sec: SectionNode) {
+  selectedKp.value = {
+    title: sec.title,
+    weightedScore: sec.weightedScore,
+    sectionTitle: sec.title,
+    correctCount: 0,
+    totalCount: 0,
+    literacies: [],
+    prerequisites: [],
+    isExplore: true,
+  };
+}
+
+function startExplore() {
+  if (!selectedKp.value) return;
+  emit('explore', { title: selectedKp.value.title, subject: subject.value, grade: grade.value });
   selectedKp.value = null;
 }
 
@@ -326,14 +346,13 @@ watch(grade, fetchOutline);
               <Transition name="tree-collapse">
                 <div v-if="expandedSections.has('ch-' + ch.title)" class="border-t border-[var(--line)] bg-[var(--surface)]">
                   <div v-for="sec in ch.children" :key="sec.title" class="border-b border-[var(--line)] last:border-b-0">
-                    <!-- 探索型章节（阅读与思考、课题学习等）：点击触发 AI 对话 -->
+                    <!-- 探索型章节（阅读与思考、课题学习等）：点击弹出详情 → 开始探索 -->
                     <button v-if="sec.kind === 'explore'"
-                      @click="emit('explore', { title: sec.title, subject, grade })"
-                      class="flex w-full items-center gap-2 px-6 py-2.5 text-left transition-all hover:bg-[#fef7e6] active:scale-[0.99]"
+                      @click="openExploreDetail(sec)"
+                      class="flex w-full items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-[#fef7e6]"
                     >
                       <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#fef7e6] text-[11px]">📖</span>
                       <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
-                      <span class="text-[10px] font-medium text-[#e0a92e]">探索</span>
                       <span v-if="sec.weightedScore >= 0"><StarDisplay :score="sec.weightedScore" /></span>
                       <span v-else><StarDisplay :score="-1" /></span>
                     </button>
@@ -395,55 +414,71 @@ watch(grade, fetchOutline);
       </div>
     </Transition>
 
-    <!-- ═══ KP Detail Floating Panel ═══ -->
+    <!-- ═══ KP Detail / Explore Detail Floating Panel ═══ -->
     <Transition name="panel-scale">
       <div v-if="selectedKp" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="closeKpDetail">
         <div class="clay clay-glass mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
           <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
             <div class="flex items-center gap-2">
-              <GraduationCap class="h-4 w-4 text-[var(--accent)]" />
+              <span v-if="selectedKp.isExplore" class="text-base">📖</span>
+              <GraduationCap v-else class="h-4 w-4 text-[var(--accent)]" />
               <span class="font-display text-sm font-bold text-[var(--ink)]">{{ selectedKp.title }}</span>
             </div>
             <button @click="closeKpDetail" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50">&times;</button>
           </div>
           <div class="space-y-3 px-5 py-4">
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-medium text-[var(--ink-soft)]">熟练度</span>
-              <StarDisplay v-if="selectedKp.weightedScore >= 0" :score="selectedKp.weightedScore" />
-              <StarDisplay v-else :score="-1" />
-            </div>
-
-            <div v-if="selectedKp.literacies.length" class="space-y-1">
-              <p class="text-xs font-semibold text-[var(--ink-soft)]">关联的核心素养</p>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="lit in selectedKp.literacies" :key="lit"
-                  class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2.5 py-1 text-[11px] font-semibold text-[#7c3aae]"
-                ><BrainCircuit class="h-3 w-3" />{{ lit }}</span>
+            <!-- 探索课详情 -->
+            <template v-if="selectedKp.isExplore">
+              <div class="rounded-xl bg-[#fef7e6] p-4">
+                <p class="text-xs leading-relaxed text-[#9a6b1a]">
+                  这是一个探索型学习主题，没有标准考题。博文 AI 导师将带你通过对话式探索来理解这个主题，结束后会给出一个参考评分。
+                </p>
               </div>
-            </div>
-
-            <div v-if="selectedKp.prerequisites.length" class="space-y-1">
-              <p class="text-xs font-semibold text-[var(--ink-soft)]">前置知识</p>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="pre in selectedKp.prerequisites" :key="pre"
-                  class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-strong)]"
-                >{{ pre }}</span>
+              <div class="rounded-xl bg-[var(--accent-soft)] p-3">
+                <p class="text-[11px] font-medium text-[var(--ink-soft)]">所属章节</p>
+                <p class="text-xs font-semibold text-[var(--ink)]">{{ selectedKp.sectionTitle }}</p>
               </div>
-            </div>
+              <button @click="startExplore()"
+                class="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#e0a92e] py-2.5 font-display text-sm font-bold text-white transition-all hover:bg-[#d49a1f] active:scale-[0.97]"
+              >📖 开始探索</button>
+            </template>
 
-            <div class="rounded-xl bg-[var(--accent-soft)] p-3">
-              <p class="text-[11px] font-medium text-[var(--ink-soft)]">所属章节</p>
-              <p class="text-xs font-semibold text-[var(--ink)]">{{ selectedKp.sectionTitle }}</p>
-            </div>
-
-            <div class="flex gap-2">
-              <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'review' }); closeKpDetail()"
-                class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-[var(--accent)] bg-white py-2.5 font-display text-sm font-bold text-[var(--accent)] transition-all hover:bg-[var(--accent-soft)] active:scale-[0.97]"
-              ><BookOpen class="h-4 w-4" /> 先去复习</button>
-              <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'weakness' }); closeKpDetail()"
-                class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]"
-              ><Target class="h-4 w-4" /> 直接练习</button>
-            </div>
+            <!-- 普通知识点详情 -->
+            <template v-else>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-medium text-[var(--ink-soft)]">熟练度</span>
+                <StarDisplay v-if="selectedKp.weightedScore >= 0" :score="selectedKp.weightedScore" />
+                <StarDisplay v-else :score="-1" />
+              </div>
+              <div v-if="selectedKp.literacies.length" class="space-y-1">
+                <p class="text-xs font-semibold text-[var(--ink-soft)]">关联的核心素养</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <span v-for="lit in selectedKp.literacies" :key="lit"
+                    class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2.5 py-1 text-[11px] font-semibold text-[#7c3aae]"
+                  ><BrainCircuit class="h-3 w-3" />{{ lit }}</span>
+                </div>
+              </div>
+              <div v-if="selectedKp.prerequisites.length" class="space-y-1">
+                <p class="text-xs font-semibold text-[var(--ink-soft)]">前置知识</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <span v-for="pre in selectedKp.prerequisites" :key="pre"
+                    class="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--accent-strong)]"
+                  >{{ pre }}</span>
+                </div>
+              </div>
+              <div class="rounded-xl bg-[var(--accent-soft)] p-3">
+                <p class="text-[11px] font-medium text-[var(--ink-soft)]">所属章节</p>
+                <p class="text-xs font-semibold text-[var(--ink)]">{{ selectedKp.sectionTitle }}</p>
+              </div>
+              <div class="flex gap-2">
+                <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'review' }); closeKpDetail()"
+                  class="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-[var(--accent)] bg-white py-2.5 font-display text-sm font-bold text-[var(--accent)] transition-all hover:bg-[var(--accent-soft)] active:scale-[0.97]"
+                ><BookOpen class="h-4 w-4" /> 先去复习</button>
+                <button @click="emit('practice', { kp: selectedKp.title, subject, grade, mode: 'weakness' }); closeKpDetail()"
+                  class="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]"
+                ><Target class="h-4 w-4" /> 直接练习</button>
+              </div>
+            </template>
           </div>
         </div>
       </div>
