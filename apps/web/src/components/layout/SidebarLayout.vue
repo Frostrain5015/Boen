@@ -133,7 +133,7 @@ watch(() => route.path, () => {
         <div class="flex items-center gap-2">
           <Mascot :size="28" :float="false" :animated="false" />
           <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
-          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.0</span>
+          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.1</span>
         </div>
         <button @click="uiStore.sidebarOpen = false" class="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
           <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />

@@ -11,6 +11,16 @@
 import db from './db.js';
 import type { ProficiencyLevel, KpProficiency, LiteracyProficiency, ProfileRecommendation } from '@boen/shared';
 
+/**
+ * Textbook navigation markers, not assessable teaching sections.  The source
+ * curriculum remains unchanged; only the learner profile tree is pruned.
+ */
+const PROFILE_OUTLINE_NOISE = /^(?:数学活动|小结|复习题\d*|阅读综合实践|本章复习与测试|(?:单元)?整理和复习|总复习)$/u;
+
+export function isProfileOutlineNoise(title: string): boolean {
+  return PROFILE_OUTLINE_NOISE.test(title.replace(/\s+/g, '').replace(/^☆/, ''));
+}
+
 // ── 等级阈值 ────────────────────────────────
 export const PROFICIENCY_THRESHOLDS = {
   mastered: 90,
@@ -366,12 +376,12 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
   for (const tb of tbs) {
     const chapters = db.prepare(
       `SELECT id, title FROM curriculum_units WHERE textbook_id=? AND parent_id IS NULL ORDER BY seq`
-    ).all(tb.id) as any[];
+    ).all(tb.id).filter((unit: any) => !isProfileOutlineNoise(unit.title)) as any[];
 
     const chapterNodes = chapters.map((ch: any) => {
       const sections = db.prepare(
         `SELECT id, title FROM curriculum_units WHERE parent_id=? ORDER BY seq`
-      ).all(ch.id) as any[];
+      ).all(ch.id).filter((unit: any) => !isProfileOutlineNoise(unit.title)) as any[];
       const sectionNodes = sections.map((sec: any) => enrichUnit(sec.id, sec.title));
       const chKps = sectionNodes.flatMap((s: any) => s.knowledgePoints);
       const chAvg = weightedAvg(chKps);
