@@ -53,19 +53,35 @@ onMounted(() => {
             @submit="(a) => chatStore.onAnswer(m, a)"
           />
 
-          <!-- 工具结果卡片 -->
-          <div v-else-if="m.kind === 'tool_result'" class="flex items-start gap-3 anim-fadeUp">
-            <div class="clay-sm flex items-center gap-2 px-4 py-2.5 text-sm">
-              <span class="text-base">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : '🎓' }}</span>
-              <span class="font-medium text-[var(--ink)]">{{ m.detail }}</span>
+          <!-- 工具结果卡片（同 quiz-gen 样式，绿色底） -->
+          <div v-else-if="m.kind === 'tool_result'" class="flex flex-col gap-1 anim-fadeUp">
+            <div class="flex items-center gap-2">
+              <Mascot :size="24" :float="false" :animated="false" />
+              <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
+            </div>
+            <div class="pl-8">
+              <div class="quiz-gen quiz-gen-done clay-sm">
+                <div class="quiz-gen-inner">
+                  <span class="quiz-gen-icon quiz-gen-icon-done">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : '🎓' }}</span>
+                  <span class="quiz-gen-label">{{ m.detail }}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- 工具错误卡片 -->
-          <div v-else-if="m.kind === 'tool_error'" class="flex items-start gap-3 anim-fadeUp">
-            <div class="clay-sm flex items-center gap-2 border-red-200 bg-red-50 px-4 py-2.5 text-sm">
-              <span class="text-base">⚠️</span>
-              <span class="font-medium text-red-700">{{ m.error }}</span>
+          <!-- 工具错误卡片（同 quiz-gen 样式，红色底） -->
+          <div v-else-if="m.kind === 'tool_error'" class="flex flex-col gap-1 anim-fadeUp">
+            <div class="flex items-center gap-2">
+              <Mascot :size="24" :float="false" :animated="false" />
+              <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
+            </div>
+            <div class="pl-8">
+              <div class="quiz-gen quiz-gen-err clay-sm">
+                <div class="quiz-gen-inner">
+                  <span class="quiz-gen-icon quiz-gen-icon-err">⚠️</span>
+                  <span class="quiz-gen-label">{{ m.error }}</span>
+                </div>
+              </div>
             </div>
           </div>
 
