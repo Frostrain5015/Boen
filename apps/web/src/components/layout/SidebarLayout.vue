@@ -124,11 +124,12 @@ watch(() => route.path, () => {
 <template>
   <!-- 侧边栏 -->
   <aside
-    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-all duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0"
+    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-[width] duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0"
+    :class="uiStore.sidebarOpen ? 'w-64' : 'w-0'"
     :style="{
-      width: uiStore.sidebarOpen ? '16rem' : '0px',
       borderRadius: uiStore.sidebarOpen ? '0 26px 26px 0' : '0',
       boxShadow: uiStore.sidebarOpen ? '12px 0 34px -20px rgba(86,64,40,0.3)' : 'none',
+      transitionProperty: 'width, border-radius, box-shadow',
     }"
   >
     <div class="flex h-full w-64 shrink-0 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
