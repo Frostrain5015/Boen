@@ -279,18 +279,29 @@ async function runGraph(
       }
     } else if (ev.event === 'on_chain_end') {
       const nodeName = (ev as any)?.name ?? '';
-      if (nodeName === 'planSteps') {
-        await send({ type: 'todo_done', action: 'plan', detail: '博文备课完成' });
-      } else if (nodeName === 'advanceStepTodo') {
-        await send({ type: 'todo_done', action: 'advance', detail: '已进入下一阶段' });
-      } else if (nodeName === 'exitSession') {
-        await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
+      if (nodeName === 'tools' && todoStepSent.size > 0) {
+        if (todoStepSent.has(PLAN_STEPS_TOOL)) {
+          await send({ type: 'todo_done', action: 'plan', detail: '博文备课完成' });
+        }
+        if (todoStepSent.has(ADVANCE_STEP_TOOL)) {
+          await send({ type: 'todo_done', action: 'advance', detail: '已进入下一阶段' });
+        }
+        if (todoStepSent.has(EXIT_SESSION_TOOL)) {
+          await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
+        }
       }
     } else if (ev.event === 'on_chain_error') {
       const nodeName = (ev as any)?.name ?? '';
-      if (['planSteps', 'advanceStepTodo', 'exitSession'].includes(nodeName)) {
-        const actionMap: Record<string, 'plan' | 'advance' | 'exit'> = { planSteps: 'plan', advanceStepTodo: 'advance', exitSession: 'exit' };
-        await send({ type: 'todo_fail', action: actionMap[nodeName] ?? 'plan', error: '工具执行失败' });
+      if (nodeName === 'tools') {
+        if (todoStepSent.has(PLAN_STEPS_TOOL)) {
+          await send({ type: 'todo_fail', action: 'plan', error: '备课工具执行失败' });
+        }
+        if (todoStepSent.has(ADVANCE_STEP_TOOL)) {
+          await send({ type: 'todo_fail', action: 'advance', error: '步骤推进工具执行失败' });
+        }
+        if (todoStepSent.has(EXIT_SESSION_TOOL)) {
+          await send({ type: 'todo_fail', action: 'exit', error: '退出工具执行失败' });
+        }
       }
     }
   }
