@@ -26,7 +26,8 @@ export type ChatItem =
   | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
   | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload }
-  | { kind: 'tool_result'; action: string; detail: string };
+  | { kind: 'tool_result'; action: string; detail: string }
+  | { kind: 'tool_error'; action: string; error: string };
 
 const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
 
@@ -151,6 +152,9 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'todo_done') {
       pendingTool.value = null;
       items.value.push({ kind: 'tool_result', action: e.action, detail: e.detail });
+    } else if (e.type === 'todo_fail') {
+      pendingTool.value = null;
+      items.value.push({ kind: 'tool_error', action: e.action, error: e.error });
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
       if (authStore.subscription && !authStore.subscription.isPremium) {

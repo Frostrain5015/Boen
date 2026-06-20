@@ -278,7 +278,6 @@ async function runGraph(
         }
       }
     } else if (ev.event === 'on_chain_end') {
-      // 检测 graph 工具节点执行完毕 → 发送 todo_done（此时工具真正完成）
       const nodeName = (ev as any)?.name ?? '';
       if (nodeName === 'planSteps') {
         await send({ type: 'todo_done', action: 'plan', detail: '博文备课完成' });
@@ -286,6 +285,12 @@ async function runGraph(
         await send({ type: 'todo_done', action: 'advance', detail: '已进入下一阶段' });
       } else if (nodeName === 'exitSession') {
         await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
+      }
+    } else if (ev.event === 'on_chain_error') {
+      const nodeName = (ev as any)?.name ?? '';
+      if (['planSteps', 'advanceStepTodo', 'exitSession'].includes(nodeName)) {
+        const actionMap: Record<string, 'plan' | 'advance' | 'exit'> = { planSteps: 'plan', advanceStepTodo: 'advance', exitSession: 'exit' };
+        await send({ type: 'todo_fail', action: actionMap[nodeName] ?? 'plan', error: '工具执行失败' });
       }
     }
   }

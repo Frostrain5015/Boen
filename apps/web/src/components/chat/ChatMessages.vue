@@ -61,6 +61,14 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- 工具错误卡片 -->
+          <div v-else-if="m.kind === 'tool_error'" class="flex items-start gap-3 anim-fadeUp">
+            <div class="clay-sm flex items-center gap-2 border-red-200 bg-red-50 px-4 py-2.5 text-sm">
+              <span class="text-base">⚠️</span>
+              <span class="font-medium text-red-700">{{ m.error }}</span>
+            </div>
+          </div>
+
           <!-- 用户消息 -->
           <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
             <div class="max-w-[85%] text-right">
