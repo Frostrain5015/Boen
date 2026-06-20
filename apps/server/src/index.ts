@@ -17,6 +17,7 @@ import {
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
+  COMPLETE_REVIEW_TOOL, EXIT_SESSION_TOOL,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -231,6 +232,24 @@ async function runGraph(
 }
 
 /** 检测并发送 review_complete 事件 */
+/** 检测 exit_session 工具调用 → 结算 + 清缓存 */
+async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string) {
+  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
+  const exitCall = calls.find((c) => c.name === EXIT_SESSION_TOOL);
+  if (exitCall?.args && userId && threadId) {
+    const args = exitCall.args as Record<string, unknown>;
+    const updatedKps = flushProficiencyCache(userId, threadId);
+    await send({
+      type: 'settlement',
+      summary: String(args.summary ?? ''),
+      score: Number(args.score ?? 0),
+      stepsCompleted: Number(args.stepsCompleted ?? 0),
+      totalSteps: Number(args.totalSteps ?? 0),
+      updatedKps,
+    });
+  }
+}
+
 async function emitReviewCompleteIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>) {
   const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
   const reviewCall = calls.find((c) => c.name === COMPLETE_REVIEW_TOOL);
@@ -1231,6 +1250,8 @@ app.post('/api/chat', async (c) => {
       }
 
       await emitQuestionIfAny(last, send, { subject: body.subject ?? 'math', grade: body.grade });
+      // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
+      await handleSessionExit(last, send, userId, body.threadId);
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
@@ -1536,6 +1557,7 @@ app.post('/api/answer', async (c) => {
       );
 
       const last = await runGraph({ messages: toolMsgs }, body.threadId, send);
+      await handleSessionExit(last, send, userId, body.threadId);
       await emitQuestionIfAny(last, send, { subject, grade: grade || undefined });
       await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });

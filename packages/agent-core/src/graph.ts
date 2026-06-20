@@ -81,6 +81,22 @@ function detectWeaknessIntent(text: string): boolean {
 /** 复习完成工具 */
 export const COMPLETE_REVIEW_TOOL = 'complete_review';
 
+/** 类课堂退出工具 */
+export const EXIT_SESSION_TOOL = 'exit_session';
+
+const exitSessionSchema = z.object({
+  summary: z.string().describe('本次学习的总结评价'),
+  score: z.number().min(0).max(100).describe('综合评分(0-100)'),
+  stepsCompleted: z.number().min(0).describe('已完成的步数'),
+  totalSteps: z.number().min(0).describe('总步数'),
+});
+
+const exitSessionTool = tool(async () => '', {
+  name: EXIT_SESSION_TOOL,
+  description: '结束当前类课堂学习，提交总结和评分。所有步骤完成后或学生要求结束时调用此工具。',
+  schema: exitSessionSchema,
+});
+
 /** TODO 步骤推进工具 */
 export const ADVANCE_STEP_TOOL = 'advance_step';
 
@@ -147,7 +163,7 @@ const switchModeTools: any[] = [
  * 构建博文主图。
  */
 export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, checkpointer?: BaseCheckpointSaver) {
-  const structuredTools: any[] = [advanceStepTool];
+  const structuredTools: any[] = [advanceStepTool, exitSessionTool];
   const qaTools: any[] = deps.lookupKnowledgePoint ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools] : [...quizTools, ...switchModeTools];
   const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
@@ -326,7 +342,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
     if (calls.length > 0) {
-      if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL)) return 'end';
+      if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL || c.name === EXIT_SESSION_TOOL)) return 'end';
       if (calls.some((c) => c.name === ADVANCE_STEP_TOOL)) return 'advanceStepTodo';
       if (calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) return 'lookupKnowledgePoint';
     }
