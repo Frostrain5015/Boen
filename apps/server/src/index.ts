@@ -1162,9 +1162,19 @@ app.post('/api/chat', async (c) => {
         }
       }
 
+      // 结构化模式 prompt：非探索/非普通模式时注入 TODO 教学步骤
+      let modeSystemMsg: SystemMessage | undefined;
+      if (body.mode && !['qa', 'explore'].includes(body.mode) && userId) {
+        const { getModePrompt } = await import('./mode-prompts.js');
+        const modePrompt = getModePrompt(body.mode, body.message);
+        if (modePrompt) {
+          modeSystemMsg = new SystemMessage(modePrompt);
+        }
+      }
+
       const last = await runGraph(
         {
-          messages: [...skipMsgs, new HumanMessage(body.message)],
+          messages: [modeSystemMsg, ...skipMsgs, new HumanMessage(body.message)].filter(Boolean),
           gradeBand: body.gradeBand ?? 'middle',
           grade: body.grade,
           subject: body.subject ?? 'math',
