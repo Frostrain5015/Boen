@@ -187,6 +187,8 @@ export const useChatStore = defineStore('chat', () => {
     items.value.forEach((it) => {
       if (it.kind === 'assistant') it.done = true;
     });
+    // 清理无工具调用也无正文的空消息
+    items.value = items.value.filter(it => !(it.kind === 'assistant' && !it.text));
     processTikzDiagrams();
   }
 

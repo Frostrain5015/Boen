@@ -13,16 +13,19 @@ export function useScrollManagement() {
   }
 
   function scrollDown(force = false) {
-    nextTick(() => {
-      requestAnimationFrame(() => {
-        const el = scroller.value;
-        if (!el) return;
-        const threshold = Math.max(280, el.clientHeight * 0.5);
-        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-        if (force || isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: force ? 'instant' : 'smooth' });
-        hasScrollOverflow.value = el.scrollHeight > el.clientHeight + 1;
-      });
-    });
+    const doScroll = () => {
+      const el = scroller.value;
+      if (!el) return;
+      const threshold = Math.max(280, el.clientHeight * 0.5);
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+      if (force || isNearBottom) el.scrollTo({ top: el.scrollHeight, behavior: force ? 'instant' : 'smooth' });
+      hasScrollOverflow.value = el.scrollHeight > el.clientHeight + 1;
+    };
+    if (force) {
+      doScroll();
+    } else {
+      nextTick(() => requestAnimationFrame(doScroll));
+    }
   }
 
   let overflowObserver: ResizeObserver | undefined;
