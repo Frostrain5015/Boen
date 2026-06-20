@@ -331,16 +331,30 @@ function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'ArrowRight') { e.preventDefault(); nextGroup(); }
 }
 
+/**
+ * 计算题号轨道的左右 padding，使第一个和最后一个圆点都能滚到视口正中。
+ * padding = (容器宽度 - 单个圆点宽度) / 2
+ */
+function setupDotNavPadding() {
+  const nav = dotNavRef.value;
+  if (!nav) return;
+  const firstDot = nav.querySelector<HTMLElement>('.question-dot');
+  if (!firstDot) return;
+  const pad = Math.max(0, (nav.clientWidth - firstDot.offsetWidth) / 2);
+  nav.style.paddingLeft = `${pad}px`;
+  nav.style.paddingRight = `${pad}px`;
+  nextTick(() => centerCurrentDot());
+}
+
 function centerCurrentDot() {
   const nav = dotNavRef.value;
   if (!nav) return;
   const active = nav.querySelector<HTMLElement>('.question-dot-current');
   if (!active) return;
-  const navRect = nav.getBoundingClientRect();
-  const dotRect = active.getBoundingClientRect();
-  const dotCenter = dotRect.left + dotRect.width / 2 - navRect.left + nav.scrollLeft;
-  const target = dotCenter - navRect.width / 2;
-  nav.scrollLeft = Math.max(0, target);
+  // active.offsetLeft = 元素左边缘相对滚动内容的偏移（含 padding-left）
+  // 目标：让 active 的中心对齐容器可视区中心
+  const target = active.offsetLeft + active.offsetWidth / 2 - nav.clientWidth / 2;
+  nav.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
 }
 
 function gradeLabel(g: string): string {
@@ -674,7 +688,7 @@ watch(examState, (s) => {
   examTrace('state', s);
   if (s === 'taking' || s === 'results') {
     scheduleTikzProcessing();
-    nextTick(() => centerCurrentDot());
+    nextTick(() => setupDotNavPadding());
   }
 });
 watch(currentGroup, () => {
@@ -846,12 +860,25 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-onMounted(() => { window.addEventListener('keydown', handleKeydown); });
+let dotNavResizeTimer: ReturnType<typeof setTimeout> | null = null;
+function onWindowResize() {
+  if (dotNavResizeTimer) clearTimeout(dotNavResizeTimer);
+  dotNavResizeTimer = setTimeout(() => {
+    if (examState.value === 'taking') setupDotNavPadding();
+  }, 150);
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown);
+  window.addEventListener('resize', onWindowResize);
+});
 onUnmounted(() => {
   if (timerInterval.value) clearInterval(timerInterval.value);
   for (const id of tikzTimers) window.clearTimeout(id);
   tikzTimers.clear();
+  if (dotNavResizeTimer) clearTimeout(dotNavResizeTimer);
   window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('resize', onWindowResize);
 });
 </script>
 
