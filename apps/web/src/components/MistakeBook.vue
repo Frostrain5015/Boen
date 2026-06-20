@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mistake-root flex h-full min-h-0 flex-col" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 320 } }">
+  <div class="mistake-root flex h-full min-h-0 flex-col">
     <header class="flex shrink-0 items-center gap-3 px-5 py-3.5">
       <button
         @click="$emit('back')"

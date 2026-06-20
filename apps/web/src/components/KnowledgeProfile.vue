@@ -163,7 +163,7 @@ watch(grade, fetchOutline);
 </script>
 
 <template>
-  <div class="profile-root" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 400 } }">
+  <div class="profile-root">
     <!-- Loading -->
     <div v-if="loading" class="flex h-full items-center justify-center">
       <div class="flex flex-col items-center gap-3">

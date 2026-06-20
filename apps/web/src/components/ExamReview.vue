@@ -139,7 +139,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
 </script>
 
 <template>
-  <div class="review-root" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 300 } }">
+  <div class="review-root">
     <!-- 顶栏 -->
     <div class="flex items-center gap-2 border-b border-[var(--line)] bg-[var(--surface)] px-5 py-3">
       <button @click="emit('back')" class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50">

@@ -896,7 +896,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="exam-root" :data-subject="config.subject" v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { duration: 300 } }">
+  <div class="exam-root" :data-subject="config.subject">
     <!-- ═══ CONFIG ═══ -->
     <div v-if="examState === 'config'" class="flex h-full flex-col items-center justify-center p-6">
       <div class="clay clay-glass w-full max-w-lg overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
