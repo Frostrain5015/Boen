@@ -340,11 +340,15 @@ export function reviewBlueprintMatchPrompt(questions: ExamQuestion[], blueprint:
   const coveragePlan = `必考：${blueprint.coveragePlan.must.join('、')}；重点：${blueprint.coveragePlan.focus.join('、')}`;
   const diffDist = `easy ${Math.round(blueprint.difficultyDistribution.easy * 100)}% / medium ${Math.round(blueprint.difficultyDistribution.medium * 100)}% / hard ${Math.round(blueprint.difficultyDistribution.hard * 100)}%`;
 
+  const actualSum = questions.reduce((s, q) => s + q.points, 0);
+
   return [
     '你是试卷审核专家。请检查试卷是否匹配设计蓝图的要求。',
     '',
     '=== 蓝图要求 ===',
     `试卷标题：${blueprint.title}`,
+    `目标总分：${blueprint.totalScore} 分（各题分值之和必须精确等于此值）`,
+    `当前各题分值合计：${actualSum} 分${actualSum !== blueprint.totalScore ? ' ⚠ 偏差！' : ' ✓'}`,
     `板块划分：`,
     blueprintSummary,
     `知识点覆盖：${coveragePlan}`,
@@ -359,10 +363,12 @@ export function reviewBlueprintMatchPrompt(questions: ExamQuestion[], blueprint:
     '2. 题目难度是否匹配蓝图要求',
     '3. 是否遗漏了必考知识点',
     '4. 是否有超出蓝图范围的题目',
+    `5. 各题 points 之和是否等于目标总分 ${blueprint.totalScore}（当前合计 ${actualSum}，${actualSum === blueprint.totalScore ? '匹配' : '不匹配，需在 issues 中指出'})`,
     '',
     '=== 输出格式（必须严格按此 JSON 结构，字段名不能改） ===',
     '{"scores":[{"index":0,"score":100,"issues":[]}],"overallMatchScore":85}',
     '其中 score=100 完全匹配, <60=偏离蓝图；overallMatchScore 为全卷匹配度。',
+    '若总分不匹配，overallMatchScore 应低于 70。',
   ].join('\n');
 }
 

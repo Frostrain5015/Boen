@@ -195,6 +195,13 @@ export async function reviewBoard(
   // 本地格式预检（快速失败，不走 LLM）
   const localFormatIssues = detectLocalFormatIssues(questions);
 
+  // 总分预检（纯代码判断，不走 LLM）
+  const actualTotalPoints = questions.reduce((s, q) => s + q.points, 0);
+  const totalScoreMismatch = actualTotalPoints !== blueprint.totalScore;
+  if (totalScoreMismatch) {
+    console.warn(`[review] 总分预检：${actualTotalPoints} ≠ ${blueprint.totalScore}（蓝图目标），所有题 blueprint_match 维度将扣分`);
+  }
+
   // 5 维度并发（限 5 路，429 退避重试）
   const reviewTaskBuilders: Array<() => Promise<ReviewResult>> = [
     () => runSingleReview(model, reviewCorrectnessPrompt(questions, config), 'review_correctness', correctnessReviewSchema, 'correctness', questions.length),
@@ -229,6 +236,16 @@ export async function reviewBoard(
         dimension: 'format',
         score: 30,
         issues: [localFormatIssues.get(i)!],
+      };
+    }
+
+    // 覆盖：总分预检不通过时，所有题的 blueprint_match 维度扣分
+    if (totalScoreMismatch) {
+      const existing = dimScores.blueprint_match;
+      dimScores.blueprint_match = {
+        dimension: 'blueprint_match',
+        score: Math.min(existing.score, 50),
+        issues: [...existing.issues, `总分偏差：合计 ${actualTotalPoints} 分 ≠ 目标 ${blueprint.totalScore} 分`],
       };
     }
 

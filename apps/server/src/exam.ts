@@ -126,6 +126,78 @@ function cleanGeneratedText(raw: unknown): string {
   return text;
 }
 
+/**
+ * 出题后立即校准确保 sum(question.points) === 蓝图目标总分。
+ * 蓝图阶段的 validateAndFixBlueprint + tuneCountsToTarget 已保证 count × pointsPer = target，
+ * 但 toExamQuestion 固定取 task.pointsPer，理论上不会偏差。
+ * 此函数是防御性兜底：若有偏差则均匀分配到各题，避免带着错误进入审核。
+ */
+function calibratePointsToBlueprint(questions: ExamQuestion[], blueprint: ExamBlueprint): ExamQuestion[] {
+  if (questions.length === 0) return questions;
+
+  const blueprintTotal = blueprint.totalScore;
+  let actualTotal = questions.reduce((s, q) => s + q.points, 0);
+
+  if (actualTotal === blueprintTotal) {
+    console.log(`[exam] 写题后总分校验：${actualTotal} = ${blueprintTotal} ✓`);
+    return questions;
+  }
+
+  const diff = blueprintTotal - actualTotal;
+  console.warn(`[exam] 写题后总分校验：${actualTotal} → ${blueprintTotal}（${diff > 0 ? '补' : '减'}${Math.abs(diff)}分）`);
+
+  // 均匀分配差值，每题最多调整 ±5 分，从后往前分配（高分题优先吸收）
+  let remaining = diff;
+  const maxPerQ = 5;
+
+  while (remaining !== 0) {
+    let changed = false;
+    const step = remaining > 0 ? 1 : -1;
+    // 加点从后往前（高分题优先），减分从前往后（低分题优先保底线）
+    const startIdx = remaining > 0 ? questions.length - 1 : 0;
+    const direction = remaining > 0 ? -1 : 1;
+
+    for (let i = startIdx; i >= 0 && i < questions.length; i += direction) {
+      if (remaining === 0) break;
+      const q = questions[i];
+      const adjust = Math.min(Math.abs(remaining), maxPerQ) * step;
+      const newPts = q.points + adjust;
+      if (newPts >= 1) {
+        q.points = newPts;
+        remaining -= adjust;
+        changed = true;
+      }
+    }
+
+    if (!changed && remaining !== 0) {
+      // 放宽限制：无上限吸收
+      for (let i = questions.length - 1; i >= 0 && remaining !== 0; i--) {
+        const q = questions[i];
+        if (remaining > 0) {
+          q.points += remaining;
+          remaining = 0;
+        } else if (remaining < 0 && q.points > 1) {
+          const canReduce = q.points - 1;
+          const reduce = Math.min(canReduce, Math.abs(remaining));
+          q.points -= reduce;
+          remaining += reduce;
+        }
+      }
+      if (remaining !== 0) {
+        console.error(`[exam] ⚠ 写题后总分校验失败：仍差 ${remaining} 分`);
+        break;
+      }
+    }
+  }
+
+  actualTotal = questions.reduce((s, q) => s + q.points, 0);
+  if (actualTotal !== blueprintTotal) {
+    console.error(`[exam] ❌ 写题后总分校验异常：${actualTotal} ≠ ${blueprintTotal}，强制修正最后一题`);
+    questions[questions.length - 1].points += (blueprintTotal - actualTotal);
+  }
+  return questions;
+}
+
 function orderExamQuestionsForDelivery(questions: ExamQuestion[]): ExamQuestion[] {
   const grouped = new Map<string, { order: number; typeOrder: number; questions: ExamQuestion[] }>();
   questions.forEach((q, originalOrder) => {
@@ -507,6 +579,10 @@ export async function generateExam(
     // 编号 + 本地格式修复 + 卷面题型顺序硬约束：
     // 选择/判断在前，填空/简答在后；同 groupId 的材料题保持相邻。
     let questions = orderExamQuestionsForDelivery(allQuestions);
+
+    // ─── 写题后总分校验：进入审核前确保 sum(points) === blueprintTotal ────
+    questions = calibratePointsToBlueprint(questions, blueprint);
+
     await onProgress?.({ step: 'write', message: 'write', progress: 66 });
 
     // ─── 阶段三：审核委员会（5 维度并发） ──────
