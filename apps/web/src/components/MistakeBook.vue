@@ -96,6 +96,29 @@ const currentBatchIndex = ref(0);
 const subjectFilter = ref<Subject | 'all'>('all');
 const rightView = ref<'idle' | 'create' | 'detail'>('idle');
 const questionType = ref('');
+const choiceOptions = ref(['', '', '', '']);
+const selectedChoice = ref('');
+const judgmentAnswer = ref('');
+const fillAnswer = ref('');
+const detailedAnswer = ref('');
+
+function resetStructuredFields() {
+  choiceOptions.value = ['', '', '', ''];
+  selectedChoice.value = '';
+  judgmentAnswer.value = '';
+  fillAnswer.value = '';
+  detailedAnswer.value = '';
+}
+
+const promptPlaceholder = computed(() => {
+  if (questionType.value === '选择题') return '输入题干内容，选项在下方单独填写…';
+  if (questionType.value === '判断题') return '输入需要判断的陈述内容…';
+  if (questionType.value === '填空题') return '输入题目内容，用 ____ 标记填空位置…';
+  if (questionType.value === '解答题') return '输入题目内容，学生作答在下方单独填写…';
+  return '粘贴或输入题面、选项、原始作答...';
+});
+
+watch(questionType, () => resetStructuredFields());
 
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
 
@@ -225,6 +248,25 @@ function onDrop(event: DragEvent) {
   setImage(event.dataTransfer?.files?.[0] ?? null);
 }
 
+function buildPromptText(): string {
+  if (questionType.value === '选择题') {
+    const opts = choiceOptions.value
+      .map((t, i) => t.trim() ? `${String.fromCharCode(65 + i)}. ${t.trim()}` : '')
+      .filter(Boolean)
+      .join('\n');
+    return [textPrompt.value.trim(), opts].filter(Boolean).join('\n');
+  }
+  return textPrompt.value.trim();
+}
+
+function buildStudentAnswer(): string {
+  if (questionType.value === '选择题') return selectedChoice.value || studentAnswer.value;
+  if (questionType.value === '判断题') return judgmentAnswer.value || studentAnswer.value;
+  if (questionType.value === '填空题') return fillAnswer.value || studentAnswer.value;
+  if (questionType.value === '解答题') return detailedAnswer.value || studentAnswer.value;
+  return studentAnswer.value;
+}
+
 async function submitMistake() {
   if (busy.value) return;
   error.value = '';
@@ -241,8 +283,8 @@ async function submitMistake() {
         sourceType: 'text',
         subject,
         grade: props.grade,
-        promptText: textPrompt.value,
-        studentAnswer: studentAnswer.value,
+        promptText: buildPromptText(),
+        studentAnswer: buildStudentAnswer(),
         note: [questionType.value ? `题型：${questionType.value}` : '', note.value].filter(Boolean).join(' · '),
       });
     } else {
@@ -264,6 +306,7 @@ async function submitMistake() {
     studentAnswer.value = '';
     note.value = '';
     questionType.value = '';
+    resetStructuredFields();
     clearImage();
     rightView.value = 'detail';
   } catch (err) {
@@ -320,6 +363,11 @@ function openCreateForm() {
   batchMistakes.value = [];
   currentBatchIndex.value = 0;
   resetProgress();
+  resetStructuredFields();
+  textPrompt.value = '';
+  studentAnswer.value = '';
+  note.value = '';
+  questionType.value = '';
 }
 
 function selectMistake(m: MistakeItem) {
@@ -524,10 +572,72 @@ onBeforeUnmount(() => {
                       <p class="text-xs font-bold text-[var(--ink-soft)]">{{ mode === 'image' ? '补充题面（可选）' : '题面' }}</p>
                       <span v-if="mode === 'image'" class="text-[10px] text-[var(--ink-soft)] opacity-60">OCR 识别后自动填入，可手动修正</span>
                     </div>
-                    <textarea v-model="textPrompt" rows="6" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" :placeholder="mode === 'image' ? 'OCR 识别后将自动填入，也可在此补充...' : '粘贴或输入题面、选项、原始作答...'" />
+                    <textarea v-model="textPrompt" rows="5" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" :placeholder="mode === 'image' ? 'OCR 识别后将自动填入，也可在此补充...' : promptPlaceholder" />
                   </section>
 
-                  <div class="grid gap-3 md:grid-cols-2">
+                  <!-- ===== 选择题：四个选项输入 + radio 标记学生所选 ===== -->
+                  <section v-if="mode === 'text' && questionType === '选择题'" class="space-y-2">
+                    <p class="text-xs font-bold text-[var(--ink-soft)]">选项内容 <span class="font-normal opacity-60">（点击圆圈标记学生选择的答案）</span></p>
+                    <div v-for="(opt, i) in choiceOptions" :key="i" class="group flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/75 px-3 py-2.5 transition-all focus-within:border-[var(--accent)] focus-within:ring-4 focus-within:ring-[var(--accent-soft)]">
+                      <button
+                        @click="selectedChoice = String.fromCharCode(65 + i)"
+                        class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all"
+                        :class="selectedChoice === String.fromCharCode(65 + i)
+                          ? 'border-[var(--error)] bg-[var(--error)]/10 text-[var(--error)]'
+                          : 'border-[var(--line)] text-[var(--ink-soft)] hover:border-[var(--accent)] hover:text-[var(--accent)]'"
+                        :title="`标记学生选了 ${String.fromCharCode(65 + i)}`"
+                      >
+                        <span class="text-xs font-bold">{{ String.fromCharCode(65 + i) }}</span>
+                      </button>
+                      <input
+                        :value="choiceOptions[i]"
+                        @input="choiceOptions[i] = ($event.target as HTMLInputElement).value"
+                        class="min-w-0 flex-1 border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none"
+                        :placeholder="`选项 ${String.fromCharCode(65 + i)} 的内容`"
+                      />
+                      <span v-if="selectedChoice === String.fromCharCode(65 + i)" class="shrink-0 text-[10px] font-bold text-[var(--error)]">学生选的</span>
+                    </div>
+                  </section>
+
+                  <!-- ===== 判断题：正确 / 错误 按钮 ===== -->
+                  <section v-else-if="mode === 'text' && questionType === '判断题'" class="space-y-2">
+                    <p class="text-xs font-bold text-[var(--ink-soft)]">学生判断</p>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button
+                        @click="judgmentAnswer = '正确'"
+                        class="flex h-12 items-center justify-center gap-2 rounded-2xl border-2 text-sm font-bold transition-all active:scale-[0.97]"
+                        :class="judgmentAnswer === '正确'
+                          ? 'border-[#18a558] bg-[#e7f7ee] text-[#18a558]'
+                          : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[#18a558]'"
+                      >
+                        <CheckCircle2 class="h-4 w-4" /> 正确
+                      </button>
+                      <button
+                        @click="judgmentAnswer = '错误'"
+                        class="flex h-12 items-center justify-center gap-2 rounded-2xl border-2 text-sm font-bold transition-all active:scale-[0.97]"
+                        :class="judgmentAnswer === '错误'
+                          ? 'border-[var(--error)] bg-[var(--error)]/10 text-[var(--error)]'
+                          : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--error)]'"
+                      >
+                        <X class="h-4 w-4" /> 错误
+                      </button>
+                    </div>
+                  </section>
+
+                  <!-- ===== 填空题：填空答案输入 ===== -->
+                  <section v-else-if="mode === 'text' && questionType === '填空题'" class="space-y-2">
+                    <p class="text-xs font-bold text-[var(--ink-soft)]">学生填空答案</p>
+                    <input v-model="fillAnswer" class="w-full rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="输入学生填写的答案" />
+                  </section>
+
+                  <!-- ===== 解答题：学生作答 textarea ===== -->
+                  <section v-else-if="mode === 'text' && questionType === '解答题'" class="space-y-2">
+                    <p class="text-xs font-bold text-[var(--ink-soft)]">学生作答</p>
+                    <textarea v-model="detailedAnswer" rows="5" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="输入学生的完整解答过程" />
+                  </section>
+
+                  <!-- ===== 通用：未选择题型 / 图片模式 → 原有简单输入 ===== -->
+                  <div v-else class="grid gap-3 md:grid-cols-2">
                     <section class="rounded-2xl bg-white/75 p-4">
                       <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">学生答案</p>
                       <input v-model="studentAnswer" class="w-full border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none" placeholder="输入学生的作答（可选）" />
@@ -537,6 +647,12 @@ onBeforeUnmount(() => {
                       <input v-model="note" class="w-full border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none" placeholder="如：单元测验第 8 题（可选）" />
                     </section>
                   </div>
+
+                  <!-- ===== 来源备注（结构化模式下单独展示） ===== -->
+                  <section v-if="mode === 'text' && questionType" class="rounded-2xl bg-white/75 p-4">
+                    <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">来源备注</p>
+                    <input v-model="note" class="w-full border-none bg-transparent text-sm leading-relaxed text-[var(--ink)] outline-none" placeholder="如：单元测验第 8 题（可选）" />
+                  </section>
                 </div>
               </div>
             </article>
