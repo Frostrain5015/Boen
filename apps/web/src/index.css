@@ -9,6 +9,38 @@
   --font-body: 'Nunito', 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
+/* ── @property：将 CSS 变量注册为类型化 <color>，让渐变 background 可过渡 ── */
+@property --paper {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fbf6ee;
+}
+@property --paper-2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #f3e7d6;
+}
+@property --surface {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fffdf9;
+}
+@property --ink {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2c2722;
+}
+@property --ink-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #786a5d;
+}
+@property --line {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ece0cf;
+}
+
 :root {
   --paper: #fbf6ee;
   --paper-2: #f3e7d6;
@@ -92,18 +124,19 @@ html[data-fontsize="lg"] { font-size: 18px; }
     box-shadow 0.7s ease;
 }
 
-/* ── 类课堂光斑：入场轨道动画 + 过渡（必须在 * 之后，层叠优先级才够） ── */
+/* ── 类课堂光斑：入场轨道播放 + 加速浮动（长写属性，不改名 ⇒ 动画不重启）── */
 .boen-session .app-bg::before {
-  background: var(--accent);
   opacity: 0.62;
-  transition: background 0.7s ease, opacity 0.7s ease;
-  animation: blob-journey 1.4s cubic-bezier(0.22, 1, 0.36, 1) 1, blob 14s ease-in-out infinite 1.4s;
+  animation-duration: 1.4s, 14s;
+  animation-delay: 0s, 1.4s;
+  animation-play-state: running, running;
 }
 .boen-session .app-bg::after {
   background: #74b9ff;
   opacity: 0.6;
-  transition: background 0.7s ease, opacity 0.7s ease;
-  animation: blob-journey-reverse 1.4s cubic-bezier(0.22, 1, 0.36, 1) 1, blob 17s ease-in-out infinite reverse 1.4s;
+  animation-duration: 1.4s, 17s;
+  animation-delay: 0s, 1.4s;
+  animation-play-state: running, running;
 }
 
 html {
@@ -170,13 +203,22 @@ body {
   background: var(--accent);
   transition: background 0.7s ease, opacity 0.7s ease;
 }
+/* 光斑 1 — 右上（双动画：入场轨道暂停 + 浮动运行；session 激活后才播放入场） */
 .app-bg::before {
   width: 42vw;
   height: 42vw;
   top: -10vw;
   right: -8vw;
-  animation: blob 22s ease-in-out infinite;
+  animation-name: blob-journey, blob;
+  animation-duration: 1.4s, 22s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease-in-out;
+  animation-delay: 0s, 0s;
+  animation-iteration-count: 1, infinite;
+  animation-direction: normal, normal;
+  animation-fill-mode: forwards, none;
+  animation-play-state: paused, running;
 }
+/* 光斑 2 — 左下 */
 .app-bg::after {
   width: 34vw;
   height: 34vw;
@@ -184,7 +226,14 @@ body {
   left: -6vw;
   background: #ffb37a;
   opacity: 0.55;
-  animation: blob 26s ease-in-out infinite reverse;
+  animation-name: blob-journey-reverse, blob;
+  animation-duration: 1.4s, 26s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease-in-out;
+  animation-delay: 0s, 0s;
+  animation-iteration-count: 1, infinite;
+  animation-direction: normal, reverse;
+  animation-fill-mode: forwards, none;
+  animation-play-state: paused, running;
 }
 /* 颗粒噪点 */
 .app-grain {
