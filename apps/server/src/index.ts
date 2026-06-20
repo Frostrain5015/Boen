@@ -262,10 +262,7 @@ async function runGraph(
         if (name === SWITCH_SUBJECT_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
           await send({ type: 'todo_step', action: 'switch' });
-          const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
-          const subject = args?.subject ?? 'math';
-          await send({ type: 'subject_changed', subject });
-          console.log(`[Boen 类课堂] 🔄 switch_subject → ${subject} | ${new Date().toLocaleTimeString()}`);
+          console.log(`[Boen 类课堂] 🔄 switch_subject 检测到 | ${new Date().toLocaleTimeString()}`);
         }
       }
 
@@ -289,6 +286,14 @@ async function runGraph(
           const total = ((Date.now() - stepTimestamps[0]) / 1000).toFixed(1);
           console.log(`[Boen 类课堂] ✅ exit_session — ${stepCount}/${(exitCall.args as any)?.totalSteps ?? '?'}步 | ${(exitCall.args as any)?.score ?? '?'}分 | 总耗时 ${total}s | ${new Date().toLocaleTimeString()}`);
         }
+      }
+      // 兜底：用完整 args 重新发送 subject_changed（流式检测时 args 可能不完整）
+      const out = ev.data?.output as { tool_calls?: Array<{ name: string; args?: Record<string, unknown> }> } | undefined;
+      const switchCall = out?.tool_calls?.find((t) => t.name === SWITCH_SUBJECT_TOOL);
+      if (switchCall?.args) {
+        const subject = String((switchCall.args as any)?.subject ?? 'math');
+        await send({ type: 'subject_changed', subject });
+        console.log(`[Boen 类课堂] 🔄 switch_subject(完整args) → ${subject} | ${new Date().toLocaleTimeString()}`);
       }
     } else if (ev.event === 'on_chain_end') {
       const nodeName = (ev as any)?.name ?? '';
