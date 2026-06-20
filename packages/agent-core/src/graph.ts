@@ -243,7 +243,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
         const icon = s.status === 'completed' ? '✅' : s.status === 'in_progress' ? '▶️' : '⬜';
         return `${icon} 第${s.id}步：${s.label}${s.status === 'in_progress' ? '（当前步骤）' : ''}`;
       });
-      return '\n\n## 📋 教学步骤进度\n' + lines.join('\n') + '\n\n完成当前步骤后，请调用 advance_step 工具推进到下一步。';
+      return '\n\n## 📋 教学步骤进度（必须遵守）\n' + lines.join('\n') + '\n\n【强制】完成当前步骤后，**必须**调用 advance_step 工具。调用前不得输出下一步的内容。高级模型推理记录会检查你是否遵守此规则。';
     } catch { return ''; }
   }
 
