@@ -466,5 +466,6 @@ export type SseEvent =
   | { type: 'loading_knowledge_base' }
   | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'conversation_created'; conversationId: string; title: string }
+  | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number }
   | { type: 'done' }
   | { type: 'error'; message: string };

@@ -129,6 +129,63 @@ const MODE_WEIGHTS: Record<string, number> = {
   qa: 1.0, preview: 0.5, review: 1.0, weakness: 1.5, exam: 2.0,
 };
 
+// ── 结构化会话熟练度缓存 ─────────────────────
+// 学习过程中先缓存，结算时批量写入
+
+interface CachedUpdate {
+  score: number;
+  maxScore: number;
+  mode: string;
+  count: number;
+}
+
+const PROFICIENCY_CACHE = new Map<string, Map<number, CachedUpdate>>();
+
+function cacheKey(userId: string, threadId: string): string {
+  return `${userId}:${threadId}`;
+}
+
+/**
+ * 缓存一次熟练度更新（结构化学习模式下使用）
+ */
+export function cacheProficiencyUpdate(userId: string, threadId: string, kgNodeId: number, score: number, maxScore: number, mode: string): void {
+  const key = cacheKey(userId, threadId);
+  if (!PROFICIENCY_CACHE.has(key)) PROFICIENCY_CACHE.set(key, new Map());
+  const userCache = PROFICIENCY_CACHE.get(key)!;
+  const existing = userCache.get(kgNodeId);
+  if (existing) {
+    existing.score += score;
+    existing.maxScore += maxScore;
+    existing.count++;
+  } else {
+    userCache.set(kgNodeId, { score, maxScore, mode, count: 1 });
+  }
+}
+
+/**
+ * 批量写入缓存的熟练度更新，返回更新条数
+ */
+export function flushProficiencyCache(userId: string, threadId: string): number {
+  const key = cacheKey(userId, threadId);
+  const userCache = PROFICIENCY_CACHE.get(key);
+  if (!userCache || userCache.size === 0) return 0;
+  let count = 0;
+  for (const [kgNodeId, update] of userCache) {
+    updateProficiency(userId, kgNodeId, update.score, update.maxScore, update.mode);
+    count++;
+  }
+  PROFICIENCY_CACHE.delete(key);
+  return count;
+}
+
+/**
+ * 丢弃缓存的熟练度更新（用于异常中断时清理）
+ */
+export function discardProficiencyCache(userId: string, threadId: string): void {
+  const key = cacheKey(userId, threadId);
+  PROFICIENCY_CACHE.delete(key);
+}
+
 // ── CRUD ─────────────────────────────────────
 
 export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string): KpProficiency {

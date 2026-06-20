@@ -22,6 +22,7 @@ export const useUiStore = defineStore('ui', () => {
   const sidebarOpen = ref(!isMobile.value);
   const expandedSection = ref<'chat' | 'exam' | null>('chat');
   const activeMode = ref<ActiveMode>('none');
+  const sessionActive = ref(false);
   const practiceType = ref<string | null>(null);
   const practiceMenuOpen = ref(false);
   const modeTagSent = ref(false);
@@ -54,6 +55,7 @@ export const useUiStore = defineStore('ui', () => {
   // ── Actions ───────────────────────────────────────────────
 
   function activateMode(mode: 'review' | 'preview' | 'weakness') {
+    if (sessionActive.value) return; // 学习中不允许切换模式
     activeMode.value = activeMode.value === mode ? 'none' : mode;
     modeTagSent.value = false;
     const chatStore = useChatStore();
@@ -144,6 +146,7 @@ export const useUiStore = defineStore('ui', () => {
     isMobile,
     expandedSection,
     activeMode,
+    sessionActive,
     practiceType,
     practiceMenuOpen,
     modeTagSent,

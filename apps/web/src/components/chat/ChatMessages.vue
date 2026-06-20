@@ -95,4 +95,46 @@ onMounted(() => {
       </div>
     </div>
   </main>
+
+  <!-- 学习结算卡片 -->
+  <Teleport to="body">
+    <Transition name="panel-scale">
+      <div v-if="chatStore.learningSettlement" class="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="chatStore.learningSettlement = null">
+        <div class="clay clay-glass mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
+          <div class="border-b border-[var(--line)] bg-[var(--accent-soft)] px-5 py-4 text-center">
+            <span class="text-2xl">🎉</span>
+            <h3 class="mt-1 font-display text-lg font-bold text-[var(--ink)]">本次学习完成！</h3>
+          </div>
+          <div class="space-y-4 px-5 py-4">
+            <div class="flex items-center justify-center gap-4">
+              <div class="relative h-20 w-20">
+                <svg class="h-full w-full -rotate-90" viewBox="0 0 80 80">
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="var(--line)" stroke-width="6" />
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="#d4a053" stroke-width="6" stroke-linecap="round"
+                    :stroke-dasharray="2 * Math.PI * 34"
+                    :stroke-dashoffset="2 * Math.PI * 34 * (1 - chatStore.learningSettlement.score / 100)"
+                    class="transition-all duration-1000" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="font-display text-xl font-bold text-[#d4a053]">{{ chatStore.learningSettlement.score }}</span>
+                  <span class="text-[9px] font-medium text-[var(--ink-soft)]">分</span>
+                </div>
+              </div>
+              <div class="text-left text-xs text-[var(--ink-soft)]">
+                <p>📝 已完成 {{ chatStore.learningSettlement.stepsCompleted }} / {{ chatStore.learningSettlement.totalSteps }} 步</p>
+                <p>📊 更新了 {{ chatStore.learningSettlement.updatedKps }} 个知识点</p>
+              </div>
+            </div>
+            <div class="max-h-32 overflow-y-auto rounded-xl bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--ink)] md-body"
+              v-html="renderMarkdown(chatStore.learningSettlement.summary)">
+            </div>
+            <button @click="chatStore.learningSettlement = null"
+              class="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]">
+              继续学习
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>

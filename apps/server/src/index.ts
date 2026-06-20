@@ -25,7 +25,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -1190,8 +1190,28 @@ app.post('/api/chat', async (c) => {
 
       // 保存助手回复
       if (owned && last) {
-        const content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
+        let content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
         addMessage(body.conversationId!, 'assistant', content);
+
+        // 检测结构化学习结束标记 → 批量写入熟练度 + 发送结算事件
+        const scoreMatch = content.match(/【MODE_SCORE:\s*(\d+)】/);
+        const stepsMatch = content.match(/已完成\s*(\d+)\s*\/\s*(\d+)\s*步/);
+        if (scoreMatch && userId && body.threadId) {
+          const sessionScore = parseInt(scoreMatch[1]);
+          const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
+          const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
+          const updatedKps = flushProficiencyCache(userId, body.threadId);
+          await send({
+            type: 'settlement',
+            summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
+            score: sessionScore,
+            stepsCompleted,
+            totalSteps,
+            updatedKps,
+          });
+          // 从前端展示中移除评分标记
+          content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
+        }
         // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
         const qData = extractQuestionPayload(last, { subject: body.subject ?? 'math', grade: body.grade });
         if (qData) {
@@ -1250,16 +1270,29 @@ app.post('/api/explore', async (c) => {
         let content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
         addMessage(threadId, 'assistant', content);
 
-        // 解析探索评分 【EXPLORE_SCORE: N】，尝试匹配知识点并更新画像
+        // 解析探索评分标记 → 批量写入 + 结算事件
         const scoreMatch = content.match(/【EXPLORE_SCORE:\s*(\d+)】/);
         if (scoreMatch && userId) {
-          const exploreScore = Math.max(0, Math.min(100, parseInt(scoreMatch[1])));
+          const stepsMatch = content.match(/已完成\s*(\d+)\s*\/\s*(\d+)\s*步/);
+          const sessionScore = Math.max(0, Math.min(100, parseInt(scoreMatch[1])));
+          const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
+          const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
+
+          const updatedKps = flushProficiencyCache(userId, threadId);
           const { findKnowledgePointNode } = await import('./exam.js');
           const node = findKnowledgePointNode(body.title, body.subject);
           if (node) {
-            updateProficiency(userId, node.id, exploreScore, 100, 'explore');
+            updateProficiency(userId, node.id, sessionScore, 100, 'explore');
           }
-          // 从前端展示中移除评分标记
+
+          await send({
+            type: 'settlement',
+            summary: content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '').trim(),
+            score: sessionScore,
+            stepsCompleted,
+            totalSteps,
+            updatedKps: updatedKps + (node ? 1 : 0),
+          });
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
       }
@@ -1448,7 +1481,12 @@ app.post('/api/answer', async (c) => {
           const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
           const before = oldRow?.weighted_score ?? -1;
           const currentMode = ((state.values as any)?.mode as string) ?? 'qa';
-          updateProficiency(userId, node.id, result.score, result.maxScore, currentMode);
+          // 结构化学习模式：缓存更新，结算时批量写入
+          if (['review', 'preview', 'weakness', 'practice', 'explore'].includes(currentMode)) {
+            cacheProficiencyUpdate(userId, body.threadId, node.id, result.score, result.maxScore, currentMode);
+          } else {
+            updateProficiency(userId, node.id, result.score, result.maxScore, currentMode);
+          }
           const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
           const after = newRow?.weighted_score ?? -1;
           profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });

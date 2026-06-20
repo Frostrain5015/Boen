@@ -45,6 +45,7 @@ export const useChatStore = defineStore('chat', () => {
   const input = ref('');
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
+  const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number } | null>(null);
   // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
@@ -94,7 +95,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // ── SSE event handler ────────────────────────────────────
-  function handleEvent(e: SseEvent, idx: { value: number }) {
+  async function handleEvent(e: SseEvent, idx: { value: number }) {
     if (e.type === 'token') {
       let cur = items.value[idx.value];
       if (!cur || cur.kind !== 'assistant') {
@@ -132,6 +133,11 @@ export const useChatStore = defineStore('chat', () => {
           dailyRemaining: e.dailyRemaining,
         };
       }
+    } else if (e.type === 'settlement') {
+      learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps };
+      const { useUiStore } = await import('@/stores/ui');
+      const ui = useUiStore();
+      if ('sessionActive' in ui) (ui as any).sessionActive = false;
     } else if (e.type === 'error') {
       items.value.push(newAssistant(`\u26a0\ufe0f ${e.message}`));
     }
@@ -189,6 +195,7 @@ export const useChatStore = defineStore('chat', () => {
           subject: uiStore.subject,
           conversationId: currentConversationId.value ?? undefined,
           practiceType: uiStore.practiceType ?? undefined,
+          mode: uiStore.activeMode !== 'none' ? (uiStore.activeMode as any) : undefined,
         },
         (e) => handleEvent(e, idx),
       );
@@ -319,6 +326,7 @@ export const useChatStore = defineStore('chat', () => {
     currentConversationId,
     reaction,
     dailyLimitReached,
+    learningSettlement,
     // getters
     hasItems,
     showTyping,
