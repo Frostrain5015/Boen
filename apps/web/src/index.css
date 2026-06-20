@@ -157,7 +157,9 @@ body {
     radial-gradient(90% 70% at 0% 100%, #f3e7d6 0%, transparent 50%),
     linear-gradient(180deg, #fbf6ee 0%, #f3e7d6 100%);
 }
-/* 冷色覆盖层（opacity 交叉淡变，浏览器保证可过渡） */
+/* 冷色覆盖层（opacity 交叉淡变，浏览器保证可过渡）
+   背景硬编码冷色 paper，不依赖 var() — CSS 变量 snap 时
+   背景不跳变，仅 opacity 变化 → 进出都平滑 */
 .app-bg-overlay {
   position: absolute;
   inset: 0;
@@ -167,8 +169,8 @@ body {
   transition: opacity 0.7s ease;
   background:
     radial-gradient(120% 80% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
-    radial-gradient(90% 70% at 0% 100%, var(--paper-2) 0%, transparent 50%),
-    linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+    radial-gradient(90% 70% at 0% 100%, #e5eaf3 0%, transparent 50%),
+    linear-gradient(180deg, #f1f4f9 0%, #e5eaf3 100%);
 }
 .boen-session .app-bg-overlay {
   opacity: 1;
