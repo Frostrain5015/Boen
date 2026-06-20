@@ -294,9 +294,13 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } },
     } as any : undefined) : model;
 
+    // 移除前几轮 agent 循环添加的 system/curriculum 消息，避免重复追加
+    const filteredMessages = state.messages.filter((m: any) =>
+      m._getType?.() !== 'system' && m._getType?.() !== '__end__'
+    );
     const messages = state.curriculum
-      ? [system, new SystemMessage(state.curriculum), ...state.messages]
-      : [system, ...state.messages];
+      ? [system, new SystemMessage(state.curriculum), ...filteredMessages]
+      : [system, ...filteredMessages];
     const response = await llm.invoke(messages);
 
     // 检测模式切换工具调用 → 记录待确认状态

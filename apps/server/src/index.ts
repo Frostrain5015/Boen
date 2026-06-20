@@ -185,7 +185,7 @@ function checkAndIncrementUsage(userId: string): { allowed: boolean; remaining: 
 }
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
-const runConfig = (threadId: string) => ({ version: 'v2' as const, configurable: { thread_id: threadId } });
+const runConfig = (threadId: string) => ({ version: 'v2' as const, configurable: { thread_id: threadId }, recursionLimit: 50 });
 
 /** 流式跑一次图：推送 token，结束后返回最后一条消息 */
 async function runGraph(
