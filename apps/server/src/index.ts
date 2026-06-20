@@ -1277,7 +1277,6 @@ app.post('/api/chat', async (c) => {
           styleExamples,
           practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
-          ...(todoState ? { todoState } : {}),
         },
         body.threadId,
         send,
