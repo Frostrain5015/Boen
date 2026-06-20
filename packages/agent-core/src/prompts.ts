@@ -128,6 +128,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
     '- 核心方法：让学生讲，不是你自己讲。先让学生用自己的话回忆和表达，暴露掌握程度。',
     '- 根据学生讲述中的遗漏做针对性补充，不要全覆盖重讲。',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调用 advance_step 就看不到下一步该做什么。** 调用流程：完成当前步 → 调 advance_step → 系统显示下一步内容 → 你再执行。',
+    '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     '',
     '【教学要求】',
     '- 【KaTeX 公式规则】行内用 $...$，行间用 $$...$$。**$$ 必须成对出现**。',
@@ -156,6 +157,7 @@ export function systemPromptForPreview(gradeBand: GradeBand, subject?: string, u
     '- 使用 KaTeX 和 TikZ 的规则同日常模式。',
     '- 预习完成后，学生说「明白了」即可结束，不需要出题测试。',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具，然后等待系统推进步骤。**严禁连续输出多个步骤的内容而不调用 advance_step**。每调用一次 advance_step，系统会更新步骤状态，你才能在 TODO 清单中看到下一步。不调用 advance_step = 步骤不会推进。',
+    '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
@@ -187,6 +189,7 @@ export function systemPromptForWeakness(gradeBand: GradeBand, subject?: string, 
     '- 无历史数据时直接开始练习，不要强行要求学生提供错题。',
     '- 使用 KaTeX 和 TikZ 的规则同日常模式。',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调工具就看不到。** 完成当前步 → 调 advance_step → 系统显示下一步。',
+    '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
@@ -279,6 +282,7 @@ export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand
     '- 每道题作答后必须标注错因，不能只打对错',
     '- 练习结束后给出本次小结和下次复习建议',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调工具就看不到。** 完成当前步 → 调 advance_step → 系统显示下一步。',
+    '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途提前结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');

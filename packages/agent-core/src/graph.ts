@@ -239,11 +239,15 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     try {
       const todo = JSON.parse(todoJson);
       if (!todo.steps?.length) return '';
+      const allDone = todo.steps.every((s: any) => s.status === 'completed');
       const lines = todo.steps.map((s: any) => {
         if (s.status === 'completed') return `✅ 第${s.id}步：${s.label} ✅`;
         if (s.status === 'in_progress') return `▶️ 第${s.id}步：${s.label}（当前步骤）`;
         return `⬜ 第${s.id}步：？？？`;
       });
+      if (allDone) {
+        return '\n\n## 📋 步骤进度\n' + lines.join('\n') + '\n\n🎉 所有步骤已完成！请调用 exit_session 工具结束学习并提交评分。';
+      }
       return '\n\n## 📋 步骤进度\n' + lines.join('\n') + '\n\n【强制】完成当前步骤后调用 advance_step 查看下一步。不调工具看不到下一步内容。';
     } catch { return ''; }
   }

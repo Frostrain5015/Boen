@@ -273,14 +273,36 @@ async function runGraph(
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });
   const msgs = (state.values?.messages ?? []) as BaseMessage[];
+  // 返回最后一条 AI 消息（含 tool_calls），而非 exitSession 节点产生的 ToolMessage
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i]._getType() === 'ai') return msgs[i];
+  }
   return msgs[msgs.length - 1];
 }
 
-/** 检测并发送 review_complete 事件 */
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
 async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string) {
-  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
-  const exitCall = calls.find((c) => c.name === EXIT_SESSION_TOOL);
+  let exitCall: ToolCall | undefined;
+
+  // Case 1: last 本身是带 exit_session 的 AI 消息
+  const lastCalls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
+  exitCall = lastCalls.find((c) => c.name === EXIT_SESSION_TOOL);
+
+  // Case 2: 消息已被 exitSession 节点处理 → 从 state 历史中回溯查找
+  if (!exitCall && threadId) {
+    try {
+      const state = await graph.getState({ configurable: { thread_id: threadId } });
+      const msgs = (state?.values?.messages ?? []) as BaseMessage[];
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const aiMsg = msgs[i] as AIMessage;
+        if (aiMsg?.tool_calls?.length) {
+          const found = (aiMsg.tool_calls as ToolCall[]).find((c) => c.name === EXIT_SESSION_TOOL);
+          if (found) { exitCall = found; break; }
+        }
+      }
+    } catch {}
+  }
+
   if (exitCall?.args && userId && threadId) {
     const args = exitCall.args as Record<string, unknown>;
     const updatedKps = flushProficiencyCache(userId, threadId);
