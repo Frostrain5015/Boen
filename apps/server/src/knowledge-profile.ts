@@ -15,10 +15,29 @@ import type { ProficiencyLevel, KpProficiency, LiteracyProficiency, ProfileRecom
  * Textbook navigation markers, not assessable teaching sections.  The source
  * curriculum remains unchanged; only the learner profile tree is pruned.
  */
-const PROFILE_OUTLINE_NOISE = /^(?:数学活动|小结|复习题\d*|阅读综合实践|本章复习与测试|(?:单元)?整理和复习|总复习)$/u;
+const PROFILE_OUTLINE_NOISE = /^(?:数学活动|小结|复习题\d*|本章复习与测试|(?:单元)?整理和复习|总复习)$/u;
+/** Trivial non-teaching activity titles (no assessable content) */
+const TRIVIAL_NOISE = ['数学游戏', '拼图游戏', '图说数学史'];
 
 export function isProfileOutlineNoise(title: string): boolean {
-  return PROFILE_OUTLINE_NOISE.test(title.replace(/\s+/g, '').replace(/^☆/, ''));
+  const clean = title.replace(/\s+/g, '').replace(/^☆/, '');
+  if (PROFILE_OUTLINE_NOISE.test(clean)) return true;
+  return TRIVIAL_NOISE.some(t => clean.startsWith(t));
+}
+
+/**
+ * Sections suited for AI conversational exploration rather than traditional
+ * exam-based assessment.  These appear in the profile with a distinct 📖 icon
+ * and trigger an AI dialogue on click.
+ */
+const EXPLORE_PATTERNS = [
+  '阅读与思考', '课题学习', '实验与探究', '探究与发现',
+  '综合与实践', '数学思考', '游戏规则的公平性',
+  '像科学家那样探究', '探究物质组成的奥秘', '数字编码',
+];
+export function isExploreSection(title: string): boolean {
+  const clean = title.replace(/\s+/g, '').replace(/^[★☆]/, '');
+  return EXPLORE_PATTERNS.some(p => clean.includes(p));
 }
 
 // ── 等级阈值 ────────────────────────────────
@@ -444,7 +463,9 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
   let weakCount = 0, goodCount = 0, masteredCount = 0;
 
   function enrichUnit(unitId: number, title: string): any {
-    const kps = db.prepare(`
+    // 探索型章节不参与上级聚合，不加载知识点
+    const isExplore = isExploreSection(title);
+    const kps = isExplore ? [] : db.prepare(`
       SELECT n.id, n.title, n.weight FROM curriculum_kg_map m
       JOIN kg_nodes n ON n.id = m.node_id
       WHERE m.unit_id=? AND n.type='knowledge_point'
@@ -484,7 +505,7 @@ export function getProfileOutline(subject: string, grade: string, userId?: strin
     }
 
     const secAvg = weightedAvg(kpNodes);
-    return { title, weightedScore: secAvg, knowledgePoints: kpNodes };
+    return { title, weightedScore: secAvg, knowledgePoints: kpNodes, kind: isExplore ? 'explore' : 'section' };
   }
 
   /** 数据丰富度阈值：低于此练习次数的知识点在聚合时权重打折 */

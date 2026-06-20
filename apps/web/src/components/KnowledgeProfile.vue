@@ -21,6 +21,7 @@ interface SectionNode {
   weightedScore: number;
   level?: string;
   knowledgePoints: KpNode[];
+  kind?: string;
 }
 
 interface ChapterNode {
@@ -74,6 +75,7 @@ const emit = defineEmits<{
   (e: 'back'): void;
   (e: 'practice', detail: { kp?: string; subject: 'chinese' | 'math' | 'english' | 'science'; grade: string; mode?: string }): void;
   (e: 'exam', detail: { subject: 'chinese' | 'math' | 'english' | 'science'; grade: string; durationMinutes: number; notes: string }): void;
+  (e: 'explore', detail: { title: string; subject: 'chinese' | 'math' | 'english' | 'science'; grade: string }): void;
 }>();
 
 const SUBJECTS = [
@@ -324,32 +326,44 @@ watch(grade, fetchOutline);
               <Transition name="tree-collapse">
                 <div v-if="expandedSections.has('ch-' + ch.title)" class="border-t border-[var(--line)] bg-[var(--surface)]">
                   <div v-for="sec in ch.children" :key="sec.title" class="border-b border-[var(--line)] last:border-b-0">
-                    <button @click="toggleSection('sec-' + sec.title)" class="flex w-full items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-white/50">
-                      <component :is="expandedSections.has('sec-' + sec.title) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-[var(--ink-soft)]" />
+                    <!-- 探索型章节（阅读与思考、课题学习等）：点击触发 AI 对话 -->
+                    <button v-if="sec.kind === 'explore'"
+                      @click="emit('explore', { title: sec.title, subject, grade })"
+                      class="flex w-full items-center gap-2 px-6 py-2.5 text-left transition-all hover:bg-[#fef7e6] active:scale-[0.99]"
+                    >
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#fef7e6] text-[11px]">📖</span>
                       <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
+                      <span class="text-[10px] font-medium text-[#e0a92e]">探索</span>
                       <span v-if="sec.weightedScore >= 0"><StarDisplay :score="sec.weightedScore" /></span>
                       <span v-else><StarDisplay :score="-1" /></span>
                     </button>
-
-                    <!-- Knowledge points -->
-                    <Transition name="tree-collapse">
-                      <div v-if="expandedSections.has('sec-' + sec.title)" class="space-y-0.5 px-8 pb-2">
-                        <div v-for="kp in sec.knowledgePoints" :key="kp.title"
-                          @click="openKpDetail(kp, sec.title)"
-                          class="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 transition-all hover:bg-[var(--accent-soft)] active:scale-[0.98]"
-                        >
-                          <GraduationCap class="h-3 w-3 shrink-0 text-[var(--accent)]" />
-                          <span class="flex-1 text-[11px] font-medium text-[var(--ink)]">{{ kp.title }}</span>
-                          <div class="flex gap-1">
-                            <span v-for="lit in kp.literacies.slice(0, 2)" :key="lit"
-                              class="inline-flex items-center gap-0.5 rounded-full bg-[#f0e7fa] px-1.5 py-0.5 text-[9px] font-semibold text-[#7c3aae]"
-                            ><BrainCircuit class="h-2 w-2" />{{ lit }}</span>
+                    <!-- 普通章节：展开显示知识点 -->
+                    <template v-else>
+                      <button @click="toggleSection('sec-' + sec.title)" class="flex w-full items-center gap-2 px-6 py-2 text-left transition-colors hover:bg-white/50">
+                        <component :is="expandedSections.has('sec-' + sec.title) ? ChevronDown : ChevronRight" class="h-3 w-3 shrink-0 text-[var(--ink-soft)]" />
+                        <span class="flex-1 text-xs font-medium text-[var(--ink)]">{{ sec.title }}</span>
+                        <span v-if="sec.weightedScore >= 0"><StarDisplay :score="sec.weightedScore" /></span>
+                        <span v-else><StarDisplay :score="-1" /></span>
+                      </button>
+                      <Transition name="tree-collapse">
+                        <div v-if="expandedSections.has('sec-' + sec.title)" class="space-y-0.5 px-8 pb-2">
+                          <div v-for="kp in sec.knowledgePoints" :key="kp.title"
+                            @click="openKpDetail(kp, sec.title)"
+                            class="flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-1.5 transition-all hover:bg-[var(--accent-soft)] active:scale-[0.98]"
+                          >
+                            <GraduationCap class="h-3 w-3 shrink-0 text-[var(--accent)]" />
+                            <span class="flex-1 text-[11px] font-medium text-[var(--ink)]">{{ kp.title }}</span>
+                            <div class="flex gap-1">
+                              <span v-for="lit in kp.literacies.slice(0, 2)" :key="lit"
+                                class="inline-flex items-center gap-0.5 rounded-full bg-[#f0e7fa] px-1.5 py-0.5 text-[9px] font-semibold text-[#7c3aae]"
+                              ><BrainCircuit class="h-2 w-2" />{{ lit }}</span>
+                            </div>
+                            <span v-if="kp.weightedScore >= 0"><StarDisplay :score="kp.weightedScore" /></span>
+                            <span v-else><StarDisplay :score="-1" /></span>
                           </div>
-                          <span v-if="kp.weightedScore >= 0"><StarDisplay :score="kp.weightedScore" /></span>
-                          <span v-else><StarDisplay :score="-1" /></span>
                         </div>
-                      </div>
-                    </Transition>
+                      </Transition>
+                    </template>
                   </div>
                 </div>
               </Transition>
