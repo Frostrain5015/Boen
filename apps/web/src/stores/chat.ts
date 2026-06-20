@@ -286,12 +286,13 @@ export const useChatStore = defineStore('chat', () => {
 
   async function handleDeleteConversation(id: string, event: Event) {
     event.stopPropagation();
+    const ok = await confirm({ title: '\u5220\u9664\u5bf9\u8bdd', message: '\u786e\u5b9a\u8981\u5220\u9664\u8fd9\u4e2a\u5bf9\u8bdd\u5417\uff1f', confirmText: '\u5220\u9664', danger: true });
+    if (!ok) return;
+    // \u786e\u8ba4\u5220\u9664\u540e\u518d\u9000\u51fa\u7c7b\u8bfe\u5802\uff08\u5426\u5219\u53d6\u6d88\u540e session \u5df2\u7ed3\u675f\uff09
     const uiStore = useUiStore();
     if (currentConversationId.value === id && uiStore.sessionActive) {
       uiStore.endSession();
     }
-    const ok = await confirm({ title: '\u5220\u9664\u5bf9\u8bdd', message: '\u786e\u5b9a\u8981\u5220\u9664\u8fd9\u4e2a\u5bf9\u8bdd\u5417\uff1f', confirmText: '\u5220\u9664', danger: true });
-    if (!ok) return;
     try {
       await apiDeleteConversation(id);
       conversations.value = conversations.value.filter((c) => c.id !== id);
