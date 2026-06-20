@@ -53,8 +53,8 @@ onMounted(() => {
             @submit="(a) => chatStore.onAnswer(m, a)"
           />
 
-          <!-- 工具结果卡片（同 quiz-gen 样式，绿色底） -->
-          <div v-else-if="m.kind === 'tool_result'" class="flex flex-col gap-1 anim-fadeUp">
+          <!-- 工具结果卡片（同 quiz-gen 样式，绿色底，不重播入场动画） -->
+          <div v-else-if="m.kind === 'tool_result'" class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
               <Mascot :size="24" :float="false" :animated="false" />
               <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
@@ -69,8 +69,8 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- 工具错误卡片（同 quiz-gen 样式，红色底） -->
-          <div v-else-if="m.kind === 'tool_error'" class="flex flex-col gap-1 anim-fadeUp">
+          <!-- 工具错误卡片（同 quiz-gen 样式，红色底，不重播入场动画） -->
+          <div v-else-if="m.kind === 'tool_error'" class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
               <Mascot :size="24" :float="false" :animated="false" />
               <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
