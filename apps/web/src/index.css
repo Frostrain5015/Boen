@@ -72,6 +72,32 @@ html[data-fontsize="lg"] { font-size: 18px; }
   --accent-glow: rgba(52, 152, 219, 0.42);
 }
 
+/* ── 类课堂模式：冷色氛围覆盖 ────────────────────── */
+[data-session="active"] {
+  --paper: #f1f4f9;
+  --paper-2: #e5eaf3;
+  --surface: #f7f9fd;
+  --ink: #1e2a3a;
+  --ink-soft: #5f7089;
+  --line: #d4dde9;
+}
+[data-session="active"] .app-bg {
+  background:
+    radial-gradient(120% 80% at 100% 0%, #d0ddf0 0%, transparent 45%),
+    radial-gradient(90% 70% at 0% 100%, #dce8f5 0%, transparent 50%),
+    linear-gradient(180deg, #f1f4f9 0%, #e5eaf3 100%);
+}
+[data-session="active"] .app-bg::before {
+  background: #6c5ce7;
+  opacity: 0.62;
+  animation-duration: 14s;
+}
+[data-session="active"] .app-bg::after {
+  background: #74b9ff;
+  opacity: 0.55;
+  animation-duration: 17s;
+}
+
 html {
   height: 100dvh;
   overflow-y: scroll;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
@@ -22,6 +22,14 @@ onMounted(() => {
   document.documentElement.setAttribute('data-fontsize', fs);
 
   authStore.checkAuth();
+
+  // 类课堂模式：同步 sessionActive → data-session 属性（驱动 CSS 变量冷色覆盖）
+  const applySession = (active: boolean) => {
+    const el = document.querySelector<HTMLElement>('[data-subject].relative.flex.h-full');
+    if (el) el.dataset.session = active ? 'active' : '';
+  };
+  applySession(uiStore.sessionActive);
+  watch(() => uiStore.sessionActive, applySession);
 
   // Remove boot loader after Vue has rendered
   requestAnimationFrame(() => {
