@@ -742,6 +742,45 @@ function toggleResult(qIndex: number) {
   scheduleTikzProcessing();
 }
 
+const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
+
+/** 根据题目 index 获取完整的题目数据 */
+function getQuestion(index: number): ExamQuestionData | undefined {
+  return session.value?.questions.find(q => q.index === index);
+}
+
+/** 获取用户对选择题的选项选择（multiple_choice 类型） */
+function getUserSelectedKeys(index: number): string[] {
+  const a = answers.value.get(index);
+  return Array.isArray(a) ? a : [];
+}
+
+/** 获取用户对判断题的作答 */
+function getUserTF(index: number): boolean | null {
+  const a = answers.value.get(index);
+  return typeof a === 'boolean' ? a : null;
+}
+
+/** 获取用户对填空题某一空的作答 */
+function getUserBlank(index: number, i: number): string {
+  const a = answers.value.get(index);
+  return Array.isArray(a) ? (a[i] ?? '') : '';
+}
+
+/** 获取用户对简答题的作答文本 */
+function getUserAnswerText(index: number): string {
+  const a = answers.value.get(index);
+  return typeof a === 'string' && a.trim() ? a : '';
+}
+
+/** 获取填空题的空格数据（用于结果页展示） */
+function getResultBlankRows(q: ExamQuestionData): { acceptedAnswers: string[] }[] {
+  if (q.blanks?.length) return q.blanks;
+  const markerCount = (q.stem.match(/_{2,}|＿{2,}|（\s*）|\(\s*\)|\[\s*\]/g) ?? []).length;
+  const count = Math.max(q.blankCount ?? 0, markerCount, 1);
+  return Array.from({ length: count }, () => ({ acceptedAnswers: [] }));
+}
+
 async function requestDetailedExplanation() {
   if (!session.value || !results.value || detailedReviewLoading.value) return;
   detailedReviewLoading.value = true;
@@ -1174,16 +1213,70 @@ onUnmounted(() => {
             <button @click="toggleResult(qr.index)" class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--accent-soft)]/30">
               <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold" :class="qr.correct ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fdeaef] text-[#f2557a]'">{{ qr.correct ? '✓' : '✗' }}</span>
               <span class="flex-1 truncate text-xs font-medium text-[var(--ink)]">第 {{ qr.index + 1 }} 题</span>
+              <span v-if="getQuestion(qr.index)" class="hidden text-[10px] font-semibold text-[var(--accent-strong)] sm:inline">{{ TYPE_LABELS[getQuestion(qr.index)!.type] }}</span>
               <span v-if="qr.knowledgePoint" class="hidden truncate text-[10px] text-[var(--ink-soft)] sm:block">{{ qr.knowledgePoint }}</span>
               <span class="text-xs font-bold" :class="qr.correct ? 'text-[#18a558]' : 'text-[#f2557a]'">{{ qr.score }}/{{ qr.maxScore }}</span>
               <component :is="expandedResults.has(qr.index) ? ChevronUp : ChevronDown" class="h-3.5 w-3.5 text-[var(--ink-soft)]" />
             </button>
             <Transition name="reveal">
               <div v-if="expandedResults.has(qr.index)" class="border-t border-[var(--line)] bg-[var(--surface)] px-4 py-3">
-                <div class="space-y-2 text-xs">
+                <div class="space-y-3 text-xs">
+                  <template v-if="getQuestion(qr.index)">
+                    <!-- Passage (for passage-based questions) -->
+                    <div v-if="getQuestion(qr.index)!.passage" class="md-body rounded-xl bg-[var(--surface)] p-3 text-sm leading-relaxed text-[var(--ink-soft)]" v-html="renderMarkdown(getQuestion(qr.index)!.passage || '')"></div>
+
+                    <!-- Question stem -->
+                    <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(getQuestion(qr.index)!.stem)"></div>
+
+                    <!-- 选择题: Show options with green=correct, red=user's wrong selection -->
+                    <div v-if="getQuestion(qr.index)!.type === 'multiple_choice'" class="space-y-1.5">
+                      <div v-for="opt in displayOptions(getQuestion(qr.index)!)" :key="opt.key"
+                        class="review-option flex items-center gap-2.5 rounded-xl border-2 px-3 py-2 text-sm"
+                        :class="(getQuestion(qr.index)!.correctKeys || []).includes(opt.key) ? 'border-[#18a558] bg-[#e7f7ee]'
+                          : getUserSelectedKeys(qr.index).includes(opt.key) ? 'border-[#f2557a] bg-[#fdeaef]'
+                          : 'border-[var(--line)] bg-white'">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                          :class="(getQuestion(qr.index)!.correctKeys || []).includes(opt.key) ? 'bg-[#18a558] text-white' : getUserSelectedKeys(qr.index).includes(opt.key) ? 'bg-[#f2557a] text-white' : 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'">{{ opt.key }}</span>
+                        <div class="md-body min-w-0 flex-1 text-[var(--ink)]" v-html="renderMarkdown(opt.text)"></div>
+                        <span v-if="(getQuestion(qr.index)!.correctKeys || []).includes(opt.key)" class="text-[11px] font-semibold text-[#18a558]">正确答案</span>
+                        <span v-else-if="getUserSelectedKeys(qr.index).includes(opt.key)" class="text-[11px] font-semibold text-[#f2557a]">你的选择</span>
+                      </div>
+                    </div>
+
+                    <!-- 判断题 -->
+                    <div v-else-if="getQuestion(qr.index)!.type === 'true_false'" class="flex flex-wrap gap-4 text-sm">
+                      <span>正确答案：<b :class="getQuestion(qr.index)!.answer ? 'text-[#18a558]' : 'text-[#f2557a]'">{{ getQuestion(qr.index)!.answer ? '正确' : '错误' }}</b></span>
+                      <span>你的作答：<b :class="getUserTF(qr.index) === null ? 'text-[var(--ink-soft)]' : getUserTF(qr.index) === getQuestion(qr.index)!.answer ? 'text-[#18a558]' : 'text-[#f2557a]'">{{ getUserTF(qr.index) === null ? '（未作答）' : getUserTF(qr.index) ? '正确' : '错误' }}</b></span>
+                    </div>
+
+                    <!-- 填空题 -->
+                    <div v-else-if="getQuestion(qr.index)!.type === 'fill_blank'" class="space-y-1.5 text-sm">
+                      <div v-for="(b, i) in getResultBlankRows(getQuestion(qr.index)!)" :key="i" class="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[11px] font-bold text-[var(--accent-strong)]">{{ i + 1 }}</span>
+                        <span>你的作答：<b :class="b.acceptedAnswers.length > 0 && b.acceptedAnswers.some(ans => ans.trim() && ans.trim() === getUserBlank(qr.index, i).trim()) ? 'text-[#18a558]' : 'text-[#f2557a]'">{{ getUserBlank(qr.index, i).trim() || '（空）' }}</b></span>
+                        <span v-if="b.acceptedAnswers.length" class="text-[var(--ink-soft)]">参考：{{ b.acceptedAnswers.join(' / ') }}</span>
+                      </div>
+                    </div>
+
+                    <!-- 简答题 -->
+                    <div v-else-if="getQuestion(qr.index)!.type === 'short_answer'" class="space-y-2 text-sm">
+                      <div class="rounded-xl bg-[var(--surface)] p-3">
+                        <p class="mb-1 text-xs font-semibold text-[var(--ink-soft)]">你的作答</p>
+                        <p class="whitespace-pre-wrap text-[var(--ink)]">{{ getUserAnswerText(qr.index) || '（未作答）' }}</p>
+                      </div>
+                      <div v-if="getQuestion(qr.index)!.keyPoints?.length" class="flex flex-wrap gap-1.5">
+                        <span v-for="(kp, ki) in getQuestion(qr.index)!.keyPoints" :key="ki" class="rounded-full bg-[var(--accent-soft)] px-2.5 py-0.5 text-[11px] font-semibold text-[var(--accent-strong)]">{{ kp }}</span>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- 参考答案 (keep existing) -->
                   <p><span class="font-semibold text-[var(--ink-soft)]">参考答案：</span><span class="text-[var(--ink)] md-body" v-html="renderMarkdown(qr.reference)"></span></p>
+
+                  <!-- 解析 (keep existing) -->
                   <div v-if="qr.explanation" class="rounded-xl bg-white p-3 text-[var(--ink)] md-body" v-html="renderMarkdown(qr.explanation)"></div>
-                  <!-- 针对性错误详解 -->
+
+                  <!-- 针对性错误详解 (keep existing) -->
                   <div v-if="qr.correct === false && !qr.detailedExplanation && !detailedReviewLoading" class="flex items-center gap-2">
                     <button @click="requestDetailedExplanation" class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white active:scale-[0.97]">
                       <BrainCircuit class="h-3 w-3" /> 查看详解
@@ -1200,6 +1293,8 @@ onUnmounted(() => {
                   <div v-if="qr.correct === false && detailedReviewLoading && !qr.detailedExplanation" class="flex items-center gap-2 rounded-xl bg-[var(--accent-soft)] px-3 py-2 text-[10px] font-semibold text-[var(--accent-strong)]">
                     <BrainCircuit class="h-3 w-3 animate-pulse" /> 正在生成详解...
                   </div>
+
+                  <!-- KP / Literacy tags (keep existing) -->
                   <div v-if="qr.knowledgePoint" class="flex flex-wrap gap-1.5">
                     <span class="inline-flex items-center gap-1 rounded-full bg-[#e6edfa] px-2 py-0.5 text-[10px] font-semibold text-[#2b5fa8]"><GraduationCap class="h-2.5 w-2.5" />{{ qr.knowledgePoint }}</span>
                     <span v-for="lit in qr.literacy" :key="lit" class="inline-flex items-center gap-1 rounded-full bg-[#f0e7fa] px-2 py-0.5 text-[10px] font-semibold text-[#7c3aae]"><BrainCircuit class="h-2.5 w-2.5" />{{ lit }}</span>
@@ -1393,6 +1488,10 @@ onUnmounted(() => {
 .exam-opt-key-selected { background: var(--accent); color: #fff; transform: scale(1.1); }
 .exam-opt :deep(.md-body > :first-child) { margin-top: 0; }
 .exam-opt :deep(.md-body > :last-child) { margin-bottom: 0; }
+
+/* ── 结果页：选择题选项展示 ── */
+.review-option :deep(.md-body > :first-child) { margin-top: 0; }
+.review-option :deep(.md-body > :last-child) { margin-bottom: 0; }
 
 /* ── 单题考试：判断题 ── */
 .exam-tf {

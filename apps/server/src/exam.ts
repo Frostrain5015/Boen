@@ -586,16 +586,79 @@ export async function generateExam(
       throw new Error('试卷生成失败：没有生成任何有效题目');
     }
 
-    // 修正总分精确等于目标分
+    // ─── 严格总分校准：必须精确等于目标分 ────
     let totalScore = questions.reduce((s, q) => s + q.points, 0);
     const targetTotal = enrichedConfig.totalScore ?? blueprint.totalScore;
+
     if (totalScore !== targetTotal && questions.length > 0) {
       const diff = targetTotal - totalScore;
-      // 把差值调整到最后一题上
-      const last = questions[questions.length - 1];
-      last.points = Math.max(1, last.points + diff);
+      console.warn(`[exam] 总分偏差 ${totalScore} → ${targetTotal}（${diff > 0 ? '补' : '减'}${Math.abs(diff)}分），分布式校准`);
+
+      // 第一轮：均匀分配差值，每题最多调整 ±5 分
+      let remaining = diff;
+      const maxPerQ = 5;
+
+      while (remaining !== 0) {
+        let changed = false;
+        const step = remaining > 0 ? 1 : -1;
+        const startIdx = remaining > 0 ? questions.length - 1 : 0;
+        const direction = remaining > 0 ? -1 : 1;
+
+        for (let i = startIdx; i >= 0 && i < questions.length; i += direction) {
+          if (remaining === 0) break;
+          const q = questions[i];
+          const adjust = Math.min(Math.abs(remaining), maxPerQ) * step;
+          const newPts = q.points + adjust;
+
+          if (newPts >= 1) {
+            q.points = newPts;
+            remaining -= adjust;
+            changed = true;
+          }
+        }
+
+        // 第二轮：如果均匀分配不够，放宽限制（每题最低1分，无上限）
+        if (!changed && remaining !== 0) {
+          // 从最后一题开始，尽可能吸收差值
+          for (let i = questions.length - 1; i >= 0 && remaining !== 0; i--) {
+            const q = questions[i];
+            if (remaining > 0) {
+              q.points += remaining;
+              remaining = 0;
+            } else if (remaining < 0 && q.points > 1) {
+              const canReduce = q.points - 1;
+              const reduce = Math.min(canReduce, Math.abs(remaining));
+              q.points -= reduce;
+              remaining += reduce;
+            }
+          }
+        }
+
+        if (!changed && remaining !== 0) {
+          console.error(`[exam] ⚠ 总分校准失败：仍差 ${remaining} 分，当前总分 ${questions.reduce((s, q) => s + q.points, 0)}`);
+          break; // prevent infinite loop
+        }
+      }
+
       totalScore = questions.reduce((s, q) => s + q.points, 0);
-      console.warn(`[exam] 总分 ${totalScore - diff} → ${totalScore}（${diff > 0 ? '补' : '减'}${Math.abs(diff)} 分到第 ${last.index + 1} 题）`);
+
+      // 最终断言
+      if (totalScore !== targetTotal) {
+        console.error(`[exam] ❌ 总分校准异常：${totalScore} ≠ ${targetTotal}，强制修正最后一题`);
+        const lastQ = questions[questions.length - 1];
+        lastQ.points += (targetTotal - totalScore);
+        if (lastQ.points < 1) {
+          // 最后一题不够减，向前借分
+          for (let i = questions.length - 2; i >= 0 && lastQ.points < 1; i--) {
+            const borrow = 1 - lastQ.points;
+            if (questions[i].points > 1 + borrow) {
+              questions[i].points -= borrow;
+              lastQ.points += borrow;
+            }
+          }
+        }
+        totalScore = questions.reduce((s, q) => s + q.points, 0);
+      }
     }
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
 
@@ -1593,12 +1656,14 @@ async function autoCollectMistakes(
   userId: string,
   examId: string,
   questions: ExamQuestion[],
+  answers: Array<{ questionIndex: number; answer: AnswerPayload }>,
   results: ExamResults,
   subject: string,
   grade: string,
   model?: BaseChatModel,
 ): Promise<{ count: number; mistakeIds: string[] }> {
   const mistakeIds: string[] = [];
+  const answerMap = new Map(answers.map(a => [a.questionIndex, a.answer]));
 
   // 筛选得分率 < 60% 的题目
   const penalized = results.questionResults.filter(
@@ -1657,10 +1722,20 @@ async function autoCollectMistakes(
     const errorReason = analysis?.errorReason ?? undefined;
     const correctAnswer = qr.reference?.slice(0, 2000) ?? undefined;
 
-    // 答案匹配度
-    const matchScore = 0; // score/maxScore < 0.6, so effectively incorrect
+    // 提取学生实际答案文本
+    const userAnswer = answerMap.get(qr.index);
+    let studentAnswerText: string | null = null;
+    if (userAnswer) {
+      if (userAnswer.type === 'multiple_choice') studentAnswerText = userAnswer.selectedKeys?.join(', ') ?? null;
+      else if (userAnswer.type === 'fill_blank') studentAnswerText = userAnswer.answers?.join(' | ') ?? null;
+      else if (userAnswer.type === 'true_false') studentAnswerText = userAnswer.value ? '正确' : '错误';
+      else if (userAnswer.type === 'short_answer') studentAnswerText = userAnswer.text ?? null;
+    }
 
-    // 创建错题记录（status 先设为 analyzed 或 needs_review，取决于知识点映射）
+    // 答案匹配度：基于实际得分率
+    const matchScore = qr.maxScore > 0 ? qr.score / qr.maxScore : 0;
+
+    // 创建错题记录（status 直接设为 analyzed，因为考试中已有完整评分信息）
     db.prepare(`
       INSERT INTO mistake_items (
         id, user_id, subject, grade, source_type, status, title, prompt_text,
@@ -1669,7 +1744,7 @@ async function autoCollectMistakes(
         answer_match_score, is_correct,
         created_at, updated_at
       ) VALUES (
-        ?, ?, ?, ?, 'text', 'needs_review', ?, ?,
+        ?, ?, ?, ?, 'text', 'analyzed', ?, ?,
         ?, ?, ?,
         ?, ?, ?,
         ?, ?,
@@ -1682,7 +1757,7 @@ async function autoCollectMistakes(
       grade,
       (q.stem?.split(/\n|。|\./)[0] ?? '考试错题').slice(0, 32),
       q.stem?.slice(0, 8000) ?? '',
-      null, // student_answer: exam doesn't carry raw text in results
+      studentAnswerText,
       correctAnswer ?? null,
       q.explanation?.slice(0, 2000) ?? null,
       errorType ?? null,
@@ -1695,7 +1770,6 @@ async function autoCollectMistakes(
     );
 
     // 知识点映射
-    let mapped = false;
     const kpTitle = q.knowledgePoint;
     if (kpTitle) {
       const node = findKnowledgePointNode(kpTitle, subject);
@@ -1704,13 +1778,7 @@ async function autoCollectMistakes(
           INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, evidence_json)
           VALUES (?, ?, 'primary', 0.7, ?)
         `).run(id, node.id, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
-        mapped = true;
       }
-    }
-
-    // 如果映射成功，更新 status 为 analyzed
-    if (mapped) {
-      db.prepare(`UPDATE mistake_items SET status='analyzed', updated_at=? WHERE id=?`).run(now, id);
     }
 
     mistakeIds.push(id);
@@ -1891,6 +1959,7 @@ export async function submitExamSession(
       userId,
       examId,
       session.questions,
+      answers,
       results,
       session.subject,
       session.grade,
