@@ -234,16 +234,17 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };
 
-  /** 格式化 TODO 状态为文字清单 */
+  /** 格式化 TODO 状态为文字清单（仅展示当前一步，其余隐藏强制工具调用） */
   function formatTodoState(todoJson: string): string {
     try {
       const todo = JSON.parse(todoJson);
       if (!todo.steps?.length) return '';
       const lines = todo.steps.map((s: any) => {
-        const icon = s.status === 'completed' ? '✅' : s.status === 'in_progress' ? '▶️' : '⬜';
-        return `${icon} 第${s.id}步：${s.label}${s.status === 'in_progress' ? '（当前步骤）' : ''}`;
+        if (s.status === 'completed') return `✅ 第${s.id}步：${s.label} ✅`;
+        if (s.status === 'in_progress') return `▶️ 第${s.id}步：${s.label}（当前步骤）`;
+        return `⬜ 第${s.id}步：？？？`;
       });
-      return '\n\n## 📋 教学步骤进度（必须遵守）\n' + lines.join('\n') + '\n\n【强制】完成当前步骤后，**必须**调用 advance_step 工具。调用前不得输出下一步的内容。高级模型推理记录会检查你是否遵守此规则。';
+      return '\n\n## 📋 步骤进度\n' + lines.join('\n') + '\n\n【强制】完成当前步骤后调用 advance_step 查看下一步。不调工具看不到下一步内容。';
     } catch { return ''; }
   }
 
