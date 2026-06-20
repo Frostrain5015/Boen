@@ -311,6 +311,10 @@ const answeredStatus = computed(() => {
   for (const q of session.value?.questions ?? []) m.set(q.index, isQuestionAnswered(q));
   return m;
 });
+/** 每个大题组是否至少有一道小题已作答 */
+const groupAnsweredStatus = computed(() => groupedQuestions.value.map(g =>
+  g.questions.some(q => answeredStatus.value.get(q.index)),
+));
 
 function goToGroup(idx: number) {
   if (idx < 0 || idx >= totalGroups.value) return;
@@ -983,7 +987,7 @@ onUnmounted(() => {
       <!-- 单题区域 -->
       <div class="relative flex-1 flex flex-col overflow-hidden bg-[var(--surface)]/30">
         <!-- 题号轨道（独立于 Transition，不随题目切换淡入淡出） -->
-        <div class="shrink-0 pt-5 pb-3">
+        <div class="shrink-0 py-6">
           <div ref="dotNavRef" class="dot-nav-scroll mx-auto" role="navigation" aria-label="大题导航">
             <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
             <button
@@ -991,7 +995,7 @@ onUnmounted(() => {
               :key="gi"
               @click="goToGroup(gi)"
               class="question-dot"
-              :class="currentGroupIndex === gi ? 'question-dot-current' : 'question-dot-idle'"
+              :class="currentGroupIndex === gi ? 'question-dot-current' : groupAnsweredStatus[gi] ? 'question-dot-answered' : 'question-dot-idle'"
               :aria-label="`第 ${gi + 1} 大题`"
               :aria-current="currentGroupIndex === gi ? 'step' : undefined"
             >
@@ -1366,6 +1370,7 @@ onUnmounted(() => {
   overflow-x: auto;
   scrollbar-width: none;
   scroll-behavior: smooth;
+  padding: 0.5rem 0;
   min-height: 3rem;
   max-width: 100%;
 }
