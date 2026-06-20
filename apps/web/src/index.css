@@ -108,21 +108,6 @@ html {
   overflow-y: scroll;
   scrollbar-color: rgba(86, 64, 40, 0.18) transparent;
 }
-/* 学科切换渐变动画遮罩 */
-html.subject-transition::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  background: var(--surface);
-  animation: subjectFade 0.45s ease forwards;
-}
-@keyframes subjectFade {
-  0%   { opacity: 0; }
-  25%  { opacity: 0.55; }
-  100% { opacity: 0; }
-}
 html::-webkit-scrollbar {
   width: 7px;
 }
@@ -161,20 +146,18 @@ body {
 }
 
 /* ── 流动光斑背景 + 纸纹颗粒 ───────────────── */
-/* 暖色背景层（硬编码暖色 paper，boen-session 不改变它 → 无跳变） */
+/* 暖色背景层（完全硬编码，不随 subject 变化 → gradient 永不 snap） */
 .app-bg {
   position: fixed;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   background:
-    radial-gradient(120% 80% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
+    radial-gradient(120% 80% at 100% 0%, #d9f4ec 0%, transparent 45%),
     radial-gradient(90% 70% at 0% 100%, #f3e7d6 0%, transparent 50%),
     linear-gradient(180deg, #fbf6ee 0%, #f3e7d6 100%);
 }
-/* 冷色覆盖层（opacity 交叉淡变，浏览器保证可过渡）
-   背景硬编码冷色 paper，不依赖 var() — CSS 变量 snap 时
-   背景不跳变，仅 opacity 变化 → 进出都平滑 */
+/* 冷色覆盖层（boen-session 时淡入，背景也完全硬编码） */
 .app-bg-overlay {
   position: absolute;
   inset: 0;
@@ -183,7 +166,7 @@ body {
   opacity: 0;
   transition: opacity 0.7s ease;
   background:
-    radial-gradient(120% 80% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
+    radial-gradient(120% 80% at 100% 0%, #d4e6f1 0%, transparent 45%),
     radial-gradient(90% 70% at 0% 100%, #e5eaf3 0%, transparent 50%),
     linear-gradient(180deg, #f1f4f9 0%, #e5eaf3 100%);
 }
