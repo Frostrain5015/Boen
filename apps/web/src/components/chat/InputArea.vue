@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted } from 'vue';
+import { nextTick, onMounted, computed, ref } from 'vue';
 import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
@@ -18,6 +18,18 @@ function setInputEl(el: unknown) {
   _inputEl = el instanceof HTMLTextAreaElement ? el : null;
 }
 function focusInput() { nextTick(() => _inputEl?.focus()); }
+
+const practiceBtnRef = ref<HTMLElement | null>(null);
+const practiceMenuStyle = computed(() => {
+  const btn = practiceBtnRef.value;
+  if (!btn) return null;
+  const rect = btn.getBoundingClientRect();
+  return {
+    left: rect.left + 'px',
+    bottom: (window.innerHeight - rect.top) + 'px',
+    minWidth: '140px',
+  };
+});
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -40,17 +52,18 @@ onMounted(() => {
         <button @click="uiStore.activateMode('preview')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
         <button @click="uiStore.activateMode('weakness')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>集中练习</span></button>
         <!-- 专项练习 -->
-        <div v-if="uiStore.practiceMenu.length" class="relative inline-block">
+        <div v-if="uiStore.practiceMenu.length" class="relative inline-block" ref="practiceBtnRef">
           <button @click="uiStore.togglePracticeMenu()" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.practiceMenuOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
-          <Transition name="fade">
-            <div v-if="uiStore.practiceMenuOpen" class="absolute left-0 bottom-full z-50 mb-1 min-w-[140px]">
-              <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg" @mouseleave="uiStore.closePracticeMenu()">
-                <button v-for="p in uiStore.practiceMenu" :key="p.type" @click="uiStore.startPractice(p.type, p.hint); focusInput()" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
-              </div>
-            </div>
-          </Transition>
         </div>
       </div>
+      <!-- 专项练习下拉菜单（Teleport 到 body 避免 overflow:hidden 裁剪） -->
+      <Teleport to="body">
+        <div v-if="uiStore.practiceMenuOpen && practiceMenuStyle" class="fixed z-50" :style="practiceMenuStyle" @mouseleave="uiStore.closePracticeMenu()">
+          <div class="clay-sm flex flex-col gap-0.5 p-1.5 shadow-lg">
+            <button v-for="p in uiStore.practiceMenu" :key="p.type" @click="uiStore.startPractice(p.type, p.hint); uiStore.closePracticeMenu(); focusInput()" class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] whitespace-nowrap">{{ p.label }}</button>
+          </div>
+        </div>
+      </Teleport>
       <DailyLimitBanner :show="chatStore.dailyLimitReached" @close="chatStore.dailyLimitReached = false" />
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
