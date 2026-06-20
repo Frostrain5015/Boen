@@ -264,6 +264,52 @@ function hasOutgoing(nodeId: number, type: string): boolean {
   return Boolean(db.prepare(`SELECT 1 FROM kg_edges WHERE source_id=? AND type=? LIMIT 1`).get(nodeId, type));
 }
 
+/**
+ * Older seeders could create a second node for the same subject/title before
+ * curriculum mapping had been established.  Remove only a duplicate that is
+ * provably orphaned; anything referenced by a learner record, question,
+ * mapping, edge, or weight is deliberately retained for manual migration and
+ * therefore remains visible to the production audit.
+ */
+function dropOrphanDuplicateKnowledgeNodes(): number {
+  const groups = db.prepare(`
+    SELECT subject, title, GROUP_CONCAT(id) AS ids
+    FROM kg_nodes
+    WHERE type='knowledge_point'
+    GROUP BY subject, title
+    HAVING COUNT(*) > 1
+  `).all() as Array<{ subject: string; title: string; ids: string }>;
+  const referenceCount = db.prepare(`
+    SELECT
+      (SELECT COUNT(*) FROM curriculum_kg_map WHERE node_id=?) +
+      (SELECT COUNT(*) FROM kg_edges WHERE source_id=? OR target_id=?) +
+      (SELECT COUNT(*) FROM kg_weight_dims WHERE node_id=?) +
+      (SELECT COUNT(*) FROM user_kp_proficiency WHERE kg_node_id=?) +
+      (SELECT COUNT(*) FROM mistake_kp_map WHERE kg_node_id=?) +
+      (SELECT COUNT(*) FROM mistake_proficiency_events WHERE kg_node_id=?) AS n
+  `);
+  const remove = db.prepare(`DELETE FROM kg_nodes WHERE id=?`);
+  let removed = 0;
+
+  const tx = db.transaction(() => {
+    for (const group of groups) {
+      const candidates = group.ids.split(',').map(Number).filter(Number.isInteger).map((id) => ({
+        id,
+        references: (referenceCount.get(id, id, id, id, id, id, id) as { n: number }).n,
+      })).sort((a, b) => b.references - a.references || a.id - b.id);
+      // Keep the most referenced (then oldest) node.  Only delete nodes whose
+      // reference count is exactly zero, so no learner-visible history moves.
+      for (const candidate of candidates.slice(1)) {
+        if (candidate.references !== 0) continue;
+        remove.run(candidate.id);
+        removed++;
+      }
+    }
+  });
+  tx();
+  return removed;
+}
+
 function syncCurriculumNodes(): number {
   const rows = db.prepare(`
     SELECT DISTINCT ukm.unit_id, kp.subject, kp.title, COALESCE(kp.description, '') AS description
@@ -413,17 +459,18 @@ function fillWeightGaps(): void {
 }
 
 /** 批量修复当前数据库；可安全重复执行。 */
-export function repairProductionKnowledgeGraph(): { createdNodes: number; audit: ProductionKgAudit } {
+export function repairProductionKnowledgeGraph(): { createdNodes: number; removedDuplicateNodes: number; audit: ProductionKgAudit } {
   ensureKnowledgeGraphTables();
   ensureWeightTable();
   seedKnowledgeGraph();
+  const removedDuplicateNodes = dropOrphanDuplicateKnowledgeNodes();
   const createdNodes = syncCurriculumNodes();
   seedThemeLiteracyOntology();
   seedSemanticEdges();
   seedCurriculumSequenceEdges();
   fillWeightGaps();
   const audit = auditProductionKnowledgeGraph();
-  return { createdNodes, audit };
+  return { createdNodes, removedDuplicateNodes, audit };
 }
 
 /** 对所有“数据库中实际发布”的学科/年级进行生产准入审计。 */
@@ -532,6 +579,7 @@ if (process.argv[1]?.includes('production-kg')) {
       console.log(`[production-kg] 已创建数据库备份：${backupPath}`);
       const result = repairProductionKnowledgeGraph();
       console.log(`[production-kg] 新建 ${result.createdNodes} 个知识点节点`);
+      console.log(`[production-kg] 清理 ${result.removedDuplicateNodes} 个无引用重复节点`);
     }
     const audit = assertProductionKnowledgeGraph();
     console.log(`[production-kg] 生产验收通过：${audit.scopes.length} 个已发布学科年级单元`);
