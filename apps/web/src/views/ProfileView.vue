@@ -29,6 +29,7 @@ function handleExam(detail: { subject: Subject; grade: string; durationMinutes: 
 }
 
 function handleExplore(detail: { title: string; subject: Subject; grade: string }) {
+  uiStore.startSession();
   uiStore.subject = detail.subject as any;
   const token = getToken();
   fetch('/api/explore', {

@@ -54,10 +54,20 @@ export const useUiStore = defineStore('ui', () => {
 
   // ── Actions ───────────────────────────────────────────────
 
-  function activateMode(mode: 'review' | 'preview' | 'weakness') {
-    if (sessionActive.value) return; // 学习中不允许切换模式
-    if (activeMode.value === mode) { activeMode.value = 'none'; return; }
+  /** 开始类课堂会话（锁定模式按钮、播放跑马灯） */
+  function startSession() {
     sessionActive.value = true;
+  }
+
+  /** 结束类课堂会话（解锁模式按钮、停止跑马灯） */
+  function endSession() {
+    sessionActive.value = false;
+    activeMode.value = 'none';
+  }
+
+  function activateMode(mode: 'review' | 'preview' | 'weakness') {
+    if (sessionActive.value) return; // 发送第一条消息后锁定
+    if (activeMode.value === mode) { activeMode.value = 'none'; return; }
     activeMode.value = mode;
     modeTagSent.value = false;
     const chatStore = useChatStore();
@@ -76,7 +86,6 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   function startPractice(type: string, hint: string) {
-    sessionActive.value = true;
     practiceType.value = type;
     const chatStore = useChatStore();
     chatStore.input = hint;
@@ -101,7 +110,6 @@ export const useUiStore = defineStore('ui', () => {
 
   // Navigate from practice/profile into chat context
   async function handlePractice(detail: { kp?: string; subject: Subject; grade: string; mode?: string }) {
-    sessionActive.value = true;
     const chatStore = useChatStore();
     expandedSection.value = 'chat';
     activeMode.value = (detail.mode as ActiveMode) || (detail.kp ? 'weakness' : 'review');
@@ -122,7 +130,6 @@ export const useUiStore = defineStore('ui', () => {
   }
 
   async function handleMistakePractice(detail: { prompt: string; subject: Subject; grade: string }) {
-    sessionActive.value = true;
     const chatStore = useChatStore();
     const authStore = useAuthStore();
     expandedSection.value = 'chat';
@@ -161,6 +168,8 @@ export const useUiStore = defineStore('ui', () => {
     voiceLocale,
     practiceMenu,
     // actions
+    startSession,
+    endSession,
     activateMode,
     togglePracticeMenu,
     closePracticeMenu,

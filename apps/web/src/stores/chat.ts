@@ -136,8 +136,7 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'settlement') {
       learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps };
       const { useUiStore } = await import('@/stores/ui');
-      const ui = useUiStore();
-      if ('sessionActive' in ui) (ui as any).sessionActive = false;
+      useUiStore().endSession();
     } else if (e.type === 'error') {
       items.value.push(newAssistant(`\u26a0\ufe0f ${e.message}`));
     }
@@ -158,6 +157,10 @@ export const useChatStore = defineStore('chat', () => {
     if (!t || busy.value) return;
     const authStore = useAuthStore();
     const uiStore = useUiStore();
+    // 发送第一条消息时锁定类课堂模式
+    if (uiStore.activeMode !== 'none' && !uiStore.sessionActive) {
+      uiStore.startSession();
+    }
 
     // Auto-create conversation if none is active
     if (!currentConversationId.value) {
