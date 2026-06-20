@@ -18,7 +18,8 @@ export const useUiStore = defineStore('ui', () => {
 
   // ── State ─────────────────────────────────────────────────
   const subject = ref<Subject>('math');
-  const sidebarOpen = ref(true);
+  const isMobile = ref(typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false);
+  const sidebarOpen = ref(!isMobile.value);
   const expandedSection = ref<'chat' | 'exam' | null>('chat');
   const activeMode = ref<ActiveMode>('none');
   const practiceType = ref<string | null>(null);
@@ -140,6 +141,7 @@ export const useUiStore = defineStore('ui', () => {
     // state
     subject,
     sidebarOpen,
+    isMobile,
     expandedSection,
     activeMode,
     practiceType,

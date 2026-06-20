@@ -181,9 +181,9 @@ watch(grade, fetchOutline);
     </div>
 
     <!-- Main layout -->
-    <div v-else class="flex h-full gap-4 p-4">
+    <div v-else class="flex h-full flex-col gap-4 p-4 lg:flex-row">
       <!-- ═══ Left panel: Stats + Recommendations ═══ -->
-      <div class="panel-scroll flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto">
+      <div class="panel-scroll flex w-full flex-col gap-4 overflow-y-auto lg:w-[340px] lg:shrink-0">
         <!-- Subject selector + back button -->
         <div class="clay clay-glass overflow-hidden">
           <div class="flex items-center gap-2 p-3">
@@ -284,7 +284,7 @@ watch(grade, fetchOutline);
                 <span v-if="kp.weightedScore >= 0" class="mt-0.5 inline-block"><StarDisplay :score="kp.weightedScore" /></span>
                 <span v-else class="mt-0.5 inline-block"><StarDisplay :score="-1" /></span>
               </div>
-              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white opacity-0 transition-opacity group-hover:opacity-100" title="开始练习">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100" title="开始练习">
                 <BookOpen class="h-3.5 w-3.5" />
               </span>
             </button>

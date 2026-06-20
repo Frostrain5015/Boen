@@ -493,7 +493,7 @@ onBeforeUnmount(() => {
                   <span class="rounded-full px-1.5 py-0.5" :class="m.status === 'analyzed' ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fef3e2] text-[#f59e42]'">{{ m.status === 'analyzed' ? '已归档' : '待确认' }}</span>
                 </span>
               </span>
-              <button @click.stop="archive(m.id)" class="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--ink-soft)] opacity-0 transition-all hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100" aria-label="归档错题"><Trash2 class="h-4 w-4" /></button>
+              <button @click.stop="archive(m.id)" class="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--ink-soft)] opacity-100 transition-all hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:opacity-0 sm:group-hover:opacity-100" aria-label="归档错题"><Trash2 class="h-4 w-4" /></button>
             </button>
           </div>
         </section>
@@ -700,6 +700,10 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-else-if="rightView === 'detail' && selectedMistake" class="panel-scroll h-full overflow-y-auto p-5">
+          <!-- Mobile back button -->
+          <button @click="rightView = 'idle'; selectedMistake = null" class="mb-3 flex items-center gap-2 rounded-xl bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] md:hidden">
+            <ArrowLeft class="h-4 w-4" /> 返回列表
+          </button>
           <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <article class="space-y-4">
               <div class="rounded-[24px] bg-[var(--paper)]/70 p-4">

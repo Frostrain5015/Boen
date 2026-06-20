@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   ChevronLeft,
@@ -114,13 +114,18 @@ function startNewExam() {
   examStore.startNewExam();
   router.push('/exam');
 }
+
+// Auto-close sidebar on mobile when route changes
+watch(() => route.path, () => {
+  if (uiStore.isMobile) uiStore.sidebarOpen = false;
+});
 </script>
 
 <template>
   <!-- 侧边栏 -->
   <aside
-    class="h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-in-out"
-    :class="uiStore.sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)]' : 'w-0'"
+    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-[width] duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0"
+    :class="uiStore.sidebarOpen ? 'w-64 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)] lg:rounded-none' : 'w-0'"
   >
     <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
       <!-- 品牌 + 折叠 -->
@@ -128,9 +133,9 @@ function startNewExam() {
         <div class="flex items-center gap-2">
           <Mascot :size="28" :float="false" :animated="false" />
           <span class="brand-text text-lg font-bold tracking-tight">博文 Boen</span>
-          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.2.2</span>
+          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.0</span>
         </div>
-        <button @click="uiStore.sidebarOpen = false" class="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
+        <button @click="uiStore.sidebarOpen = false" class="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
           <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
         </button>
       </div>
@@ -166,7 +171,7 @@ function startNewExam() {
                 <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
               </div>
             </div>
-            <button @click="(e) => chatStore.handleDeleteConversation(conv.id, e)" class="opacity-0 rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:opacity-100" title="删除对话">
+            <button @click="(e) => chatStore.handleDeleteConversation(conv.id, e)" class="rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:opacity-0 sm:group-hover:opacity-100" title="删除对话">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
           </button>
@@ -203,9 +208,9 @@ function startNewExam() {
                 <span>{{ formatDate(ex.submittedAt ?? ex.createdAt) }}</span>
               </div>
             </div>
-            <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] group-hover:hidden">{{ ex.result.percentage }}</span>
-            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] group-hover:hidden">未完成</span>
-            <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="hidden shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] group-hover:block" title="删除考试">
+            <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] hidden sm:inline sm:group-hover:hidden">{{ ex.result.percentage }}</span>
+            <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] hidden sm:inline sm:group-hover:hidden">未完成</span>
+            <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:hidden sm:group-hover:inline" title="删除考试">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
           </button>
@@ -276,11 +281,18 @@ function startNewExam() {
     </div>
   </aside>
 
+  <!-- Mobile backdrop overlay -->
+  <div
+    v-if="uiStore.sidebarOpen"
+    class="fixed inset-0 z-30 bg-black/30 backdrop-blur-sm transition-opacity lg:hidden"
+    @click="uiStore.sidebarOpen = false"
+  />
+
   <!-- 折叠态下的展开把手 -->
   <button
     v-if="!uiStore.sidebarOpen"
     @click="uiStore.sidebarOpen = true"
-    class="absolute bottom-3 left-2 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)]"
+    class="fixed bottom-4 left-3 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4)] transition-colors hover:bg-[var(--accent-soft)] lg:absolute lg:bottom-3 lg:left-2 lg:h-9 lg:w-9"
     title="展开侧栏"
   >
     <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
