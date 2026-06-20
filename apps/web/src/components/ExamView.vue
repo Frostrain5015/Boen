@@ -149,11 +149,6 @@ const tikzSvgsMap = computed(() => {
   return Object.keys(all).length ? all : undefined;
 });
 
-const qualityWarningSet = computed(() => {
-  const warnings = session.value?.qualityReport?.qualityWarnings ?? [];
-  return new Set(warnings);
-});
-
 const tikzTimers = new Set<number>();
 let tikzScheduled = false;
 function scheduleTikzProcessing() {
@@ -187,6 +182,15 @@ const SUBJECTS = [
 /** 学科主题色（与 index.css data-subject CSS 变量保持一致） */
 const UI_STORE = useUiStore();
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+/** 英语学科不开放小一、小二 */
+const availableGrades = computed(() =>
+  config.value.subject === 'english'
+    ? GRADES.filter(g => Number(g) >= 3)
+    : GRADES,
+);
+watch(() => config.value.subject, (subj) => {
+  if (subj === 'english' && Number(config.value.grade) < 3) config.value.grade = '3';
+});
 const DURATIONS = [
   { value: 15, label: '巩固自测', emoji: '📝' },
   { value: 45, label: '单元考试', emoji: '📚' },
@@ -908,7 +912,7 @@ onUnmounted(() => {
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">年级</p>
             <select v-model="config.grade" class="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]">
-              <option v-for="g in GRADES" :key="g" :value="g">{{ gradeLabel(g) }}</option>
+              <option v-for="g in availableGrades" :key="g" :value="g">{{ gradeLabel(g) }}</option>
             </select>
           </div>
           <div>
@@ -1017,10 +1021,6 @@ onUnmounted(() => {
                   <span class="ml-auto text-xs font-medium text-[var(--ink-soft)]">{{ sq.points }}分</span>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
-                  <div v-if="qualityWarningSet.has(sq.index)" class="flex items-start gap-2 rounded-xl border border-[#f2c46d] bg-[#fff7df] px-3 py-2 text-xs font-semibold text-[#9a5b12]">
-                    <AlertTriangle class="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>注意：该题质量未通过终审</span>
-                  </div>
                   <div class="md-body text-sm font-medium leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(subStem(sq))"></div>
 
                   <!-- Multiple Choice -->
@@ -1373,6 +1373,8 @@ onUnmounted(() => {
   padding: 0.5rem 0;
   min-height: 3rem;
   max-width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 2.5rem, black calc(100% - 2.5rem), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 2.5rem, black calc(100% - 2.5rem), transparent 100%);
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
 .question-dot-edge {
