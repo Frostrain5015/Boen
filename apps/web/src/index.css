@@ -108,6 +108,21 @@ html {
   overflow-y: scroll;
   scrollbar-color: rgba(86, 64, 40, 0.18) transparent;
 }
+/* 学科切换渐变动画遮罩 */
+html.subject-transition::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: var(--surface);
+  animation: subjectFade 0.45s ease forwards;
+}
+@keyframes subjectFade {
+  0%   { opacity: 0; }
+  25%  { opacity: 0.55; }
+  100% { opacity: 0; }
+}
 html::-webkit-scrollbar {
   width: 7px;
 }

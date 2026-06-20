@@ -133,6 +133,7 @@ export function systemPromptForReview(gradeBand: GradeBand, subject?: string, us
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调用 advance_step 就看不到下一步该做什么。** 调用流程：完成当前步 → 调 advance_step → 系统显示下一步内容 → 你再执行。',
     '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     '- 【⚠️ 出题强制令】需要出题时，**必须调用出题工具（ask_multiple_choice / ask_fill_blank / ask_true_false / ask_short_answer）来出题**，绝不要把题目和选项直接写在文字回复里。写在文字里的题目无法记录到学生的知识画像中。',
+    '- 【⚠️ 学科切换强制令】学生的问题属于其他学科时（如数学讨论中问物理/英语），**必须立即调用 switch_subject 工具切换到对应学科**，不得询问确认，也不得以"我是XX学科助手"为由拒绝回答。切换后知识库自动更新。**拒绝切换=严重错误。**',
     '',
     '【教学要求】',
     '- 【KaTeX 公式规则】行内用 $...$，行间用 $$...$$。**$$ 必须成对出现**。',
@@ -163,6 +164,7 @@ export function systemPromptForPreview(gradeBand: GradeBand, subject?: string, u
     '- 【📋 plan_steps 强制令】**第一步必须先调用 plan_steps 工具**，根据预习内容自行规划至少 3 步教学 TODO（例如：建立连接 → 核心概念引入 → 简单尝试 → 标记疑问点 → 预习总结）。规划完成后 system 会显示步骤清单，你再开始第一步教学。',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具，然后等待系统推进步骤。**严禁连续输出多个步骤的内容而不调用 advance_step**。每调用一次 advance_step，系统会更新步骤状态，你才能在 TODO 清单中看到下一步。不调用 advance_step = 步骤不会推进。',
     '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
+    '- 【⚠️ 学科切换强制令】学生的问题属于其他学科时（如数学预习中问物理/英语），**必须立即调用 switch_subject 工具切换到对应学科**，不得以"我是XX学科助手"为由拒绝回答。切换后知识库自动更新。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
@@ -197,6 +199,7 @@ export function systemPromptForWeakness(gradeBand: GradeBand, subject?: string, 
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调工具就看不到。** 完成当前步 → 调 advance_step → 系统显示下一步。',
     '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途坚持结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     '- 【⚠️ 出题强制令】需要出题时，**必须调用出题工具（ask_multiple_choice / ask_fill_blank / ask_true_false / ask_short_answer）来出题**，绝不要把题目和选项直接写在文字回复里。写在文字里的题目无法记录到学生的知识画像中。',
+    '- 【⚠️ 学科切换强制令】学生的问题属于其他学科时（如训练数学中突然问英语），**必须立即调用 switch_subject 工具切换到对应学科**，不得以"我是XX学科助手"为由拒绝回答。切换后知识库自动更新。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');
@@ -291,6 +294,7 @@ export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand
     '- 练习结束后给出本次小结和下次复习建议',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调工具就看不到。** 完成当前步 → 调 advance_step → 系统显示下一步。',
     '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途提前结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
+    '- 【⚠️ 学科切换强制令】学生的问题属于其他学科时（如英语练习中突然问数学），**必须立即调用 switch_subject 工具切换到对应学科**，不得以"我是XX学科助手"为由拒绝回答。切换后知识库自动更新。',
     xlopGuide,
     guide,
   ].filter(Boolean).join('\n');

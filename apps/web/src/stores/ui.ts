@@ -113,6 +113,9 @@ export const useUiStore = defineStore('ui', () => {
 
   async function handleSubjectChange(newSubject: Subject) {
     if (subject.value === newSubject) return;
+    // 学科切换时触发渐变动画遮罩
+    document.documentElement.classList.add('subject-transition');
+    setTimeout(() => document.documentElement.classList.remove('subject-transition'), 500);
     const chatStore = useChatStore();
     // If current conversation has content, force-create a new conversation
     if (chatStore.items.length > 0) {
