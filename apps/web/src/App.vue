@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
+import { onMounted, watch, ref } from 'vue';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
@@ -12,6 +12,7 @@ import { useFavicon } from '@/composables/useFavicon';
 
 const authStore = useAuthStore();
 const uiStore = useUiStore();
+const appRoot = ref<HTMLElement | null>(null);
 
 // Initialize favicon watcher
 useFavicon();
@@ -25,11 +26,16 @@ onMounted(() => {
 
   // 类课堂模式：同步 sessionActive → data-session 属性（驱动 CSS 变量冷色覆盖）
   const applySession = (active: boolean) => {
-    const el = document.querySelector<HTMLElement>('[data-subject].relative.flex.h-full');
+    const el = appRoot.value;
+    console.log(`[Boen 类课堂] 🎨 applySession(${active}) — el:`, el?.tagName, el?.className);
     if (el) el.dataset.session = active ? 'active' : '';
   };
+  // 首次检查（可能 auth 已完成且 session 已激活）
   applySession(uiStore.sessionActive);
-  watch(() => uiStore.sessionActive, applySession);
+  watch(() => uiStore.sessionActive, (val) => {
+    console.log(`[Boen 类课堂] 🔍 sessionActive watcher fired: ${val}`);
+    applySession(val);
+  });
 
   // Remove boot loader after Vue has rendered
   requestAnimationFrame(() => {
@@ -57,7 +63,7 @@ onMounted(() => {
   <LoginView v-else-if="!authStore.authChecked || !authStore.authenticated" />
 
   <!-- 主应用 -->
-  <div v-else :data-subject="uiStore.subject" class="relative flex h-full flex-col">
+  <div v-else ref="appRoot" :data-subject="uiStore.subject" class="relative flex h-full flex-col">
     <div class="app-bg"></div>
     <div class="app-grain"></div>
 
