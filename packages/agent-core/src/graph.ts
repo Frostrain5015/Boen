@@ -494,7 +494,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     })
     .addEdge('lookupKnowledgePoint', 'qa')
     .addEdge('advanceStepTodo', 'qa')
-    .addEdge('planSteps', '__end__')
+    .addEdge('planSteps', 'qa')
     .addEdge('exitSession', '__end__');
 
   return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });
