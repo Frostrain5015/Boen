@@ -203,9 +203,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       if (detectWeaknessIntent(text)) {
         return { mode: 'weakness', forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
-      // 学习模式中收到用户消息 → 切回讲解阶段
+      // 学习模式中收到用户消息 → 切回讲解阶段（保留 forceQuiz 检测结果，不屏蔽）
       if (state.mode === 'review' || state.mode === 'preview' || state.mode === 'weakness') {
-        return { mode: state.mode, reviewPhase: 'teaching', forceQuiz: false };
+        return { mode: state.mode, reviewPhase: 'teaching', forceQuiz: force, quizTool: qTool };
       }
       return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: qTool };
     }
@@ -264,16 +264,32 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
     if (state.mode === 'review') {
       system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools(reviewTools as any);
+      if (state.forceQuiz && model.bindTools) {
+        tools = model.bindTools(quizTools, { tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } } });
+      } else if (model.bindTools) {
+        tools = model.bindTools(reviewTools as any);
+      }
     } else if (state.mode === 'preview') {
       system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
+      if (state.forceQuiz && model.bindTools) {
+        tools = model.bindTools(quizTools, { tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } } });
+      } else if (model.bindTools) {
+        tools = model.bindTools([...qaTools, ...structuredTools] as any);
+      }
     } else if (state.practiceType) {
       system = new SystemMessage(systemPromptForPractice(state.practiceType as PracticeType, state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
+      if (state.forceQuiz && model.bindTools) {
+        tools = model.bindTools(quizTools, { tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } } });
+      } else if (model.bindTools) {
+        tools = model.bindTools([...qaTools, ...structuredTools] as any);
+      }
     } else if (state.mode === 'weakness') {
       system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools(reviewTools as any);
+      if (state.forceQuiz && model.bindTools) {
+        tools = model.bindTools(quizTools, { tool_choice: { type: 'function', function: { name: state.quizTool ?? 'ask_multiple_choice' } } });
+      } else if (model.bindTools) {
+        tools = model.bindTools(reviewTools as any);
+      }
     } else {
       system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (last && isToolMessage(last)) {
