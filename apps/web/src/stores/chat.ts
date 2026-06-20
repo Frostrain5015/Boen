@@ -181,7 +181,7 @@ export const useChatStore = defineStore('chat', () => {
       items.value.push(newAssistant(`\u26a0\ufe0f ${e.message}`));
     } else if (e.type === 'subject_changed') {
       const { useUiStore } = await import('@/stores/ui');
-      useUiStore().handleSubjectChange(e.subject as any);
+      useUiStore().handleSubjectChange(e.subject as any, true);
     }
     scrollDown();
   }

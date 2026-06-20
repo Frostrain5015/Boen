@@ -344,7 +344,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     if (!aiMsg?.tool_calls?.length) return {};
 
     const planCall = aiMsg.tool_calls.find((c: any) => c.name === PLAN_STEPS_TOOL);
-    if (planCall) {
+    if (planCall && !state.todoState) {
       const args = planCall.args as { steps?: Array<{ label: string }> } | undefined;
       if (args?.steps?.length) {
         return {

@@ -111,11 +111,11 @@ export const useUiStore = defineStore('ui', () => {
     practiceMenuOpen.value = false;
   }
 
-  async function handleSubjectChange(newSubject: Subject) {
+  async function handleSubjectChange(newSubject: Subject, keepConversation?: boolean) {
     if (subject.value === newSubject) return;
     const chatStore = useChatStore();
-    // If current conversation has content, force-create a new conversation
-    if (chatStore.items.length > 0) {
+    // 仅手动切换时新建对话，模型自适应切换保留现有对话
+    if (!keepConversation && chatStore.items.length > 0) {
       try {
         const { conversation } = await createConversation('\u65b0\u5bf9\u8bdd', newSubject);
         chatStore.conversations.unshift(conversation);
@@ -123,7 +123,7 @@ export const useUiStore = defineStore('ui', () => {
         chatStore.items = [];
       } catch { toast.error('\u5207\u6362\u5b66\u79d1\u521b\u5efa\u5bf9\u8bdd\u5931\u8d25'); }
     }
-    // 等待上一帧 DOM 更新完成（清空对话）后再切换学科，保证 CSS transition 不被合并跳过
+    
     await nextTick();
     subject.value = newSubject;
   }
