@@ -10,25 +10,18 @@ const uiStore = useUiStore();
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col session-wrap" :class="{ 'session-active': uiStore.sessionActive }">
+  <div class="flex min-h-0 flex-1 flex-col">
+    <!-- 类课堂跑马灯 - 独立 DOM 元素，不受 scoped 伪元素限制 -->
+    <div v-if="uiStore.sessionActive" class="session-beam"></div>
     <AppHeader />
     <ChatMessages />
     <InputArea />
   </div>
 </template>
 
-<style scoped>
-/* ── 跑马灯边框特效 ── */
-.session-wrap.session-active {
-  box-shadow:
-    inset 0 1px 0 rgba(212, 160, 83, 0.08),
-    0 0 30px rgba(212, 160, 83, 0.05);
-}
-
-/* 单条金色流光轨 */
-.session-wrap.session-active::before {
-  content: '';
-  display: block;
+<style>
+/* ── 跑马灯边框特效（全局样式，避免 scoped 编译问题） ── */
+.session-beam {
   position: fixed;
   top: 0;
   left: 0;
@@ -39,7 +32,7 @@ const uiStore = useUiStore();
   background: linear-gradient(90deg,
     transparent 0%,
     rgba(212, 160, 83, 0.2) 15%,
-    var(--accent) 40%,
+    #d4a053 40%,
     rgba(212, 160, 83, 0.6) 60%,
     rgba(212, 160, 83, 0.15) 80%,
     transparent 100%
