@@ -332,7 +332,15 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function centerCurrentDot() {
-  // 固定窗口渲染，无需滚动
+  const nav = dotNavRef.value;
+  if (!nav) return;
+  const active = nav.querySelector<HTMLElement>('.question-dot-current');
+  if (!active) return;
+  const navRect = nav.getBoundingClientRect();
+  const dotRect = active.getBoundingClientRect();
+  const dotCenter = dotRect.left + dotRect.width / 2 - navRect.left + nav.scrollLeft;
+  const target = dotCenter - navRect.width / 2;
+  nav.scrollLeft = Math.max(0, target);
 }
 
 function gradeLabel(g: string): string {
@@ -666,10 +674,14 @@ watch(examState, (s) => {
   examTrace('state', s);
   if (s === 'taking' || s === 'results') {
     scheduleTikzProcessing();
+    nextTick(() => centerCurrentDot());
   }
 });
 watch(currentGroup, () => {
   scheduleTikzProcessing();
+});
+watch(currentGroupIndex, () => {
+  nextTick(() => centerCurrentDot());
 });
 watch(tikzSvgsMap, () => {
   if (examState.value === 'taking' || examState.value === 'results') scheduleTikzProcessing();
@@ -1321,12 +1333,13 @@ onUnmounted(() => {
 /* ── 顶部题号轨道 ── */
 .dot-nav-scroll {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
   gap: 0.35rem;
-  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
   min-height: 3rem;
+  max-width: 100%;
 }
 .dot-nav-scroll::-webkit-scrollbar { display: none; }
 .question-dot-edge {
