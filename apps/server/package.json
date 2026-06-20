@@ -8,6 +8,9 @@
     "start": "tsx src/index.ts",
     "seed:curriculum": "tsx src/seed-curriculum.ts",
     "seed:kg": "tsx src/seed-knowledge-graph.ts",
+    "repair:kg": "tsx src/production-kg.ts",
+    "verify:kg": "tsx src/production-kg.ts --verify",
+    "verify:taxonomy": "tsx src/verify-question-taxonomy.ts",
     "seed:weights": "tsx src/kg-weights.ts",
     "verify:curriculum": "tsx src/verify-curriculum.ts",
     "seed:kp": "tsx src/seed-kp.ts"

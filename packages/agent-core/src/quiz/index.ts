@@ -127,7 +127,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
         passage: a.passage ?? undefined,
         options: a.options,
         multiSelect: a.multiSelect,
-        knowledgePoint: a.knowledgePoint ?? undefined,
+        knowledgePointId: a.knowledgePointId ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };
     }
@@ -138,7 +138,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
         stem: a.stem,
         passage: a.passage ?? undefined,
         blankCount: a.blanks.length,
-        knowledgePoint: a.knowledgePoint ?? undefined,
+        knowledgePointId: a.knowledgePointId ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };
     }
@@ -148,7 +148,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
         type: 'true_false',
         stem: a.stem,
         passage: a.passage ?? undefined,
-        knowledgePoint: a.knowledgePoint ?? undefined,
+        knowledgePointId: a.knowledgePointId ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };
     }
@@ -158,7 +158,7 @@ export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionP
         type: 'short_answer',
         stem: a.stem,
         passage: a.passage ?? undefined,
-        knowledgePoint: a.knowledgePoint ?? undefined,
+        knowledgePointId: a.knowledgePointId ?? undefined,
         difficulty: a.difficulty ?? undefined,
       };
     }
@@ -180,8 +180,10 @@ export async function gradeAnswer(
     const args = rawArgs as Record<string, unknown>;
     return {
       ...base,
-      knowledgePoints: args.knowledgePoint ? [String(args.knowledgePoint)] : undefined,
-      literacies: Array.isArray(args.literacies) ? (args.literacies as string[]) : undefined,
+      // 题面、考点、素养分别由服务器的题库和知识图谱回填；不要把模型自报的
+      // knowledgePoint / literacies 传给前端或画像系统。
+      knowledgePoints: undefined,
+      literacies: undefined,
       knowledgePointId: args.knowledgePointId ? Number(args.knowledgePointId) : undefined,
     };
   };

@@ -6,9 +6,11 @@ const difficulty = z.preprocess(
   (v) => typeof v === 'string' ? (diffMap[v] ?? v) : v,
   z.enum(['easy', 'medium', 'hard']).nullish(),
 ).describe('题目难度');
-const knowledgePoint = z.string().nullish().describe('对应考点（仅填主要考点标题，如"解一元一次方程"）');
-const knowledgePointId = z.number().nullish().describe('知识点 ID（来自课程知识库，优先使用 knowledgePointId 而非 knowledgePoint 文本）');
-const literacies = z.array(z.string()).nullish().describe('本题考查的核心素养，如"数感""符号意识""运算能力""推理意识""模型意识""空间观念""几何直观""数据意识""应用意识""创新意识"等，选 1-3 个');
+// 知识点与核心素养的展示值由服务端按 ID 从数据库读取。保留旧字段只是为了
+// 兼容历史工具调用；它们不应被任何调用方信任或直接展示。
+const knowledgePoint = z.string().nullish().describe('兼容字段：服务端不会使用或展示该文本，请勿填写');
+const knowledgePointId = z.number().int().positive().nullish().describe('发布课程知识库中的知识点 ID；服务端按此 ID 解析考点和核心素养');
+const literacies = z.array(z.string()).nullish().describe('兼容字段：服务端会忽略，核心素养由知识图谱解析');
 const richTextDescription = 'Markdown text; math questions may include KaTeX formulas and fenced ```tikz ...``` diagrams.';
 const explanation = z.string().describe(
   '答案解析。请用以下结构（Markdown 格式）：\n' +

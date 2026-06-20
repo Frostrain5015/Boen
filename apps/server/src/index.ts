@@ -24,6 +24,7 @@ import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
+import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
 import { updateProficiency, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
@@ -267,11 +268,38 @@ async function autoGenerateTitle(conversationId: string, userMessage: string, on
 }
 
 /** 若最后一条消息触发了出题工具，推送 question 事件（每次只呈现第一道） */
-async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>) {
+type QuestionScope = { subject: string; grade?: string };
+
+/**
+ * The LLM is allowed to choose a published node ID, never to supply the
+ * learner-visible knowledge-point or literacy labels.  Resolve both labels
+ * from the graph immediately before persistence/SSE delivery.
+ */
+function databaseQuestionPayload(quiz: ToolCall, scope: QuestionScope): import('@boen/shared').QuestionPayload {
+  const payload = toQuestionPayload(quiz.name, quiz.args);
+  const allowedKnowledgePointIds = scope.grade
+    ? getPublishedKnowledgePointIds(scope.subject, scope.grade)
+    : [];
+  const taxonomy = resolveQuestionTaxonomy({
+    subject: scope.subject,
+    grade: scope.grade,
+    knowledgePointId: payload.knowledgePointId,
+    // Compatibility lookup only: even in this path the displayed label still
+    // comes from the database and is limited to this published scope.
+    knowledgePointTitle: quiz.args.knowledgePoint,
+    allowedKnowledgePointIds,
+  });
+  if (!taxonomy) {
+    throw new Error('题目没有绑定当前学科、年级的已发布知识点，已拒绝展示');
+  }
+  return { ...payload, ...taxonomy };
+}
+
+async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, scope: QuestionScope) {
   const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
   const quiz = calls.find((c) => QUIZ_TOOL_NAMES.has(c.name));
   if (quiz?.id) {
-    await send({ type: 'question', toolCallId: quiz.id, question: toQuestionPayload(quiz.name, quiz.args) });
+    await send({ type: 'question', toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) });
   }
 }
 
@@ -290,13 +318,34 @@ async function pendingSkipToolMessages(threadId: string): Promise<ToolMessage[]>
 }
 
 /** 获取出题工具调用的结果（若最后一条消息触发了出题） */
-function extractQuestionPayload(last: BaseMessage | undefined): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
+function extractQuestionPayload(last: BaseMessage | undefined, scope: QuestionScope): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
   const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
   const quiz = calls.find((c) => QUIZ_TOOL_NAMES.has(c.name));
   if (quiz?.id) {
-    return { toolCallId: quiz.id, question: toQuestionPayload(quiz.name, quiz.args) };
+    return { toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) };
   }
   return null;
+}
+
+/** Strip unverifiable labels from historical conversation payloads on read. */
+function sanitizeConversationQuestionMessage<T extends { role: string; content: string }>(message: T, subject: string): T {
+  if (message.role !== 'system') return message;
+  try {
+    const meta = JSON.parse(message.content) as Record<string, any>;
+    if (meta.__boen_type !== 'question') return message;
+    const canonicalize = (value: Record<string, any> | undefined) => {
+      if (!value) return value;
+      const taxonomy = getQuestionTaxonomyById(Number(value.knowledgePointId), subject);
+      return taxonomy
+        ? { ...value, ...taxonomy, knowledgePoints: [taxonomy.knowledgePoint] }
+        : { ...value, knowledgePointId: undefined, knowledgePoint: undefined, knowledgePoints: undefined, literacies: [] };
+    };
+    meta.payload = canonicalize(meta.payload);
+    meta.grading = canonicalize(meta.grading);
+    return { ...message, content: JSON.stringify(meta) };
+  } catch {
+    return message;
+  }
 }
 
 const app = new Hono();
@@ -867,7 +916,7 @@ app.get('/api/exam/:examId', async (c) => {
     ? session.questions // 已交卷：揭示完整题目（正确答案/解析）供回顾
     : session.questions.map(q => ({
         index: q.index, type: q.type, stem: q.stem, passage: q.passage, points: q.points,
-        knowledgePoint: q.knowledgePoint, difficulty: q.difficulty,
+        knowledgePointId: q.knowledgePointId, knowledgePoint: q.knowledgePoint, literacies: q.literacies, difficulty: q.difficulty,
         options: q.type === 'multiple_choice' ? q.options : undefined,
         multiSelect: q.type === 'multiple_choice' ? q.multiSelect : undefined,
         blankCount: q.type === 'fill_blank' ? (q.blankCount ?? q.blanks?.length ?? 1) : undefined,
@@ -1017,7 +1066,7 @@ app.get('/api/conversations/:id', async (c) => {
   const id = c.req.param('id');
   const conversation = getConversation(id);
   if (!conversation || conversation.userId !== userId) return c.json({ error: 'Conversation not found' }, 404);
-  const messages = getMessages(id);
+  const messages = getMessages(id).map((message) => sanitizeConversationQuestionMessage(message, conversation.subject));
   return c.json({ conversation, messages });
 });
 
@@ -1134,13 +1183,13 @@ app.post('/api/chat', async (c) => {
         const content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
         addMessage(body.conversationId!, 'assistant', content);
         // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
-        const qData = extractQuestionPayload(last);
+        const qData = extractQuestionPayload(last, { subject: body.subject ?? 'math', grade: body.grade });
         if (qData) {
           addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
         }
       }
 
-      await emitQuestionIfAny(last, send);
+      await emitQuestionIfAny(last, send, { subject: body.subject ?? 'math', grade: body.grade });
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
@@ -1181,7 +1230,7 @@ function autoCollectChatMistake(
   const id = `mistake-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
   const stem: string = toolArgs.stem ?? toolArgs.question ?? '';
-  const knowledgePoint: string | undefined = toolArgs.knowledgePoint ?? result.knowledgePoints?.[0];
+  const knowledgePoint: string | undefined = result.knowledgePoints?.[0];
   const correctAnswer = (result.reference ?? toolArgs.answer ?? toolArgs.referenceAnswer ?? '').slice(0, 2000) || null;
   const studentAnswerText = extractStudentAnswerText(answer);
   const matchScore = result.maxScore > 0 ? result.score / result.maxScore : 0;
@@ -1228,8 +1277,9 @@ function autoCollectChatMistake(
     );
 
     // 知识点映射
-    if (knowledgePoint) {
-      const node = findKnowledgePointNode(knowledgePoint, subject);
+    if (result.knowledgePointId && knowledgePoint) {
+      const node = db.prepare("SELECT id FROM kg_nodes WHERE id=? AND type='knowledge_point' AND subject=?")
+        .get(result.knowledgePointId, subject) as { id: number } | undefined;
       if (node) {
         const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
         const afterScore = profRow?.weighted_score ?? null;
@@ -1301,24 +1351,32 @@ app.post('/api/answer', async (c) => {
       // 判分
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);
 
-      // 更新知识画像：优先用 knowledgePointId 直连节点，否则回退到文本模糊匹配
+      const subject = String((state.values as any)?.subject ?? 'math');
+      const grade = String((state.values as any)?.grade ?? '');
+      const taxonomy = resolveQuestionTaxonomy({
+        subject,
+        grade: grade || undefined,
+        knowledgePointId: (target.args as Record<string, unknown>).knowledgePointId,
+        knowledgePointTitle: (target.args as Record<string, unknown>).knowledgePoint,
+        allowedKnowledgePointIds: grade ? getPublishedKnowledgePointIds(subject, grade) : [],
+      });
+      if (!taxonomy) throw new Error('题目知识点不属于当前已发布课程，已拒绝写入画像或展示');
+      result.knowledgePointId = taxonomy.knowledgePointId;
+      result.knowledgePoints = [taxonomy.knowledgePoint];
+      result.literacies = taxonomy.literacies;
+      const safeToolContent = JSON.stringify({
+        ...JSON.parse(toolContent),
+        databaseTaxonomy: taxonomy,
+      });
+
+      // 更新知识画像：只使用经数据库校验的知识点 ID。
       const profChanges: Array<{ kp: string; before: number; after: number }> = [];
       if (userId) {
-        const subject = (state.values as any)?.subject ?? 'math';
-        // 收集要更新的节点：ID 优先
+        // 收集要更新的节点：ID 唯一来源
         const nodesToUpdate: Array<{ id: number; title: string }> = [];
         if (result.knowledgePointId) {
-          const node = db.prepare('SELECT id, title FROM kg_nodes WHERE id=?').get(result.knowledgePointId) as { id: number; title: string } | undefined;
+          const node = db.prepare("SELECT id, title FROM kg_nodes WHERE id=? AND type='knowledge_point' AND subject=?").get(result.knowledgePointId, subject) as { id: number; title: string } | undefined;
           if (node) nodesToUpdate.push(node);
-        }
-        // 若无 ID 或 ID 无效，则从文本模糊匹配
-        if (nodesToUpdate.length === 0 && result.knowledgePoints?.length) {
-          for (const kpName of result.knowledgePoints) {
-            for (const kp of kpName.split(/[；;]/).map(s => s.trim()).filter(Boolean)) {
-              const node = findKnowledgePointNode(kp, subject);
-              if (node) nodesToUpdate.push({ id: node.id, title: kp });
-            }
-          }
         }
         for (const node of nodesToUpdate) {
           const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
@@ -1358,12 +1416,12 @@ app.post('/api/answer', async (c) => {
       // 答复该 AIMessage 的全部 tool_calls，保证消息序列合法（正常只有一个）
       const toolMsgs: ToolMessage[] = calls.map((t) =>
         t.id === body.toolCallId
-          ? new ToolMessage({ content: toolContent, tool_call_id: t.id })
+          ? new ToolMessage({ content: safeToolContent, tool_call_id: t.id })
           : new ToolMessage({ content: '（已跳过）', tool_call_id: t.id! }),
       );
 
       const last = await runGraph({ messages: toolMsgs }, body.threadId, send);
-      await emitQuestionIfAny(last, send);
+      await emitQuestionIfAny(last, send, { subject, grade: grade || undefined });
       await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {

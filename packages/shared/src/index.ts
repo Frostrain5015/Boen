@@ -51,7 +51,11 @@ interface BaseQuestion {
   type: QuestionType;
   stem: string;
   passage?: string;
+  /** Canonical ID resolved from the published curriculum knowledge graph. */
+  knowledgePointId?: number;
   knowledgePoint?: string;
+  /** Canonical literacy labels resolved from the knowledge graph. */
+  literacies?: string[];
   difficulty?: Difficulty;
 }
 

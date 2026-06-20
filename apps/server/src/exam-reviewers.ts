@@ -429,7 +429,17 @@ export async function regenerateQuestions(
 
     if (validationPassed) {
       // 替换原题（保留 index 和 points）
-      questions[index] = { ...regenerated, index, points: original.points };
+      // Taxonomy is immutable across regeneration.  The question writer may
+      // change the wording, but learner-visible labels remain the original
+      // database-resolved knowledge point and literacies.
+      questions[index] = {
+        ...regenerated,
+        index,
+        points: original.points,
+        knowledgePoint: original.knowledgePoint,
+        knowledgePointId: original.knowledgePointId,
+        literacies: original.literacies,
+      };
       regeneratedIndices.push(index);
       const newStem = questions[index]?.stem?.slice(0, 60) || '';
       const oldStem = original?.stem?.slice(0, 60) || '';

@@ -32,6 +32,7 @@ import { withConcurrencyLimit, Semaphore } from './concurrency.js';
 import { stepBlueprintArchitect, flattenBlueprint, type WriteTask } from './exam-blueprint.js';
 import { reviewBoard, regenerateQuestions } from './exam-reviewers.js';
 import { questionWriterPrompt } from './exam-prompts.js';
+import { canonicalizeStoredQuestionTaxonomy, getPublishedKnowledgePointIds, resolveQuestionTaxonomy, type QuestionTaxonomy } from './question-taxonomy.js';
 
 // ── 配置类型 ─────────────────────────────────
 
@@ -94,7 +95,64 @@ export type ExamGradingProgressFn = (p: ExamGradingProgress) => void | Promise<v
 function normalizeLiteracies(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.filter((l): l is string => typeof l === 'string');
   if (typeof raw === 'string') return raw.split(/[,，、\s]+/).filter(Boolean);
-  return ['综合素养'];
+  return [];
+}
+
+/**
+ * A blueprint may be proposed by an LLM, but all of its learner-visible
+ * taxonomy must be projected onto published graph nodes before it can enter
+ * the writing pipeline.  Unknown names/IDs are a production error, not a
+ * reason to retain a model-authored label.
+ */
+function canonicalizeExamBlueprint(blueprint: ExamBlueprint, config: ExamConfig): ExamBlueprint {
+  const publishedIds = getPublishedKnowledgePointIds(config.subject, config.grade);
+  if (publishedIds.length === 0) {
+    throw new Error(`${config.subject} G${config.grade} 没有已发布知识点，不能生成考试`);
+  }
+
+  const resolve = (candidate: { id?: unknown; title?: unknown }): QuestionTaxonomy | null =>
+    resolveQuestionTaxonomy({
+      subject: config.subject,
+      grade: config.grade,
+      knowledgePointId: candidate.id,
+      knowledgePointTitle: candidate.title,
+      allowedKnowledgePointIds: publishedIds,
+    });
+  const resolveName = (value: string): string | null => resolve({ title: value })?.knowledgePoint ?? null;
+
+  const sections = blueprint.sections.map((section, sectionIndex) => {
+    const knowledgePoints = section.knowledgePoints.map((candidate) => {
+      const taxonomy = resolve(candidate);
+      if (!taxonomy) {
+        throw new Error(`蓝图第 ${sectionIndex + 1} 个板块引用了未发布知识点：${candidate.title || candidate.id || '空值'}`);
+      }
+      return {
+        id: taxonomy.knowledgePointId,
+        title: taxonomy.knowledgePoint,
+        weight: Number.isFinite(candidate.weight) && candidate.weight > 0 ? candidate.weight : 1,
+      };
+    });
+    if (!knowledgePoints.length) throw new Error(`蓝图第 ${sectionIndex + 1} 个板块没有有效知识点`);
+
+    return {
+      ...section,
+      knowledgePoints,
+      questionTypes: section.questionTypes.map((plan) => {
+        const focusKps = [...new Set(plan.focusKps.map(resolveName).filter((name): name is string => Boolean(name)))];
+        return { ...plan, focusKps: focusKps.length ? focusKps : [knowledgePoints[0].title] };
+      }),
+    };
+  });
+
+  const canonicalNames = (values: string[] | undefined): string[] =>
+    [...new Set((values ?? []).map(resolveName).filter((name): name is string => Boolean(name)))];
+  const coveragePlan = {
+    must: canonicalNames(blueprint.coveragePlan?.must),
+    focus: canonicalNames(blueprint.coveragePlan?.focus),
+    ...(blueprint.coveragePlan?.stretch ? { stretch: canonicalNames(blueprint.coveragePlan.stretch) } : {}),
+  };
+
+  return { ...blueprint, sections, coveragePlan };
 }
 
 const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
@@ -361,10 +419,8 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
     q2.blanks = normalized.blanks;
     q2.blankCount = normalized.blankCount;
   }
-  if (!q2.knowledgePoint) q2.knowledgePoint = '综合';
   if (!q2.explanation) q2.explanation = '详见参考答案。';
   q2.literacies = normalizeLiteracies(q2.literacies);
-  if (!q2.literacies.length) q2.literacies = ['综合素养'];
   return q2;
 }
 
@@ -414,6 +470,7 @@ function parseGeneratedQuestionList(raw: unknown, questionType: string, count: n
 function validateExamQuestionForDelivery(q: ExamQuestion): string | null {
   if (!q.stem || q.stem.trim().length < 5) return '题干过短或缺失';
   if (!q.explanation || q.explanation.trim().length < 5) return '解析过短或缺失';
+  if (!Number.isInteger(q.knowledgePointId) || (q.knowledgePointId ?? 0) <= 0) return 'knowledgePointId 缺失';
   if (!q.knowledgePoint || q.knowledgePoint.trim().length === 0) return 'knowledgePoint 缺失';
   if (!normalizeLiteracies(q.literacies).length) return 'literacies 缺失';
 
@@ -541,13 +598,14 @@ export async function generateExam(
     const enrichedConfig: ExamConfig = { ...config, styleContext };
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 10 });
-    const blueprint = await stepBlueprintArchitect(
+    const rawBlueprint = await stepBlueprintArchitect(
       model,
       { subject: enrichedConfig.subject, grade: enrichedConfig.grade, totalScore: enrichedConfig.totalScore, notes: enrichedConfig.notes },
       weightGuide,
       [curriculumContext, profileContext, styleContext].filter(Boolean).join('\n\n'),
       mode,
     );
+    const blueprint = canonicalizeExamBlueprint(rawBlueprint, enrichedConfig);
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 18 });
 
@@ -605,7 +663,7 @@ export async function generateExam(
         scores,
         { subject: enrichedConfig.subject, grade: enrichedConfig.grade },
         crossGroupContext,
-        writeSingleQuestion,
+        (writerModel, prompt, questionType) => writeSingleQuestion(writerModel, prompt, questionType, enrichedConfig),
       );
       questions = orderExamQuestionsForDelivery(regenResult.questions);
       for (const index of regenResult.report.regeneratedIndices) regeneratedIndices.add(index);
@@ -825,7 +883,7 @@ async function stepWriteQuestionsV2(
     try {
       const questions = await invokeGenerateQuestions(model, finalPrompt, task.questionType, task.count);
       if (questions.length > 0) {
-        return toValidatedExamQuestions(questions, task);
+        return toValidatedExamQuestions(questions, task, config);
       }
     } catch (err) {
       console.warn(`[write:${task.questionType}] 第 ${attempt + 1} 次失败:`, err instanceof Error ? err.message.slice(0, 80) : err);
@@ -841,30 +899,33 @@ async function stepWriteQuestionsV2(
     task = { ...task, count: Math.max(1, task.count - 1) };
     try {
       const questions = await invokeGenerateQuestions(model, prompt, task.questionType, task.count);
-      if (questions.length > 0) return toValidatedExamQuestions(questions, task);
+      if (questions.length > 0) return toValidatedExamQuestions(questions, task, config);
     } catch { /* 继续到兜底 */ }
   }
 
     // 最终兜底：标记 __needs_review__，审核阶段强制重出
     console.warn(`[write:${task.questionType}] 全部失败，生成占位题等待重出`);
+  const fallbackTaxonomy = resolveTaskTaxonomy({ knowledgePointId: task.sectionKnowledgePoints[0]?.id }, task, config);
+  if (!fallbackTaxonomy) throw new Error('出题板块没有有效的数据库知识点，不能生成占位题');
   return Array.from({ length: task.count }, (_, i) => ({
       index: i,
       type: task.questionType as ExamQuestion['type'],
       points: task.pointsPer,
       stem: '__needs_review__',
-      knowledgePoint: task.focusKps[0] ?? '综合',
-      literacies: ['综合素养'],
+      knowledgePoint: fallbackTaxonomy.knowledgePoint,
+      knowledgePointId: fallbackTaxonomy.knowledgePointId,
+      literacies: fallbackTaxonomy.literacies,
       difficulty: task.difficulty as ExamQuestion['difficulty'],
       explanation: '__needs_review__',
       ...(task.questionType === 'multiple_choice' ? { options: [{ key: 'A', text: 'A' }, { key: 'B', text: 'B' }], correctKeys: ['A'], multiSelect: false } : {}),
     } as ExamQuestion));
   }
 
-function toValidatedExamQuestions(rawQuestions: any[], task: WriteTask): ExamQuestion[] {
+function toValidatedExamQuestions(rawQuestions: any[], task: WriteTask, config: ExamConfig): ExamQuestion[] {
   if (rawQuestions.length !== task.count) {
     throw new Error(`出题数量不匹配：期望 ${task.count} 道，实际 ${rawQuestions.length} 道`);
   }
-  const questions = rawQuestions.map((q: any, i: number) => localFormatFix(toExamQuestion(q, task, i), i));
+  const questions = rawQuestions.map((q: any, i: number) => localFormatFix(toExamQuestion(q, task, i, config), i));
   const issues = questions
     .map((q) => ({ index: q.index, issue: validateExamQuestionForDelivery(q) }))
     .filter((x): x is { index: number; issue: string } => Boolean(x.issue));
@@ -883,10 +944,10 @@ async function invokeGenerateQuestions(
   count: number,
 ): Promise<any[]> {
   const examples: Record<string, string> = {
-    multiple_choice: `{"questions":[{"stem":"题干（不要含选项字母）","options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false,"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养1"],"difficulty":"medium","explanation":"解析内容"}]}`,
-    fill_blank: `{"questions":[{"stem":"题干 ____","blanks":[{"acceptedAnswers":["标准答案"]}],"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
-    true_false: `{"questions":[{"stem":"判断题陈述","answer":true,"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
-    short_answer: `{"questions":[{"stem":"题干内容","referenceAnswer":"参考答案","keyPoints":["要点1","要点2"],"knowledgePoint":"考点名称","knowledgePointId":123,"literacies":["核心素养"],"difficulty":"medium","explanation":"解析内容"}]}`,
+    multiple_choice: `{"questions":[{"stem":"题干（不要含选项字母）","options":[{"key":"A","text":"选项1"},{"key":"B","text":"选项2"},{"key":"C","text":"选项3"},{"key":"D","text":"选项4"}],"correctKeys":["A"],"multiSelect":false,"knowledgePointId":123,"difficulty":"medium","explanation":"解析内容"}]}`,
+    fill_blank: `{"questions":[{"stem":"题干 ____","blanks":[{"acceptedAnswers":["标准答案"]}],"knowledgePointId":123,"difficulty":"medium","explanation":"解析内容"}]}`,
+    true_false: `{"questions":[{"stem":"判断题陈述","answer":true,"knowledgePointId":123,"difficulty":"medium","explanation":"解析内容"}]}`,
+    short_answer: `{"questions":[{"stem":"题干内容","referenceAnswer":"参考答案","keyPoints":["要点1","要点2"],"knowledgePointId":123,"difficulty":"medium","explanation":"解析内容"}]}`,
   };
   const schemaExample = examples[questionType] ?? examples.short_answer;
   const textPrompt = prompt + '\n\n=== 输出格式要求 ===\n必须输出纯净 JSON，不要 markdown 代码块，不要其他任何文字。' +
@@ -907,16 +968,29 @@ async function invokeGenerateQuestions(
 }
 
 /** 把 LLM 输出的单题转换为 ExamQuestion（补全 points/index） */
-function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion {
+function resolveTaskTaxonomy(raw: { knowledgePointId?: unknown; knowledgePoint?: unknown }, task: WriteTask, config: ExamConfig): QuestionTaxonomy | null {
+  return resolveQuestionTaxonomy({
+    subject: config.subject,
+    grade: config.grade,
+    knowledgePointId: raw.knowledgePointId,
+    knowledgePointTitle: raw.knowledgePoint,
+    allowedKnowledgePointIds: task.sectionKnowledgePoints.map((kp) => kp.id).filter((id): id is number => Number.isInteger(id)),
+  });
+}
+
+/** Resolve the only learner-visible taxonomy fields from the published graph. */
+function toExamQuestion(raw: any, task: WriteTask, index: number, config: ExamConfig): ExamQuestion {
+  const taxonomy = resolveTaskTaxonomy(raw, task, config);
+  if (!taxonomy) throw new Error(`第 ${index + 1} 题未绑定本板块已发布知识点`);
   const base: ExamQuestion = {
     index,
     type: task.questionType as ExamQuestion['type'],
     points: task.pointsPer,
     stem: raw.stem ?? '',
     passage: normalizeOptionalPassage(raw.passage),
-    knowledgePoint: raw.knowledgePoint ?? task.focusKps[0] ?? '综合',
-    knowledgePointId: raw.knowledgePointId,
-    literacies: normalizeLiteracies(raw.literacies),
+    knowledgePoint: taxonomy.knowledgePoint,
+    knowledgePointId: taxonomy.knowledgePointId,
+    literacies: taxonomy.literacies,
     difficulty: raw.difficulty ?? task.difficulty,
     explanation: raw.explanation ?? '',
     groupId: raw.groupId,
@@ -946,7 +1020,7 @@ function toExamQuestion(raw: any, task: WriteTask, index: number): ExamQuestion 
 
 // ── 重出阶段：单题出题（供 regenerateQuestions 回调） ─────────
 
-async function writeSingleQuestion(model: BaseChatModel, prompt: string, questionType: string): Promise<ExamQuestion | null> {
+async function writeSingleQuestion(model: BaseChatModel, prompt: string, questionType: string, config: ExamConfig): Promise<ExamQuestion | null> {
   try {
     const questions = await invokeGenerateQuestions(model, prompt, questionType, 1);
     if (questions.length === 0) return null;
@@ -958,8 +1032,10 @@ async function writeSingleQuestion(model: BaseChatModel, prompt: string, questio
       focusKps: [],
       difficulty: 'medium',
       sectionTitle: '',
-      sectionKnowledgePoints: [],
-    } as WriteTask, 0);
+      // The replacement prompt contains the original canonical ID.  Permit all
+      // published nodes here and validate the selected ID again below.
+      sectionKnowledgePoints: getPublishedKnowledgePointIds(config.subject, config.grade).map((id) => ({ id, title: '', weight: 1 })),
+    } as WriteTask, 0, config);
   } catch {
     return null;
   }
@@ -1906,7 +1982,14 @@ export function createExamSession(userId: string, config: ExamConfig, data: Gene
 export function getExamSession(examId: string, userId: string): ExamSession | null {
   const row = db.prepare(`SELECT * FROM exam_sessions WHERE id=? AND user_id=?`).get(examId, userId) as any;
   if (!row) return null;
-  const questions = (JSON.parse(row.questions) as ExamQuestion[]).map((q, i) => localFormatFix(q, i));
+  const questions = (JSON.parse(row.questions) as ExamQuestion[]).map((q, i) => {
+    const canonical = canonicalizeStoredQuestionTaxonomy(q, row.subject, row.grade);
+    // Historical labels that cannot be traced to a published node must never
+    // reach the client.  The question remains reviewable, but without a
+    // fabricated/legacy taxonomy label.
+    const safeQuestion = canonical ?? { ...q, knowledgePointId: undefined, knowledgePoint: undefined, literacies: [] };
+    return localFormatFix(safeQuestion, i);
+  });
   return {
     id: row.id, userId: row.user_id, subject: row.subject, grade: row.grade, title: row.title,
     questions, totalScore: row.total_score, durationMinutes: row.duration_minutes ?? 45,
