@@ -14,6 +14,8 @@ import {
   Lock,
   Settings,
   User,
+  Crown,
+  LogOut,
 } from 'lucide-vue-next';
 import Mascot from '@/components/Mascot.vue';
 import { useChatStore } from '@/stores/chat';
@@ -232,8 +234,8 @@ function startNewExam() {
         </button>
       </div>
 
-      <!-- 用户设置入口 -->
-      <div class="shrink-0 border-t border-[var(--line)] px-3 py-2.5">
+      <!-- 用户设置入口 + 退出登录 -->
+      <div class="shrink-0 space-y-0.5 border-t border-[var(--line)] px-3 py-2.5">
         <router-link
           to="/setup"
           class="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--accent-soft)]/60"
@@ -248,11 +250,21 @@ function startNewExam() {
             <User v-else class="h-3.5 w-3.5 text-[var(--accent-strong)]" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-xs font-bold text-[var(--ink)]">{{ authStore.userProfile?.name ?? authStore.currentUser?.username ?? '用户' }}</p>
+            <p class="flex items-center gap-1.5 truncate text-xs font-bold text-[var(--ink)]">
+              <span class="truncate">{{ authStore.userProfile?.name ?? authStore.currentUser?.username ?? '用户' }}</span>
+              <span v-if="authStore.isPremium" class="badge-premium shrink-0"><Crown class="h-2.5 w-2.5" /> 会员</span>
+            </p>
             <p class="text-[10px] text-[var(--ink-soft)]">{{ userGradeLabel }} · {{ userModelLabel }}</p>
           </div>
           <Settings class="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
         </router-link>
+        <button
+          @click="authStore.doLogout()"
+          class="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-xs font-semibold text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/5 hover:text-[var(--error)]"
+        >
+          <LogOut class="ml-7 h-3.5 w-3.5" />
+          退出登录
+        </button>
       </div>
 
       <!-- ICP 备案 -->

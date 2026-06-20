@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
 import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Crown, Save } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
-import BoenSelect from '@/components/BoenSelect.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -17,15 +16,23 @@ const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[]
   { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
 ];
 
-const gradeOptions = computed(() =>
-  GRADE_GROUPS.map(g => ({ label: g.band, options: g.items.map(i => ({ value: i.value, label: i.label })) })),
-);
+function detectBand(g: Grade): string {
+  for (const group of GRADE_GROUPS) {
+    if (group.items.some(i => i.value === g)) return group.band;
+  }
+  return '初中';
+}
 
 const name = ref(authStore.userProfile?.name ?? '');
 const grade = ref<Grade>(authStore.userProfile?.grade ?? '8');
+const selectedBand = ref(detectBand(grade.value));
 const modelProvider = ref(localStorage.getItem('boen_model_provider') || 'default');
 const fontSize = ref<'sm' | 'md' | 'lg'>(
   (localStorage.getItem('boen_font_size') as 'sm' | 'md' | 'lg') || 'md',
+);
+
+const currentBandItems = computed(() =>
+  GRADE_GROUPS.find(g => g.band === selectedBand.value)?.items ?? [],
 );
 
 const FONT_SIZE_OPTIONS = [
@@ -136,12 +143,35 @@ function handleBack() {
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">学习配置</h2>
           </div>
           <div class="space-y-4 px-5 py-4">
-            <label class="flex flex-col gap-1.5">
+            <div class="flex flex-col gap-3">
               <span class="flex items-center gap-1.5 font-display text-xs font-semibold" style="color: var(--ink-soft)">
                 <GraduationCap class="h-3.5 w-3.5" /> 当前年级
               </span>
-              <BoenSelect v-model="grade" :options="gradeOptions" placeholder="选择年级" />
-            </label>
+              <!-- 第一行：学段 -->
+              <div class="grid grid-cols-3 gap-2">
+                <button
+                  v-for="group in GRADE_GROUPS"
+                  :key="group.band"
+                  @click="selectedBand = group.band"
+                  class="flex h-10 items-center justify-center rounded-2xl border-2 text-xs font-bold transition-all active:scale-[0.97]"
+                  :class="selectedBand === group.band
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]'
+                    : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
+                >{{ group.band }}</button>
+              </div>
+              <!-- 第二行：具体年级 -->
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="item in currentBandItems"
+                  :key="item.value"
+                  @click="grade = item.value"
+                  class="flex h-9 items-center justify-center rounded-xl px-3.5 text-xs font-bold transition-all active:scale-[0.97]"
+                  :class="grade === item.value
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+                >{{ item.label }}</button>
+              </div>
+            </div>
           </div>
         </div>
 

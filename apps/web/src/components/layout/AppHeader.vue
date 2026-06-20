@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useChatStore } from '@/stores/chat';
 import SubjectSwitcher from './SubjectSwitcher.vue';
-import UserMenu from './UserMenu.vue';
 
 const chatStore = useChatStore();
 </script>
@@ -18,7 +17,6 @@ const chatStore = useChatStore();
 
     <div class="ml-auto flex items-center gap-3">
       <SubjectSwitcher />
-      <UserMenu />
     </div>
   </header>
 </template>
