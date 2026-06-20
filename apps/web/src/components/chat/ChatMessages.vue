@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { PencilLine } from 'lucide-vue-next';
+import { PencilLine, Wrench } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import Mascot from '@/components/Mascot.vue';
 import QuestionCard from '@/components/QuestionCard.vue';
@@ -85,6 +85,16 @@ onMounted(() => {
                     <PencilLine class="h-4 w-4" />
                   </span>
                   <span class="quiz-gen-label">博文正在出题</span>
+                  <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
+                </div>
+              </div>
+              <!-- 工具调用 pending 指示器（同出题模式） -->
+              <div v-else-if="i === chatStore.items.length - 1 && chatStore.pendingTool" class="quiz-gen clay-sm">
+                <div class="quiz-gen-inner">
+                  <span class="quiz-gen-icon">
+                    <Wrench class="h-4 w-4" />
+                  </span>
+                  <span class="quiz-gen-label">{{ chatStore.pendingTool.action === 'plan' ? '🔧 博文正在备课...' : chatStore.pendingTool.action === 'advance' ? '🔧 正在进入下一阶段...' : chatStore.pendingTool.action === 'exit' ? '🔧 课堂即将结束' : chatStore.pendingTool.detail }}</span>
                   <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                 </div>
               </div>

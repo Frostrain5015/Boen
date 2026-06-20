@@ -45,6 +45,8 @@ export const useChatStore = defineStore('chat', () => {
   const input = ref('');
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
+  /** 工具调用 pending 指示器（同 quiz_generating 模式） */
+  const pendingTool = ref<{ action: string; detail: string } | null>(null);
   const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number } | null>(null);
   /** 类课堂是否进行中（用于步骤日志检测，避免跨 store 引用） */
   let _sessionActive = false;
@@ -52,6 +54,8 @@ export const useChatStore = defineStore('chat', () => {
   let _sessionStartTime = 0;
   /** 已记录到的步骤日志位置（防重复） */
   let _lastLoggedStep = 0;
+  /** 待插入的工具结果消息（等 token 到来才插入，确保 pending→done 顺序） */
+  let _pendingTodoDetail: string | null = null;
   // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
@@ -103,6 +107,12 @@ export const useChatStore = defineStore('chat', () => {
   // ── SSE event handler ────────────────────────────────────
   async function handleEvent(e: SseEvent, idx: { value: number }) {
     if (e.type === 'token') {
+      // 有文本 token 说明工具已处理完毕，清除 pending 并插入工具结果消息
+      if (pendingTool.value && _pendingTodoDetail) {
+        items.value.push({ kind: 'assistant', text: _pendingTodoDetail, done: true });
+        _pendingTodoDetail = null;
+      }
+      pendingTool.value = null;
       let cur = items.value[idx.value];
       if (!cur || cur.kind !== 'assistant') {
         items.value.push(newAssistant());
@@ -137,13 +147,14 @@ export const useChatStore = defineStore('chat', () => {
         const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
         console.log(`[Boen 类课堂] 🎯 第${_lastLoggedStep}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
-      // 工具调用处切分消息：闭合当前 assistant，插入工具结果，后续 token 另起新消息
+      // pending 指示器（同 quiz_generating），等后续 token 才插入结果消息
+      pendingTool.value = { action: e.action, detail: e.detail };
+      _pendingTodoDetail = e.detail;
       const lastItem = items.value[items.value.length - 1];
       if (lastItem?.kind === 'assistant' && !lastItem.done) {
         lastItem.done = true;
       }
-      items.value.push({ kind: 'assistant', text: e.detail, done: true });
-      idx.value = -1;  // 重置索引，后续 token 另起新消息
+      idx.value = -1;
       if (e.detail) toast.info(e.detail);
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
@@ -360,6 +371,7 @@ export const useChatStore = defineStore('chat', () => {
     input,
     busy,
     isGeneratingQuiz,
+    pendingTool,
     conversations,
     currentConversationId,
     reaction,
