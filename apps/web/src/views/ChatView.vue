@@ -19,67 +19,41 @@ const uiStore = useUiStore();
 
 <style scoped>
 /* ── 跑马灯边框特效 ── */
-.session-wrap {
-  position: relative;
-}
-
 .session-wrap.session-active {
   box-shadow:
-    inset 0 0 40px rgba(212, 160, 83, 0.03),
+    inset 0 1px 0 rgba(212, 160, 83, 0.08),
     0 0 30px rgba(212, 160, 83, 0.05);
 }
 
-/* 上下两条流光轨道 */
-.session-wrap.session-active::before,
-.session-wrap.session-active::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-  z-index: 10;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    rgba(212, 160, 83, 0.15) 10%,
-    rgba(212, 160, 83, 0.6) 25%,
-    var(--accent) 45%,
-    rgba(212, 160, 83, 0.6) 65%,
-    rgba(212, 160, 83, 0.15) 85%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  height: 2px;
-}
-
-/* 上边：从右向左平滑扫过 */
+/* 单条金色流光轨 */
 .session-wrap.session-active::before {
+  content: '';
+  display: block;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  animation: scan-beam-top 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  height: 2px;
+  z-index: 9999;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(212, 160, 83, 0.2) 15%,
+    var(--accent) 40%,
+    rgba(212, 160, 83, 0.6) 60%,
+    rgba(212, 160, 83, 0.15) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: scan-beam 3.5s cubic-bezier(0.5, 0, 0.5, 1) infinite;
 }
 
-/* 下边：从左向右平滑扫过 */
-.session-wrap.session-active::after {
-  bottom: 0;
-  left: 0;
-  right: 0;
-  animation: scan-beam-bottom 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-
-@keyframes scan-beam-top {
-  0%   { background-position: 200% 0; opacity: 0.1; }
-  20%  { opacity: 1; }
-  45%  { background-position: -50% 0; }
-  55%  { background-position: -50% 0; opacity: 1; }
-  80%  { opacity: 0.1; }
-  100% { background-position: -100% 0; opacity: 0.05; }
-}
-
-@keyframes scan-beam-bottom {
-  0%   { background-position: -100% 0; opacity: 0.05; }
-  20%  { opacity: 0.1; }
-  45%  { background-position: 150% 0; }
-  55%  { background-position: 150% 0; opacity: 0.1; }
-  80%  { opacity: 1; }
-  100% { background-position: 200% 0; opacity: 0.1; }
+@keyframes scan-beam {
+  0%   { background-position: 200% 0; opacity: 0.2; }
+  15%  { opacity: 1; }
+  45%  { background-position: -20% 0; }
+  55%  { background-position: -20% 0; opacity: 0.8; }
+  85%  { opacity: 0.2; }
+  100% { background-position: -100% 0; opacity: 0.1; }
 }
 </style>
