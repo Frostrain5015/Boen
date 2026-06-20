@@ -17,7 +17,7 @@ import {
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
-  COMPLETE_REVIEW_TOOL, EXIT_SESSION_TOOL,
+  COMPLETE_REVIEW_TOOL, EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -203,6 +203,11 @@ async function runGraph(
     quizSignaled = true;
     await send({ type: 'quiz_generating' });
   };
+  // TODO 状态机工具检测缓存 + 计时
+  let todoStepSent = new Set<string>();
+  let stepCount = 0;
+  const stepTimestamps: number[] = [Date.now()];
+
   for await (const ev of events) {
     if (ev.event === 'on_chat_model_stream') {
       const chunk = ev.data?.chunk as
@@ -210,20 +215,51 @@ async function runGraph(
         | undefined;
       const text = typeof chunk?.content === 'string' ? chunk.content : '';
       if (text) await send({ type: 'token', value: text });
-      // 模型一旦开始产出出题工具调用就立即通知前端（名字可能被分片，累积后匹配）
+
+      // 检测类课堂工具调用（advance_step / exit_session）
+      const toolNames = [
+        ...(chunk?.tool_call_chunks ?? []).map((t) => t.name).filter(Boolean),
+        ...(chunk?.tool_calls ?? []).map((t) => t.name).filter(Boolean),
+      ] as string[];
+      for (const name of toolNames) {
+        if (name === ADVANCE_STEP_TOOL && !todoStepSent.has(name)) {
+          todoStepSent.add(name);
+          stepCount++;
+          stepTimestamps.push(Date.now());
+          const elapsed = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[stepTimestamps.length - 2]) / 1000).toFixed(1);
+          const total = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[0]) / 1000).toFixed(1);
+          await send({ type: 'todo_step', action: 'advance', detail: `第${stepCount}步完成` });
+          console.log(`[Boen 类课堂] 🎯 第${stepCount}步完成 — 耗时 ${elapsed}s | 总 ${total}s | ${new Date().toLocaleTimeString()}`);
+        }
+        if (name === EXIT_SESSION_TOOL && !todoStepSent.has(name)) {
+          todoStepSent.add(name);
+          const args = (chunk?.tool_calls?.[0]?.args ?? chunk?.tool_call_chunks?.[0]) as any;
+          const total = ((Date.now() - stepTimestamps[0]) / 1000).toFixed(1);
+          console.log(`[Boen 类课堂] ✅ exit_session — ${stepCount}/${args?.totalSteps ?? '?'}步 | ${args?.score ?? '?'}分 | 总耗时 ${total}s | ${new Date().toLocaleTimeString()}`);
+        }
+      }
+
+      // 出题工具检测
       if (!quizSignaled) {
         for (const tc of chunk?.tool_call_chunks ?? []) if (tc.name) toolNameBuf += tc.name;
-        const names = [
-          ...(chunk?.tool_call_chunks ?? []).map((t) => t.name),
-          ...(chunk?.tool_calls ?? []).map((t) => t.name),
-          toolNameBuf,
-        ];
+        const names = [...toolNames, toolNameBuf];
         if (names.some(looksLikeQuiz)) await signalQuiz();
       }
-    } else if (ev.event === 'on_chat_model_end' && !quizSignaled) {
-      // 兜底：模型不分片流式输出 tool_call 时，turn 结束从完整输出里识别
-      const out = ev.data?.output as { tool_calls?: Array<{ name?: string }> } | undefined;
-      if ((out?.tool_calls ?? []).some((t) => looksLikeQuiz(t.name))) await signalQuiz();
+    } else if (ev.event === 'on_chat_model_end') {
+      // 兜底：模型不分片流式输出 tool_call
+      if (!quizSignaled) {
+        const out = ev.data?.output as { tool_calls?: Array<{ name?: string }> } | undefined;
+        if ((out?.tool_calls ?? []).some((t) => looksLikeQuiz(t.name))) await signalQuiz();
+      }
+      // 兜底检测 exit_session（不分片流时最后一帧拿完整 args）
+      if (!todoStepSent.has(EXIT_SESSION_TOOL)) {
+        const out = ev.data?.output as { tool_calls?: Array<{ name: string; args?: Record<string, unknown> }> } | undefined;
+        const exitCall = out?.tool_calls?.find((t) => t.name === EXIT_SESSION_TOOL);
+        if (exitCall) {
+          const total = ((Date.now() - stepTimestamps[0]) / 1000).toFixed(1);
+          console.log(`[Boen 类课堂] ✅ exit_session — ${stepCount}/${(exitCall.args as any)?.totalSteps ?? '?'}步 | ${(exitCall.args as any)?.score ?? '?'}分 | 总耗时 ${total}s | ${new Date().toLocaleTimeString()}`);
+        }
+      }
     }
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });

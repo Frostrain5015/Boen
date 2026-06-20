@@ -110,17 +110,8 @@ export const useChatStore = defineStore('chat', () => {
       if (cur.kind === 'assistant') {
         cur.text += e.value;
         if (e.value.includes('`')) nextTick(() => runTikz(document));
-        // 类课堂 TODO 步骤日志（检查累积文本，避免 token 拆分漏检）
-        if (_sessionActive) {
-          const stepMatch = cur.text.match(/第([一二三四五六七八九十]+)步[：:]/);
-          if (stepMatch && _lastLoggedStep < stepMatch[0].length) {
-            const idx = '一二三四五六七八九十'.indexOf(stepMatch[1]);
-            if (idx >= 0) {
-              console.log(`[Boen 类课堂] 🎯 第${idx + 1}步开始 — ${new Date().toLocaleTimeString()}`);
-              _lastLoggedStep = cur.text.length;
-            }
-          }
-        }
+        // 类课堂 TODO 步骤日志（占位，实际由 todo_step 事件驱动）
+        // 此处保留空分支避免后续误会
       }
     } else if (e.type === 'quiz_generating') {
       isGeneratingQuiz.value = true;
