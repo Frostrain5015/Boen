@@ -53,49 +53,28 @@ onMounted(() => {
             @submit="(a) => chatStore.onAnswer(m, a)"
           />
 
-          <!-- 工具 pending 卡片（同 quiz-gen 样式，橙色底，有动画点） -->
-          <div v-else-if="m.kind === 'tool_pending'" class="flex flex-col gap-1">
+          <!-- 工具卡片（pending/done/error 单一模板，仅切换 CSS 类，不重建 DOM） -->
+          <div v-else-if="m.kind === 'tool_pending' || m.kind === 'tool_result' || m.kind === 'tool_error'" class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
               <Mascot :size="24" :float="false" :animated="false" />
               <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
             </div>
             <div class="pl-8">
-              <div class="quiz-gen clay-sm">
+              <div class="quiz-gen clay-sm"
+                :class="m.kind === 'tool_result' ? 'quiz-gen-done' : m.kind === 'tool_error' ? 'quiz-gen-err' : ''">
                 <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon"><Wrench class="h-4 w-4" /></span>
-                  <span class="quiz-gen-label">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : '课堂即将结束' }}</span>
-                  <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- 工具结果卡片（同 quiz-gen 样式，绿色底，不重播入场动画） -->
-          <div v-else-if="m.kind === 'tool_result'" class="flex flex-col gap-1">
-            <div class="flex items-center gap-2">
-              <Mascot :size="24" :float="false" :animated="false" />
-              <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
-            </div>
-            <div class="pl-8">
-              <div class="quiz-gen quiz-gen-done clay-sm">
-                <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon quiz-gen-icon-done">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : '🎓' }}</span>
-                  <span class="quiz-gen-label">{{ m.detail }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 工具错误卡片（同 quiz-gen 样式，红色底，不重播入场动画） -->
-          <div v-else-if="m.kind === 'tool_error'" class="flex flex-col gap-1">
-            <div class="flex items-center gap-2">
-              <Mascot :size="24" :float="false" :animated="false" />
-              <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
-            </div>
-            <div class="pl-8">
-              <div class="quiz-gen quiz-gen-err clay-sm">
-                <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon quiz-gen-icon-err">⚠️</span>
-                  <span class="quiz-gen-label">{{ m.error }}</span>
+                  <span class="quiz-gen-icon"
+                    :class="m.kind === 'tool_result' ? 'quiz-gen-icon-done' : m.kind === 'tool_error' ? 'quiz-gen-icon-err' : ''">
+                    <template v-if="m.kind === 'tool_error'">⚠️</template>
+                    <Wrench v-else-if="m.kind === 'tool_pending'" class="h-4 w-4" />
+                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : '🎓' }}</template>
+                  </span>
+                  <span class="quiz-gen-label">
+                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : '课堂即将结束' }}</template>
+                    <template v-else-if="m.kind === 'tool_result'">{{ (m as any).detail }}</template>
+                    <template v-else>{{ (m as any).error }}</template>
+                  </span>
+                  <span class="quiz-gen-dots" :class="{ 'opacity-0': m.kind !== 'tool_pending' }"><span></span><span></span><span></span></span>
                 </div>
               </div>
             </div>

@@ -455,6 +455,7 @@ body {
   padding: 0.45rem 1rem 0.45rem 0.85rem;
   background: var(--surface);
   border: 1.5px solid var(--accent-soft);
+  transition: background 0.35s ease, border-color 0.35s ease;
 }
 .quiz-gen-inner {
   display: flex;
@@ -470,17 +471,20 @@ body {
   background: var(--accent-soft);
   color: var(--accent-strong);
   animation: quizGenPulse 2s ease-in-out infinite;
+  transition: background 0.35s ease, color 0.35s ease;
 }
 .quiz-gen-label {
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--ink-soft);
+  transition: color 0.35s ease;
 }
 .quiz-gen-dots {
   display: inline-flex;
   gap: 3px;
   align-items: center;
+  transition: opacity 0.3s ease;
 }
 .quiz-gen-dots span {
   width: 5px;
