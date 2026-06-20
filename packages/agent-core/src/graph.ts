@@ -264,7 +264,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
     if (state.mode === 'review') {
       system = new SystemMessage(systemPromptForReview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools([...reviewTools, ...structuredTools] as any);
+      if (model.bindTools) tools = model.bindTools(reviewTools as any);
     } else if (state.mode === 'preview') {
       system = new SystemMessage(systemPromptForPreview(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
       if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
@@ -273,7 +273,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       if (model.bindTools) tools = model.bindTools([...qaTools, ...structuredTools] as any);
     } else if (state.mode === 'weakness') {
       system = new SystemMessage(systemPromptForWeakness(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade) + todoAppend);
-      if (model.bindTools) tools = model.bindTools([...reviewTools, ...structuredTools] as any);
+      if (model.bindTools) tools = model.bindTools(reviewTools as any);
     } else {
       system = new SystemMessage(systemPromptForQa(state.gradeBand ?? 'middle', state.subject ?? 'math', state.userName, state.grade));
       if (last && isToolMessage(last)) {
