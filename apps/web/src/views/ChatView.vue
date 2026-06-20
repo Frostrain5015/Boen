@@ -13,6 +13,18 @@ const uiStore = useUiStore();
   <div class="flex min-h-0 flex-1 flex-col">
     <!-- 类课堂跑马灯 - 独立 DOM 元素，不受 scoped 伪元素限制 -->
     <div v-if="uiStore.sessionActive" class="session-beam"></div>
+    <!-- 类课堂步骤进度条 -->
+    <Transition name="todo-fade">
+      <div v-if="uiStore.sessionActive && chatStore.todoProgress" class="todo-progress-bar">
+        <div class="todo-progress-inner">
+          <span class="todo-step-label">{{ chatStore.todoProgress.detail }}</span>
+          <div class="todo-track">
+            <div class="todo-fill" :style="{ width: `${(chatStore.todoProgress.completed / 5) * 100}%` }"></div>
+          </div>
+          <span class="todo-count">{{ chatStore.todoProgress.completed }} / 5</span>
+        </div>
+      </div>
+    </Transition>
     <AppHeader />
     <ChatMessages />
     <InputArea />
@@ -48,5 +60,62 @@ const uiStore = useUiStore();
   55%  { background-position: -20% 0; opacity: 0.8; }
   85%  { opacity: 0.2; }
   100% { background-position: -100% 0; opacity: 0.1; }
+}
+
+/* ── 类课堂步骤进度条 ── */
+.todo-progress-bar {
+  position: fixed;
+  top: 2px;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  padding: 6px 16px 0;
+}
+.todo-progress-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(212,160,83,0.25);
+  border-radius: 20px;
+  padding: 4px 14px;
+  pointer-events: auto;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.todo-step-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8b6914;
+  white-space: nowrap;
+}
+.todo-track {
+  width: 60px;
+  height: 4px;
+  background: #f0e6d0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.todo-fill {
+  height: 100%;
+  background: #d4a053;
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.todo-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #b8860b;
+  font-variant-numeric: tabular-nums;
+}
+.todo-fade-enter-active, .todo-fade-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+.todo-fade-enter-from, .todo-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

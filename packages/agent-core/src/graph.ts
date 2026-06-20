@@ -354,29 +354,51 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   /** 退出类课堂节点：插入 ToolMessage 后结束 */
   const exitSessionNode = async (state: State): Promise<Partial<State>> => {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
-    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === EXIT_SESSION_TOOL && c.id);
-    const toolMsgs = calls.map((call) =>
+    const allCalls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
+    const exitCalls = allCalls.filter((c) => c.name === EXIT_SESSION_TOOL);
+    const toolMsgs: ToolMessage[] = exitCalls.map((call) =>
       new ToolMessage({ content: '学习已结束，总结与评分已提交。', tool_call_id: call.id! }),
     );
+    // 为同响应中的其他工具调用补 ToolMessage
+    for (const c of allCalls.filter((c) => c.name !== EXIT_SESSION_TOOL)) {
+      toolMsgs.push(new ToolMessage({ content: '已处理。', tool_call_id: c.id! }));
+    }
     return { messages: toolMsgs };
   };
 
   /** TODO 步进节点：推进到下一步，继续对话 */
   const advanceStepTodoNode = async (state: State): Promise<Partial<State>> => {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
-    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === ADVANCE_STEP_TOOL && c.id);
-    const toolMsgs: ToolMessage[] = calls.map((call) =>
-      new ToolMessage({ content: `步骤 ${calls.indexOf(call) + 1} 已标记完成。`, tool_call_id: call.id! }),
+    const allCalls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
+    const advanceCalls = allCalls.filter((c) => c.name === ADVANCE_STEP_TOOL);
+    const toolMsgs: ToolMessage[] = advanceCalls.map((call, i) =>
+      new ToolMessage({ content: `步骤 ${i + 1} 已标记完成。`, tool_call_id: call.id! }),
     );
+
+    // 为同响应中的其他工具调用（如出题工具）补 ToolMessage，防止悬空 tool_calls
+    const otherCalls = allCalls.filter((c) => c.name !== ADVANCE_STEP_TOOL);
+    for (const c of otherCalls) {
+      toolMsgs.push(new ToolMessage({ content: '题目已生成，请继续。', tool_call_id: c.id! }));
+    }
+
     if (!state.todoState) return { messages: toolMsgs };
     try {
       const todo = JSON.parse(state.todoState);
-      const completedId = todo.currentStep;
+      // 使用 LLM 传入的 stepId（兜底用 currentStep）
+      const completedId = advanceCalls[0]?.args
+        ? (Number((advanceCalls[0].args as Record<string, unknown>).stepId) || todo.currentStep)
+        : todo.currentStep;
       const step = todo.steps.find((s: any) => s.id === completedId);
       if (step) step.status = 'completed';
-      todo.currentStep = Math.min(todo.currentStep + 1, todo.steps.length + 1);
-      const nextStep = todo.steps.find((s: any) => s.status === 'in_progress' || s.status === 'pending');
-      if (nextStep) nextStep.status = 'in_progress';
+      // 找到下一个未完成步骤并推进
+      const nextStep = todo.steps.find((s: any) => s.status === 'pending');
+      if (nextStep) {
+        nextStep.status = 'in_progress';
+        todo.currentStep = nextStep.id;
+      } else {
+        // 所有步骤已完成
+        todo.currentStep = todo.steps.length + 1;
+      }
       return { messages: toolMsgs, todoState: JSON.stringify(todo) };
     } catch { return { messages: toolMsgs }; }
   };
