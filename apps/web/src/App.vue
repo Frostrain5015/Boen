@@ -2,7 +2,6 @@
 import { onMounted } from 'vue';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
-import UserSetupDialog from '@/components/UserSetupDialog.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import SidebarLayout from '@/components/layout/SidebarLayout.vue';
@@ -18,6 +17,10 @@ const uiStore = useUiStore();
 useFavicon();
 
 onMounted(() => {
+  // 字体大小初始化
+  const fs = localStorage.getItem('boen_font_size') || 'md';
+  document.documentElement.setAttribute('data-fontsize', fs);
+
   authStore.checkAuth();
 
   // Remove boot loader after Vue has rendered
@@ -44,8 +47,6 @@ onMounted(() => {
 
   <!-- 登录页面（authChecked 为 false 时也拦截，防止闪未登录对话界面） -->
   <LoginView v-else-if="!authStore.authChecked || !authStore.authenticated" />
-
-  <!-- 用户设置 → 独立路由 /setup，不再使用弹窗 -->
 
   <!-- 主应用 -->
   <div v-else :data-subject="uiStore.subject" class="relative flex h-full flex-col">

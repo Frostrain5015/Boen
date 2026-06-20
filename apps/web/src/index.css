@@ -37,6 +37,12 @@
   --locked-surface: #f7f2eb;
   --locked-line: #e8dfd2;
 }
+
+/* ── 字体大小（小/中/大三档，rem 自动跟随） ── */
+html[data-fontsize="sm"] { font-size: 14px; }
+html[data-fontsize="md"], html:not([data-fontsize]) { font-size: 16px; }
+html[data-fontsize="lg"] { font-size: 18px; }
+
 /* 语文：暖橙色 */
 [data-subject='chinese'] {
   --accent: #ff7a4d;

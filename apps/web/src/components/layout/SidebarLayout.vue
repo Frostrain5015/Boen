@@ -12,6 +12,8 @@ import {
   NotebookPen,
   BrainCircuit,
   Lock,
+  Settings,
+  User,
 } from 'lucide-vue-next';
 import Mascot from '@/components/Mascot.vue';
 import { useChatStore } from '@/stores/chat';
@@ -33,6 +35,24 @@ const currentView = computed(() => {
   if (name === 'profile') return 'profile';
   if (name === 'mistakes') return 'mistakes';
   return 'chat';
+});
+
+const userGradeLabel = computed(() => {
+  const g = authStore.userProfile?.grade;
+  if (!g) return '';
+  const n = Number(g);
+  if (n >= 1 && n <= 6) return `${'一二三四五六'[n - 1]}年级`;
+  if (n >= 7 && n <= 9) return `初${'一二三'[n - 7]}`;
+  if (g === 'high') return '高中';
+  if (g === 'college') return '大学';
+  return g;
+});
+
+const userModelLabel = computed(() => {
+  const p = localStorage.getItem('boen_model_provider') || 'default';
+  if (p === 'deepseek') return 'Flash';
+  if (p === 'deepseek-pro') return 'Pro';
+  return 'Kimi';
 });
 
 function subjectLabel(val: string) {
@@ -210,6 +230,29 @@ function startNewExam() {
           <span class="flex-1">档案</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
         </button>
+      </div>
+
+      <!-- 用户设置入口 -->
+      <div class="shrink-0 border-t border-[var(--line)] px-3 py-2.5">
+        <router-link
+          to="/setup"
+          class="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--accent-soft)]/60"
+        >
+          <div class="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--accent-soft)]">
+            <img
+              v-if="authStore.currentUser?.picture"
+              :src="authStore.currentUser.picture"
+              :alt="authStore.currentUser.username"
+              class="h-full w-full object-cover"
+            />
+            <User v-else class="h-3.5 w-3.5 text-[var(--accent-strong)]" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-xs font-bold text-[var(--ink)]">{{ authStore.userProfile?.name ?? authStore.currentUser?.username ?? '用户' }}</p>
+            <p class="text-[10px] text-[var(--ink-soft)]">{{ userGradeLabel }} · {{ userModelLabel }}</p>
+          </div>
+          <Settings class="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
+        </router-link>
       </div>
 
       <!-- ICP 备案 -->

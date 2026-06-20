@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { User, LogOut, Settings, Crown, MessageSquare } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useToast } from '@/composables/useToast';
 
+const router = useRouter();
 const authStore = useAuthStore();
 const uiStore = useUiStore();
 const toast = useToast();
@@ -68,7 +70,7 @@ onUnmounted(() => {
       </div>
       <div class="border-t border-[var(--line)]">
         <button
-          @click="authStore.openSetupDialog(); uiStore.showUserMenu = false"
+          @click="router.push('/setup'); uiStore.showUserMenu = false"
           class="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--accent-soft)]"
         >
           <Settings class="h-4 w-4" />
