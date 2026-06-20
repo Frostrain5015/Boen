@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { PencilLine, Wrench } from 'lucide-vue-next';
+import { PencilLine, Wrench, CheckCircle, XCircle } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import Mascot from '@/components/Mascot.vue';
 import QuestionCard from '@/components/QuestionCard.vue';
@@ -65,16 +65,20 @@ onMounted(() => {
                 <div class="quiz-gen-inner">
                   <span class="quiz-gen-icon"
                     :class="m.kind === 'tool_result' ? 'quiz-gen-icon-done' : m.kind === 'tool_error' ? 'quiz-gen-icon-err' : ''">
-                    <template v-if="m.kind === 'tool_error'">⚠️</template>
-                    <Wrench v-else-if="m.kind === 'tool_pending'" class="h-4 w-4" />
-                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : '🎓' }}</template>
+                    <Wrench v-if="m.kind === 'tool_pending'" class="h-4 w-4" />
+                    <CheckCircle v-else-if="m.kind === 'tool_result'" class="h-5 w-5" />
+                    <XCircle v-else class="h-5 w-5" />
                   </span>
                   <span class="quiz-gen-label">
                     <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : '课堂即将结束' }}</template>
                     <template v-else-if="m.kind === 'tool_result'">{{ (m as any).detail }}</template>
                     <template v-else>{{ (m as any).error }}</template>
                   </span>
-                  <span class="quiz-gen-dots" :class="{ 'opacity-0': m.kind !== 'tool_pending' }"><span></span><span></span><span></span></span>
+                  <span class="quiz-gen-dots">
+                    <span v-if="m.kind === 'tool_pending'" class="flex gap-[3px]"><span></span><span></span><span></span></span>
+                    <CheckCircle v-else-if="m.kind === 'tool_result'" class="h-4 w-4 text-green-600" />
+                    <XCircle v-else class="h-4 w-4 text-red-600" />
+                  </span>
                 </div>
               </div>
             </div>
