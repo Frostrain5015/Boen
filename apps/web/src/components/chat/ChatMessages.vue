@@ -53,6 +53,22 @@ onMounted(() => {
             @submit="(a) => chatStore.onAnswer(m, a)"
           />
 
+          <!-- 工具 pending 卡片（同 quiz-gen 样式，橙色底，有动画点） -->
+          <div v-else-if="m.kind === 'tool_pending'" class="flex flex-col gap-1">
+            <div class="flex items-center gap-2">
+              <Mascot :size="24" :float="false" :animated="false" />
+              <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
+            </div>
+            <div class="pl-8">
+              <div class="quiz-gen clay-sm">
+                <div class="quiz-gen-inner">
+                  <span class="quiz-gen-icon"><Wrench class="h-4 w-4" /></span>
+                  <span class="quiz-gen-label">{{ m.action === 'plan' ? '🔧 博文正在备课...' : m.action === 'advance' ? '🔧 正在进入下一阶段...' : '🔧 课堂即将结束' }}</span>
+                  <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
           <!-- 工具结果卡片（同 quiz-gen 样式，绿色底，不重播入场动画） -->
           <div v-else-if="m.kind === 'tool_result'" class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
@@ -101,7 +117,7 @@ onMounted(() => {
           </div>
 
           <!-- 助手消息 -->
-          <div v-else class="flex flex-col gap-1 anim-fadeUp">
+          <div v-else-if="m.kind === 'assistant'" class="flex flex-col gap-1 anim-fadeUp">
             <div class="flex items-center gap-2">
               <Mascot :size="24" :float="false" :animated="false" />
               <span class="text-xs font-semibold text-[var(--accent)]">博文</span>
@@ -110,23 +126,13 @@ onMounted(() => {
               <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
                 <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
               </div>
-              <!-- 正在出题提示 -->
+              <!-- 正在出题提示，仅在最后一条且是 assistant 时 -->
               <div v-if="i === chatStore.items.length - 1 && chatStore.isGeneratingQuiz" class="quiz-gen clay-sm">
                 <div class="quiz-gen-inner">
                   <span class="quiz-gen-icon">
                     <PencilLine class="h-4 w-4" />
                   </span>
                   <span class="quiz-gen-label">博文正在出题</span>
-                  <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
-                </div>
-              </div>
-              <!-- 工具调用 pending 指示器（同出题模式） -->
-              <div v-else-if="i === chatStore.items.length - 1 && chatStore.pendingTool" class="quiz-gen clay-sm">
-                <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon">
-                    <Wrench class="h-4 w-4" />
-                  </span>
-                  <span class="quiz-gen-label">{{ chatStore.pendingTool.action === 'plan' ? '🔧 博文正在备课...' : chatStore.pendingTool.action === 'advance' ? '🔧 正在进入下一阶段...' : chatStore.pendingTool.action === 'exit' ? '🔧 课堂即将结束' : chatStore.pendingTool.detail }}</span>
                   <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                 </div>
               </div>

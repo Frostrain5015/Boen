@@ -26,6 +26,7 @@ export type ChatItem =
   | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
   | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload }
+  | { kind: 'tool_pending'; action: string }
   | { kind: 'tool_result'; action: string; detail: string }
   | { kind: 'tool_error'; action: string; error: string };
 
@@ -47,8 +48,6 @@ export const useChatStore = defineStore('chat', () => {
   const input = ref('');
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
-  /** 工具调用 pending 指示器（同 quiz_generating 模式） */
-  const pendingTool = ref<{ action: string; detail: string } | null>(null);
   const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number } | null>(null);
   /** 类课堂是否进行中（用于步骤日志检测，避免跨 store 引用） */
   let _sessionActive = false;
@@ -107,7 +106,6 @@ export const useChatStore = defineStore('chat', () => {
   // ── SSE event handler ────────────────────────────────────
   async function handleEvent(e: SseEvent, idx: { value: number }) {
     if (e.type === 'token') {
-      pendingTool.value = null;
       let cur = items.value[idx.value];
       if (!cur || cur.kind !== 'assistant') {
         items.value.push(newAssistant());
@@ -142,19 +140,27 @@ export const useChatStore = defineStore('chat', () => {
         const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
         console.log(`[Boen 类课堂] 🎯 第${_lastLoggedStep}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
-      // pending 指示器（同 quiz_generating），直至 on_chain_end 发出 todo_done
-      pendingTool.value = { action: e.action, detail: '' };
-      const lastItem = items.value[items.value.length - 1];
+      // pending 插入 chat items（todo_done 时原地替换为 tool_result，无缝过渡）
+      items.value.push({ kind: 'tool_pending', action: e.action });
+      const lastItem = items.value[items.value.length - 2];
       if (lastItem?.kind === 'assistant' && !lastItem.done) {
         lastItem.done = true;
       }
       idx.value = -1;
     } else if (e.type === 'todo_done') {
-      pendingTool.value = null;
-      items.value.push({ kind: 'tool_result', action: e.action, detail: e.detail });
+      for (let i = items.value.length - 1; i >= 0; i--) {
+        if (items.value[i].kind === 'tool_pending') {
+          items.value[i] = { kind: 'tool_result', action: e.action, detail: e.detail };
+          break;
+        }
+      }
     } else if (e.type === 'todo_fail') {
-      pendingTool.value = null;
-      items.value.push({ kind: 'tool_error', action: e.action, error: e.error });
+      for (let i = items.value.length - 1; i >= 0; i--) {
+        if (items.value[i].kind === 'tool_pending') {
+          items.value[i] = { kind: 'tool_error', action: e.action, error: e.error };
+          break;
+        }
+      }
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
       if (authStore.subscription && !authStore.subscription.isPremium) {
@@ -370,7 +376,6 @@ export const useChatStore = defineStore('chat', () => {
     input,
     busy,
     isGeneratingQuiz,
-    pendingTool,
     conversations,
     currentConversationId,
     reaction,
