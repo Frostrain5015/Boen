@@ -92,19 +92,15 @@ html[data-fontsize="lg"] { font-size: 18px; }
     box-shadow 0.7s ease;
 }
 
-/* ── 类课堂光斑：入场轨道播放 + 加速浮动（长写属性，不改名 ⇒ 动画不重启）── */
+/* ── 类课堂光斑：透明度和颜色冷调调整（无环游，仅渐变过渡）── */
 .boen-session .app-bg::before {
   opacity: 0.62;
-  animation-duration: 1.4s, 14s;
-  animation-delay: 0s, 1.4s;
-  animation-play-state: running, running;
+  animation-duration: 14s;
 }
 .boen-session .app-bg::after {
   background: #74b9ff;
   opacity: 0.6;
-  animation-duration: 1.4s, 17s;
-  animation-delay: 0s, 1.4s;
-  animation-play-state: running, running;
+  animation-duration: 17s;
 }
 
 html {
@@ -189,20 +185,13 @@ body {
   z-index: 1;
   transition: background 0.7s ease, opacity 0.7s ease;
 }
-/* 光斑 1 — 右上（双动画：入场轨道暂停 + 浮动运行） */
+/* 光斑 1 — 右上（慢速浮动） */
 .app-bg::before {
   width: 42vw;
   height: 42vw;
   top: -10vw;
   right: -8vw;
-  animation-name: blob-journey, blob;
-  animation-duration: 1.4s, 22s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease-in-out;
-  animation-delay: 0s, 0s;
-  animation-iteration-count: 1, infinite;
-  animation-direction: normal, normal;
-  animation-fill-mode: forwards, none;
-  animation-play-state: paused, running;
+  animation: blob 22s ease-in-out infinite;
 }
 /* 光斑 2 — 左下 */
 .app-bg::after {
@@ -212,14 +201,7 @@ body {
   left: -6vw;
   background: #ffb37a;
   opacity: 0.55;
-  animation-name: blob-journey-reverse, blob;
-  animation-duration: 1.4s, 26s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease-in-out;
-  animation-delay: 0s, 0s;
-  animation-iteration-count: 1, infinite;
-  animation-direction: normal, reverse;
-  animation-fill-mode: forwards, none;
-  animation-play-state: paused, running;
+  animation: blob 26s ease-in-out infinite reverse;
 }
 /* 颗粒噪点 */
 .app-grain {
@@ -298,21 +280,6 @@ body {
   0%, 100% { transform: translate(0, 0) scale(1); }
   33% { transform: translate(4vw, 3vw) scale(1.12); }
   66% { transform: translate(-3vw, 2vw) scale(0.92); }
-}
-/* 类课堂入场轨道（椭圆环游 → 回到原位） */
-@keyframes blob-journey {
-  0%   { transform: translate(0, 0) scale(1); }
-  25%  { transform: translate(-10vw, 5vh) scale(1.06); }
-  50%  { transform: translate(-4vw, 10vh) scale(0.94); }
-  75%  { transform: translate(5vw, 3vh) scale(1.02); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-@keyframes blob-journey-reverse {
-  0%   { transform: translate(0, 0) scale(1); }
-  25%  { transform: translate(10vw, -5vh) scale(1.06); }
-  50%  { transform: translate(4vw, -10vh) scale(0.94); }
-  75%  { transform: translate(-5vw, -3vh) scale(1.02); }
-  100% { transform: translate(0, 0) scale(1); }
 }
 @keyframes floaty {
   0%, 100% { transform: translateY(0) rotate(-2deg); }

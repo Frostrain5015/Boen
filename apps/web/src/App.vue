@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
@@ -12,6 +13,14 @@ import { useFavicon } from '@/composables/useFavicon';
 
 const authStore = useAuthStore();
 const uiStore = useUiStore();
+const router = useRouter();
+
+// 类课堂模式：离开聊天页时自动退出
+watch(() => router.currentRoute.value.name, (name) => {
+  if (name !== 'chat' && uiStore.sessionActive) {
+    uiStore.endSession();
+  }
+});
 
 // Initialize favicon watcher
 useFavicon();

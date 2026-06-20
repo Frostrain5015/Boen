@@ -273,6 +273,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function handleNewConversation() {
     const uiStore = useUiStore();
+    if (uiStore.sessionActive) uiStore.endSession();
     try {
       const { conversation } = await apiCreateConversation('\u65b0\u5bf9\u8bdd', uiStore.subject);
       conversations.value.unshift(conversation);
@@ -285,6 +286,10 @@ export const useChatStore = defineStore('chat', () => {
 
   async function handleDeleteConversation(id: string, event: Event) {
     event.stopPropagation();
+    const uiStore = useUiStore();
+    if (currentConversationId.value === id && uiStore.sessionActive) {
+      uiStore.endSession();
+    }
     const ok = await confirm({ title: '\u5220\u9664\u5bf9\u8bdd', message: '\u786e\u5b9a\u8981\u5220\u9664\u8fd9\u4e2a\u5bf9\u8bdd\u5417\uff1f', confirmText: '\u5220\u9664', danger: true });
     if (!ok) return;
     try {
@@ -302,6 +307,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function selectConversation(id: string) {
     const uiStore = useUiStore();
+    if (uiStore.sessionActive) uiStore.endSession();
     currentConversationId.value = id;
     try {
       const { conversation: conv, messages: msgs } = await getConversation(id);
