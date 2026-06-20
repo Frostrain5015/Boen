@@ -82,6 +82,9 @@ const completedSteps = ref<Set<AnalyzeMistakeStep>>(new Set());
 const selectedAssetObjectUrl = ref('');
 const batchMistakes = ref<MistakeItem[]>([]);
 const currentBatchIndex = ref(0);
+const subjectFilter = ref<Subject | 'all'>('all');
+const rightView = ref<'idle' | 'create' | 'detail'>('idle');
+const questionType = ref('');
 
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
 
@@ -102,10 +105,16 @@ function formatTime(sec: number) {
 async function refreshMistakes(selectLatest = false) {
   loadingList.value = true;
   try {
-    const data = await listMistakes({ grade: props.grade ?? undefined, limit: 30 });
+    const params: { grade?: string; limit: number; subject?: Subject } = { grade: props.grade ?? undefined, limit: 30 };
+    if (subjectFilter.value !== 'all') params.subject = subjectFilter.value;
+    const data = await listMistakes(params);
     mistakes.value = data.mistakes;
-    if (selectLatest && data.mistakes[0]) selectedMistake.value = data.mistakes[0];
-    else if (selectedMistake.value) selectedMistake.value = data.mistakes.find((m) => m.id === selectedMistake.value?.id) ?? selectedMistake.value;
+    if (selectLatest && data.mistakes[0]) {
+      selectedMistake.value = data.mistakes[0];
+      rightView.value = 'detail';
+    } else if (selectedMistake.value) {
+      selectedMistake.value = data.mistakes.find((m) => m.id === selectedMistake.value?.id) ?? selectedMistake.value;
+    }
   } finally {
     loadingList.value = false;
   }
@@ -213,23 +222,24 @@ async function submitMistake() {
   currentBatchIndex.value = 0;
   busy.value = true;
   try {
+    const subject = (subjectFilter.value !== 'all' ? subjectFilter.value : props.initialSubject) as Subject;
     let created: { mistake: MistakeItem };
     if (mode.value === 'text') {
       if (!textPrompt.value.trim()) throw new Error('请先输入题面');
       created = await createTextMistake({
         sourceType: 'text',
-        subject: props.initialSubject,
+        subject,
         grade: props.grade,
         promptText: textPrompt.value,
         studentAnswer: studentAnswer.value,
-        note: note.value,
+        note: [questionType.value ? `题型：${questionType.value}` : '', note.value].filter(Boolean).join(' · '),
       });
     } else {
       // 'image' is the default fallback
       if (!imageFile.value) throw new Error('请先上传错题图片');
       created = await createImageMistake({
         sourceType: 'image',
-        subject: props.initialSubject,
+        subject,
         grade: props.grade,
         file: imageFile.value,
         filename: imageFile.value.name,
@@ -242,7 +252,9 @@ async function submitMistake() {
     textPrompt.value = '';
     studentAnswer.value = '';
     note.value = '';
+    questionType.value = '';
     clearImage();
+    rightView.value = 'detail';
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {
@@ -274,6 +286,34 @@ async function archive(id: string) {
 async function startPractice(mistake: MistakeItem) {
   const { prompt } = await getMistakePracticePrompt(mistake.id);
   emit('practice', { prompt, subject: mistake.subject as Subject, grade: mistake.grade });
+}
+
+const subjectGrouped = computed(() =>
+  SUBJECTS.map(s => ({
+    ...s,
+    count: mistakes.value.filter(m => m.subject === s.value).length,
+  })),
+);
+
+const filteredMistakes = computed(() =>
+  subjectFilter.value === 'all'
+    ? mistakes.value
+    : mistakes.value.filter(m => m.subject === subjectFilter.value),
+);
+
+function openCreateForm() {
+  rightView.value = 'create';
+  selectedMistake.value = null;
+  error.value = '';
+  correctNotice.value = '';
+  batchMistakes.value = [];
+  currentBatchIndex.value = 0;
+  resetProgress();
+}
+
+function selectMistake(m: MistakeItem) {
+  selectedMistake.value = m;
+  rightView.value = 'detail';
 }
 
 onMounted(async () => {
@@ -318,74 +358,53 @@ onBeforeUnmount(() => {
 
     <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 pb-4 lg:grid-cols-[360px_minmax(0,1fr)]">
       <aside class="panel-scroll flex min-h-0 flex-col gap-4 overflow-y-auto">
-        <section class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
-          <div class="mb-3 flex items-center gap-2">
-            <NotebookPen class="h-4 w-4 text-[var(--accent)]" />
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">记录新错题</h2>
-          </div>
-
-          <div class="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--paper)] p-1">
-            <button @click="mode = 'image'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'image' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ImagePlus class="h-3.5 w-3.5" />图片</button>
-            <button @click="mode = 'text'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'text' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ScanText class="h-3.5 w-3.5" />文本</button>
-          </div>
-
-          <Transition name="panel" mode="out-in">
-            <div v-if="mode === 'image'" key="image" class="space-y-3">
-              <label
-                class="group flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed p-4 text-center transition-all"
-                :class="dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/60 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/60'"
-                @dragover.prevent="dragging = true"
-                @dragleave.prevent="dragging = false"
-                @drop.prevent="onDrop"
-              >
-                <img v-if="imagePreview" :src="imagePreview" alt="错题图片预览" class="max-h-36 rounded-2xl object-contain shadow-sm" />
-                <template v-else>
-                  <UploadCloud class="mb-2 h-9 w-9 text-[var(--accent)] transition-transform group-hover:-translate-y-1" />
-                  <p class="text-sm font-bold text-[var(--ink)]">上传整页试卷或单题照片</p>
-                  <p class="mt-1 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别</p>
-                </template>
-                <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
-              </label>
-              <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
-              <p class="text-xs" style="color: var(--ink-soft)">最大 15MB · 支持 jpg/png/webp</p>
-              <button v-if="imagePreview" @click="clearImage" class="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[var(--paper)] px-3 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><X class="h-3.5 w-3.5" />移除图片</button>
-            </div>
-
-            <div v-else key="text" class="space-y-2">
-              <label class="text-xs font-bold text-[var(--ink-soft)]" for="mistake-text">题面</label>
-              <textarea id="mistake-text" v-model="textPrompt" rows="7" class="w-full resize-none rounded-[20px] border border-[var(--line)] bg-white/75 px-3 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="粘贴或输入题面、选项、原始作答..." />
-            </div>
-          </Transition>
-
-          <div class="mt-3 space-y-2">
-            <input v-model="studentAnswer" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="学生答案/错解（可选）" />
-            <input v-model="note" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="来源备注，如单元测验第 8 题（可选）" />
-          </div>
-
-          <button @click="submitMistake" :disabled="busy" class="btn-accent mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold disabled:cursor-not-allowed">
-            <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
-            <Sparkles v-else class="h-4 w-4" />
-            {{ busy ? '正在分析' : '识别并归档' }}
-          </button>
-          <p v-if="error" class="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
-        </section>
-
-        <section class="clay clay-glass min-h-[220px] overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 140 } }">
+        <section class="clay clay-glass min-h-[220px] overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-3">
             <FileImage class="h-4 w-4 text-[var(--accent)]" />
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">最近错题</h2>
-            <button @click="refreshMistakes(true)" class="ml-auto grid h-8 w-8 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]" aria-label="刷新错题列表"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loadingList }" /></button>
+            <h2 class="font-display text-sm font-bold text-[var(--ink)]">错题列表</h2>
+            <button @click="openCreateForm" class="ml-auto grid h-8 w-8 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-strong)] hover:scale-110 active:scale-95" aria-label="新增错题" title="新增错题">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <button @click="refreshMistakes(true)" class="grid h-8 w-8 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]" aria-label="刷新错题列表"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loadingList }" /></button>
           </div>
-          <div v-if="mistakes.length === 0" class="flex flex-col items-center gap-2 px-4 py-10 text-center">
+
+          <div class="flex gap-1 overflow-x-auto border-b border-[var(--line)] px-3 py-2" style="scrollbar-width:none">
+            <button
+              v-for="s in [{ value: 'all' as const, label: '全部', count: mistakes.length }, ...subjectGrouped]"
+              :key="s.value"
+              @click="subjectFilter = s.value"
+              class="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all"
+              :class="subjectFilter === s.value
+                ? 'bg-[var(--accent)] text-white shadow-sm'
+                : 'bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+            >
+              <span class="h-1.5 w-1.5 rounded-full" :style="{ background: s.value === 'all' ? 'var(--accent)' : s.value === 'chinese' ? '#e74c3c' : s.value === 'math' ? '#3498db' : s.value === 'english' ? '#f59e42' : '#2ecc71' }"></span>
+              {{ s.label }}
+              <span class="text-[10px] opacity-70">{{ s.count }}</span>
+            </button>
+          </div>
+
+          <div v-if="filteredMistakes.length === 0" class="flex flex-col items-center gap-2 px-4 py-10 text-center">
             <Mascot :size="54" state="thinking" />
-            <p class="text-xs font-semibold text-[var(--ink-soft)]">还没有错题记录</p>
+            <p class="text-xs font-semibold text-[var(--ink-soft)]">
+              {{ subjectFilter === 'all' ? '还没有错题记录' : '该学科暂无错题' }}
+            </p>
           </div>
           <div v-else v-auto-animate class="space-y-1 p-2">
-            <button v-for="m in mistakes" :key="m.id" @click="selectedMistake = m" class="group flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-all hover:bg-[var(--accent-soft)] active:scale-[0.99]" :class="selectedMistake?.id === m.id ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)]'">
-              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white shadow-sm"><NotebookPen class="h-4 w-4 text-[var(--accent)]" /></span>
+            <button
+              v-for="m in filteredMistakes"
+              :key="m.id"
+              @click="selectMistake(m)"
+              class="group flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-all hover:bg-[var(--accent-soft)] active:scale-[0.99]"
+              :class="selectedMistake?.id === m.id && rightView === 'detail' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)]'"
+            >
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white shadow-sm">
+                <NotebookPen class="h-4 w-4" :class="m.subject === 'chinese' ? 'text-[#e74c3c]' : m.subject === 'math' ? 'text-[#3498db]' : m.subject === 'english' ? 'text-[#f59e42]' : 'text-[#2ecc71]'" />
+              </span>
               <span class="min-w-0 flex-1">
                 <span class="block truncate text-sm font-bold">{{ m.title || '未命名错题' }}</span>
                 <span class="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
+                  <span>{{ SUBJECTS.find(s => s.value === m.subject)?.label }}</span>
                   <span>{{ formatTime(m.updatedAt) }}</span>
                   <span class="rounded-full px-1.5 py-0.5" :class="m.status === 'analyzed' ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fef3e2] text-[#f59e42]'">{{ m.status === 'analyzed' ? '已归档' : '待确认' }}</span>
                 </span>
@@ -419,15 +438,85 @@ onBeforeUnmount(() => {
           <span class="leading-relaxed">{{ correctNotice }}</span>
         </div>
 
-        <div v-if="!selectedMistake" class="flex h-full min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">
+        <div v-if="rightView === 'idle'" class="flex h-full min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">
           <Mascot :size="110" state="idle" />
           <div>
             <h2 class="font-display text-2xl font-bold text-[var(--ink)]">把真实错题放进来</h2>
-            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">整页试卷、作业拍照、文本录入都可以。系统会自动识别题面、定位章节和知识点，并把错题证据写入知识画像。</p>
+            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">点击左侧 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white">+</span> 按钮新增错题，支持拍照上传和手动录入。</p>
           </div>
         </div>
 
-        <div v-else class="panel-scroll h-full overflow-y-auto p-5">
+        <div v-else-if="rightView === 'create'" class="panel-scroll h-full overflow-y-auto p-5">
+          <div class="mx-auto max-w-xl space-y-4">
+            <div class="rounded-[24px] bg-[var(--paper)]/70 p-5">
+              <div class="mb-4 flex items-center gap-3">
+                <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><NotebookPen class="h-5 w-5" /></div>
+                <div>
+                  <h2 class="font-display text-xl font-bold text-[var(--ink)]">新增错题</h2>
+                  <p class="text-xs font-semibold text-[var(--ink-soft)]">拍照或手动录入，系统自动分析错因</p>
+                </div>
+              </div>
+
+              <div class="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-[var(--paper)] p-1">
+                <button @click="mode = 'image'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'image' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ImagePlus class="h-3.5 w-3.5" />拍照上传</button>
+                <button @click="mode = 'text'" class="flex h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all" :class="mode === 'text' ? 'bg-[var(--surface)] text-[var(--accent-strong)] shadow-sm' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"><ScanText class="h-3.5 w-3.5" />手动输入</button>
+              </div>
+
+              <Transition name="panel" mode="out-in">
+                <div v-if="mode === 'image'" key="image" class="space-y-3">
+                  <label
+                    class="group flex min-h-[180px] cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed p-4 text-center transition-all"
+                    :class="dragging ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--line)] bg-white/60 hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]/60'"
+                    @dragover.prevent="dragging = true"
+                    @dragleave.prevent="dragging = false"
+                    @drop.prevent="onDrop"
+                  >
+                    <img v-if="imagePreview" :src="imagePreview" alt="错题图片预览" class="max-h-44 rounded-2xl object-contain shadow-sm" />
+                    <template v-else>
+                      <UploadCloud class="mb-2 h-10 w-10 text-[var(--accent)] transition-transform group-hover:-translate-y-1" />
+                      <p class="text-sm font-bold text-[var(--ink)]">上传整页试卷或单题照片</p>
+                      <p class="mt-1 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
+                    </template>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
+                  </label>
+                  <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs text-[var(--ink-soft)]">最大 15MB · 支持 jpg/png/webp</p>
+                    <button v-if="imagePreview" @click="clearImage" class="inline-flex h-8 items-center gap-1 rounded-xl bg-[var(--paper)] px-2.5 text-xs font-bold text-[var(--ink-soft)] transition-colors hover:bg-[var(--line)]"><X class="h-3 w-3" />移除</button>
+                  </div>
+                </div>
+
+                <div v-else key="text" class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <label class="text-xs font-bold text-[var(--ink-soft)]" for="mistake-text">题面</label>
+                    <select v-model="questionType" class="ml-auto h-7 rounded-lg border border-[var(--line)] bg-white/75 px-2 text-[11px] font-bold text-[var(--ink-soft)] outline-none transition-all focus:border-[var(--accent)]">
+                      <option value="">自动识别题型</option>
+                      <option value="选择题">选择题</option>
+                      <option value="填空题">填空题</option>
+                      <option value="判断题">判断题</option>
+                      <option value="解答题">解答题</option>
+                    </select>
+                  </div>
+                  <textarea id="mistake-text" v-model="textPrompt" rows="8" class="w-full resize-none rounded-[20px] border border-[var(--line)] bg-white/75 px-3 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="粘贴或输入题面、选项、原始作答..." />
+                </div>
+              </Transition>
+
+              <div class="mt-4 space-y-2">
+                <input v-model="studentAnswer" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="学生答案/错解（可选）" />
+                <input v-model="note" class="h-11 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]" placeholder="来源备注，如单元测验第 8 题（可选）" />
+              </div>
+
+              <button @click="submitMistake" :disabled="busy" class="btn-accent mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold disabled:cursor-not-allowed">
+                <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
+                <Sparkles v-else class="h-4 w-4" />
+                {{ busy ? '正在分析' : '识别并归档' }}
+              </button>
+              <p v-if="error" class="mt-3 flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div v-else-if="rightView === 'detail' && selectedMistake" class="panel-scroll h-full overflow-y-auto p-5">
           <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
             <article class="space-y-4">
               <div class="rounded-[24px] bg-[var(--paper)]/70 p-4">
