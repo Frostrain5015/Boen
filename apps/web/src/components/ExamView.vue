@@ -980,28 +980,29 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- 单题区域（题号轨道 + 题目卡片） -->
-      <div class="relative flex-1 overflow-hidden bg-[var(--surface)]/30">
+      <!-- 单题区域 -->
+      <div class="relative flex-1 flex flex-col overflow-hidden bg-[var(--surface)]/30">
+        <!-- 题号轨道（独立于 Transition，不随题目切换淡入淡出） -->
+        <div class="shrink-0 pt-5 pb-3">
+          <div ref="dotNavRef" class="dot-nav-scroll mx-auto" role="navigation" aria-label="大题导航">
+            <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
+            <button
+              v-for="(g, gi) in groupedQuestions"
+              :key="gi"
+              @click="goToGroup(gi)"
+              class="question-dot"
+              :class="currentGroupIndex === gi ? 'question-dot-current' : 'question-dot-idle'"
+              :aria-label="`第 ${gi + 1} 大题`"
+              :aria-current="currentGroupIndex === gi ? 'step' : undefined"
+            >
+              <span>{{ gi + 1 }}</span>
+            </button>
+            <span v-if="currentGroupIndex + 1 < totalGroups" class="question-dot-edge">››</span>
+          </div>
+        </div>
+        <!-- 答题内容（带过渡动画） -->
         <Transition :name="questionSwitchDirection === 'next' ? 'question-next' : 'question-prev'" mode="out-in">
-          <div v-if="currentQuestion" :key="currentQuestion.index" class="absolute inset-0 flex flex-col overflow-y-auto px-4 sm:px-6">
-            <!-- 题号轨道（大题导航） -->
-            <div class="shrink-0 pt-5 pb-3">
-              <div ref="dotNavRef" class="dot-nav-scroll mx-auto" role="navigation" aria-label="大题导航">
-                <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
-                <button
-                  v-for="(g, gi) in groupedQuestions"
-                  :key="gi"
-                  @click="goToGroup(gi)"
-                  class="question-dot"
-                  :class="currentGroupIndex === gi ? 'question-dot-current' : 'question-dot-idle'"
-                  :aria-label="`第 ${gi + 1} 大题`"
-                  :aria-current="currentGroupIndex === gi ? 'step' : undefined"
-                >
-                  <span>{{ gi + 1 }}</span>
-                </button>
-                <span v-if="currentGroupIndex + 1 < totalGroups" class="question-dot-edge">››</span>
-              </div>
-            </div>
+          <div v-if="currentQuestion" :key="currentQuestion.index" class="relative flex-1 overflow-y-auto px-4 sm:px-6">
             <!-- 同组题目展示 -->
             <div class="mx-auto w-full max-w-2xl pb-6 space-y-6">
               <div v-if="groupPassage" class="passage-block md-body text-sm" :class="config.subject === 'chinese' ? 'passage-block-chi' : config.subject === 'english' ? 'passage-block-eng' : ''" v-html="renderMarkdown(groupPassage)"></div>
