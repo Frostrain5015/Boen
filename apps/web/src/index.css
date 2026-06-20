@@ -9,38 +9,6 @@
   --font-body: 'Nunito', 'HarmonyOS Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
-/* ── @property：将 CSS 变量注册为类型化 <color>，让渐变 background 可过渡 ── */
-@property --paper {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #fbf6ee;
-}
-@property --paper-2 {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #f3e7d6;
-}
-@property --surface {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #fffdf9;
-}
-@property --ink {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #2c2722;
-}
-@property --ink-soft {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #786a5d;
-}
-@property --line {
-  syntax: '<color>';
-  inherits: true;
-  initial-value: #ece0cf;
-}
-
 :root {
   --paper: #fbf6ee;
   --paper-2: #f3e7d6;
@@ -182,6 +150,7 @@ body {
 }
 
 /* ── 流动光斑背景 + 纸纹颗粒 ───────────────── */
+/* 暖色背景层（硬编码暖色 paper，boen-session 不改变它 → 无跳变） */
 .app-bg {
   position: fixed;
   inset: 0;
@@ -189,10 +158,26 @@ body {
   overflow: hidden;
   background:
     radial-gradient(120% 80% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
+    radial-gradient(90% 70% at 0% 100%, #f3e7d6 0%, transparent 50%),
+    linear-gradient(180deg, #fbf6ee 0%, #f3e7d6 100%);
+}
+/* 冷色覆盖层（opacity 交叉淡变，浏览器保证可过渡） */
+.app-bg-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.7s ease;
+  background:
+    radial-gradient(120% 80% at 100% 0%, var(--accent-soft) 0%, transparent 45%),
     radial-gradient(90% 70% at 0% 100%, var(--paper-2) 0%, transparent 50%),
     linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
-  transition: background 0.7s ease;
 }
+.boen-session .app-bg-overlay {
+  opacity: 1;
+}
+/* 光斑必须在覆盖层之上 */
 .app-bg::before,
 .app-bg::after {
   content: '';
@@ -201,9 +186,10 @@ body {
   filter: blur(70px);
   opacity: 0.5;
   background: var(--accent);
+  z-index: 1;
   transition: background 0.7s ease, opacity 0.7s ease;
 }
-/* 光斑 1 — 右上（双动画：入场轨道暂停 + 浮动运行；session 激活后才播放入场） */
+/* 光斑 1 — 右上（双动画：入场轨道暂停 + 浮动运行） */
 .app-bg::before {
   width: 42vw;
   height: 42vw;

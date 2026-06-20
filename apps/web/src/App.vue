@@ -50,7 +50,9 @@ onMounted(() => {
 
   <!-- 主应用 -->
   <div v-else :class="{ 'boen-session': uiStore.sessionActive }" :data-subject="uiStore.subject" class="relative flex h-full flex-col">
-    <div class="app-bg"></div>
+    <div class="app-bg">
+      <div class="app-bg-overlay" aria-hidden="true"></div>
+    </div>
     <div class="app-grain"></div>
 
     <div class="relative z-10 flex h-full">
