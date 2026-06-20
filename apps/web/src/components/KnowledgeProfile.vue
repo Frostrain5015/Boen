@@ -5,6 +5,7 @@ import StarDisplay from '@/components/StarDisplay.vue';
 import { ChevronDown, ChevronRight, GraduationCap, BrainCircuit, AlertTriangle, Target, Sparkles, BookOpen, BarChart3, ArrowRight, FileText } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import { getToken } from '@/services/auth';
+import { useAuthStore } from '@/stores/auth';
 
 interface KpNode {
   title: string;
@@ -47,7 +48,7 @@ interface OutlineData {
 }
 
 const subject = ref<'chinese' | 'math' | 'english' | 'science'>('math');
-const grade = ref<string>('7');
+const grade = ref<string>(useAuthStore().userProfile?.grade ?? '7');
 const outline = ref<OutlineData | null>(null);
 const loading = ref(true);
 const expandedSections = ref<Set<string>>(new Set());
@@ -89,6 +90,11 @@ const SUBJECTS = [
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 const subjectIndex = computed(() => SUBJECTS.findIndex((s) => s.value === subject.value));
+
+const availableSubjects = computed(() => {
+  if (grade.value === 'high') return SUBJECTS.filter((s) => s.value !== 'science');
+  return SUBJECTS;
+});
 
 function gradeLabel(g: string): string {
   const n = Number(g);
@@ -182,6 +188,9 @@ function startPractice(kpTitle?: string) {
 onMounted(fetchOutline);
 watch(subject, fetchOutline);
 watch(grade, fetchOutline);
+watch(() => useAuthStore().userProfile?.grade, (g) => {
+  if (g && g !== grade.value) { grade.value = g; }
+});
 </script>
 
 <template>
@@ -225,7 +234,7 @@ watch(grade, fetchOutline);
                 }"
               ></span>
               <button
-                v-for="s in SUBJECTS" :key="s.value"
+                v-for="s in availableSubjects" :key="s.value"
                 @click="subject = s.value"
                 class="relative z-10 flex w-16 items-center justify-center gap-1 rounded-[14px] py-1.5 font-display text-sm font-semibold transition-colors"
                 :class="subject === s.value ? 'text-white' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'"

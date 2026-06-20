@@ -29,7 +29,17 @@ export const useUiStore = defineStore('ui', () => {
   const showUserMenu = ref(false);
 
   // ── Getters ───────────────────────────────────────────────
-  const subjectIndex = computed(() => SUBJECT_LABELS.findIndex((s) => s.value === subject.value));
+  /** 当前年级过滤后的可选学科列表 */
+  const availableSubjects = computed(() => {
+    const auth = useAuthStore();
+    const grade = auth.userProfile?.grade;
+    if (grade === 'high') return SUBJECT_LABELS.filter((s) => s.value !== 'science');
+    return SUBJECT_LABELS;
+  });
+
+  const subjectIndex = computed(() => availableSubjects.value.findIndex((s) => s.value === subject.value));
+
+  const isCollege = computed(() => useAuthStore().userProfile?.grade === 'college');
 
   const voiceLocale = computed(() => subject.value === 'english' ? 'en-US' : 'zh-CN');
 
@@ -170,7 +180,9 @@ export const useUiStore = defineStore('ui', () => {
     showUserMenu,
     // getters
     subjectIndex,
+    availableSubjects,
     voiceLocale,
+    isCollege,
     practiceMenu,
     // actions
     startSession,

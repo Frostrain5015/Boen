@@ -60,7 +60,12 @@ async function handleExplore(detail: { title: string; subject: Subject; grade: s
 </script>
 
 <template>
-  <PremiumGate feature-name="知识画像分析" :icon="BrainCircuit">
+  <PremiumGate v-if="!uiStore.isCollege" feature-name="知识画像分析" :icon="BrainCircuit">
     <KnowledgeProfile class="flex-1" @back="handleBack" @practice="handlePractice" @exam="handleExam" @explore="handleExplore" />
   </PremiumGate>
+  <div v-else class="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+    <span class="text-4xl">🎓</span>
+    <h2 class="font-display text-lg font-bold text-[var(--ink)]">大学通用模式</h2>
+    <p class="max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">当前为大学通用模式，不绑定特定学科教材。你可以自由提问任何专业领域的问题。</p>
+  </div>
 </template>
