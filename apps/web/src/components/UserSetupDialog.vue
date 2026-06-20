@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import type { Grade } from '@boen/shared';
 import { Sparkles, User, GraduationCap, X } from 'lucide-vue-next';
+import BoenSelect from '@/components/BoenSelect.vue';
 
 const props = defineProps<{
   profile: { name: string; grade: Grade } | null;
@@ -18,6 +19,10 @@ const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[]
   { band: '初中', items: ['一', '二', '三'].map((c, i) => ({ value: String(i + 7) as Grade, label: `初${c}` })) },
   { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
 ];
+
+const gradeOptions = computed(() =>
+  GRADE_GROUPS.map(g => ({ label: g.band, options: g.items.map(i => ({ value: i.value, label: i.label })) })),
+);
 
 const name = ref(props.profile?.name ?? '');
 const grade = ref<Grade>(props.profile?.grade ?? '8');
@@ -82,12 +87,7 @@ function handleSave() {
               <GraduationCap class="h-3.5 w-3.5" />
               当前年级
             </span>
-            <select v-model="grade" class="setup-select">
-              <template v-for="grp in GRADE_GROUPS" :key="grp.band">
-                <option disabled class="setup-optgroup-label">{{ grp.band }}</option>
-                <option v-for="g in grp.items" :key="g.value" :value="g.value" class="setup-option">{{ g.label }}</option>
-              </template>
-            </select>
+            <BoenSelect v-model="grade" :options="gradeOptions" placeholder="选择年级" />
           </label>
 
           <!-- 模型提供商 -->
@@ -213,41 +213,6 @@ function handleSave() {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .setup-input::placeholder { color: var(--ink-soft); opacity: 0.5; }
-.setup-select {
-  width: 100%;
-  padding: 0.6rem 0.85rem;
-  border-radius: 14px;
-  border: 1.5px solid var(--line);
-  background: #fff;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--ink);
-  cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23786a5d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2rem;
-}
-.setup-select:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-.setup-optgroup-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--ink-soft);
-  background: var(--surface);
-  cursor: default;
-}
-.setup-option {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--ink);
-}
 .setup-x {
   position: absolute;
   top: 0.85rem;

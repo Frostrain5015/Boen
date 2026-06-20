@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
 import { Sparkles, User, GraduationCap, ArrowLeft } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
+import BoenSelect from '@/components/BoenSelect.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -13,6 +14,10 @@ const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[]
   { band: '初中', items: ['一', '二', '三'].map((c, i) => ({ value: String(i + 7) as Grade, label: `初${c}` })) },
   { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
 ];
+
+const gradeOptions = computed(() =>
+  GRADE_GROUPS.map(g => ({ label: g.band, options: g.items.map(i => ({ value: i.value, label: i.label })) })),
+);
 
 const name = ref(authStore.userProfile?.name ?? '');
 const grade = ref<Grade>(authStore.userProfile?.grade ?? '8');
@@ -73,17 +78,7 @@ function handleSave() {
             <span class="flex items-center gap-1.5 font-display text-xs font-semibold" style="color: var(--ink-soft)">
               <GraduationCap class="h-3.5 w-3.5" /> 当前年级
             </span>
-            <select v-model="grade"
-              class="w-full rounded-xl border bg-white px-3 py-2.5 text-sm font-semibold outline-none transition-colors"
-              style="border-color: var(--line); color: var(--ink); appearance: none"
-              @focus="($event.target as HTMLElement).style.borderColor = 'var(--accent)'"
-              @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
-            >
-              <template v-for="grp in GRADE_GROUPS" :key="grp.band">
-                <option disabled style="font-weight: 700; color: var(--ink-soft)">{{ grp.band }}</option>
-                <option v-for="g in grp.items" :key="g.value" :value="g.value">{{ g.label }}</option>
-              </template>
-            </select>
+            <BoenSelect v-model="grade" :options="gradeOptions" placeholder="选择年级" />
           </label>
 
           <label class="flex flex-col gap-1.5">

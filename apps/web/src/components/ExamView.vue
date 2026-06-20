@@ -10,6 +10,7 @@ import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
 import { useUiStore } from '@/stores/ui';
 import StarDisplay from '@/components/StarDisplay.vue';
+import BoenSelect from '@/components/BoenSelect.vue';
 
 const toast = useToast();
 
@@ -187,6 +188,10 @@ const availableGrades = computed(() =>
   config.value.subject === 'english'
     ? GRADES.filter(g => Number(g) >= 3)
     : GRADES,
+);
+
+const gradeOptions = computed(() =>
+  availableGrades.value.map(g => ({ value: g, label: gradeLabel(g) })),
 );
 watch(() => config.value.subject, (subj) => {
   if (subj === 'english' && Number(config.value.grade) < 3) config.value.grade = '3';
@@ -911,9 +916,7 @@ onUnmounted(() => {
           </div>
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">年级</p>
-            <select v-model="config.grade" class="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[var(--ink)] outline-none transition-colors focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-soft)]">
-              <option v-for="g in availableGrades" :key="g" :value="g">{{ gradeLabel(g) }}</option>
-            </select>
+            <BoenSelect v-model="config.grade" :options="gradeOptions" placeholder="选择年级" />
           </div>
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">备注 <span class="font-normal text-[var(--ink-soft)]/60">（教材章节 / 知识点 / 特殊要求）</span></p>

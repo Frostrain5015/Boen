@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import {
   AlertCircle,
   ArrowLeft,
@@ -31,6 +31,9 @@ import {
   streamMistakeAnalyze,
 } from '@/services/chat';
 import Mascot from '@/components/Mascot.vue';
+import BoenSelect from '@/components/BoenSelect.vue';
+import { renderMarkdown } from '@/lib/markdown';
+import { processTikzDiagrams } from '@/lib/tikz';
 
 type Subject = 'chinese' | 'math' | 'english' | 'science';
 type IntakeMode = 'image' | 'text';
@@ -60,6 +63,14 @@ const STEP_META: Record<AnalyzeMistakeStep, { label: string; icon: typeof ScanTe
   complete: { label: '完成', icon: CheckCircle2 },
 };
 const STEPS: AnalyzeMistakeStep[] = ['ocr', 'analyze', 'map', 'profile', 'style', 'complete'];
+
+const QUESTION_TYPE_OPTIONS = [
+  { value: '', label: '自动识别题型' },
+  { value: '选择题', label: '选择题' },
+  { value: '填空题', label: '填空题' },
+  { value: '判断题', label: '判断题' },
+  { value: '解答题', label: '解答题' },
+];
 
 const mode = ref<IntakeMode>('image');
 const textPrompt = ref('');
@@ -316,6 +327,21 @@ function selectMistake(m: MistakeItem) {
   rightView.value = 'detail';
 }
 
+const tikzTimers = new Set<number>();
+function scheduleTikzProcessing() {
+  for (const id of tikzTimers) window.clearTimeout(id);
+  tikzTimers.clear();
+  const run = () => processTikzDiagrams(document).catch(() => {});
+  nextTick(() => {
+    run();
+    requestAnimationFrame(run);
+    for (const delay of [150, 600, 1500]) {
+      const id = window.setTimeout(run, delay);
+      tikzTimers.add(id);
+    }
+  });
+}
+
 onMounted(async () => {
   await refreshMistakes(true);
 });
@@ -325,16 +351,26 @@ watch(selectedMistake, async (mistake) => {
   if (!mistake?.isCorrect) correctNotice.value = '';
   revokeSelectedAssetUrl();
   const asset = mistake?.assets?.[0];
-  if (!mistake || !asset) return;
+  if (!mistake || !asset) {
+    scheduleTikzProcessing();
+    return;
+  }
   try {
     selectedAssetObjectUrl.value = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
   } catch (e) {
     selectedAssetObjectUrl.value = '';
     console.warn('[mistakes] fetch asset failed:', e);
   }
+  scheduleTikzProcessing();
 }, { immediate: true });
 
+watch(rightView, (v) => {
+  if (v === 'detail') scheduleTikzProcessing();
+});
+
 onBeforeUnmount(() => {
+  for (const id of tikzTimers) window.clearTimeout(id);
+  tikzTimers.clear();
   revokeSelectedAssetUrl();
   clearImage();
 });
@@ -525,13 +561,7 @@ onBeforeUnmount(() => {
                 <div class="space-y-3">
                   <div>
                     <p class="mb-1 text-[11px] font-bold text-[var(--ink-soft)]">题型</p>
-                    <select v-model="questionType" class="h-10 w-full rounded-2xl border border-[var(--line)] bg-white/75 px-3 text-sm font-bold text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--accent-soft)]">
-                      <option value="">自动识别题型</option>
-                      <option value="选择题">选择题</option>
-                      <option value="填空题">填空题</option>
-                      <option value="判断题">判断题</option>
-                      <option value="解答题">解答题</option>
-                    </select>
+                    <BoenSelect v-model="questionType" :options="QUESTION_TYPE_OPTIONS" placeholder="自动识别题型" />
                   </div>
                   <div class="rounded-2xl bg-[var(--paper)] p-3">
                     <p class="text-[11px] leading-relaxed text-[var(--ink-soft)]">
@@ -582,26 +612,26 @@ onBeforeUnmount(() => {
                 <div class="space-y-4">
                   <section>
                     <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">识别题面</p>
-                    <div class="rounded-2xl bg-white/75 p-4 text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{{ selectedMistake.promptText || '暂无题面' }}</div>
+                    <div class="md-body rounded-2xl bg-white/75 p-4" v-html="renderMarkdown(selectedMistake.promptText || '暂无题面')"></div>
                   </section>
                   <div class="grid gap-3 md:grid-cols-2">
                     <section class="rounded-2xl bg-white/75 p-4">
                       <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">学生答案</p>
-                      <p class="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{{ selectedMistake.studentAnswer || '未识别到学生答案' }}</p>
+                      <div class="md-body text-sm" v-html="renderMarkdown(selectedMistake.studentAnswer || '未识别到学生答案')"></div>
                     </section>
                     <section class="rounded-2xl bg-white/75 p-4">
                       <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">正确答案</p>
-                      <p class="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{{ selectedMistake.correctAnswer || '待补充' }}</p>
+                      <div class="md-body text-sm" v-html="renderMarkdown(selectedMistake.correctAnswer || '待补充')"></div>
                     </section>
                   </div>
                   <section class="rounded-2xl bg-white/75 p-4">
                     <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">错因诊断</p>
                     <p class="text-sm font-bold text-[var(--error)]">{{ selectedMistake.errorType || '待确认' }}</p>
-                    <p class="mt-2 text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{{ selectedMistake.errorReason || '暂未生成错因' }}</p>
+                    <div class="md-body mt-2 text-sm" v-html="renderMarkdown(selectedMistake.errorReason || '暂未生成错因')"></div>
                   </section>
                   <section class="rounded-2xl bg-white/75 p-4">
                     <p class="mb-1 text-xs font-bold text-[var(--ink-soft)]">解法提示</p>
-                    <p class="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{{ selectedMistake.explanation || '暂无解法' }}</p>
+                    <div class="md-body text-sm" v-html="renderMarkdown(selectedMistake.explanation || '暂无解法')"></div>
                   </section>
                 </div>
               </div>

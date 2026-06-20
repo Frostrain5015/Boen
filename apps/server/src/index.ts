@@ -1165,6 +1165,7 @@ function autoCollectChatMistake(
   toolArgs: Record<string, any>,
   answer: AnswerPayload,
   result: { correct: boolean | null; score: number; maxScore: number; reference?: string; explanation?: string; knowledgePoints?: string[]; knowledgePointId?: number },
+  chatModel?: BaseChatModel,
 ): void {
   // 仅归集得分率 < 60% 的题目
   if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
@@ -1223,14 +1224,31 @@ function autoCollectChatMistake(
     if (knowledgePoint) {
       const node = findKnowledgePointNode(knowledgePoint, subject);
       if (node) {
+        const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+        const afterScore = profRow?.weighted_score ?? null;
         db.prepare(`
-          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, evidence_json)
-          VALUES (?, ?, 'primary', 0.7, ?)
-        `).run(id, node.id, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
+          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
+          VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
+        `).run(id, node.id, afterScore, afterScore, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
       }
     }
 
     console.log(`[mistake] 对话错题归集：${id} (${subject}/${grade}/${mode}) ${result.score}/${result.maxScore}`);
+
+    // 异步生成标题（fire-and-forget，不阻塞主流程）
+    if (chatModel) {
+      const stemText = stem.slice(0, 300);
+      chatModel.invoke(
+        [new SystemMessage('你是标题生成助手，只输出纯文本，不超过10个字。'), new HumanMessage(`为以下错题生成一个精炼标题（10字以内，概括核心考点）：\n${stemText}`)],
+      ).then((res) => {
+        const titleText = typeof res.content === 'string' ? res.content.trim().slice(0, 32) : '';
+        if (titleText) {
+          db.prepare('UPDATE mistake_items SET title=?, updated_at=? WHERE id=? AND user_id=?').run(
+            titleText, Math.floor(Date.now() / 1000), id, userId,
+          );
+        }
+      }).catch(() => {});
+    }
   } catch (err) {
     console.warn('[mistake] 对话错题归集失败:', err instanceof Error ? err.message : err);
   }
@@ -1315,7 +1333,7 @@ app.post('/api/answer', async (c) => {
         const chatSubject = (state.values as any)?.subject ?? 'math';
         const chatGrade = String((state.values as any)?.grade ?? '7');
         const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
-        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result);
+        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model);
       } catch { /* 归集失败不影响主流程 */ }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂

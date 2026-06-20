@@ -1747,15 +1747,16 @@ async function autoCollectMistakes(
   );
   if (penalized.length === 0) return { count: 0, mistakeIds };
 
-  // LLM 简要分析错因（单次批量调用）
-  let analyses: Array<{ errorType: string; errorReason: string }> = [];
+  // LLM 简要分析错因 + 生成标题（单次批量调用）
+  let analyses: Array<{ errorType: string; errorReason: string; title?: string }> = [];
   if (model && penalized.length > 0) {
     try {
       const prompt = [
-        '请简要分析以下考试错题的错误类型和原因。',
-        '输出 JSON 数组，每个元素包含 errorType 和 errorReason。',
+        '请简要分析以下考试错题的错误类型和原因，并为每道题生成一个简短标题。',
+        '输出 JSON 数组，每个元素包含 errorType、errorReason 和 title。',
         `errorType 可选值：概念混淆 | 计算失误 | 审题遗漏 | 步骤跳步 | 表达不完整 | 其他`,
         'errorReason：用一两句话具体说明错因，不要只写"粗心"。',
+        'title：10字以内的精炼摘要，概括该题的核心考点（如"绝对值性质"、"分数加减法"）。',
         '',
         ...penalized.map((qr, i) => {
           const q = questions.find((x) => x.index === qr.index);
@@ -1778,6 +1779,7 @@ async function autoCollectMistakes(
         (a: any) => ({
           errorType: String(a.errorType ?? '其他'),
           errorReason: String(a.errorReason ?? ''),
+          title: a.title ? String(a.title).slice(0, 32) : undefined,
         }),
       );
     } catch (err) {
@@ -1797,6 +1799,7 @@ async function autoCollectMistakes(
     const errorType = analysis?.errorType ?? undefined;
     const errorReason = analysis?.errorReason ?? undefined;
     const correctAnswer = qr.reference?.slice(0, 2000) ?? undefined;
+    const title = analysis?.title ?? (q.stem?.split(/\n|。|\./)[0] ?? '考试错题').slice(0, 32);
 
     // 提取学生实际答案文本
     const userAnswer = answerMap.get(qr.index);
@@ -1831,7 +1834,7 @@ async function autoCollectMistakes(
       userId,
       subject,
       grade,
-      (q.stem?.split(/\n|。|\./)[0] ?? '考试错题').slice(0, 32),
+      title,
       q.stem?.slice(0, 8000) ?? '',
       studentAnswerText,
       correctAnswer ?? null,
@@ -1850,10 +1853,13 @@ async function autoCollectMistakes(
     if (kpTitle) {
       const node = findKnowledgePointNode(kpTitle, subject);
       if (node) {
+        // 读取当前熟练度（考试判分时已更新，此处记录到错题映射中）
+        const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+        const afterScore = profRow?.weighted_score ?? null;
         db.prepare(`
-          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, evidence_json)
-          VALUES (?, ?, 'primary', 0.7, ?)
-        `).run(id, node.id, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
+          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
+          VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
+        `).run(id, node.id, afterScore, afterScore, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
       }
     }
 
