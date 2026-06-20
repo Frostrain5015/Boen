@@ -237,19 +237,19 @@ async function runGraph(
           stepTimestamps.push(Date.now());
           const elapsed = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[stepTimestamps.length - 2]) / 1000).toFixed(1);
           const total = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[0]) / 1000).toFixed(1);
-          await send({ type: 'todo_step', action: 'advance', detail: '即将进入下一阶段' });
+          await send({ type: 'todo_step', action: 'advance', detail: '已进入下一阶段' });
           console.log(`[Boen 类课堂] 🎯 第${stepCount}步完成 — 耗时 ${elapsed}s | 总 ${total}s | ${new Date().toLocaleTimeString()}`);
         }
         if (name === EXIT_SESSION_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
-          await send({ type: 'todo_step', action: 'exit', detail: '即将下课' });
+          // exit 的 toast 由 handleSessionExit 在 settlement 时发送
           const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
           const total = ((Date.now() - stepTimestamps[0]) / 1000).toFixed(1);
           console.log(`[Boen 类课堂] ✅ exit_session — ${stepCount}/${args?.totalSteps ?? '?'}步 | ${args?.score ?? '?'}分 | 总耗时 ${total}s | ${new Date().toLocaleTimeString()}`);
         }
         if (name === PLAN_STEPS_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
-          await send({ type: 'todo_step', action: 'plan', detail: '博文正在备课' });
+          await send({ type: 'todo_step', action: 'plan', detail: '博文备课完成' });
           const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
           const count = args?.steps?.length ?? '?';
           console.log(`[Boen 类课堂] 📋 plan_steps — 规划了 ${count} 步 | ${new Date().toLocaleTimeString()}`);
@@ -314,6 +314,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
   if (exitCall?.args && userId && threadId) {
     const args = exitCall.args as Record<string, unknown>;
     const updatedKps = flushProficiencyCache(userId, threadId);
+    await send({ type: 'todo_step', action: 'exit', detail: '课堂已结束' });
     await send({
       type: 'settlement',
       summary: String(args.summary ?? ''),

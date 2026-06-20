@@ -137,6 +137,13 @@ export const useChatStore = defineStore('chat', () => {
         const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
         console.log(`[Boen 类课堂] 🎯 第${_lastLoggedStep}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
+      // 工具调用处切分消息：闭合当前 assistant，插入工具结果，后续 token 另起新消息
+      const lastItem = items.value[items.value.length - 1];
+      if (lastItem?.kind === 'assistant' && !lastItem.done) {
+        lastItem.done = true;
+      }
+      items.value.push({ kind: 'assistant', text: e.detail, done: true });
+      idx.value = -1;  // 重置索引，后续 token 另起新消息
       if (e.detail) toast.info(e.detail);
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
