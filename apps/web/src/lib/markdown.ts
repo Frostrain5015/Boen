@@ -166,13 +166,23 @@ function normalizeBlanks(text: string): string {
  * 同时将模型中出现的 \opadd 等 xlop 命令转换为 KaTeX array。
  */
 export function renderMarkdown(text: string): string {
-  const normalized = sanitizeGeneratedHtml(text)
+  // 自动闭合未配对的 $（模型有时遗漏闭合定界符）
+  const autoClosed = text.split('\n').map(line => {
+    // 统计行中 $ 个数，奇数则补一个闭合
+    const dollars = line.match(/\$/g);
+    if (dollars && dollars.length % 2 === 1) {
+      return line + '$';
+    }
+    return line;
+  }).join('\n');
+
+  const normalized = sanitizeGeneratedHtml(autoClosed)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`)
     // 画线句支持：'被引用的句子' / '被引用的句子' → <u>被引用的句子</u>（语文阅读常见）
     .replace(/[''']([^''']{4,})[''']/g, (_, s) => `<u>${s}</u>`)
     // 修复模型常见 KaTeX 格式错误
-    .replace(/\$(.+?)\$\$/g, (_, inner) => `$$${inner}$$`) // $...$$ → $$...$$（混用定界符）
+    .replace(/(?<!\$)\$(?!\$)([^$]+?)\$\$/g, (_, inner) => `$$${inner}$$`) // $...$$ → $$...$$（混用定界符，只匹配非$内容避免跨边界）
     .replace(/\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}\s*\$\$/g, (_, body) => `\n$$\\begin{array}${body}\\end{array}\n$$`) // \begin{array}...\end{array}$$ → 补开头 $$
     .replace(/(^|[^$])?\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}/g, (_, prefix, body) => {
       if (prefix?.includes('$')) return _;
@@ -185,7 +195,12 @@ export function renderMarkdown(text: string): string {
  * 行内渲染（不包 <p>、不产生块级间距），用于选项文字等短文本场景。
  */
 export function renderMarkdownInline(text: string): string {
-  const normalized = sanitizeGeneratedHtml(text)
+  const autoClosed = text.split('\n').map(line => {
+    const dollars = line.match(/\$/g);
+    if (dollars && dollars.length % 2 === 1) return line + '$';
+    return line;
+  }).join('\n');
+  const normalized = sanitizeGeneratedHtml(autoClosed)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
   return DOMPurify.sanitize(md.renderInline(normalizeXlop(normalizeBlanks(normalized))), PURIFY_CONFIG);

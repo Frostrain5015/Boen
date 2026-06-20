@@ -510,6 +510,7 @@ app.post('/api/render-tikz', async (c) => {
 \\usepackage{fontspec}
 \\usepackage{xeCJK}
 \\setCJKmainfont{Noto Sans CJK SC}
+\\usepackage{amsmath}
 \\usepackage{tikz}
 \\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
 \\usepackage{pgfplots}

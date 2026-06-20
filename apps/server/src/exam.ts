@@ -557,7 +557,7 @@ async function renderTikzBlockAsync(texCode: string): Promise<string | null> {
       const texPath = join(tmpDir, 'tikz.tex');
       const pdfPath = join(tmpDir, 'tikz.pdf');
       const svgPath = join(tmpDir, 'tikz.svg');
-      writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${texCode}\\end{document}`, 'utf-8');
+      writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{amsmath}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${texCode}\\end{document}`, 'utf-8');
       await execFileAsync('xelatex', ['-no-shell-escape', '-interaction=nonstopmode', `-output-directory=${tmpDir}`, texPath], { timeout: 30000 });
       if (!existsSync(pdfPath)) return null;
       await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `-o=${svgPath}`, pdfPath], { timeout: 15000 });
