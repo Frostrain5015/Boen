@@ -936,7 +936,7 @@ onUnmounted(() => {
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <h2 class="brand-text text-xl font-bold tracking-tight" style="color: var(--accent-strong)">博文正在出卷</h2>
+        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在出卷</h2>
         <div class="w-80 space-y-0.5">
           <div
             v-for="item in generationSteps"
@@ -991,7 +991,7 @@ onUnmounted(() => {
       <!-- 单题区域 -->
       <div class="relative flex-1 flex flex-col overflow-hidden bg-[var(--surface)]/30">
         <!-- 题号轨道（独立于 Transition，不随题目切换淡入淡出） -->
-        <div class="shrink-0 py-6">
+        <div class="mx-auto w-full max-w-2xl shrink-0 py-6 px-4 sm:px-6">
           <div ref="dotNavRef" class="dot-nav-scroll mx-auto" role="navigation" aria-label="大题导航">
             <span v-if="currentGroupIndex > 0" class="question-dot-edge">‹‹</span>
             <button
