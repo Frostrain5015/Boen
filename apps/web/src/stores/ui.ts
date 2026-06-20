@@ -44,7 +44,6 @@ export const useUiStore = defineStore('ui', () => {
   const voiceLocale = computed(() => subject.value === 'english' ? 'en-US' : 'zh-CN');
 
   const practiceMenu = computed(() => {
-    const s = subject.value;
     const all: Record<string, Array<{ type: string; label: string; hint: string }>> = {
       chinese: [
         { type: 'dictation', label: '\u5b57\u8bcd\u542c\u5199', hint: '\u5f00\u59cb\u5b57\u8bcd\u542c\u5199\u7ec3\u4e60' },
@@ -59,7 +58,11 @@ export const useUiStore = defineStore('ui', () => {
         { type: 'vocabulary', label: '\u5355\u8bcd\u5b66\u4e60', hint: '\u5f00\u59cb\u5355\u8bcd\u5b66\u4e60' },
       ],
     };
-    return all[s] ?? [];
+    // \u901a\u7528\u6a21\u5f0f\u4e0b\u663e\u793a\u6240\u6709\u5b66\u79d1\u7684\u5168\u90e8\u4e13\u9879\u7ec3\u4e60
+    if (!activeMode.value || activeMode.value === 'none') {
+      return Object.values(all).flat();
+    }
+    return all[subject.value] ?? [];
   });
 
   // ── Actions ───────────────────────────────────────────────
