@@ -53,6 +53,14 @@ onMounted(() => {
             @submit="(a) => chatStore.onAnswer(m, a)"
           />
 
+          <!-- 工具结果卡片 -->
+          <div v-else-if="m.kind === 'tool_result'" class="flex items-start gap-3 anim-fadeUp">
+            <div class="clay-sm flex items-center gap-2 px-4 py-2.5 text-sm">
+              <span class="text-base">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : '🎓' }}</span>
+              <span class="font-medium text-[var(--ink)]">{{ m.detail }}</span>
+            </div>
+          </div>
+
           <!-- 用户消息 -->
           <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
             <div class="max-w-[85%] text-right">

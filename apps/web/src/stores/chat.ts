@@ -25,7 +25,8 @@ export type Subject = 'chinese' | 'math' | 'english' | 'science';
 export type ChatItem =
   | { kind: 'user'; text: string; modeTag?: string }
   | { kind: 'assistant'; text: string; done: boolean }
-  | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload };
+  | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload }
+  | { kind: 'tool_result'; action: string; detail: string };
 
 const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
 
@@ -54,8 +55,6 @@ export const useChatStore = defineStore('chat', () => {
   let _sessionStartTime = 0;
   /** 已记录到的步骤日志位置（防重复） */
   let _lastLoggedStep = 0;
-  /** 待插入的工具结果消息（等 token 到来才插入，确保 pending→done 顺序） */
-  let _pendingTodoDetail: string | null = null;
   // 已移除 knowledgeBaseLoading
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
@@ -107,11 +106,6 @@ export const useChatStore = defineStore('chat', () => {
   // ── SSE event handler ────────────────────────────────────
   async function handleEvent(e: SseEvent, idx: { value: number }) {
     if (e.type === 'token') {
-      // 有文本 token 说明工具已处理完毕，清除 pending 并插入工具结果消息
-      if (pendingTool.value && _pendingTodoDetail) {
-        items.value.push({ kind: 'assistant', text: _pendingTodoDetail, done: true });
-        _pendingTodoDetail = null;
-      }
       pendingTool.value = null;
       let cur = items.value[idx.value];
       if (!cur || cur.kind !== 'assistant') {
@@ -147,15 +141,16 @@ export const useChatStore = defineStore('chat', () => {
         const elapsed = ((Date.now() - _sessionStartTime) / 1000).toFixed(1);
         console.log(`[Boen 类课堂] 🎯 第${_lastLoggedStep}步完成 — 会话已进行 ${elapsed}s | ${new Date().toLocaleTimeString()}`);
       }
-      // pending 指示器（同 quiz_generating），等后续 token 才插入结果消息
-      pendingTool.value = { action: e.action, detail: e.detail };
-      _pendingTodoDetail = e.detail;
+      // pending 指示器（同 quiz_generating），直至 on_chain_end 发出 todo_done
+      pendingTool.value = { action: e.action, detail: '' };
       const lastItem = items.value[items.value.length - 1];
       if (lastItem?.kind === 'assistant' && !lastItem.done) {
         lastItem.done = true;
       }
       idx.value = -1;
-      if (e.detail) toast.info(e.detail);
+    } else if (e.type === 'todo_done') {
+      pendingTool.value = null;
+      items.value.push({ kind: 'tool_result', action: e.action, detail: e.detail });
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
       if (authStore.subscription && !authStore.subscription.isPremium) {

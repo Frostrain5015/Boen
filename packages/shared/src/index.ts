@@ -467,6 +467,7 @@ export type SseEvent =
   | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'conversation_created'; conversationId: string; title: string }
   | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit'; detail: string }
+  | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit'; detail: string }
   | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number }
   | { type: 'done' }
   | { type: 'error'; message: string };
