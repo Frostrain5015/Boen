@@ -133,6 +133,18 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kp_prof_user ON user_kp_proficiency(user_id);
 `);
 
+// Elo 列迁移
+const profColumnsMigration = db.prepare(`PRAGMA table_info(user_kp_proficiency)`).all() as Array<{ name: string }>;
+const hasProfCol = (name: string) => profColumnsMigration.some((col) => col.name === name);
+if (!hasProfCol('rating')) {
+  db.exec(`ALTER TABLE user_kp_proficiency ADD COLUMN rating REAL DEFAULT 50`);
+}
+if (!hasProfCol('rating_sigma')) {
+  db.exec(`ALTER TABLE user_kp_proficiency ADD COLUMN rating_sigma REAL DEFAULT 20`);
+}
+// 将已有的 weighted_score 回填到 rating
+db.exec(`UPDATE user_kp_proficiency SET rating = weighted_score WHERE rating = 50 AND weighted_score != 50`);
+
 // ── 复习课程记录 ────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS review_sessions (
@@ -282,6 +294,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mistake_prof_user_node ON mistake_proficiency_events(user_id, kg_node_id, applied_at);
   CREATE INDEX IF NOT EXISTS idx_mistake_prof_item ON mistake_proficiency_events(mistake_id);
 `);
+
+// mistake_proficiency_events Elo 列迁移
+const mpeColsMigration = db.prepare(`PRAGMA table_info(mistake_proficiency_events)`).all() as Array<{ name: string }>;
+const hasMpeCol = (name: string) => mpeColsMigration.some((col) => col.name === name);
+if (!hasMpeCol('before_rating')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN before_rating REAL`);
+if (!hasMpeCol('after_rating')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN after_rating REAL`);
+if (!hasMpeCol('before_sigma')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN before_sigma REAL`);
+if (!hasMpeCol('after_sigma')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN after_sigma REAL`);
 
 // ── 订阅系统 ─────────────────────────────────────────
 db.exec(`

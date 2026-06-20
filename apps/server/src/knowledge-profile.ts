@@ -36,33 +36,79 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
   return 'needs_practice';
 }
 
-// ── CRUD ─────────────────────────────────────
+// ── Elo 常量 ──────────────────────────────────
+const ELO_RATING_INIT = 50;
+const ELO_SIGMA_INIT = 20;
+const ELO_SIGMA_MIN = 3;
+const ELO_SIGMA_MAX = 25;
+const ELO_K_BASE = 5;
+const ELO_SCALING = 15;      // logistic scaling factor
+const ELO_DEFAULT_DIFFICULTY = 50;
 
-/** EMA 基础平滑因子 */
+/** 各模式下对 Elo K-factor 的倍增器（不是直接控制 observed，而是控制更新幅度的权重） */
+const MODE_ELO_MULTIPLIERS: Record<string, number> = {
+  qa: 1.0,
+  preview: 0.7,
+  review: 1.0,
+  weakness: 1.3,
+  exam: 1.5,
+};
+
+/** 前置依赖反向传播用的 K-factor（比主更新弱得多） */
+const ELO_K_PROPAGATE = 2;
+
+// ── Elo 辅助函数 ──────────────────────────────
+
+/** 逻辑期望：给定 rating 和题目难度，预期正确率 */
+function expectedCorrectness(rating: number, difficulty: number): number {
+  return 1 / (1 + Math.exp(-(rating - difficulty) / ELO_SCALING));
+}
+
+/** 根据不确定度和模式计算 K-factor */
+function computeKFactor(sigma: number, mode: string): number {
+  const modeMult = MODE_ELO_MULTIPLIERS[mode] ?? 1.0;
+  const uncertaintyFactor = 1 + (sigma / ELO_SIGMA_MAX);
+  return ELO_K_BASE * modeMult * uncertaintyFactor;
+}
+
+/** Elo 评分更新核心 */
+function updateRatingElo(
+  oldRating: number, oldSigma: number,
+  observed: number, expected: number,
+  mode: string,
+): { newRating: number; newSigma: number; delta: number } {
+  const K = computeKFactor(oldSigma, mode);
+  const delta = K * (observed - expected);
+  const newRating = Math.max(0, Math.min(100, oldRating + delta));
+  const newSigma = Math.max(ELO_SIGMA_MIN, Math.min(ELO_SIGMA_MAX, oldSigma * 0.85));
+  return { newRating: Math.round(newRating * 10) / 10, newSigma: Math.round(newSigma * 10) / 10, delta: Math.round(delta * 10) / 10 };
+}
+
+/** 遗忘：距上次练习每过一天 sigma 涨 0.5，上限 ELO_SIGMA_MAX */
+function applyForgetting(sigma: number, lastUpdated: number, now: number): number {
+  if (lastUpdated <= 0) return sigma;
+  const daysSince = Math.max(0, (now - lastUpdated) / 86400);
+  if (daysSince < 0.5) return sigma;
+  return Math.min(ELO_SIGMA_MAX, sigma + 0.5 * daysSince);
+}
+
+/** 旧 EMA 自适应 alpha（保留后向兼容） */
 const BASE_ALPHA = 0.25;
-
-/** 自适应 alpha：好转时加速上升，恶化时减速下降 */
 function adaptiveAlpha(effectivePct: number, oldWeighted: number): number {
   const diff = effectivePct - oldWeighted;
-  // 显著好转（当前表现远超历史）→ 加速吸收
   if (diff > 15) return 0.45;
-  // 轻度好转 → 略快
   if (diff > 5) return 0.35;
-  // 恶化 → 减速，让坏成绩影响变小
   if (diff < -10) return 0.12;
   if (diff < -3) return 0.18;
-  // 持平 → 基础速度
   return BASE_ALPHA;
 }
 
-/** 各模式下熟练度权重（预习容错高、考试权重高） */
+/** 旧 EMA 模式权重（保留后向兼容） */
 const MODE_WEIGHTS: Record<string, number> = {
-  qa: 1.0,       // 通用对话
-  preview: 0.5,  // 预习——探索阶段，容错高
-  review: 1.0,   // 复习巩固——正常
-  weakness: 1.5, // 薄弱点突破——刻意训练，权重高
-  exam: 2.0,     // 考试——时间压力下表现更能反映真实水平
+  qa: 1.0, preview: 0.5, review: 1.0, weakness: 1.5, exam: 2.0,
 };
+
+// ── CRUD ─────────────────────────────────────
 
 export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string): KpProficiency {
   const existing = db.prepare(`SELECT * FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, kgNodeId) as any;
@@ -70,28 +116,69 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
   const total = existing ? existing.total_count + maxScore : maxScore;
   const now = Math.floor(Date.now() / 1000);
 
-  // 加权 EMA：不同模式下对熟练度的影响不同
-  const modeWeight = MODE_WEIGHTS[mode ?? 'qa'] ?? 1.0;
+  // ── Elo 路径 ──
+  const modeKey = mode ?? 'qa';
+  const oldRating = existing?.rating ?? ELO_RATING_INIT;
+  const oldSigma = existing?.rating_sigma ?? ELO_SIGMA_INIT;
+
+  // 1. 遗忘：先增长 sigma
+  const sigmaBefore = applyForgetting(oldSigma, existing?.last_updated ?? 0, now);
+
+  // 2. 期望正确率
+  const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
+
+  // 3. 观测值：得分比例 × 模式倍数
+  const modeMult = MODE_ELO_MULTIPLIERS[modeKey] ?? 1.0;
+  const observed = maxScore > 0 ? Math.min(1, (score / maxScore) * modeMult) : 0;
+
+  // 4. Elo 更新
+  const { newRating, newSigma, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, modeKey);
+
+  // ── 旧 EMA 后向兼容 ──
+  const oldWeighted = existing?.weighted_score ?? 50;
+  const modeWeight = MODE_WEIGHTS[modeKey] ?? 1.0;
   const weightedPct = maxScore > 0 ? ((score * modeWeight) / maxScore) * 100 : 0;
   const effectivePct = Math.min(100, weightedPct);
+  const alpha = existing ? adaptiveAlpha(effectivePct, oldWeighted) : BASE_ALPHA;
+  const weighted = Math.round(alpha * effectivePct + (1 - alpha) * oldWeighted);
 
-  // 自适应 alpha：进步时加速上升，退步时减速下降
-  const alpha = existing ? adaptiveAlpha(effectivePct, existing.weighted_score) : BASE_ALPHA;
-  // 首次答题从 50 分起步用 EMA 平滑上升，避免1题满分
-  const INITIAL_WEIGHT = 50;
-  const weighted = existing
-    ? Math.round(alpha * effectivePct + (1 - alpha) * existing.weighted_score)
-    : Math.round(alpha * effectivePct + (1 - alpha) * INITIAL_WEIGHT);
-
+  // ── 写库：weighted_score 向后兼容，rating/sigma 是新数据 ──
   db.prepare(`
-    INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, last_updated)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, rating, rating_sigma, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, kg_node_id) DO UPDATE SET
       correct_count = excluded.correct_count,
       total_count = excluded.total_count,
       weighted_score = excluded.weighted_score,
+      rating = excluded.rating,
+      rating_sigma = excluded.rating_sigma,
       last_updated = excluded.last_updated
-  `).run(userId, kgNodeId, correct, total, weighted, now);
+  `).run(userId, kgNodeId, correct, total, Math.round(newRating), newRating, newSigma, now);
+
+  // ── 前置依赖反向传播（仅当 observed > expected + 0.15，即明显答对时才传播） ──
+  if (observed > expected + 0.15) {
+    const prereqs = db.prepare(`
+      SELECT e.source_id FROM kg_edges e
+      WHERE e.target_id=? AND e.type='prerequisite'
+    `).all(kgNodeId) as Array<{ source_id: number }>;
+    for (const prereq of prereqs) {
+      const prev = db.prepare(`SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, prereq.source_id) as any;
+      if (!prev) continue;
+      const preSigma = applyForgetting(prev.rating_sigma ?? ELO_SIGMA_INIT, prev.last_updated ?? 0, now);
+      const preExpected = expectedCorrectness(prev.rating ?? ELO_RATING_INIT, ELO_DEFAULT_DIFFICULTY);
+      const preDelta = ELO_K_PROPAGATE * (1.0 - preExpected);
+      const preNewRating = Math.max(0, Math.min(100, (prev.rating ?? ELO_RATING_INIT) + preDelta));
+      const preNewSigma = Math.max(ELO_SIGMA_MIN, Math.min(ELO_SIGMA_MAX, preSigma * 0.9));
+      db.prepare(`
+        UPDATE user_kp_proficiency SET rating=?, rating_sigma=?, last_updated=?
+        WHERE user_id=? AND kg_node_id=?
+      `).run(
+        Math.round(preNewRating * 10) / 10,
+        Math.round(preNewSigma * 10) / 10,
+        now, userId, prereq.source_id,
+      );
+    }
+  }
 
   const node = db.prepare(`SELECT title FROM kg_nodes WHERE id=?`).get(kgNodeId) as { title: string } | undefined;
   return {
@@ -99,9 +186,11 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
     title: node?.title ?? '',
     correctCount: correct,
     totalCount: total,
-    weightedScore: weighted,
-    level: getProficiencyLevel(weighted),
+    weightedScore: Math.round(newRating),
+    level: getProficiencyLevel(Math.round(newRating)),
     lastUpdated: now,
+    rating: newRating,
+    ratingSigma: newSigma,
   };
 }
 
@@ -117,6 +206,8 @@ export function getProficiency(userId: string, kgNodeId: number): KpProficiency 
     correctCount: row.correct_count, totalCount: row.total_count,
     weightedScore: row.weighted_score, level: getProficiencyLevel(row.weighted_score),
     lastUpdated: row.last_updated,
+    rating: row.rating ?? undefined,
+    ratingSigma: row.rating_sigma ?? undefined,
   };
 }
 
@@ -138,6 +229,8 @@ export function getAllProficiencies(userId: string, subject?: string, grade?: st
     correctCount: row.correct_count, totalCount: row.total_count,
     weightedScore: row.weighted_score, level: getProficiencyLevel(row.weighted_score),
     lastUpdated: row.last_updated,
+    rating: row.rating ?? undefined,
+    ratingSigma: row.rating_sigma ?? undefined,
   }));
 }
 
@@ -239,10 +332,28 @@ export function getRecommendedKPs(userId: string, subject: string, grade: string
   for (const node of all) {
     const prof = getProficiency(userId, node.id);
     const ws = prof?.weightedScore ?? -1;
-    // 还没答过题的优先推荐
-    const weakness = prof ? (1 - ws / 100) : 1.0;
+    const rt = prof?.rating;
+    const sg = prof?.ratingSigma;
     const weight = node.weight ?? 0.5;
-    const score = weakness * weight;
+
+    // 三因素评分：0.5 薄弱 + 0.3 信息增益 + 0.2 重要性
+    const weakness = rt != null ? Math.max(0, 1 - rt / 100) : 1.0;
+    const infoGain = sg != null ? Math.min(1, sg / ELO_SIGMA_MAX) : 1.0;
+    const score = 0.5 * weakness + 0.3 * infoGain + 0.2 * weight;
+
+    // 原因文本：结合 sigma 提供更精准的说明
+    let reason: string;
+    if (ws < 0) {
+      reason = '尚未练习过';
+    } else if (ws < 60 && sg != null && sg > 15) {
+      reason = '需要加强（建议优先练习，提高掌握度）';
+    } else if (ws < 60) {
+      reason = '需要加强';
+    } else if (sg != null && sg > 15) {
+      reason = '巩固提升（不确定度较高）';
+    } else {
+      reason = '巩固提升';
+    }
 
     scored.push({
       kgNodeId: node.id,
@@ -250,15 +361,40 @@ export function getRecommendedKPs(userId: string, subject: string, grade: string
       weightedScore: ws,
       level: getProficiencyLevel(ws >= 0 ? ws : 0),
       weight,
-      reason: ws < 0 ? '尚未练习过' : ws < 60 ? '需要加强' : '巩固提升',
+      reason,
+      rating: rt ?? undefined,
+      ratingSigma: sg ?? undefined,
     });
   }
 
-  return scored.sort((a, b) => {
-    const aScore = ((1 - (a.weightedScore >= 0 ? a.weightedScore : 0) / 100) * a.weight);
-    const bScore = ((1 - (b.weightedScore >= 0 ? b.weightedScore : 0) / 100) * b.weight);
-    return bScore - aScore;
-  }).slice(0, limit);
+  // 按三因素评分排序
+  scored.sort((a, b) => {
+    const wa = a.rating != null ? Math.max(0, 1 - a.rating / 100) : 1.0;
+    const wb = b.rating != null ? Math.max(0, 1 - b.rating / 100) : 1.0;
+    const ia = a.ratingSigma != null ? Math.min(1, a.ratingSigma / ELO_SIGMA_MAX) : 1.0;
+    const ib = b.ratingSigma != null ? Math.min(1, b.ratingSigma / ELO_SIGMA_MAX) : 1.0;
+    const sa = 0.5 * wa + 0.3 * ia + 0.2 * (a.weight ?? 0.5);
+    const sb = 0.5 * wb + 0.3 * ib + 0.2 * (b.weight ?? 0.5);
+    return sb - sa;
+  });
+
+  const topK = scored.slice(0, limit);
+
+  // 前置依赖感知排序：若 A 是 B 的前置依赖，确保 A 排在 B 前面
+  for (let i = 0; i < topK.length; i++) {
+    for (let j = i + 1; j < topK.length; j++) {
+      const prereq = db.prepare(`
+        SELECT 1 FROM kg_edges
+        WHERE source_id=? AND target_id=? AND type='prerequisite'
+      `).get(topK[j].kgNodeId, topK[i].kgNodeId);
+      if (prereq) {
+        // topK[j] 是 topK[i] 的前置依赖 → 交换
+        [topK[i], topK[j]] = [topK[j], topK[i]];
+      }
+    }
+  }
+
+  return topK;
 }
 
 // ── 历史回填 ───────────────────────────────

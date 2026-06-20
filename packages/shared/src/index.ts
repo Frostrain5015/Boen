@@ -117,6 +117,10 @@ export interface KpProficiency {
   weightedScore: number;
   level: ProficiencyLevel;
   lastUpdated: number;
+  /** Elo rating (0-100), progressively stabilized */
+  rating?: number;
+  /** Uncertainty of the Elo rating (0-25) */
+  ratingSigma?: number;
 }
 
 export interface LiteracyProficiency {
@@ -133,6 +137,10 @@ export interface ProfileRecommendation {
   level: ProficiencyLevel;
   weight: number;
   reason: string;
+  /** Elo rating (0-100) */
+  rating?: number;
+  /** Uncertainty of the Elo rating */
+  ratingSigma?: number;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -289,6 +297,14 @@ export interface ProficiencyChange {
   /** 本条得分/满分 */
   score: number;
   maxScore: number;
+  /** 变化前的 Elo rating */
+  ratingBefore?: number;
+  /** 变化后的 Elo rating */
+  ratingAfter?: number;
+  /** 变化前的不确定度 */
+  sigmaBefore?: number;
+  /** 变化后的不确定度 */
+  sigmaAfter?: number;
 }
 
 export interface ExamResults {

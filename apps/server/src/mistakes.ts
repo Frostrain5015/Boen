@@ -659,9 +659,9 @@ function revertMistakeProficiencyEvents(mistakeId: string, userId: string) {
       } else {
         db.prepare(`
           UPDATE user_kp_proficiency
-          SET correct_count=?, total_count=?, weighted_score=?, last_updated=?
+          SET correct_count=?, total_count=?, weighted_score=?, rating=?, rating_sigma=?, last_updated=?
           WHERE user_id=? AND kg_node_id=?
-        `).run(ev.before_correct_count ?? 0, ev.before_total_count ?? 0, ev.before_score, now, userId, ev.kg_node_id);
+        `).run(ev.before_correct_count ?? 0, ev.before_total_count ?? 0, ev.before_score, ev.before_rating ?? 50, ev.before_sigma ?? 20, now, userId, ev.kg_node_id);
       }
     }
     mark.run(now, ev.id);
@@ -673,6 +673,18 @@ function applyMistakeProficiency(userId: string, mistakeId: string, nodeId: numb
   const beforeScore = existing?.weighted_score ?? null;
   const beforeCorrect = existing?.correct_count ?? null;
   const beforeTotal = existing?.total_count ?? null;
+  const beforeRating = existing?.rating ?? 50;
+  const beforeSigma = existing?.rating_sigma ?? 20;
+  const now = nowSec();
+
+  // ── Elo 惩罚（低 K-factor） ──
+  const expected = 1 / (1 + Math.exp(-(beforeRating - 50) / 15));
+  const roleK = role === 'primary' ? 4 : role === 'related' ? 2.5 : 1.5;
+  const eloDelta = roleK * (1 + confidence * 0.5) * (0 - expected);
+  const afterRating = Math.max(0, Math.min(100, Math.round((beforeRating + eloDelta) * 10) / 10));
+  const afterSigma = Math.max(3, Math.min(25, Math.round((beforeSigma * 1.15) * 10) / 10));
+
+  // ── 旧 EMA 后向兼容 ──
   const alphaBase = role === 'primary' ? 0.18 : role === 'related' ? 0.1 : 0.08;
   const alphaSpan = role === 'primary' ? 0.12 : 0.08;
   const alpha = alphaBase + alphaSpan * confidence;
@@ -681,25 +693,28 @@ function applyMistakeProficiency(userId: string, mistakeId: string, nodeId: numb
     : role === 'primary' ? 35 : 45;
   const afterCorrect = existing?.correct_count ?? 0;
   const afterTotal = (existing?.total_count ?? 0) + 1;
-  const now = nowSec();
 
   db.prepare(`
-    INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, last_updated)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, rating, rating_sigma, last_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id, kg_node_id) DO UPDATE SET
       correct_count=excluded.correct_count,
       total_count=excluded.total_count,
       weighted_score=excluded.weighted_score,
+      rating=excluded.rating,
+      rating_sigma=excluded.rating_sigma,
       last_updated=excluded.last_updated
-  `).run(userId, nodeId, afterCorrect, afterTotal, afterScore, now);
+  `).run(userId, nodeId, afterCorrect, afterTotal, afterScore, afterRating, afterSigma, now);
 
   db.prepare(`
     INSERT INTO mistake_proficiency_events (
       mistake_id, user_id, kg_node_id, before_score, after_score,
       before_correct_count, before_total_count, after_correct_count, after_total_count,
-      role, confidence, applied_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(mistakeId, userId, nodeId, beforeScore, afterScore, beforeCorrect, beforeTotal, afterCorrect, afterTotal, role, confidence, now);
+      role, confidence, applied_at,
+      before_rating, after_rating, before_sigma, after_sigma
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(mistakeId, userId, nodeId, beforeScore, afterScore, beforeCorrect, beforeTotal, afterCorrect, afterTotal, role, confidence, now,
+    beforeRating, afterRating, beforeSigma, afterSigma);
 
   return { beforeScore, afterScore, appliedAt: now };
 }
