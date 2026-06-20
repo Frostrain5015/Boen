@@ -18,7 +18,7 @@ import {
   toQuestionPayload,
   gradeAnswer,
 } from '@boen/agent-core';
-import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, SseEvent } from '@boen/shared';
+import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
@@ -1146,6 +1146,96 @@ app.post('/api/chat', async (c) => {
   });
 });
 
+// ── 对话模式错题自动归集 ─────────────────────────
+
+function extractStudentAnswerText(answer: AnswerPayload): string | null {
+  if (answer.type === 'multiple_choice') return answer.selectedKeys?.join(', ') ?? null;
+  if (answer.type === 'fill_blank') return answer.answers?.join(' | ') ?? null;
+  if (answer.type === 'true_false') return answer.value ? '正确' : '错误';
+  if (answer.type === 'short_answer') return answer.text ?? null;
+  return null;
+}
+
+function autoCollectChatMistake(
+  userId: string,
+  subject: string,
+  grade: string,
+  mode: string,
+  toolName: string,
+  toolArgs: Record<string, any>,
+  answer: AnswerPayload,
+  result: { correct: boolean | null; score: number; maxScore: number; reference?: string; explanation?: string; knowledgePoints?: string[]; knowledgePointId?: number },
+): void {
+  // 仅归集得分率 < 60% 的题目
+  if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
+
+  const now = Math.floor(Date.now() / 1000);
+  const id = `mistake-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  const stem: string = toolArgs.stem ?? toolArgs.question ?? '';
+  const knowledgePoint: string | undefined = toolArgs.knowledgePoint ?? result.knowledgePoints?.[0];
+  const correctAnswer = (result.reference ?? toolArgs.answer ?? toolArgs.referenceAnswer ?? '').slice(0, 2000) || null;
+  const studentAnswerText = extractStudentAnswerText(answer);
+  const matchScore = result.maxScore > 0 ? result.score / result.maxScore : 0;
+
+  // 推断错误类型（无 LLM，基于题型简单判断）
+  let errorType = '其他';
+  if (answer.type === 'multiple_choice') errorType = '概念混淆';
+  else if (answer.type === 'fill_blank') errorType = '表达不完整';
+  else if (answer.type === 'true_false') errorType = '概念混淆';
+  else if (answer.type === 'short_answer') errorType = '步骤跳步';
+
+  try {
+    db.prepare(`
+      INSERT INTO mistake_items (
+        id, user_id, subject, grade, source_type, status, title, prompt_text,
+        student_answer, correct_answer, explanation,
+        error_type, error_reason, analysis_confidence,
+        answer_match_score, is_correct,
+        created_at, updated_at
+      ) VALUES (
+        ?, ?, ?, ?, 'text', 'analyzed', ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?,
+        ?, ?
+      )
+    `).run(
+      id,
+      userId,
+      subject,
+      grade,
+      (stem.split(/\n|。|\./)[0] ?? '对话错题').slice(0, 32),
+      stem.slice(0, 8000) ?? '',
+      studentAnswerText,
+      correctAnswer,
+      (result.explanation ?? toolArgs.explanation ?? '').slice(0, 2000) || null,
+      errorType,
+      `对话模式(${mode})作答错误，得分 ${result.score}/${result.maxScore}`,
+      0.3,
+      matchScore,
+      0,
+      now,
+      now,
+    );
+
+    // 知识点映射
+    if (knowledgePoint) {
+      const node = findKnowledgePointNode(knowledgePoint, subject);
+      if (node) {
+        db.prepare(`
+          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, evidence_json)
+          VALUES (?, ?, 'primary', 0.7, ?)
+        `).run(id, node.id, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
+      }
+    }
+
+    console.log(`[mistake] 对话错题归集：${id} (${subject}/${grade}/${mode}) ${result.score}/${result.maxScore}`);
+  } catch (err) {
+    console.warn('[mistake] 对话错题归集失败:', err instanceof Error ? err.message : err);
+  }
+}
+
 app.post('/api/answer', async (c) => {
   const body = (await c.req.json()) as AnswerRequest;
   const userId = await resolveUserId(c);
@@ -1219,6 +1309,14 @@ app.post('/api/answer', async (c) => {
 
       // 发送判分结果（含熟练度变化）
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
+
+      // 错题自动归集（得分率 < 60% 时写入错题本）
+      try {
+        const chatSubject = (state.values as any)?.subject ?? 'math';
+        const chatGrade = String((state.values as any)?.grade ?? '7');
+        const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
+        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result);
+      } catch { /* 归集失败不影响主流程 */ }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂
       if (body.conversationId && body.answer) {
