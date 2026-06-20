@@ -170,7 +170,7 @@ const switchSubjectTool = tool(async ({ subject }) => {
 });
 
 // ── 工具组合 ────────────────────────────────
-const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool, switchSubjectTool];
+const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool];
 
 /** 格式化 TODO 状态为文字清单 */
 function formatTodoState(todoJson: string): string {
@@ -205,7 +205,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   const qaTools: any[] = deps.lookupKnowledgePoint
     ? [...quizTools, lookupKnowledgePointTool, ...switchModeTools, switchSubjectTool]
     : [...quizTools, ...switchModeTools, switchSubjectTool];
-  const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools];
+  const reviewTools: any[] = [...quizTools, completeReviewTool, ...switchModeTools, ...structuredTools, switchSubjectTool];
   if (deps.lookupKnowledgePoint) reviewTools.push(lookupKnowledgePointTool);
 
   // ── 获取当前模式所需的工具列表 ──────────────
