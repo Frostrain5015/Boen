@@ -124,10 +124,10 @@ watch(() => route.path, () => {
 <template>
   <!-- 侧边栏 -->
   <aside
-    class="fixed inset-y-0 left-0 z-40 h-full overflow-hidden transition-all duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)] lg:rounded-none lg:shadow-none"
-    :class="uiStore.sidebarOpen ? 'w-64' : 'w-0'"
+    class="fixed inset-y-0 left-0 z-40 flex overflow-hidden transition-all duration-300 ease-in-out lg:relative lg:inset-auto lg:z-auto shrink-0 rounded-r-[26px] shadow-[12px_0_34px_-20px_rgba(86,64,40,0.3)] lg:rounded-none lg:shadow-none"
+    :style="{ width: uiStore.sidebarOpen ? '16rem' : '0px' }"
   >
-    <div class="flex h-full w-64 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
+    <div class="flex h-full w-64 shrink-0 flex-col bg-[var(--surface)]/80 backdrop-blur-sm">
       <!-- 品牌 + 折叠（常驻显示，不随视图隐藏） -->
       <div class="flex shrink-0 items-center justify-between border-b border-[var(--line)] px-3 py-2.5">
         <div class="flex items-center gap-2">
