@@ -342,16 +342,32 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.id);
     if (calls.length > 0) {
-      if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL || c.name === EXIT_SESSION_TOOL)) return 'end';
+      if (calls.some((c) => c.name === EXIT_SESSION_TOOL)) return 'exitSession';
+      if (calls.some((c) => c.name === COMPLETE_REVIEW_TOOL)) return 'end';
       if (calls.some((c) => c.name === ADVANCE_STEP_TOOL)) return 'advanceStepTodo';
       if (calls.every((c) => c.name === LOOKUP_KNOWLEDGE_POINT_TOOL)) return 'lookupKnowledgePoint';
     }
     return 'end';
   };
 
+  /** 退出类课堂节点：插入 ToolMessage 后结束 */
+  const exitSessionNode = async (state: State): Promise<Partial<State>> => {
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === EXIT_SESSION_TOOL && c.id);
+    const toolMsgs = calls.map((call) =>
+      new ToolMessage({ content: '学习已结束，总结与评分已提交。', tool_call_id: call.id! }),
+    );
+    return { messages: toolMsgs };
+  };
+
   /** TODO 步进节点：推进到下一步，继续对话 */
   const advanceStepTodoNode = async (state: State): Promise<Partial<State>> => {
-    if (!state.todoState) return {};
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const calls = ((last?.tool_calls ?? []) as ToolCall[]).filter((c) => c.name === ADVANCE_STEP_TOOL && c.id);
+    const toolMsgs: ToolMessage[] = calls.map((call) =>
+      new ToolMessage({ content: `步骤 ${calls.indexOf(call) + 1} 已标记完成。`, tool_call_id: call.id! }),
+    );
+    if (!state.todoState) return { messages: toolMsgs };
     try {
       const todo = JSON.parse(state.todoState);
       const completedId = todo.currentStep;
@@ -360,8 +376,8 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       todo.currentStep = Math.min(todo.currentStep + 1, todo.steps.length + 1);
       const nextStep = todo.steps.find((s: any) => s.status === 'in_progress' || s.status === 'pending');
       if (nextStep) nextStep.status = 'in_progress';
-      return { todoState: JSON.stringify(todo) };
-    } catch { return {}; }
+      return { messages: toolMsgs, todoState: JSON.stringify(todo) };
+    } catch { return { messages: toolMsgs }; }
   };
 
   const graph = new StateGraph(BoenState)
@@ -370,16 +386,19 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     .addNode('qa', qaNode)
     .addNode('lookupKnowledgePoint', lookupKnowledgePointNode)
     .addNode('advanceStepTodo', advanceStepTodoNode)
+    .addNode('exitSession', exitSessionNode)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'qa')
     .addConditionalEdges('qa', routeAfterQa, {
       lookupKnowledgePoint: 'lookupKnowledgePoint',
       advanceStepTodo: 'advanceStepTodo',
+      exitSession: 'exitSession',
       end: '__end__',
     })
     .addEdge('lookupKnowledgePoint', 'qa')
-    .addEdge('advanceStepTodo', 'qa');
+    .addEdge('advanceStepTodo', 'qa')
+    .addEdge('exitSession', '__end__');
 
   return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });
 }
