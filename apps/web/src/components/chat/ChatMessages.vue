@@ -63,7 +63,7 @@ onMounted(() => {
               <div class="quiz-gen clay-sm">
                 <div class="quiz-gen-inner">
                   <span class="quiz-gen-icon"><Wrench class="h-4 w-4" /></span>
-                  <span class="quiz-gen-label">{{ m.action === 'plan' ? '🔧 博文正在备课...' : m.action === 'advance' ? '🔧 正在进入下一阶段...' : '🔧 课堂即将结束' }}</span>
+                  <span class="quiz-gen-label">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : '课堂即将结束' }}</span>
                   <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                 </div>
               </div>
@@ -78,7 +78,7 @@ onMounted(() => {
             <div class="pl-8">
               <div class="quiz-gen quiz-gen-done clay-sm">
                 <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon quiz-gen-icon-done">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : '🎓' }}</span>
+                  <span class="quiz-gen-icon quiz-gen-icon-done">{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : '🎓' }}</span>
                   <span class="quiz-gen-label">{{ m.detail }}</span>
                 </div>
               </div>

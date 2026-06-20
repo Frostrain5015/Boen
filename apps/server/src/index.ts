@@ -17,7 +17,7 @@ import {
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
   gradeAnswer,
-  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL,
+  EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL, LOOKUP_KNOWLEDGE_POINT_TOOL,
 } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
@@ -254,6 +254,11 @@ async function runGraph(
           const count = args?.steps?.length ?? '?';
           console.log(`[Boen 类课堂] 📋 plan_steps — 规划了 ${count} 步 | ${new Date().toLocaleTimeString()}`);
         }
+        if (name === LOOKUP_KNOWLEDGE_POINT_TOOL && !todoStepSent.has(name)) {
+          todoStepSent.add(name);
+          await send({ type: 'todo_step', action: 'query' });
+          console.log(`[Boen 类课堂] 📖 lookup_knowledge_point — 查询教材库 | ${new Date().toLocaleTimeString()}`);
+        }
       }
 
       // 出题工具检测
@@ -289,6 +294,9 @@ async function runGraph(
         if (todoStepSent.has(EXIT_SESSION_TOOL)) {
           await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
         }
+        if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
+          await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
+        }
       }
     } else if (ev.event === 'on_chain_error') {
       const nodeName = (ev as any)?.name ?? '';
@@ -301,6 +309,9 @@ async function runGraph(
         }
         if (todoStepSent.has(EXIT_SESSION_TOOL)) {
           await send({ type: 'todo_fail', action: 'exit', error: '退出工具执行失败' });
+        }
+        if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
+          await send({ type: 'todo_fail', action: 'query', error: '教材库查询失败' });
         }
       }
     }
