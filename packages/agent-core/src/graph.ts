@@ -429,10 +429,18 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     if (!last || !isAIMessage(last) || !last.tool_calls?.length) return '__end__';
 
+    const hasQuiz = last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name));
+    const hasNonQuiz = last.tool_calls.some((call) => !QUIZ_TOOL_NAMES.has(call.name));
+
+    // 同时有出题工具和其他工具（如 advance_step + ask_multiple_choice）：
+    // 先走 ToolNode 执行非出题工具（quiz tool 不在 allTools 中，被 ToolNode 忽略），
+    // 然后 agent 重跑，此轮只发出题调用。
+    if (hasQuiz && hasNonQuiz) return 'tools';
+
     // 题目工具是人机协作边界，不是立即执行的服务端函数。它进入
     // awaitQuestion 节点，以 interrupt 持久化暂停；学生作答后再由
     // Command.resume 回到同一节点，写入 ToolMessage 并继续教学。
-    if (last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name))) return 'awaitQuestion';
+    if (hasQuiz) return 'awaitQuestion';
 
     // 备课、步骤推进、知识点查询等工具仍由 ToolNode 正常执行。
     return 'tools';
@@ -442,16 +450,6 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const quiz = last?.tool_calls?.find((call) => QUIZ_TOOL_NAMES.has(call.name));
     if (!quiz?.id) throw new Error('出题工具缺少可恢复的调用 ID');
-
-    // 为非出题工具注入 ToolMessage，防止 LangChain 校验失败
-    // ⚠ 直接操作 state.messages 数组：interrupt 前的变更会被 checkpoint 持久化
-    for (const call of last?.tool_calls ?? []) {
-      if (!QUIZ_TOOL_NAMES.has(call.name) && call.id) {
-        (state.messages as any[]).push(
-          new ToolMessage({ content: '已拦截（非出题工具）', tool_call_id: call.id }),
-        );
-      }
-    }
 
     const resume = interrupt<QuestionInterrupt, QuestionResume>({
       type: 'question',
@@ -483,7 +481,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
   // ── ToolNode（仅执行无需学生输入的工具）───────────────────
   // 出题工具由 awaitQuestion 的 interrupt/Command 协议处理，不会自动执行。
-  const allTools = Array.from(new Set([...reviewTools, ...qaTools, lookupKnowledgePointTool].flat())) as any[];
+  // 因此从 allTools 中排除 quizTools，避免混合调用时 ToolNode 错误执行出题工具。
+  const allTools = Array.from(new Set([...reviewTools, ...qaTools, ...structuredTools, lookupKnowledgePointTool].flat())) as any[]
+    .filter((t: any) => !QUIZ_TOOL_NAMES.has(t.name));
   const toolNode = new ToolNode(allTools);
 
   // ── 构建图 ──────────────────────────────────
