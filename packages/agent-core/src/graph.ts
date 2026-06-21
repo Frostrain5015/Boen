@@ -482,8 +482,8 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   // ── ToolNode（仅执行无需学生输入的工具）───────────────────
   // 出题工具由 awaitQuestion 的 interrupt/Command 协议处理，不会自动执行。
   // 因此从 allTools 中排除 quizTools，避免混合调用时 ToolNode 错误执行出题工具。
-  const allTools = Array.from(new Set([...reviewTools, ...qaTools, ...structuredTools, lookupKnowledgePointTool].flat())) as any[]
-    .filter((t: any) => !QUIZ_TOOL_NAMES.has(t.name));
+  const allToolSet = new Set([...reviewTools, ...qaTools, ...structuredTools, lookupKnowledgePointTool].flat());
+  const allTools = [...allToolSet].filter((t: any) => !QUIZ_TOOL_NAMES.has(t.name));
   const toolNode = new ToolNode(allTools);
 
   // ── 构建图 ──────────────────────────────────
