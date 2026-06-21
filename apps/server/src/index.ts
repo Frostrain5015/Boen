@@ -514,15 +514,18 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
     const args = exitCall.args as Record<string, unknown>;
     const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, threadId);
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
-    await send({
-      type: 'settlement',
-      summary: String(args.summary ?? ''),
-      score: Number(args.score ?? 0),
-      stepsCompleted: Number(args.stepsCompleted ?? 0),
-      totalSteps: Number(args.totalSteps ?? 0),
-      updatedKps,
-      proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
-    });
+    // 仅当 cache 非空才发结算事件（MODE_SCORE 路径已发过时跳过）
+    if (updatedKps > 0) {
+      await send({
+        type: 'settlement',
+        summary: String(args.summary ?? ''),
+        score: Number(args.score ?? 0),
+        stepsCompleted: Number(args.stepsCompleted ?? 0),
+        totalSteps: Number(args.totalSteps ?? 0),
+        updatedKps,
+        proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
+      });
+    }
   }
 }
 
