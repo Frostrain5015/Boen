@@ -1,16 +1,11 @@
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { Readable } from 'node:stream';
+import { readFileSync } from 'node:fs';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import * as OcrPkg from '@alicloud/ocr-api20210707';
-// CJS/ESM interop: runtime exports expose both default Client and request classes.
-const OcrRuntime = OcrPkg as any;
-const OcrClient = (OcrRuntime.default ?? OcrRuntime) as new (config: any) => { recognizeEduPaperStructed(req: any): Promise<any> };
-const { RecognizeEduPaperStructedRequest } = OcrRuntime;
-import * as OpenApi from '@alicloud/openapi-client';
+import { createHmac } from 'node:crypto';
 import type {
   Difficulty,
   MistakeAsset,
@@ -311,41 +306,84 @@ function subjectForAliyun(subject: string, grade: string) {
   return 'default';
 }
 
-let aliyunClient: InstanceType<typeof OcrClient> | null = null;
-function getAliyunOcrClient() {
-  const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
-  const accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
-  if (!accessKeyId || !accessKeySecret) {
-    throw new Error('阿里云 OCR 未配置：请设置 ALIYUN_ACCESS_KEY_ID 和 ALIYUN_ACCESS_KEY_SECRET');
-  }
-  if (!aliyunClient) {
-    const config = new OpenApi.Config({
-      accessKeyId,
-      accessKeySecret,
-      endpoint: process.env.ALIYUN_OCR_ENDPOINT ?? 'ocr-api.cn-hangzhou.aliyuncs.com',
-    });
-    aliyunClient = new OcrClient(config as any);
-  }
-  return aliyunClient;
+/** 阿里云 ACK 签名辅助：计算 HMAC-SHA1 */
+function signString(source: string, secret: string): string {
+  return createHmac('sha1', secret).update(source, 'utf8').digest('base64');
 }
 
+/** 阿里云 RPC 风格时间戳 */
+function aliyunTimestamp(): string {
+  return new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+}
+
+/** 阿里云 RPC 风格随机数 */
+function aliyunNonce(): string {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
+
+/** 拼接规范查询字符串（key=urlencode(value) & ...） */
+function aliyunQueryString(params: Record<string, string>): string {
+  return Object.keys(params)
+    .sort()
+    .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+    .join('&');
+}
+
+/**
+ * 直接调用阿里云 OCR RecognizeEduPaperStructed API（绕过 SDK，
+ * 避免 @alicloud/openapi-core v1.0.7 与 Node.js 20 的 stream 兼容问题）。
+ */
 async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grade: string): Promise<OcrResult> {
-  const client = getAliyunOcrClient();
-  const request = new RecognizeEduPaperStructedRequest({
-    subject: subjectForAliyun(subject, grade),
-    needRotate: (process.env.ALIYUN_OCR_NEED_ROTATE ?? 'true') !== 'false',
-    outputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false',
-    body: createReadStream(filePath) as unknown as Readable,
+  const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
+  const accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
+  if (!accessKeyId || !accessKeySecret) throw new Error('阿里云 OCR 未配置');
+
+  const imageBytes = readFileSync(filePath);
+  const imageBase64 = imageBytes.toString('base64');
+  const imageMime = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+  // RPC 公共参数 + 业务参数
+  const params: Record<string, string> = {
+    Action: 'RecognizeEduPaperStructed',
+    Format: 'json',
+    Version: '2021-07-07',
+    Timestamp: aliyunTimestamp(),
+    SignatureNonce: aliyunNonce(),
+    AccessKeyId: accessKeyId,
+    SignatureMethod: 'HMAC-SHA1',
+    SignatureVersion: '1.0',
+    Subject: subjectForAliyun(subject, grade),
+    NeedRotate: (process.env.ALIYUN_OCR_NEED_ROTATE ?? 'true') !== 'false' ? 'true' : 'false',
+    OutputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false' ? 'true' : 'false',
+  };
+
+  // body 字段放 base64 图片
+  params.body = `data:${imageMime};base64,${imageBase64}`;
+
+  // 计算签名
+  const queryStr = aliyunQueryString(params);
+  const signStr = `POST&%2F&${encodeURIComponent(queryStr)}`;
+  params.Signature = signString(signStr, `${accessKeySecret}&`);
+
+  // 发送 POST 请求
+  const endpoint = process.env.ALIYUN_OCR_ENDPOINT ?? 'ocr-api.cn-hangzhou.aliyuncs.com';
+  const finalQuery = aliyunQueryString(params);
+  const response = await fetch(`https://${endpoint}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: finalQuery,
   });
-  const response = await client.recognizeEduPaperStructed(request);
-  const body = response.body;
-  if (body?.code && body.code !== '200') {
-    throw new Error(`阿里云 OCR 识别失败：${body.message ?? body.code}`);
+  if (!response.ok) {
+    throw new Error(`阿里云 OCR HTTP ${response.status}: ${await response.text()}`);
   }
-  const normalized = normalizeOcrText(body?.data);
+  const result = (await response.json()) as any;
+  if (result.code && result.code !== '200') {
+    throw new Error(`阿里云 OCR 识别失败：${result.message ?? result.code}`);
+  }
+  const normalized = normalizeOcrText(result.data);
   return {
     provider: 'aliyun:RecognizeEduPaperStructed',
-    raw: { requestId: body?.requestId, code: body?.code, data: normalized.raw },
+    raw: { requestId: result.requestId, code: result.code, data: normalized.raw },
     text: normalized.text,
   };
 }
