@@ -28,7 +28,7 @@ export const passageField = z.string().nullish().describe('阅读材料（语文
 const groupId = z.number().int().nullish().describe('同一材料或分步设问的小题分组 ID');
 
 export const multipleChoiceSchema = z.object({
-  stem: z.string().describe(`题干。${richTextDescription}`),
+  stem: z.string().describe(`题干（只写问题文字，不含选项）。${richTextDescription}`),
   passage: passageField,
   groupId,
   options: z
@@ -88,7 +88,7 @@ export const shortAnswerSchema = z.object({
 export const quizTools = [
   tool(async () => '', {
     name: 'ask_multiple_choice',
-    description: '出一道选择题（单选或多选）让学生作答。不要把题目写进普通文字回复，必须用本工具。',
+    description: '出一道选择题（单选或多选）让学生作答。不要把题目写进普通文字回复，必须用本工具。注意：stem 只写题干（问题本身），选项只能放在 options 数组中，严禁把选项写进 stem。',
     schema: multipleChoiceSchema,
   }),
   tool(async () => '', {

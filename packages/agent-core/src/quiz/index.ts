@@ -116,16 +116,56 @@ const setEq = (a: string[], b: string[]) => {
   return sa.size === sb.size && [...sa].every((x) => sb.has(x));
 };
 
+/**
+ * 防御性清洗：如果 LLM 把选项写进了题干（A. xxx\nB. xxx\nC. xxx\nD. xxx），
+ * 将其从 stem 中移除，合并到 options。
+ */
+function cleanMultipleChoiceStem(stem: string, existingOptions: { key: string; text: string }[]): { stem: string; options: { key: string; text: string }[] } {
+  const source = String(stem ?? '').replace(/\r\n/g, '\n');
+  const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  // 匹配行首或空格后的 "A." "A、" "A)" "A．" "A:" 等
+  const marker = /(^|[\s\n])([A-G])\s*[.．、:：)]\s*/g;
+  const matches = [...source.matchAll(marker)]
+    .filter((m) => m.index !== undefined)
+    .map((m) => ({ key: m[2], start: m.index! + m[1].length, contentStart: m.index! + m[0].length }));
+  if (matches.length < 2) return { stem: source.trim(), options: existingOptions };
+
+  // 检查是否匹配 A,B,C,… 顺序
+  const startIdx = OPTION_LETTERS.indexOf(matches[0].key);
+  const isSequence = matches.every((m, i) => m.key === OPTION_LETTERS[startIdx + i]);
+  if (!isSequence) return { stem: source.trim(), options: existingOptions };
+
+  // 提取选项文本
+  const extracted = matches.map((m, i) => {
+    const next = matches[i + 1];
+    return { key: m.key, text: source.slice(m.contentStart, next ? next.start : source.length).trim() };
+  }).filter((o) => o.text.length > 0);
+  if (extracted.length < 2) return { stem: source.trim(), options: existingOptions };
+
+  // 去重合并：已存在的选项不覆盖
+  const existingKeys = new Set(existingOptions.map((o) => o.key.toUpperCase()));
+  const merged = [...existingOptions];
+  for (const opt of extracted) {
+    if (!existingKeys.has(opt.key)) {
+      merged.push(opt);
+      existingKeys.add(opt.key);
+    }
+  }
+
+  return { stem: source.slice(0, matches[0].start).trim(), options: merged };
+}
+
 /** 把模型给的工具参数（含答案）转成发给前端的题目（剥离答案） */
 export function toQuestionPayload(toolName: string, rawArgs: unknown): QuestionPayload {
   switch (toolName) {
     case 'ask_multiple_choice': {
       const a = multipleChoiceSchema.parse(rawArgs);
+      const { stem: cleanedStem, options: cleanedOptions } = cleanMultipleChoiceStem(a.stem, a.options);
       return {
         type: 'multiple_choice',
-        stem: a.stem,
+        stem: cleanedStem,
         passage: a.passage ?? undefined,
-        options: a.options,
+        options: cleanedOptions,
         multiSelect: a.multiSelect,
         knowledgePointId: a.knowledgePointId ?? undefined,
         difficulty: a.difficulty ?? undefined,
