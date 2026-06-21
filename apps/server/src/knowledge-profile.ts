@@ -56,7 +56,7 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
 }
 
 // ── Elo 常量 ──────────────────────────────────
-export const ELO_RATING_INIT = 50;
+export const ELO_RATING_INIT = 25;
 export const ELO_SIGMA_INIT = 20;
 const ELO_SIGMA_MIN = 3;
 const ELO_SIGMA_MAX = 25;
