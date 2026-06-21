@@ -51,13 +51,18 @@ export const useUiStore = defineStore('ui', () => {
 
   const voiceLocale = computed(() => subject.value === 'english' ? 'en-US' : 'zh-CN');
 
-  /** 进度概览：已完成步数 / 总步数 */
+  /** 进度概览：当前所处阶段号 / 总步数（current 为「当前在第几步」，非已完成数量） */
   const todoProgress = computed(() => {
-    const total = todoList.value.length;
-    const done = todoList.value.filter((s) => s.status === 'completed').length;
-    return { done, total };
+    const list = todoList.value;
+    const total = list.length;
+    if (!total) return { current: 0, total: 0 };
+    // 当前阶段 = 进行中（或失败卡住）的步骤号；若全部完成则停在最后一步
+    const active = list.find((s) => s.status === 'in_progress' || s.status === 'failed');
+    if (active) return { current: active.id, total };
+    const done = list.filter((s) => s.status === 'completed').length;
+    return { current: Math.min(Math.max(done, 1), total), total };
   });
-  /** 是否存在可展示的课堂进度（用于决定是否显示 todo 按钮） */
+  /** 是否存在可展示的课堂进度（按钮常驻，仅用于是否显示角标 / 空态） */
   const hasTodoList = computed(() => todoList.value.length > 0);
 
   const practiceMenu = computed(() => {

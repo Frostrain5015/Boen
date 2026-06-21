@@ -4,6 +4,7 @@ import {
   interrupt,
   MemorySaver,
   BaseCheckpointSaver,
+  messagesStateReducer,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
@@ -22,8 +23,10 @@ import {
 
 /** 全图共享状态 */
 export const BoenState = Annotation.Root({
+  // messagesStateReducer：追加新消息，且当返回的消息携带已存在的 id 时按 id 覆盖
+  // （用于把更新后的完整 TodoState 作为工具结果覆盖回 ToolNode 产出的 ToolMessage）。
   messages: Annotation({
-    reducer: (a: any[], b: any[]) => a.concat(b),
+    reducer: messagesStateReducer,
     default: () => [],
   }),
   gradeBand: Annotation<GradeBand>(),
@@ -113,7 +116,9 @@ const advanceStepSchema = z.object({
   note: z.string().optional().describe('完成该步骤的备注，如学生表现等'),
 });
 const advanceStepTool = tool(async ({ stepId }) => {
-  return `步骤 ${stepId} 已完成记录。请先询问学生是否准备好进入下一步，等学生明确回复后再继续。不要直接开始下一步内容。`;
+  // 注意：实际工具结果会被 updateTodoState 用「更新后的完整 TodoState」覆盖（见 todoToolResult）。
+  // 此处仅为兜底文本，须与状态机一致——调用即推进，不再要求二次确认。
+  return `第 ${stepId} 步已完成，已进入下一步。`;
 }, {
   name: ADVANCE_STEP_TOOL,
   description: '当学生确认准备好进入下一步时调用此工具。调用前必须先征得学生同意。',
@@ -190,22 +195,47 @@ const switchSubjectTool = tool(async ({ subject }) => {
 // ── 工具组合 ────────────────────────────────
 const structuredTools: any[] = [advanceStepTool, exitSessionTool, planStepsTool];
 
-/** 格式化 TODO 状态为文字清单 */
+/** 渲染步骤清单行（已完成 / 当前 / 待进行，均显示真实标签） */
+function renderTodoLines(todo: any): string {
+  return todo.steps.map((s: any) => {
+    if (s.status === 'completed') return `✅ 第${s.id}步：${s.label}`;
+    if (s.status === 'in_progress') return `▶️ 第${s.id}步：${s.label}（当前步骤）`;
+    return `⬜ 第${s.id}步：${s.label}`;
+  }).join('\n');
+}
+
+/** 格式化 TODO 状态为文字清单（注入 system prompt，每轮提供权威进度） */
 function formatTodoState(todoJson: string): string {
   try {
     const todo = JSON.parse(todoJson);
     if (!todo.steps?.length) return '';
     const allDone = todo.steps.every((s: any) => s.status === 'completed');
-    const lines = todo.steps.map((s: any) => {
-      if (s.status === 'completed') return `✅ 第${s.id}步：${s.label} ✅`;
-      if (s.status === 'in_progress') return `▶️ 第${s.id}步：${s.label}（当前步骤）`;
-      return `⬜ 第${s.id}步：？？？`;
-    });
+    const body = '\n\n## 📋 步骤进度\n' + renderTodoLines(todo);
     if (allDone) {
-      return '\n\n## 📋 步骤进度\n' + lines.join('\n') + '\n\n🎉 所有步骤已完成！请调用 exit_session 工具结束学习并提交评分。';
+      return body + '\n\n🎉 所有步骤已完成！请调用 exit_session 工具结束学习并提交评分。';
     }
-    return '\n\n## 📋 步骤进度\n' + lines.join('\n') + '\n\n【强制】完成当前步骤后调用 advance_step 查看下一步。不调工具看不到下一步内容。';
+    return body + '\n\n【规则】完成当前步骤、并征得学生同意后再调用 advance_step 进入下一步。';
   } catch { return ''; }
+}
+
+/**
+ * 把更新后的完整 TodoState 渲染为「工具结果」文本，覆盖回 advance_step / plan_steps 的
+ * ToolMessage。让模型拿到的工具结果与 system prompt 中的进度完全一致，消除「当前在第几步」的歧义。
+ */
+function todoToolResult(todoJson: string, lead: string): string {
+  try {
+    const todo = JSON.parse(todoJson);
+    if (!todo.steps?.length) return lead;
+    const allDone = todo.steps.every((s: any) => s.status === 'completed');
+    const current = todo.steps.find((s: any) => s.status === 'in_progress');
+    let msg = `${lead}\n\n## 📋 当前步骤进度\n${renderTodoLines(todo)}`;
+    if (allDone) {
+      msg += '\n\n🎉 所有步骤已完成，请调用 exit_session 工具结束学习并提交评分。';
+    } else if (current) {
+      msg += `\n\n👉 你当前位于第 ${current.id} 步「${current.label}」，现在直接开始本步教学内容，不要再询问学生是否准备好。`;
+    }
+    return msg;
+  } catch { return lead; }
 }
 
 /**
@@ -397,19 +427,31 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     }
     if (!aiMsg?.tool_calls?.length) return {};
 
+    // 构造覆盖回 ToolNode 产出的 ToolMessage：复用其 id，messagesStateReducer 会按 id 替换，
+    // 从而把「更新后的完整 TodoState」作为该工具的结果喂回模型。
+    const overwriteToolMessage = (toolCallId: string | undefined, content: string) => {
+      const existing = toolCallId
+        ? state.messages.find((m) => isToolMessage(m) && (m as ToolMessage).tool_call_id === toolCallId) as ToolMessage | undefined
+        : undefined;
+      // 必须有 existing.id 才能让 messagesStateReducer 按 id 替换；否则会追加成重复的
+      // tool 结果（同一 tool_call 两个响应），故放弃覆盖、依赖 system prompt 中的进度。
+      if (!existing?.id) return undefined;
+      return new ToolMessage({ id: existing.id, tool_call_id: toolCallId!, content });
+    };
+
     const planCall = aiMsg.tool_calls.find((c: any) => c.name === PLAN_STEPS_TOOL);
     if (planCall && !state.todoState) {
       const args = planCall.args as { steps?: Array<{ label: string }> } | undefined;
       if (args?.steps?.length) {
-        return {
-          todoState: JSON.stringify({
-            steps: args.steps.map((s: any, i: number) => ({
-              id: i + 1, label: s.label,
-              status: i === 0 ? 'in_progress' : 'pending',
-            })),
-            currentStep: 1,
-          }),
-        };
+        const todoState = JSON.stringify({
+          steps: args.steps.map((s: any, i: number) => ({
+            id: i + 1, label: s.label,
+            status: i === 0 ? 'in_progress' : 'pending',
+          })),
+          currentStep: 1,
+        });
+        const msg = overwriteToolMessage(planCall.id, todoToolResult(todoState, `✅ 学习计划已制定（共 ${args.steps.length} 步）。`));
+        return msg ? { todoState, messages: [msg] } : { todoState };
       }
     }
 
@@ -423,7 +465,10 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
         const nextStep = todo.steps.find((s: any) => s.status === 'pending');
         if (nextStep) { nextStep.status = 'in_progress'; todo.currentStep = nextStep.id; }
         else { todo.currentStep = todo.steps.length + 1; }
-        return { todoState: JSON.stringify(todo) };
+        const todoState = JSON.stringify(todo);
+        const lead = step ? `✅ 第 ${step.id} 步已完成。` : '✅ 已记录进度。';
+        const msg = overwriteToolMessage(advanceCall.id, todoToolResult(todoState, lead));
+        return msg ? { todoState, messages: [msg] } : { todoState };
       } catch {}
     }
 

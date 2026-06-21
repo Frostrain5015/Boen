@@ -93,19 +93,18 @@ onMounted(() => {
           </div>
         </Transition>
         <div class="clay clay-glass flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
-          <!-- 课堂进度 todo 按钮（仅类课堂生成清单后显示） -->
+          <!-- 课堂进度 todo 按钮（常驻显示；不在课堂时无角标、面板显示空态） -->
           <button
-            v-if="uiStore.hasTodoList"
             ref="todoBtnRef"
             @click="uiStore.toggleTodoPanel()"
             class="relative grid h-11 w-11 shrink-0 place-items-center self-center rounded-[18px] border transition-all active:scale-[0.96]"
             :class="uiStore.todoPanelOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
-            :title="`课堂进度 ${uiStore.todoProgress.done}/${uiStore.todoProgress.total}`"
+            :title="uiStore.hasTodoList ? `课堂进度 第${uiStore.todoProgress.current}/${uiStore.todoProgress.total}步` : '课堂进度（暂无）'"
             aria-label="课堂进度"
           >
             <ListChecks class="h-5 w-5" />
-            <!-- 进度角标 -->
-            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">{{ uiStore.todoProgress.done }}/{{ uiStore.todoProgress.total }}</span>
+            <!-- 进度角标：当前所处阶段号 / 总步数（仅课堂中显示） -->
+            <span v-if="uiStore.hasTodoList" class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">{{ uiStore.todoProgress.current }}/{{ uiStore.todoProgress.total }}</span>
           </button>
           <!-- 免费用户用量环 -->
           <div
@@ -176,10 +175,15 @@ onMounted(() => {
                 <ListChecks class="h-4 w-4 text-[var(--accent-strong)]" />
                 <span class="font-display text-sm font-bold text-[var(--ink)]">课堂进度</span>
               </div>
-              <span class="text-xs font-semibold text-[var(--ink-soft)]">{{ uiStore.todoProgress.done }}/{{ uiStore.todoProgress.total }} 步</span>
+              <span v-if="uiStore.hasTodoList" class="text-xs font-semibold text-[var(--ink-soft)]">第 {{ uiStore.todoProgress.current }}/{{ uiStore.todoProgress.total }} 步</span>
+            </div>
+            <!-- 空态：未处于课堂 -->
+            <div v-if="!uiStore.hasTodoList" class="px-4 py-8 text-center">
+              <p class="text-sm font-medium text-[var(--ink-soft)]">当前不在课堂中</p>
+              <p class="mt-1 text-xs text-[var(--ink-soft)]/70">进入复习 / 预习等学习模式后，这里会显示课堂步骤进度</p>
             </div>
             <!-- 步骤列表 -->
-            <ul class="max-h-[50vh] space-y-1 overflow-y-auto p-2">
+            <ul v-else class="max-h-[50vh] space-y-1 overflow-y-auto p-2">
               <li
                 v-for="step in uiStore.todoList"
                 :key="step.id"
