@@ -1126,7 +1126,7 @@ function buildGradingHumanMessage(params: { stem: string; referenceAnswer?: stri
   ].join('\n');
 }
 
-/** 构建基于 LLM 的简答题评分器（单题模式，JSON Output + Injection 防御） */
+/** 构建基于 LLM 的简答题/填空题评分器（单题模式，JSON Output + Injection 防御） */
 export function createShortAnswerGrader(model: BaseChatModel): ShortAnswerGrader {
   return async (params) => {
     try {
@@ -1139,10 +1139,12 @@ export function createShortAnswerGrader(model: BaseChatModel): ShortAnswerGrader
       );
       const content = typeof response.content === 'string' ? response.content : '';
       const parsed = JSON.parse(content);
+      const maxScore = params.maxScore ?? 1;
       return {
         correct: Boolean(parsed.correct),
-        score: Math.max(0, Math.min(1, Number(parsed.score))),
+        score: Math.max(0, Math.min(maxScore, Number(parsed.score))),
         explanation: String(parsed.explanation ?? ''),
+        perBlank: Array.isArray(parsed.perBlank) ? parsed.perBlank.map(Boolean) : undefined,
       };
     } catch (err) {
       console.error('简答题 LLM 评分失败:', err instanceof Error ? err.message : String(err));
@@ -1387,6 +1389,7 @@ export async function gradeExam(
   // ── 客观题并行评分（跳过断点已判题目） ────────────────────────────
   const objectiveQuestions = questions.filter(q => q.type !== 'short_answer' && !existingResultsMap.has(q.index));
   const shortAnswerQuestions = questions.filter(q => q.type === 'short_answer' && !existingResultsMap.has(q.index));
+  const fillBlankGrader = model ? createShortAnswerGrader(model) : undefined;
 
   const objectiveResults: ExamQuestionResult[] = await Promise.all(objectiveQuestions.map(async (q) => {
     const answer = answerMap.get(q.index);
@@ -1395,7 +1398,8 @@ export async function gradeExam(
     }
     const toolName = questionTypeToToolName(q.type);
     const rawArgs = buildRawArgs(q);
-    const { result } = await gradeAnswer(toolName, rawArgs, answer);
+    const grader = (q.type === 'fill_blank' || q.type === 'short_answer') ? fillBlankGrader : undefined;
+    const { result } = await gradeAnswer(toolName, rawArgs, answer, grader);
 
     // 填空题：使用详细匹配追踪 Level 2 misses（供 Level 3 LLM 语义判定）
     let blankLevel2Misses: Array<{ blankIndex: number; userAnswer: string; acceptedAnswers: string[] }> | undefined;

@@ -31,6 +31,8 @@ export interface ShortAnswerGraderResult {
   correct: boolean;
   score: number;
   explanation: string;
+  /** 填空题专用：各空是否匹配，长度应与 blanks 一致 */
+  perBlank?: boolean[];
 }
 
 /** 异步外部评分器，由调用方提供（典型实现：LLM 调用） */
@@ -238,36 +240,45 @@ export async function gradeAnswer(
   } else if (toolName === 'ask_fill_blank' && answer.type === 'fill_blank') {
     const a = fillBlankSchema.parse(rawArgs);
     const reference = a.blanks.map((b, i) => `空${i + 1}：${b.acceptedAnswers.join(' / ')}`).join('；');
-    if (gradeShortAnswer) {
-      // LLM 语义评分：逐空调用 LLM 判断等价性（可覆盖模糊匹配无法处理的场景）
-      const perBlank: boolean[] = [];
-      const perBlankDetails: Array<{ matched: boolean; level: string; userNorm: string; acceptedNorms: string[] }> = [];
-      for (let i = 0; i < a.blanks.length; i++) {
-        const userAns = answer.answers[i] ?? '';
-        const graderResult = await gradeShortAnswer({
-          stem: a.stem,
-          referenceAnswer: a.blanks[i].acceptedAnswers.join(' / '),
-          keyPoints: null,
-          userAnswer: userAns,
-          maxScore: 1,
-        });
-        perBlank.push(graderResult.correct ?? false);
-        perBlankDetails.push({
-          matched: graderResult.correct ?? false,
-          level: graderResult.correct ? 'exact' : 'llm_mismatch',
-          userNorm: userAns,
-          acceptedNorms: a.blanks[i].acceptedAnswers,
-        });
-      }
-      const score = perBlank.filter(Boolean).length;
+    // 先做 level-1 精确匹配 + level-2 归一化匹配（确定必然正确的空）
+    const fuzzyResults = a.blanks.map((b, i) => fuzzyMatchBlankDetailed(answer.answers[i] ?? '', b.acceptedAnswers));
+    const exactMatched = fuzzyResults.map((r) => r.matched); // level 1 / 2 已匹配
+    const exactCount = exactMatched.filter(Boolean).length;
+
+    if (gradeShortAnswer && exactCount < a.blanks.length) {
+      // 有未匹配的空 → 一次 LLM 调用评价整题，获取总分
+      const graderResult = await gradeShortAnswer({
+        stem: a.stem,
+        referenceAnswer: a.blanks.map((b, i) =>
+          `空${i + 1}参考答案：${b.acceptedAnswers.join(' / ')}`
+        ).join('\n'),
+        keyPoints: null,
+        userAnswer: a.blanks.map((b, i) =>
+          `空${i + 1}学生答案：${answer.answers[i] ?? '（未作答）'}`
+        ).join('\n'),
+        maxScore: a.blanks.length,
+      });
+      const llmScore = Math.max(0, Math.min(a.blanks.length, Math.round(graderResult.score)));
+      // 已精确匹配的保留；剩余名额按顺序分配给未匹配的空
+      let remaining = llmScore - exactCount;
+      const perBlank = exactMatched.map((m) => {
+        if (m) return true;
+        if (remaining > 0) { remaining--; return true; }
+        return false;
+      });
       result = commonResult({
-        correct: perBlank.every(Boolean),
-        score,
+        correct: llmScore >= a.blanks.length,
+        score: llmScore,
         maxScore: a.blanks.length,
         reference,
-        explanation: a.explanation,
+        explanation: graderResult.explanation || a.explanation,
         perBlank,
-        perBlankDetails,
+        perBlankDetails: perBlank.map((m, i) => ({
+          matched: m,
+          level: fuzzyResults[i].matched ? fuzzyResults[i].level : 'llm',
+          userNorm: answer.answers[i] ?? '',
+          acceptedNorms: a.blanks[i].acceptedAnswers,
+        })),
       });
     } else {
       // 无 LLM 评分器时回退到模糊匹配
