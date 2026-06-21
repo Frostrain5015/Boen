@@ -273,6 +273,29 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mistake_style_item ON mistake_style_features(mistake_id);
 `);
 
+// 全服务器「出题风格技能库」：跨用户沉淀的去重风格技能（按 学科+年级 检索）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS style_skills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    kg_node_id INTEGER,
+    question_type TEXT NOT NULL DEFAULT '',
+    difficulty TEXT NOT NULL DEFAULT 'medium',
+    skill_text TEXT NOT NULL,
+    embedding BLOB NOT NULL,
+    reinforce_count INTEGER NOT NULL DEFAULT 1,
+    distinct_user_count INTEGER NOT NULL DEFAULT 1,
+    source_user_ids TEXT,
+    quality_weight REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    last_seen_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_style_skills_bucket ON style_skills(subject, grade);
+  CREATE INDEX IF NOT EXISTS idx_style_skills_node ON style_skills(kg_node_id);
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS mistake_proficiency_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

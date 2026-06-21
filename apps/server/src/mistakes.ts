@@ -58,6 +58,8 @@ type AnalysisJson = {
   explanation?: string;
   errorType?: string;
   errorReason?: string;
+  /** LLM 对该题学生是否答对的语义判断（应用题字符串相似度不可靠时以此为准） */
+  isCorrect?: boolean;
   confidence?: number;
   knowledgeNodes?: Array<{
     kgNodeId?: number | string;
@@ -185,6 +187,18 @@ function levenshtein(a: string, b: string): number {
   return prev[n];
 }
 
+/**
+ * 轻量归一化：仅统一大小写/全角/空白，保留符号、选项字母与序号。
+ * 用于在 normalizeAnswer 把符号清空之前先做一次"宽松相等"判断，
+ * 修复 "<"、"②"、"A"、"391, 25" 等答案被清空后误判为 0 分的问题。
+ */
+function looseNormalize(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/\s+/g, '');
+}
+
 /** 答案文本归一化：全角转半角、去空白标点、去常见单位量词、去选项前缀 */
 function normalizeAnswer(raw: string): string {
   let r = raw.toLowerCase();
@@ -210,6 +224,9 @@ export function computeAnswerMatchScore(studentAnswer?: string, correctAnswer?: 
   const s = (studentAnswer ?? '').trim();
   const c = (correctAnswer ?? '').trim();
   if (!s || !c) return 0;
+
+  // 先做保留符号的宽松相等判断，避免 "<"/"②"/"A" 等被后续归一化清空后误判
+  if (looseNormalize(s) === looseNormalize(c)) return 1;
 
   const ns = normalizeAnswer(s);
   const nc = normalizeAnswer(c);
@@ -242,6 +259,25 @@ export function computeAnswerMatchScore(studentAnswer?: string, correctAnswer?: 
   const jaccard = union > 0 ? inter / union : 0;
 
   return charSim * 0.6 + jaccard * 0.4;
+}
+
+/**
+ * 判定该题学生是否答对（用于把"做对的题"从错题本过滤）。
+ * 字符串相似度对应用题不可靠：学生写整段过程、参考答案却很简短，相似度天然偏低，
+ * 而 LLM 已对题目做了语义批改。因此优先信任 LLM 的判断，相似度仅作兜底：
+ *   1. 学生未作答 → 一定不算做对，保留待复核
+ *   2. LLM 显式 isCorrect 布尔值 → 直接采用
+ *   3. LLM 错因明确为"无错误" → 视为做对
+ *   4. 否则回退到字符串相似度阈值
+ */
+function resolveIsCorrect(analysis: AnalysisJson, studentAnswer: string | undefined, matchScore: number): boolean {
+  const answer = studentAnswer?.trim() ?? '';
+  if (!answer || answer === '未提供' || answer === '未作答' || answer === '空') return false;
+  if (typeof analysis.isCorrect === 'boolean') return analysis.isCorrect;
+  const errorType = (analysis.errorType ?? '').trim().toLowerCase();
+  const noErrorMarkers = ['none', 'no_error', 'no error', 'correct', '无', '无错误', '无误', '正确', '正确无误'];
+  if (noErrorMarkers.includes(errorType)) return true;
+  return matchScore >= ANSWER_MATCH_THRESHOLD;
 }
 
 function safeParseJson(raw: string): any {
@@ -512,7 +548,8 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   const compactCandidates = '';
   const concisePrompt = [
     'Extract every question from this school-paper OCR text. Return only a compact JSON array.',
-    'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, confidence, questionType, difficulty, and knowledgeNodes.',
+    'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, isCorrect, confidence, questionType, difficulty, and knowledgeNodes.',
+    'isCorrect is a boolean judging whether the student actually answered correctly. Word/application problems: the student often writes full working such as "740-492=248(个) 答：北区有248个洞窟。" while the reference answer is terse like "248个" — judge by whether the final result is right, never by text overlap. When correct, set isCorrect=true and errorType="none". Set isCorrect=false only for genuine errors; if the student left the answer blank, set isCorrect=false and errorType="unanswered".',
     'knowledgeNodes is an array of { kgNodeId, title, role, confidence, evidence }. Only use IDs from the candidate list. Keep explanations under 100 Chinese characters.',
     `Subject: ${params.subject}; grade: ${params.grade}`,
     `Candidates: ${compactCandidates || 'none'}`,
@@ -860,8 +897,9 @@ function applyMistakeProficiency(userId: string, mistakeId: string, nodeId: numb
   return { beforeScore, afterScore, appliedAt: now };
 }
 
-function buildStyleText(analysis: AnalysisJson, promptText: string) {
-  const parts = [
+/** 抽象风格字段（题型/难度/情境/推理/干扰/呈现/摘要），不含原题原文 */
+function styleFields(analysis: AnalysisJson): string[] {
+  return [
     `题型: ${analysis.questionType ?? '综合题'}`,
     `难度: ${normalizeDifficulty(analysis.difficulty)}`,
     `情境: ${analysis.scenarioType ?? '常规学习场景'}`,
@@ -869,39 +907,151 @@ function buildStyleText(analysis: AnalysisJson, promptText: string) {
     analysis.distractorPattern ? `干扰模式: ${analysis.distractorPattern}` : '',
     analysis.presentationFeatures ? `呈现特征: ${JSON.stringify(analysis.presentationFeatures)}` : '',
     analysis.styleText ? `风格摘要: ${analysis.styleText}` : '',
-    `原题结构摘要: ${promptText.replace(/\s+/g, ' ').slice(0, 240)}`,
   ].filter(Boolean);
-  return parts.join('\n');
 }
 
-function saveStyleFeature(mistakeId: string, analysis: AnalysisJson, promptText: string) {
+/** 单题风格文本（含原题结构摘要切片，仅存入 per-user 审计表 mistake_style_features） */
+function buildStyleText(analysis: AnalysisJson, promptText: string) {
+  return [
+    ...styleFields(analysis),
+    `原题结构摘要: ${promptText.replace(/\s+/g, ' ').slice(0, 240)}`,
+  ].join('\n');
+}
+
+/** 全局技能文本：去掉原题原文切片，作为跨用户外泄的隐私保险 */
+function buildSkillText(analysis: AnalysisJson) {
+  return styleFields(analysis).join('\n');
+}
+
+/**
+ * 写入单题风格审计行（mistake_style_features），并把算好的向量返回，
+ * 供全局技能库 create-or-reinforce 复用（避免二次 embedding）。
+ */
+async function saveStyleFeature(
+  mistakeId: string,
+  analysis: AnalysisJson,
+  promptText: string,
+): Promise<{ styleText: string; vector: number[] | null }> {
   const styleText = buildStyleText(analysis, promptText);
-  let embedding: Buffer | null = null;
-  return embedTexts([styleText])
-    .then(([vec]) => {
-      embedding = vec ? vectorToBlob(vec) : null;
-    })
-    .catch(() => {
-      embedding = null;
-    })
-    .then(() => {
+  let vector: number[] | null = null;
+  try {
+    const [vec] = await embedTexts([styleText]);
+    vector = vec ?? null;
+  } catch {
+    vector = null;
+  }
+  db.prepare(`
+    INSERT INTO mistake_style_features (
+      mistake_id, question_type, difficulty, scenario_type, reasoning_pattern,
+      distractor_pattern, presentation_features, style_text, embedding
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    mistakeId,
+    analysis.questionType ?? '综合题',
+    normalizeDifficulty(analysis.difficulty),
+    analysis.scenarioType ?? '常规学习场景',
+    analysis.reasoningPattern ?? '提取条件并分步求解',
+    analysis.distractorPattern ?? null,
+    analysis.presentationFeatures ? JSON.stringify(analysis.presentationFeatures) : null,
+    styleText,
+    vector ? vectorToBlob(vector) : null,
+  );
+  return { styleText, vector };
+}
+
+// ── 全局「出题风格技能库」参数 ──
+/** 向量相似度达到即合并进同一技能（bge-small-zh 归一化向量） */
+const STYLE_SKILL_MERGE_THRESHOLD = 0.86;
+/** 单次 create-or-reinforce / 检索的候选扫描上限，封顶内存 cosine 量 */
+const STYLE_SKILL_CANDIDATE_LIMIT = 200;
+/** source_user_ids 记录的来源用户数上限，封顶单行体积 */
+const STYLE_SKILL_SOURCE_USER_CAP = 50;
+
+/** 向量归一化（质心更新后恢复单位长度，使 cosine=点积成立） */
+function normalizeVector(v: number[]): number[] {
+  let norm = 0;
+  for (const x of v) norm += x * x;
+  norm = Math.sqrt(norm) || 1;
+  return v.map((x) => x / norm);
+}
+
+/** 技能排序/门槛权重：被反复强化、被多人验证的风格更靠前（封顶 0.25 防爆款霸屏） */
+function computeStyleSkillWeight(reinforceCount: number, distinctUserCount: number): number {
+  return Math.min(0.25, Math.log2(1 + reinforceCount) * 0.05 + Math.min(distinctUserCount, 5) * 0.02);
+}
+
+/**
+ * 全局风格技能 create-or-reinforce：在同 学科+年级 桶内找最相近技能，
+ * 相似度≥阈值则强化（计数+1、质心增量更新），否则新建。同步、纯 DB + 内存向量扫描，
+ * 复用 saveStyleFeature 已算好的向量，绝不抛异常进 analyze/SSE 流。
+ */
+function sedimentGlobalStyleSkill(opts: {
+  subject: string;
+  grade: string;
+  userId: string;
+  kgNodeId: number | null;
+  analysis: AnalysisJson;
+  vector: number[] | null;
+}): void {
+  const { subject, grade, userId, kgNodeId, analysis, vector } = opts;
+  if (!vector) return;
+  try {
+    const candidates = db.prepare(`
+      SELECT id, embedding, reinforce_count, distinct_user_count, source_user_ids
+      FROM style_skills
+      WHERE subject=? AND grade=?
+      ORDER BY quality_weight DESC, last_seen_at DESC
+      LIMIT ?
+    `).all(subject, grade, STYLE_SKILL_CANDIDATE_LIMIT) as Array<{
+      id: number; embedding: Buffer; reinforce_count: number; distinct_user_count: number; source_user_ids: string | null;
+    }>;
+
+    let best: { sim: number; row: (typeof candidates)[number] } | null = null;
+    for (const row of candidates) {
+      const sim = cosineSim(vector, blobToVector(row.embedding));
+      if (!best || sim > best.sim) best = { sim, row };
+    }
+
+    const now = nowSec();
+    if (best && best.sim >= STYLE_SKILL_MERGE_THRESHOLD) {
+      const row = best.row;
+      const sources = row.source_user_ids ? safeJson<string[]>(row.source_user_ids, []) : [];
+      const isNewUser = !sources.includes(userId);
+      if (isNewUser && sources.length < STYLE_SKILL_SOURCE_USER_CAP) sources.push(userId);
+      const reinforceCount = row.reinforce_count + 1;
+      const distinctUserCount = row.distinct_user_count + (isNewUser ? 1 : 0);
+      // 质心增量更新：旧向量按旧计数加权 + 新向量，再归一化
+      const oldVec = blobToVector(row.embedding);
+      const merged = normalizeVector(oldVec.map((x, i) => x * row.reinforce_count + vector[i]));
       db.prepare(`
-        INSERT INTO mistake_style_features (
-          mistake_id, question_type, difficulty, scenario_type, reasoning_pattern,
-          distractor_pattern, presentation_features, style_text, embedding
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        UPDATE style_skills SET
+          embedding=?, reinforce_count=?, distinct_user_count=?, source_user_ids=?,
+          quality_weight=?, updated_at=?, last_seen_at=?
+        WHERE id=?
       `).run(
-        mistakeId,
+        vectorToBlob(merged), reinforceCount, distinctUserCount, JSON.stringify(sources),
+        computeStyleSkillWeight(reinforceCount, distinctUserCount), now, now, row.id,
+      );
+    } else {
+      db.prepare(`
+        INSERT INTO style_skills (
+          subject, grade, kg_node_id, question_type, difficulty, skill_text,
+          embedding, reinforce_count, distinct_user_count, source_user_ids, quality_weight,
+          created_at, updated_at, last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+      `).run(
+        subject, grade, kgNodeId ?? null,
         analysis.questionType ?? '综合题',
         normalizeDifficulty(analysis.difficulty),
-        analysis.scenarioType ?? '常规学习场景',
-        analysis.reasoningPattern ?? '提取条件并分步求解',
-        analysis.distractorPattern ?? null,
-        analysis.presentationFeatures ? JSON.stringify(analysis.presentationFeatures) : null,
-        styleText,
-        embedding,
+        buildSkillText(analysis),
+        vectorToBlob(vector),
+        JSON.stringify([userId]),
+        computeStyleSkillWeight(1, 1), now, now, now,
       );
-    });
+    }
+  } catch (err) {
+    console.warn('[mistakes] 全局风格技能沉淀失败（已忽略）:', err instanceof Error ? err.message : String(err));
+  }
 }
 
 /**
@@ -989,13 +1139,11 @@ async function applyAnalysisToMistake(
   const status: MistakeStatus = mappings.length > 0 ? 'analyzed' : 'needs_review';
   const now = nowSec();
 
-  // ── 答案匹配度：≥阈值视为大概率做对 ──
+  // ── 是否做对：以 LLM 语义判断为主，字符串相似度兜底 ──
   // 做对的题：前端错题列表过滤、熟练度不再扣减，但题型风格仍沉淀
-  const matchScore = computeAnswerMatchScore(
-    analysis.studentAnswer?.trim() || row.student_answer || undefined,
-    analysis.correctAnswer?.trim() || undefined,
-  );
-  const isCorrect = matchScore >= ANSWER_MATCH_THRESHOLD;
+  const studentAnswerForMatch = analysis.studentAnswer?.trim() || row.student_answer || undefined;
+  const matchScore = computeAnswerMatchScore(studentAnswerForMatch, analysis.correctAnswer?.trim() || undefined);
+  const isCorrect = resolveIsCorrect(analysis, studentAnswerForMatch, matchScore);
 
   revertMistakeProficiencyEvents(mistakeId, userId);
   clearAnalysis(mistakeId);
@@ -1058,7 +1206,11 @@ async function applyAnalysisToMistake(
   // 题型沉淀逻辑不受答案正确率判断影响：做对的题同样沉淀出题风格
   await onProgress?.({ step: 'style', message: `沉淀题型风格（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
   if (status === 'analyzed' || isCorrect) {
-    await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
+    const { vector } = await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
+    // 复用刚算好的向量，把风格沉淀进全服务器风格技能库（create-or-reinforce）
+    // 用 detectedSubject 入桶，与错题记录最终学科保持一致
+    const primaryKgNodeId = (mappings.find((m) => m.role === 'primary') ?? mappings[0])?.kgNodeId ?? null;
+    sedimentGlobalStyleSkill({ subject: detectedSubject, grade: row.grade, userId, kgNodeId: primaryKgNodeId, analysis, vector });
   }
 
   await onProgress?.({ step: 'complete', message: status === 'analyzed' ? `第 ${questionIndex + 1} 题分析完成` : '错题已保存，需补充知识点', progress: pct(1) });
@@ -1258,6 +1410,99 @@ export async function retrieveMistakeStyleSamples(userId: string, subject: strin
       return `${i + 1}. ${style.styleText.slice(0, 420)}`;
     }),
   ].join('\n');
+}
+
+/**
+ * 全服务器出题风格技能检索（纯全局池，按 学科+年级 跨用户共享）。
+ * 排序 = 向量相似度 + 知识点命中(0.35) + 强化权重(热门/多人验证更靠前) + 新鲜度(≤0.12)。
+ * 候选先按权重/新鲜度截断 200 行再算 cosine，使单次扫描量恒定。
+ */
+export async function retrieveGlobalStyleSkills(subject: string, grade: string, query: string, kgNodeIds: number[] = [], limit = 3): Promise<string> {
+  const rows = db.prepare(`
+    SELECT id, kg_node_id, skill_text, embedding, reinforce_count, distinct_user_count, quality_weight, last_seen_at
+    FROM style_skills
+    WHERE subject=? AND grade=?
+    ORDER BY quality_weight DESC, last_seen_at DESC
+    LIMIT ?
+  `).all(subject, grade, STYLE_SKILL_CANDIDATE_LIMIT) as Array<{
+    id: number; kg_node_id: number | null; skill_text: string; embedding: Buffer;
+    reinforce_count: number; distinct_user_count: number; quality_weight: number; last_seen_at: number;
+  }>;
+  if (!rows.length) return '';
+  let queryVector: number[] | null = null;
+  if (query.trim()) {
+    try {
+      queryVector = await embedQuery(query);
+    } catch (err) {
+      console.warn('[mistakes] global style embedding query failed:', err);
+      queryVector = null;
+    }
+  }
+  const targetIds = new Set(kgNodeIds);
+  const ranked = rows.map((row) => {
+    const overlap = row.kg_node_id != null && targetIds.has(row.kg_node_id) ? 0.35 : 0;
+    const sim = queryVector ? cosineSim(queryVector, blobToVector(row.embedding)) : 0;
+    const reinforceWeight = computeStyleSkillWeight(row.reinforce_count, row.distinct_user_count);
+    const recency = Math.max(0, Math.min(0.12, (row.last_seen_at ?? 0) / Math.max(1, nowSec()) * 0.12));
+    return { row, score: sim + overlap + reinforceWeight + recency };
+  }).sort((a, b) => b.score - a.score).slice(0, limit);
+  if (!ranked.length) return '';
+  return [
+    '【跨校沉淀出题风格技能】以下为全平台真实错题沉淀的题型风格，仅用于学习题型结构、出题逻辑、情境选取与干扰方式，严禁复刻原题文字、数字、学生答案或隐私信息。',
+    ...ranked.map(({ row }, i) => `${i + 1}. ${row.skill_text.slice(0, 420)}`),
+  ].join('\n');
+}
+
+/**
+ * 从现有 mistake_style_features 一次性回填全局风格技能库。
+ * 复用已存的 embedding BLOB（零重新 embedding），按时间顺序走同一套 create-or-reinforce 逻辑。
+ * 幂等：先全量清空再重建，可反复运行。
+ */
+export function backfillStyleSkills(): { created: number; reinforced: number; scanned: number } {
+  const rows = db.prepare(`
+    SELECT sf.style_text, sf.embedding, sf.question_type, sf.difficulty, sf.scenario_type,
+           sf.reasoning_pattern, sf.distractor_pattern, sf.presentation_features,
+           mi.user_id, mi.subject, mi.grade,
+           (SELECT km.kg_node_id FROM mistake_kp_map km
+            WHERE km.mistake_id = sf.mistake_id
+            ORDER BY CASE km.role WHEN 'primary' THEN 0 WHEN 'related' THEN 1 ELSE 2 END, km.confidence DESC
+            LIMIT 1) AS primary_kg_node_id
+    FROM mistake_style_features sf
+    JOIN mistake_items mi ON mi.id = sf.mistake_id
+    WHERE (mi.status='analyzed' OR mi.is_correct=1)
+    ORDER BY sf.created_at ASC
+  `).all() as Array<{
+    style_text: string; embedding: Buffer | null; question_type: string; difficulty: string;
+    scenario_type: string; reasoning_pattern: string; distractor_pattern: string | null;
+    presentation_features: string | null; user_id: string; subject: string; grade: string;
+    primary_kg_node_id: number | null;
+  }>;
+
+  db.exec(`DELETE FROM style_skills`);
+
+  let scanned = 0;
+  for (const r of rows) {
+    if (!r.embedding) continue;
+    scanned++;
+    const analysis: AnalysisJson = {
+      questionType: r.question_type,
+      difficulty: normalizeDifficulty(r.difficulty),
+      scenarioType: r.scenario_type,
+      reasoningPattern: r.reasoning_pattern,
+      distractorPattern: r.distractor_pattern ?? undefined,
+      presentationFeatures: r.presentation_features ? safeJson(r.presentation_features, undefined) : undefined,
+    };
+    sedimentGlobalStyleSkill({
+      subject: r.subject,
+      grade: r.grade,
+      userId: r.user_id,
+      kgNodeId: r.primary_kg_node_id ?? null,
+      analysis,
+      vector: blobToVector(r.embedding),
+    });
+  }
+  const created = (db.prepare(`SELECT COUNT(*) AS c FROM style_skills`).get() as { c: number }).c;
+  return { created, reinforced: Math.max(0, scanned - created), scanned };
 }
 
 export function formatMistakePracticePrompt(mistake: MistakeItem) {

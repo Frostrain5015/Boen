@@ -26,7 +26,7 @@ import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
 import db from './db.js';
 import { retrieveCurriculum } from './curriculum.js';
-import { retrieveMistakeStyleSamples } from './mistakes.js';
+import { retrieveGlobalStyleSkills } from './mistakes.js';
 import { embedTexts, cosineSim } from './embeddings.js';
 import { withConcurrencyLimit, Semaphore } from './concurrency.js';
 import { stepBlueprintArchitect, flattenBlueprint, type WriteTask } from './exam-blueprint.js';
@@ -594,7 +594,7 @@ export async function generateExam(
     const profileContext = userId ? await buildProfileContext(userId, config) : '';
     const scopeQuery = [config.chapters?.join(' '), config.notes].filter(Boolean).join('\n');
     const curriculumContext = await retrieveCurriculum({ subject: config.subject, grade: config.grade, query: scopeQuery }).catch(() => '');
-    const styleContext = userId ? await retrieveMistakeStyleSamples(userId, config.subject, config.grade, scopeQuery, [], 3).catch(() => '') : '';
+    const styleContext = await retrieveGlobalStyleSkills(config.subject, config.grade, scopeQuery, [], 3).catch(() => '');
     const enrichedConfig: ExamConfig = { ...config, styleContext };
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 10 });

@@ -54,7 +54,7 @@ import {
   getMistakeDetail,
   listMistakes,
   readMistakeAsset,
-  retrieveMistakeStyleSamples,
+  retrieveGlobalStyleSkills,
   updateMistake,
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
@@ -1421,7 +1421,7 @@ app.post('/api/chat', async (c) => {
       let styleExamples: string | undefined;
       if (userId && (body.mode === 'weakness' || body.practiceType || /错题|举一反三|出题|练习|测验|测试|考我|quiz/i.test(body.message))) {
         try {
-          styleExamples = await retrieveMistakeStyleSamples(userId, body.subject ?? 'math', body.grade ?? '7', body.message, [], 3);
+          styleExamples = await retrieveGlobalStyleSkills(body.subject ?? 'math', body.grade ?? '7', body.message, [], 3);
         } catch (err) {
           console.warn('[mistakes] style samples retrieval failed:', err);
           styleExamples = undefined;
