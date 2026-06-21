@@ -9,6 +9,7 @@ import {
   getConversation,
   createConversation as apiCreateConversation,
   deleteConversation as apiDeleteConversation,
+  StreamInterruptedError,
   type Conversation,
 } from '@/services/chat';
 import { processTikzDiagrams as runTikz } from '@/lib/tikz';
@@ -23,14 +24,15 @@ import { useUiStore } from './ui';
 export type Subject = 'chinese' | 'math' | 'english' | 'science';
 
 export type ChatItem =
-  | { kind: 'user'; text: string; modeTag?: string }
-  | { kind: 'assistant'; text: string; done: boolean }
+  | { kind: 'user'; text: string; createdAt: number; modeTag?: string }
+  | { kind: 'assistant'; text: string; done: boolean; createdAt: number }
   | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload }
   | { kind: 'tool_pending'; action: string }
   | { kind: 'tool_result'; action: string; detail: string }
   | { kind: 'tool_error'; action: string; error: string };
 
-const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false });
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+const newAssistant = (text = ''): ChatItem => ({ kind: 'assistant', text, done: false, createdAt: nowSeconds() });
 
 export const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
   chinese: { label: '\u8bed\u6587', emoji: '\ud83d\udcd6' },
@@ -67,6 +69,11 @@ export const useChatStore = defineStore('chat', () => {
   const showTyping = computed(() => {
     const last = items.value[items.value.length - 1];
     return busy.value && last?.kind === 'assistant' && !last.text;
+  });
+  /** Keep a visible pending state for the full duration of an active assistant turn. */
+  const showPendingIndicator = computed(() => {
+    const last = items.value[items.value.length - 1];
+    return busy.value && last?.kind === 'assistant' && !last.done;
   });
   const mascotState = computed<MascotState>(() => {
     if (reaction.value) return reaction.value;
@@ -149,14 +156,16 @@ export const useChatStore = defineStore('chat', () => {
       idx.value = -1;
     } else if (e.type === 'todo_done') {
       for (let i = items.value.length - 1; i >= 0; i--) {
-        if (items.value[i].kind === 'tool_pending') {
+        const item = items.value[i];
+        if (item?.kind === 'tool_pending' && item.action === e.action) {
           items.value[i] = { kind: 'tool_result', action: e.action, detail: e.detail };
           break;
         }
       }
     } else if (e.type === 'todo_fail') {
       for (let i = items.value.length - 1; i >= 0; i--) {
-        if (items.value[i].kind === 'tool_pending') {
+        const item = items.value[i];
+        if (item?.kind === 'tool_pending' && item.action === e.action) {
           items.value[i] = { kind: 'tool_error', action: e.action, error: e.error };
           break;
         }
@@ -200,6 +209,10 @@ export const useChatStore = defineStore('chat', () => {
   async function send(text: string) {
     const t = text.trim();
     if (!t || busy.value) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.warning('当前网络不可用，恢复连接后再发送');
+      return;
+    }
     const authStore = useAuthStore();
     const uiStore = useUiStore();
     // 发送第一条消息时锁定类课堂模式
@@ -232,7 +245,7 @@ export const useChatStore = defineStore('chat', () => {
     const modeTag = !uiStore.modeTagSent && modeLabel ? modeLabel : undefined;
     if (modeTag) uiStore.modeTagSent = true;
 
-    items.value.push({ kind: 'user', text: t, modeTag });
+    items.value.push({ kind: 'user', text: t, createdAt: nowSeconds(), modeTag });
     items.value.push(newAssistant());
     const idx = { value: items.value.length - 1 };
     scrollDown(true);
@@ -252,8 +265,11 @@ export const useChatStore = defineStore('chat', () => {
         (e) => handleEvent(e, idx),
       );
     } catch (err) {
-      const status = (err as any)?.status;
-      if (status === 429) {
+      if (err instanceof StreamInterruptedError) {
+        toast.warning('网络连接中断，正在同步已保存的对话内容');
+        if (currentConversationId.value) await selectConversation(currentConversationId.value);
+        else input.value = t;
+      } else if ((err as any)?.status === 429) {
         dailyLimitReached.value = true;
         // 移除乐观添加的空助手消息
         const lastItem = items.value[items.value.length - 1];
@@ -280,7 +296,12 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await streamAnswer({ threadId: currentConversationId.value!, toolCallId: item.toolCallId, answer, conversationId: currentConversationId.value ?? undefined }, (e) => handleEvent(e, idx));
     } catch (err) {
-      items.value.push(newAssistant(`\u26a0\ufe0f \u63d0\u4ea4\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
+      if (err instanceof StreamInterruptedError) {
+        toast.warning('网络连接中断，已同步服务器中保存的学习记录');
+        if (currentConversationId.value) await selectConversation(currentConversationId.value);
+      } else {
+        items.value.push(newAssistant(`\u26a0\ufe0f \u63d0\u4ea4\u5931\u8d25\uff1a${err instanceof Error ? err.message : String(err)}`));
+      }
     } finally {
       finalizeAssistants();
       scrollDown(true);
@@ -343,7 +364,7 @@ export const useChatStore = defineStore('chat', () => {
       const restored: ChatItem[] = [];
       for (const m of msgs) {
         if (m.role === 'user') {
-          restored.push({ kind: 'user', text: m.content });
+          restored.push({ kind: 'user', text: m.content, createdAt: m.createdAt });
         } else if (m.role === 'system') {
           try {
             const meta = JSON.parse(m.content);
@@ -363,7 +384,7 @@ export const useChatStore = defineStore('chat', () => {
             }
           } catch { /* non-structured system message, ignore */ }
         } else if (m.role === 'assistant') {
-          restored.push({ kind: 'assistant', text: m.content, done: true });
+          restored.push({ kind: 'assistant', text: m.content, done: true, createdAt: m.createdAt });
         }
       }
       items.value = restored;
@@ -389,6 +410,7 @@ export const useChatStore = defineStore('chat', () => {
     // getters
     hasItems,
     showTyping,
+    showPendingIndicator,
     mascotState,
     // actions
     send,

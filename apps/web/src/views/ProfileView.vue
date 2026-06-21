@@ -49,8 +49,8 @@ async function handleExplore(detail: { title: string; subject: Subject; grade: s
       const { messages } = await getConversation(conv.id);
       const restored: ChatItem[] = [];
       for (const m of messages) {
-        if (m.role === 'user') restored.push({ kind: 'user', text: m.content });
-        else if (m.role === 'assistant') restored.push({ kind: 'assistant', text: m.content, done: true });
+        if (m.role === 'user') restored.push({ kind: 'user', text: m.content, createdAt: m.createdAt });
+        else if (m.role === 'assistant') restored.push({ kind: 'assistant', text: m.content, done: true, createdAt: m.createdAt });
       }
       chatStore.items = restored;
     }

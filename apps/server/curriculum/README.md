@@ -53,4 +53,4 @@ npm run verify:curriculum --workspace @boen/server -- 7 math 一元一次方程
 
 ## 范围（当前）
 
-义务教育 1–9 年级 语文/数学/英语 + 小学(1–6)科学。初中科学（物/化/生分科）暂不收录。
+语文、数学、英语覆盖义务教育 1–9 年级；科学覆盖 1–9 年级，其中初中科学采用浙教版科学课程结构。每册可用性以已提交源数据、`sourceUrl` 与 `verify:curriculum` 校验结果为准。

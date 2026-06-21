@@ -30,12 +30,15 @@ const examStore = useExamStore();
 const uiStore = useUiStore();
 const authStore = useAuthStore();
 
-const currentView = computed(() => {
+type SidebarView = 'chat' | 'exam' | 'examReview' | 'profile' | 'mistakes' | 'setup';
+
+const currentView = computed<SidebarView>(() => {
   const name = route.name as string;
   if (name === 'examReview') return 'examReview';
   if (name === 'exam') return 'exam';
   if (name === 'profile') return 'profile';
   if (name === 'mistakes') return 'mistakes';
+  if (name === 'setup') return 'setup';
   return 'chat';
 });
 
@@ -92,11 +95,7 @@ function selectSection(section: 'chat' | 'exam' | 'profile' | 'mistakes') {
   if (section === 'chat') {
     router.push('/');
   } else {
-    if (examStore.selectedExamId) {
-      router.push(`/exam/${examStore.selectedExamId}/review`);
-    } else {
-      router.push('/exam');
-    }
+    router.push('/exam');
   }
 }
 
@@ -114,6 +113,16 @@ function startNewExam() {
   examStore.startNewExam();
   router.push('/exam');
 }
+
+// Keep the expanded navigation branch aligned with direct links, browser history,
+// and programmatic navigation instead of leaving a stale chat accordion open.
+watch(() => route.name, (name) => {
+  uiStore.expandedSection = name === 'chat'
+    ? 'chat'
+    : name === 'exam' || name === 'examReview'
+      ? 'exam'
+      : null;
+}, { immediate: true });
 
 // Auto-close sidebar on mobile when route changes
 watch(() => route.path, () => {
@@ -142,7 +151,7 @@ watch(() => route.path, () => {
             <span class="brand-text-bg">博文 Boen</span>
             <span class="brand-text-overlay">博文 Boen</span>
           </span>
-          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.2</span>
+          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.3</span>
         </div>
         <button @click="uiStore.sidebarOpen = false" class="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
           <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />
@@ -166,12 +175,16 @@ watch(() => route.path, () => {
             <Plus class="h-3.5 w-3.5" /> 新建对话
           </button>
           <div v-if="chatStore.conversations.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有对话</div>
-          <button
+          <div
             v-for="conv in chatStore.conversations" :key="conv.id"
-            @click="selectConversation(conv.id)"
-            class="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
-            :class="currentView === 'chat' && chatStore.currentConversationId === conv.id ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            class="group flex w-full items-center gap-1 rounded-lg"
           >
+            <button
+              type="button"
+              @click="selectConversation(conv.id)"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
+              :class="currentView === 'chat' && chatStore.currentConversationId === conv.id ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            >
             <MessageSquare class="h-3.5 w-3.5 shrink-0 opacity-60" />
             <div class="min-w-0 flex-1">
               <p class="truncate font-medium">{{ conv.title }}</p>
@@ -180,10 +193,11 @@ watch(() => route.path, () => {
                 <span class="text-xs text-[var(--ink-soft)]">{{ formatDate(conv.updatedAt) }}</span>
               </div>
             </div>
+            </button>
             <button @click="(e) => chatStore.handleDeleteConversation(conv.id, e)" class="rounded-md p-1 text-[var(--ink-soft)] transition-opacity hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:opacity-0 sm:group-hover:opacity-100" title="删除对话">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
-          </button>
+          </div>
         </div>
 
         <!-- ═══ 考试 ═══ -->
@@ -203,12 +217,16 @@ watch(() => route.path, () => {
             <Plus class="h-3.5 w-3.5" /> 新考试
           </button>
           <div v-if="examStore.exams.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有考试记录</div>
-          <button
+          <div
             v-for="ex in examStore.exams" :key="ex.examId"
-            @click="ex.status === 'completed' ? openExamReview(ex.examId) : startNewExam()"
-            class="group flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
-            :class="currentView === 'examReview' && examStore.selectedExamId === ex.examId ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            class="group flex w-full items-center gap-1 rounded-lg"
           >
+            <button
+              type="button"
+              @click="ex.status === 'completed' ? openExamReview(ex.examId) : startNewExam()"
+              class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-all"
+              :class="currentView === 'examReview' && examStore.selectedExamId === ex.examId ? 'bg-[#e8e4ff] text-[#5848d6]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+            >
             <span class="shrink-0 text-base">{{ subjectMeta(ex.subject).emoji }}</span>
             <div class="min-w-0 flex-1">
               <p class="truncate font-medium">{{ ex.title }}</p>
@@ -219,10 +237,11 @@ watch(() => route.path, () => {
             </div>
             <span v-if="ex.result" class="shrink-0 font-display text-sm font-bold text-[#5848d6] hidden sm:inline sm:group-hover:hidden">{{ ex.result.percentage }}</span>
             <span v-else class="shrink-0 text-[10px] font-semibold text-[#f59e42] hidden sm:inline sm:group-hover:hidden">未完成</span>
+            </button>
             <button @click="(e) => examStore.handleDeleteExam(ex.examId, e)" class="shrink-0 rounded-md p-1 text-[var(--ink-soft)] transition-colors hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:hidden sm:group-hover:inline" title="删除考试">
               <Trash2 class="h-3.5 w-3.5" />
             </button>
-          </button>
+          </div>
         </div>
 
         <!-- ═══ 错题本 ═══ -->

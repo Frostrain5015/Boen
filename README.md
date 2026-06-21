@@ -6,6 +6,8 @@
 
 > 线上体验：[boen.frostrain.tech](https://boen.frostrain.tech)
 
+当前版本：**v0.3.3**
+
 ---
 
 ## 功能概览
@@ -71,7 +73,7 @@ plan_steps → advance_step → exit_session
 | 后端 | Hono + `@hono/node-server`，SSE 流式 |
 | 前端 | Vue 3 + Vite + Tailwind v4 + markdown-it + KaTeX |
 | 图形渲染 | PGF/TiKZ → xelatex → dvisvgm 服务端编译 |
-| 知识库 | MySQL + 自定义课程知识图谱（G1-G9 全学科） |
+| 知识库 | SQLite（`better-sqlite3`）+ 自定义课程知识图谱；语数英 G1-G9、科学 G1-G9（教材版本与核验状态见课程目录） |
 | 公式编辑 | MathLive（所见即所得） |
 | 包管理 | npm workspaces（monorepo） |
 
@@ -81,8 +83,7 @@ plan_steps → advance_step → exit_session
 boen/
 ├── packages/
 │   ├── shared/          # 前后端共享类型（SseEvent / GradeBand / ChatRequest …）
-│   ├── agent-core/      # 模型工厂 + LangGraph 主图 + 工具定义 + 课程工具
-│   └── quiz/            # 出题批分子系统
+│   └── agent-core/      # 模型工厂 + LangGraph 主图 + 工具定义 + 课程工具（含 src/quiz 出题批分模块）
 ├── apps/
 │   ├── server/          # Hono SSE 后端（聊天/考试/画像/探索 API）
 │   └── web/             # Vue 3 前端

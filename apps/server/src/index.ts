@@ -1,8 +1,5 @@
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, existsSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { config as loadEnv } from 'dotenv';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -50,6 +47,7 @@ import {
   retrieveMistakeStyleSamples,
   updateMistake,
 } from './mistakes.js';
+import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -237,7 +235,7 @@ async function runGraph(
           stepTimestamps.push(Date.now());
           const elapsed = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[stepTimestamps.length - 2]) / 1000).toFixed(1);
           const total = ((stepTimestamps[stepTimestamps.length - 1] - stepTimestamps[0]) / 1000).toFixed(1);
-          await send({ type: 'todo_step', action: 'advance' });
+          await send({ type: 'todo_step', action: 'advance', detail: '正在进入下一阶段' });
           console.log(`[Boen 类课堂] 🎯 第${stepCount}步完成 — 耗时 ${elapsed}s | 总 ${total}s | ${new Date().toLocaleTimeString()}`);
         }
         if (name === EXIT_SESSION_TOOL && !todoStepSent.has(name)) {
@@ -249,19 +247,19 @@ async function runGraph(
         }
         if (name === PLAN_STEPS_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
-          await send({ type: 'todo_step', action: 'plan' });
+          await send({ type: 'todo_step', action: 'plan', detail: '博文正在备课' });
           const args = (chunk as any)?.tool_calls?.[0]?.args ?? (chunk as any)?.tool_call_chunks?.[0] ?? {};
           const count = args?.steps?.length ?? '?';
           console.log(`[Boen 类课堂] 📋 plan_steps — 规划了 ${count} 步 | ${new Date().toLocaleTimeString()}`);
         }
         if (name === LOOKUP_KNOWLEDGE_POINT_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
-          await send({ type: 'todo_step', action: 'query' });
+          await send({ type: 'todo_step', action: 'query', detail: '正在查询教材库' });
           console.log(`[Boen 类课堂] 📖 lookup_knowledge_point — 查询教材库 | ${new Date().toLocaleTimeString()}`);
         }
         if (name === SWITCH_SUBJECT_TOOL && !todoStepSent.has(name)) {
           todoStepSent.add(name);
-          await send({ type: 'todo_step', action: 'switch' });
+          await send({ type: 'todo_step', action: 'switch', detail: '正在切换学科' });
           console.log(`[Boen 类课堂] 🔄 switch_subject 检测到 | ${new Date().toLocaleTimeString()}`);
         }
       }
@@ -545,68 +543,19 @@ app.post('/api/render-tikz', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
 
-  const { code } = await c.req.json<{ code?: string }>();
-  if (!code?.trim()) return c.json({ error: 'TikZ code required' }, 400);
-
-  // 2. 代码长度限制
-  if (code.length > 10000) return c.json({ error: 'code too long' }, 400);
-
-  // 3. 代码黑名单：禁用危险 LaTeX 命令
-  const DANGEROUS_PATTERNS = [
-    /\\input\s*\{/i,
-    /\\write18/i,
-    /\\openout/i,
-    /\\readline/i,
-    /\\catcode/i,
-    /\\immediate\s*\\write/i,
-    /\\def\s*\\shell/i,
-    /\\lstinputlisting/i,
-    /\\include\s*\{/i,
-  ];
-  for (const pat of DANGEROUS_PATTERNS) {
-    if (pat.test(code)) return c.json({ error: 'dangerous code rejected' }, 400);
-  }
-
-  // 4. 跨平台临时目录
-  const tmpDir = mkdtempSync(join(tmpdir(), 'tikz-'));
-  const texPath = join(tmpDir, 'tikz.tex');
-  const pdfPath = join(tmpDir, 'tikz.pdf');
-  const svgPath = join(tmpDir, 'tikz.svg');
-
-  const tex = `\\documentclass{standalone}
-\\usepackage{fontspec}
-\\usepackage{xeCJK}
-\\setCJKmainfont{Noto Sans CJK SC}
-\\usepackage{amsmath}
-\\usepackage{tikz}
-\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
-\\usepackage{pgfplots}
-\\pgfplotsset{compat=1.18}
-\\usepackage{xlop}
-\\begin{document}
-${code}
-\\end{document}`;
+  const { code } = await c.req.json<{ code?: unknown }>();
 
   try {
-    writeFileSync(texPath, tex, 'utf-8');
-    // 5. -no-shell-escape 禁用 RCE
-    execSync(`xelatex -no-shell-escape -interaction=nonstopmode -output-directory="${tmpDir}" "${texPath}"`, { timeout: 30000, stdio: 'pipe' });
-
-    const pdfExists = existsSync(pdfPath);
-    if (!pdfExists) return c.json({ error: 'pdflatex failed' }, 500);
-
-    execSync(`dvisvgm --pdf --no-fonts -o "${svgPath}" "${pdfPath}"`, { timeout: 15000, stdio: 'pipe' });
-    const svg = existsSync(svgPath) ? execSync(`cat "${svgPath}"`, { encoding: 'utf-8', timeout: 5000 }) : '';
-    if (!svg) return c.json({ error: 'dvisvgm produced empty output' }, 500);
-
-    // 6. 只返回 SVG，不返回编译日志
+    validateTikzCode(code);
+    consumeTikzRateLimit(userId);
+    const requestId = crypto.randomUUID();
+    const svg = await renderTikzSvg(code, requestId);
     return c.json({ svg });
   } catch (err) {
-    const msg = err instanceof Error ? err.message.slice(0, 200) : String(err);
-    console.error('[tikz] render failed:', msg);
-    return c.json({ error: 'tikz render failed' }, 500);
-  } finally {
-    try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理临时目录 */ }
+    if (err instanceof TikzRenderError) return c.json({ error: err.message }, err.status as 400 | 429 | 500);
+    const message = err instanceof Error ? err.message.slice(0, 200) : String(err);
+    console.error('[tikz] request_failed', JSON.stringify({ message }));
+    return c.json({ error: 'TikZ request failed' }, 500);
   }
 });
 

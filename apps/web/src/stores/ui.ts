@@ -18,8 +18,13 @@ export const useUiStore = defineStore('ui', () => {
 
   // ── State ─────────────────────────────────────────────────
   const subject = ref<Subject>('math');
-  const isMobile = ref(typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false);
+  const mobileMediaQuery = typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)') : null;
+  const isMobile = ref(mobileMediaQuery?.matches ?? false);
   const sidebarOpen = ref(!isMobile.value);
+  mobileMediaQuery?.addEventListener('change', (event) => {
+    isMobile.value = event.matches;
+    sidebarOpen.value = !event.matches;
+  });
   const expandedSection = ref<'chat' | 'exam' | null>('chat');
   const activeMode = ref<ActiveMode>('none');
   const sessionActive = ref(false);

@@ -16,8 +16,14 @@ const { scroller, hasScrollOverflow, scrollDown, checkScrollOverflow } = useScro
 // Wire scroll callback into chat store
 chatStore.setScrollDownCallback(scrollDown);
 
-function formatTime() {
-  return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+function formatTime(timestamp: number) {
+  return new Date(timestamp * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatToolStatus(text: string) {
+  // The trailing status marker owns progress feedback; keep tool text free of
+  // punctuation dots so it never competes with that visual language.
+  return text.replace(/[.。…]/g, '');
 }
 
 // After conversation restore, re-check scroll & TikZ
@@ -70,9 +76,9 @@ onMounted(() => {
                     <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : m.action === 'switch' ? '🔄' : '🎓' }}</template>
                   </span>
                   <span class="quiz-gen-label">
-                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课...' : m.action === 'advance' ? '正在进入下一阶段...' : m.action === 'query' ? '正在查询教材库...' : m.action === 'switch' ? '正在切换学科...' : '课堂即将结束' }}</template>
-                    <template v-else-if="m.kind === 'tool_result'">{{ (m as any).detail }}</template>
-                    <template v-else>{{ (m as any).error }}</template>
+                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课' : m.action === 'advance' ? '正在进入下一阶段' : m.action === 'query' ? '正在查询教材库' : m.action === 'switch' ? '正在切换学科' : '课堂即将结束' }}</template>
+                    <template v-else-if="m.kind === 'tool_result'">{{ formatToolStatus((m as any).detail) }}</template>
+                    <template v-else>{{ formatToolStatus((m as any).error) }}</template>
                   </span>
                   <span class="quiz-gen-dots">
                     <span v-if="m.kind === 'tool_pending'" class="flex gap-[3px]"><span></span><span></span><span></span></span>
@@ -95,7 +101,7 @@ onMounted(() => {
                   'text-[var(--accent-strong)]'
                 ">{{ m.modeTag }}</span>{{ m.text }}
               </p>
-              <span class="mt-1 inline-block text-[10px] text-[var(--ink-soft)]/60">{{ formatTime() }}</span>
+              <span class="mt-1 inline-block text-[10px] text-[var(--ink-soft)]/60">{{ formatTime(m.createdAt) }}</span>
             </div>
           </div>
 
@@ -119,7 +125,7 @@ onMounted(() => {
                   <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
                 </div>
               </div>
-              <TypingDots v-else-if="i === chatStore.items.length - 1 && chatStore.showTyping && !m.text" />
+              <TypingDots v-else-if="i === chatStore.items.length - 1 && chatStore.showPendingIndicator" />
             </div>
           </div>
         </template>

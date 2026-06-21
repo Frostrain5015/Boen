@@ -5,6 +5,7 @@ import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import NetworkStatusBanner from '@/components/NetworkStatusBanner.vue';
 import SidebarLayout from '@/components/layout/SidebarLayout.vue';
 import MascotWidget from '@/components/layout/MascotWidget.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -84,4 +85,5 @@ onMounted(() => {
   <!-- Toast 通知 & 确认弹窗（全局常驻） -->
   <ToastProvider />
   <ConfirmDialog />
+  <NetworkStatusBanner />
 </template>

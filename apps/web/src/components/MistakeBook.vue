@@ -91,6 +91,7 @@ const progressMessage = ref('');
 const activeStep = ref<AnalyzeMistakeStep | null>(null);
 const completedSteps = ref<Set<AnalyzeMistakeStep>>(new Set());
 const selectedAssetObjectUrl = ref('');
+let selectedAssetRequest = 0;
 const batchMistakes = ref<MistakeItem[]>([]);
 const currentBatchIndex = ref(0);
 const subjectFilter = ref<Subject | 'all'>('all');
@@ -139,15 +140,27 @@ function formatTime(sec: number) {
 async function refreshMistakes(selectLatest = false) {
   loadingList.value = true;
   try {
-    const params: { grade?: string; limit: number; subject?: Subject } = { grade: props.grade ?? undefined, limit: 30 };
-    if (subjectFilter.value !== 'all') params.subject = subjectFilter.value;
+    // Keep the complete client-side collection so the filter tabs and their counts
+    // cannot erase the other subjects after a refresh.
+    const params = { grade: props.grade ?? undefined, limit: 100 };
     const data = await listMistakes(params);
     mistakes.value = data.mistakes;
     if (selectLatest && data.mistakes[0]) {
       selectedMistake.value = data.mistakes[0];
       rightView.value = 'detail';
+    } else if (selectLatest) {
+      selectedMistake.value = null;
+      rightView.value = 'idle';
+      batchMistakes.value = [];
+      currentBatchIndex.value = 0;
     } else if (selectedMistake.value) {
-      selectedMistake.value = data.mistakes.find((m) => m.id === selectedMistake.value?.id) ?? selectedMistake.value;
+      const refreshed = data.mistakes.find((m) => m.id === selectedMistake.value?.id);
+      if (refreshed) {
+        selectedMistake.value = refreshed;
+      } else {
+        selectedMistake.value = null;
+        rightView.value = 'idle';
+      }
     }
   } finally {
     loadingList.value = false;
@@ -332,9 +345,15 @@ async function reanalyze(mistake: MistakeItem) {
 }
 
 async function archive(id: string) {
-  await deleteMistake(id);
-  if (selectedMistake.value?.id === id) selectedMistake.value = null;
-  await refreshMistakes(true);
+  try {
+    await deleteMistake(id);
+    batchMistakes.value = batchMistakes.value.filter((mistake) => mistake.id !== id);
+    currentBatchIndex.value = Math.min(currentBatchIndex.value, Math.max(0, batchMistakes.value.length - 1));
+    if (selectedMistake.value?.id === id) selectedMistake.value = null;
+    await refreshMistakes(true);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '删除错题失败，请稍后重试';
+  }
 }
 
 async function startPractice(mistake: MistakeItem) {
@@ -397,6 +416,7 @@ onMounted(async () => {
 watch(selectedMistake, async (mistake) => {
   // 切换到非做对的题时清空"做对了"提示
   if (!mistake?.isCorrect) correctNotice.value = '';
+  const requestId = ++selectedAssetRequest;
   revokeSelectedAssetUrl();
   const asset = mistake?.assets?.[0];
   if (!mistake || !asset) {
@@ -404,7 +424,12 @@ watch(selectedMistake, async (mistake) => {
     return;
   }
   try {
-    selectedAssetObjectUrl.value = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
+    const objectUrl = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
+    if (requestId !== selectedAssetRequest || selectedMistake.value?.id !== mistake.id) {
+      URL.revokeObjectURL(objectUrl);
+      return;
+    }
+    selectedAssetObjectUrl.value = objectUrl;
   } catch (e) {
     selectedAssetObjectUrl.value = '';
     console.warn('[mistakes] fetch asset failed:', e);
@@ -475,26 +500,31 @@ onBeforeUnmount(() => {
             </p>
           </div>
           <div v-else v-auto-animate class="space-y-1 p-2">
-            <button
+            <div
               v-for="m in filteredMistakes"
               :key="m.id"
-              @click="selectMistake(m)"
-              class="group flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-all hover:bg-[var(--accent-soft)] active:scale-[0.99]"
-              :class="selectedMistake?.id === m.id && rightView === 'detail' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)]'"
+              class="group flex items-center gap-1 rounded-2xl"
             >
-              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white shadow-sm">
-                <NotebookPen class="h-4 w-4" :class="m.subject === 'chinese' ? 'text-[#e74c3c]' : m.subject === 'math' ? 'text-[#3498db]' : m.subject === 'english' ? 'text-[#f59e42]' : 'text-[#2ecc71]'" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-sm font-bold">{{ m.title || '未命名错题' }}</span>
-                <span class="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
-                  <span>{{ SUBJECTS.find(s => s.value === m.subject)?.label }}</span>
-                  <span>{{ formatTime(m.updatedAt) }}</span>
-                  <span class="rounded-full px-1.5 py-0.5" :class="m.status === 'analyzed' ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fef3e2] text-[#f59e42]'">{{ m.status === 'analyzed' ? '已归档' : '待确认' }}</span>
+              <button
+                type="button"
+                @click="selectMistake(m)"
+                class="flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-all hover:bg-[var(--accent-soft)] active:scale-[0.99]"
+                :class="selectedMistake?.id === m.id && rightView === 'detail' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'text-[var(--ink)]'"
+              >
+                <span class="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white shadow-sm">
+                  <NotebookPen class="h-4 w-4" :class="m.subject === 'chinese' ? 'text-[#e74c3c]' : m.subject === 'math' ? 'text-[#3498db]' : m.subject === 'english' ? 'text-[#f59e42]' : 'text-[#2ecc71]'" />
                 </span>
-              </span>
-              <button @click.stop="archive(m.id)" class="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--ink-soft)] opacity-100 transition-all hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:opacity-0 sm:group-hover:opacity-100" aria-label="归档错题"><Trash2 class="h-4 w-4" /></button>
-            </button>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-bold">{{ m.title || '未命名错题' }}</span>
+                  <span class="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
+                    <span>{{ SUBJECTS.find(s => s.value === m.subject)?.label }}</span>
+                    <span>{{ formatTime(m.updatedAt) }}</span>
+                    <span class="rounded-full px-1.5 py-0.5" :class="m.status === 'analyzed' ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fef3e2] text-[#f59e42]'">{{ m.status === 'analyzed' ? '已归档' : '待确认' }}</span>
+                  </span>
+                </span>
+              </button>
+              <button type="button" @click="archive(m.id)" class="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[var(--ink-soft)] opacity-100 transition-all hover:bg-[var(--error)]/10 hover:text-[var(--error)] sm:opacity-0 sm:group-hover:opacity-100" aria-label="删除错题" title="删除错题"><Trash2 class="h-4 w-4" /></button>
+            </div>
           </div>
         </section>
       </aside>
@@ -525,8 +555,11 @@ onBeforeUnmount(() => {
         <div v-if="rightView === 'idle'" class="flex h-full min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">
           <Mascot :size="110" state="idle" />
           <div>
-            <h2 class="font-display text-2xl font-bold text-[var(--ink)]">把真实错题放进来</h2>
-            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">点击左侧 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white">+</span> 按钮新增错题，支持拍照上传和手动录入。</p>
+            <h2 class="font-display text-2xl font-bold text-[var(--ink)]">{{ mistakes.length === 0 ? '暂无错题记录' : '选择一题查看详情' }}</h2>
+            <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">
+              <template v-if="mistakes.length === 0">点击左侧 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white">+</span> 按钮新增错题，支持拍照上传和手动录入。</template>
+              <template v-else>从左侧列表选择错题，查看错因诊断、知识点映射与针对性练习。</template>
+            </p>
           </div>
         </div>
 

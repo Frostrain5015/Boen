@@ -13,6 +13,13 @@ import type {
 } from '@boen/shared';
 import { getToken } from './auth';
 
+export class StreamInterruptedError extends Error {
+  constructor(readonly receivedEvents: boolean) {
+    super('流式连接在服务端确认完成前中断');
+    this.name = 'StreamInterruptedError';
+  }
+}
+
 /** 通用 SSE 流读取：POST body，逐事件回调 */
 async function streamSse(
   url: string,
@@ -49,6 +56,8 @@ async function streamSse(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let receivedEvents = false;
+  let completed = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -60,12 +69,16 @@ async function streamSse(
       const line = frame.split('\n').find((l) => l.startsWith('data:'));
       if (!line) continue;
       try {
-        onEvent(JSON.parse(line.slice(5).trim()) as SseEvent);
+        const event = JSON.parse(line.slice(5).trim()) as SseEvent;
+        receivedEvents = true;
+        if (event.type === 'done') completed = true;
+        onEvent(event);
       } catch {
         /* 忽略心跳/非 JSON 帧 */
       }
     }
   }
+  if (!completed) throw new StreamInterruptedError(receivedEvents);
 }
 
 /** 发起一轮对话 */

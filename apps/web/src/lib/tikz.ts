@@ -10,6 +10,17 @@ const errBox = (msg: string) =>
 const vertBox = (html: string) =>
   `<div class="xlop-vert" style="display:inline-flex;flex-direction:column;align-items:center;font-family:'Nunito','HarmonyOS Sans SC',sans-serif;font-weight:600;line-height:1.3;padding:4px 8px;margin:0 4px;vertical-align:middle;white-space:nowrap">${html}</div>`;
 
+function replaceWithSvgImage(wrap: HTMLElement, svg: string) {
+  const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  const image = document.createElement('img');
+  image.className = 'tikz-rendered-svg';
+  image.alt = 'TikZ 示意图';
+  image.src = objectUrl;
+  image.addEventListener('load', () => URL.revokeObjectURL(objectUrl), { once: true });
+  image.addEventListener('error', () => URL.revokeObjectURL(objectUrl), { once: true });
+  wrap.replaceChildren(image);
+}
+
 /** 前端竖式渲染：解析 \opadd / \opsub / \opmul / \opdiv 并生成 HTML 表格 */
 function renderXlop(code: string): string | null {
   const mAdd = code.match(/\\opadd\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
@@ -140,7 +151,7 @@ export async function processTikzDiagrams(
       const hash = simpleHash(code);
       const svg = preRendered[hash];
       if (svg) {
-        wrap.innerHTML = svg;
+        replaceWithSvgImage(wrap, svg);
         wrap.dataset.tikzState = 'done';
         continue;
       }
@@ -160,7 +171,8 @@ export async function processTikzDiagrams(
       });
       const data = await res.json().catch(() => ({})) as { svg?: string; error?: string };
       if (res.ok && data.svg) {
-        wrap.innerHTML = data.svg;
+        // Treat renderer output as an image resource, never executable DOM.
+        replaceWithSvgImage(wrap, data.svg);
         wrap.dataset.tikzState = 'done';
       } else {
         wrap.innerHTML = `<details class="tikz-fallback"><summary>📐 TikZ 渲染失败</summary><pre><code>${escapeHtml(code)}</code></pre></details>`;

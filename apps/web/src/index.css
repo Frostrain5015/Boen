@@ -361,10 +361,12 @@ body {
   display: flex;
   justify-content: center;
 }
-.tikz-wrap svg { max-width: 100%; height: auto; }
+.tikz-wrap svg,
+.tikz-wrap .tikz-rendered-svg { max-width: 100%; height: auto; }
 
 /* 「正在画图」占位：编译出 <svg> 后自动隐藏 */
-.tikz-wrap:has(svg) .tikz-gen { display: none; }
+.tikz-wrap:has(svg) .tikz-gen,
+.tikz-wrap:has(.tikz-rendered-svg) .tikz-gen { display: none; }
 .tikz-gen {
   display: inline-flex;
   align-items: center;
