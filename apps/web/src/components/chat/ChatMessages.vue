@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { PencilLine, Wrench, CheckCircle, XCircle } from 'lucide-vue-next';
+import { GraduationCap, PencilLine, Wrench, CheckCircle, XCircle } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import Mascot from '@/components/Mascot.vue';
 import QuestionCard from '@/components/QuestionCard.vue';
+import StarDisplay from '@/components/StarDisplay.vue';
 import TypingDots from '@/components/TypingDots.vue';
 import { useChatStore } from '@/stores/chat';
 import { useUiStore } from '@/stores/ui';
@@ -164,6 +165,21 @@ onMounted(() => {
             </div>
             <div class="max-h-32 overflow-y-auto rounded-xl bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--ink)] md-body"
               v-html="renderMarkdown(chatStore.learningSettlement.summary)">
+            </div>
+
+            <!-- 详细熟练度变化（结算时批量写入后的各知识点变化） -->
+            <div v-if="chatStore.learningSettlement.proficiencyChanges?.length" class="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2.5">
+              <p class="mb-1.5 text-[10px] font-semibold text-[var(--ink-soft)]">熟练度变化</p>
+              <div v-for="pc in chatStore.learningSettlement.proficiencyChanges" :key="pc.kpTitle"
+                class="flex items-center gap-2 py-0.5 text-[11px]">
+                <GraduationCap class="h-3 w-3 shrink-0 text-[var(--accent)]" />
+                <span class="flex-1 min-w-0 truncate font-medium text-[var(--ink)]">{{ pc.kpTitle }}</span>
+                <span class="inline-flex items-center gap-0.5">
+                  <StarDisplay :score="pc.after" :animateFrom="pc.before" />
+                  <span v-if="pc.after > pc.before" class="text-[11px] leading-none text-[#18a558]">↑</span>
+                  <span v-else-if="pc.after < pc.before" class="text-[11px] leading-none text-[#f2557a]">↓</span>
+                </span>
+              </div>
             </div>
             <button @click="chatStore.learningSettlement = null"
               class="flex w-full items-center justify-center gap-2 rounded-2xl bg-[var(--accent)] py-2.5 font-display text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.97]">

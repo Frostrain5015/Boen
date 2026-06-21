@@ -209,19 +209,28 @@ export function cacheProficiencyUpdate(userId: string, threadId: string, kgNodeI
 }
 
 /**
- * 批量写入缓存的熟练度更新，返回更新条数
+ * 批量写入缓存的熟练度更新，返回更新条数及每条的知识点名称和前后分数。
  */
-export function flushProficiencyCache(userId: string, threadId: string): number {
+export function flushProficiencyCache(userId: string, threadId: string): { count: number; changes: Array<{ kpTitle: string; before: number; after: number }> } {
   const key = cacheKey(userId, threadId);
   const userCache = PROFICIENCY_CACHE.get(key);
-  if (!userCache || userCache.size === 0) return 0;
-  let count = 0;
+  if (!userCache || userCache.size === 0) return { count: 0, changes: [] };
+  const changes: Array<{ kpTitle: string; before: number; after: number }> = [];
   for (const [kgNodeId, update] of userCache) {
+    // 读旧值
+    const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
+    const before = oldRow?.weighted_score ?? -1;
+    // 写新值
     updateProficiency(userId, kgNodeId, update.score, update.maxScore, update.mode);
-    count++;
+    // 读新值
+    const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
+    const after = newRow?.weighted_score ?? -1;
+    // 查节点名称
+    const node = db.prepare('SELECT title FROM kg_nodes WHERE id=?').get(kgNodeId) as { title: string } | undefined;
+    changes.push({ kpTitle: node?.title ?? `节点#${kgNodeId}`, before: Math.max(0, before), after: Math.max(0, after) });
   }
   PROFICIENCY_CACHE.delete(key);
-  return count;
+  return { count: changes.length, changes };
 }
 
 /**

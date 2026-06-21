@@ -493,7 +493,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
 
   if (exitCall?.args && userId && threadId) {
     const args = exitCall.args as Record<string, unknown>;
-    const updatedKps = flushProficiencyCache(userId, threadId);
+    const { count: updatedKps } = flushProficiencyCache(userId, threadId);
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
     await send({
       type: 'settlement',
@@ -1426,7 +1426,7 @@ app.post('/api/chat', async (c) => {
           const sessionScore = parseInt(scoreMatch[1]);
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
-          const updatedKps = flushProficiencyCache(userId, body.threadId);
+          const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, body.threadId);
           await send({
             type: 'settlement',
             summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
@@ -1434,6 +1434,7 @@ app.post('/api/chat', async (c) => {
             stepsCompleted,
             totalSteps,
             updatedKps,
+            proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
           });
           // 从前端展示中移除评分标记
           content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
@@ -1506,7 +1507,7 @@ app.post('/api/explore', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
 
-          const updatedKps = flushProficiencyCache(userId, threadId);
+          const { count: flushedCount } = flushProficiencyCache(userId, threadId);
           const { findKnowledgePointNode } = await import('./exam.js');
           const node = findKnowledgePointNode(body.title, body.subject);
           if (node) {
@@ -1519,7 +1520,7 @@ app.post('/api/explore', async (c) => {
             score: sessionScore,
             stepsCompleted,
             totalSteps,
-            updatedKps: updatedKps + (node ? 1 : 0),
+            updatedKps: flushedCount + (node ? 1 : 0),
           });
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }

@@ -327,9 +327,10 @@ watch(
             <p class="text-[11px] font-medium text-[var(--ink-soft)]">熟练度变化</p>
             <div v-for="pc in (grading as any).proficiencyChanges" :key="pc.kp" class="flex items-center gap-2 text-[11px]">
               <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
-              <span v-if="pc.before >= 0" class="inline-flex items-center gap-1">
-                <StarDisplay v-if="starDiffers(pc.before, pc.after)" :score="pc.after" :animateFrom="pc.before" />
-                <StarDisplay v-else :score="pc.after" />
+              <span v-if="pc.before >= 0" class="inline-flex items-center gap-0.5">
+                <StarDisplay :score="pc.after" :animateFrom="pc.after !== pc.before ? pc.before : undefined" />
+                <span v-if="pc.after > pc.before" class="text-[11px] leading-none text-[#18a558]">↑</span>
+                <span v-else-if="pc.after < pc.before" class="text-[11px] leading-none text-[#f2557a]">↓</span>
               </span>
               <span v-else class="font-semibold text-[var(--accent-strong)]">新</span>
             </div>

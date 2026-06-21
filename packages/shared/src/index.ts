@@ -481,6 +481,6 @@ export type SseEvent =
   | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
   | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; error: string }
   | { type: 'subject_changed'; subject: string }
-  | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number }
+  | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }> }
   | { type: 'done' }
   | { type: 'error'; message: string };
