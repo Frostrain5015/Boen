@@ -429,10 +429,17 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     if (!last || !isAIMessage(last) || !last.tool_calls?.length) return '__end__';
 
+    const hasQuiz = last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name));
+    const hasNonQuiz = last.tool_calls.some((call) => !QUIZ_TOOL_NAMES.has(call.name));
+
+    // 既出题又调其他工具（如 advance_step + ask_multiple_choice），
+    // 先走 ToolNode 执行非出题工具，再让 agent 重跑只发出题调用。
+    if (hasQuiz && hasNonQuiz) return 'tools';
+
     // 题目工具是人机协作边界，不是立即执行的服务端函数。它进入
     // awaitQuestion 节点，以 interrupt 持久化暂停；学生作答后再由
     // Command.resume 回到同一节点，写入 ToolMessage 并继续教学。
-    if (last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name))) return 'awaitQuestion';
+    if (hasQuiz) return 'awaitQuestion';
 
     // 备课、步骤推进、知识点查询等工具仍由 ToolNode 正常执行。
     return 'tools';
@@ -440,19 +447,8 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
   const awaitQuestion = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
-    if (!last?.tool_calls?.length) throw new Error('没有工具调用');
-    const quiz = last.tool_calls.find((call) => QUIZ_TOOL_NAMES.has(call.name));
+    const quiz = last?.tool_calls?.find((call) => QUIZ_TOOL_NAMES.has(call.name));
     if (!quiz?.id) throw new Error('出题工具缺少可恢复的调用 ID');
-
-    // 为非出题工具生成空 ToolMessage，防止 LangChain 校验失败
-    // （模型可能同时调用了 advance_step + ask_multiple_choice，
-    //   路由到 awaitQuestion 后只处理出题，非出题工具的 tool_call 会无对应响应）
-    const stubMessages: ToolMessage[] = [];
-    for (const call of last.tool_calls) {
-      if (!QUIZ_TOOL_NAMES.has(call.name) && call.id) {
-        stubMessages.push(new ToolMessage({ content: '', tool_call_id: call.id }));
-      }
-    }
 
     const resume = interrupt<QuestionInterrupt, QuestionResume>({
       type: 'question',
@@ -470,7 +466,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       tool_call_id: quiz.id,
     });
 
-    return { messages: [answerMessage, ...stubMessages], questionResumeType: resume.type };
+    return { messages: [answerMessage], questionResumeType: resume.type };
   };
 
   function continueAfterQuestion(state: State): 'agent' | '__end__' {
