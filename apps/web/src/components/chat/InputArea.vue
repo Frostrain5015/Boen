@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, computed, ref } from 'vue';
+import { nextTick, onMounted, computed, ref, type Component } from 'vue';
 import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2 } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
@@ -31,7 +31,16 @@ const practiceMenuStyle = computed(() => {
   };
 });
 
-// ── 课堂进度 todo 浮层定位（从按钮左上方向上弹出，Teleport 到 body 避免裁切）──
+// ── 当前学习模式（课堂中按钮淡出、改为高亮状态文本）──
+const MODE_META: Record<string, { label: string; icon: Component }> = {
+  review: { label: '复习巩固', icon: GraduationCap },
+  preview: { label: '预习模式', icon: BookOpen },
+  weakness: { label: '集中练习', icon: Target },
+  practice: { label: '专项练习', icon: PenTool },
+};
+const activeModeMeta = computed(() => MODE_META[uiStore.activeMode] ?? MODE_META.review);
+
+// ── 课堂进度 todo 浮层定位（向按钮左侧展开，避开输入框；窄屏回退到按钮上方）──
 const todoBtnRef = ref<HTMLElement | null>(null);
 const todoPanelStyle = computed(() => {
   // 依赖 todoPanelOpen 触发重算，确保每次打开都读取最新按钮位置
@@ -39,9 +48,20 @@ const todoPanelStyle = computed(() => {
   const btn = todoBtnRef.value;
   if (!btn) return null;
   const rect = btn.getBoundingClientRect();
+  const gap = 8;
+  const spaceLeft = rect.left - 16; // 按钮左侧可用宽度（留 16px 视口边距）
+  if (spaceLeft >= 240) {
+    // 向左展开：面板右缘贴按钮左缘，底部与按钮底部对齐、向上生长，不与输入框重叠
+    return {
+      right: (window.innerWidth - rect.left + gap) + 'px',
+      bottom: (window.innerHeight - rect.bottom) + 'px',
+      width: Math.min(320, spaceLeft - gap) + 'px',
+    };
+  }
+  // 窄屏回退：按钮上方展开
   return {
     left: rect.left + 'px',
-    bottom: (window.innerHeight - rect.top + 8) + 'px',
+    bottom: (window.innerHeight - rect.top + gap) + 'px',
     width: 'min(20rem, calc(100vw - 2rem))',
   };
 });
@@ -61,15 +81,27 @@ onMounted(() => {
 <template>
   <footer class="px-4 pb-4 pt-16">
     <div class="mx-auto w-full max-w-2xl">
-      <!-- 学习模式按钮（大学仅通用模式，不显示） -->
-      <div v-if="!uiStore.isCollege" class="mb-2 flex items-center gap-1.5 overflow-x-auto px-1" style="scrollbar-width:none;overflow-y:visible">
-        <button @click="uiStore.activateMode('review')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>复习巩固</span></button>
-        <button @click="uiStore.activateMode('preview')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
-        <button @click="uiStore.activateMode('weakness')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>集中练习</span></button>
-        <!-- 专项练习 -->
-        <div v-if="uiStore.practiceMenu.length" class="relative inline-block" ref="practiceBtnRef">
-          <button @click="uiStore.togglePracticeMenu()" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.practiceMenuOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
-        </div>
+      <!-- 学习模式按钮（大学仅通用模式，不显示）。课堂中淡出按钮、改显当前模式高亮状态 -->
+      <div v-if="!uiStore.isCollege" class="relative mb-2 flex min-h-[34px] items-center gap-1.5 px-1">
+        <Transition name="mode-swap">
+          <!-- 课堂中：当前模式高亮状态文本（不可点击） -->
+          <div v-if="uiStore.sessionActive" key="status" class="flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-xs font-semibold text-[var(--accent-strong)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)]">
+            <component :is="activeModeMeta.icon" class="h-3.5 w-3.5" />
+            <span>{{ activeModeMeta.label }}</span>
+            <span class="session-mode-dot"></span>
+            <span class="opacity-70">进行中</span>
+          </div>
+          <!-- 非课堂：模式按钮组 -->
+          <div v-else key="buttons" class="flex items-center gap-1.5 overflow-x-auto" style="scrollbar-width:none;overflow-y:visible">
+            <button @click="uiStore.activateMode('review')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'review' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><GraduationCap class="h-3.5 w-3.5" /><span>复习巩固</span></button>
+            <button @click="uiStore.activateMode('preview')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'preview' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><BookOpen class="h-3.5 w-3.5" /><span>预习模式</span></button>
+            <button @click="uiStore.activateMode('weakness')" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.activeMode === 'weakness' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><Target class="h-3.5 w-3.5" /><span>集中练习</span></button>
+            <!-- 专项练习 -->
+            <div v-if="uiStore.practiceMenu.length" class="relative inline-block" ref="practiceBtnRef">
+              <button @click="uiStore.togglePracticeMenu()" class="flex shrink-0 items-center gap-1.5 rounded-2xl border px-3.5 py-1.5 text-xs font-semibold shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)] transition-all active:scale-[0.96]" :class="uiStore.practiceMenuOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/70 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"><PenTool class="h-3.5 w-3.5" /><span>专项练习</span></button>
+            </div>
+          </div>
+        </Transition>
       </div>
       <!-- 专项练习下拉菜单（Teleport 到 body 避免 overflow:hidden 裁剪） -->
       <Teleport to="body">
@@ -180,7 +212,6 @@ onMounted(() => {
             <!-- 空态：未处于课堂 -->
             <div v-if="!uiStore.hasTodoList" class="px-4 py-8 text-center">
               <p class="text-sm font-medium text-[var(--ink-soft)]">当前不在课堂中</p>
-              <p class="mt-1 text-xs text-[var(--ink-soft)]/70">进入复习 / 预习等学习模式后，这里会显示课堂步骤进度</p>
             </div>
             <!-- 步骤列表 -->
             <ul v-else class="max-h-[50vh] space-y-1 overflow-y-auto p-2">
@@ -226,6 +257,45 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ── 模式按钮 ↔ 课堂状态文本 平滑切换 ── */
+.mode-swap-enter-active {
+  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.mode-swap-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  position: absolute;
+  left: 0.25rem;
+  top: 0;
+}
+.mode-swap-enter-from {
+  opacity: 0;
+  transform: translateX(-6px) scale(0.96);
+}
+.mode-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.97);
+}
+/* 课堂进行中脉冲点 */
+.session-mode-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: sessionDotPulse 1.6s ease-in-out infinite;
+}
+@keyframes sessionDotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); opacity: 1; }
+  50% { box-shadow: 0 0 0 4px transparent; opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mode-swap-enter-active,
+  .mode-swap-leave-active { transition: opacity 0.2s ease; }
+  .mode-swap-enter-from,
+  .mode-swap-leave-to { transform: none; }
+  .session-mode-dot { animation: none; }
+}
+
 /* ── 课堂进度浮层弹入 ── */
 .todo-panel-enter-active {
   transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;

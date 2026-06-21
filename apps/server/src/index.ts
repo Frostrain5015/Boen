@@ -218,15 +218,11 @@ function getPendingQuestion(state: { tasks?: Array<{ interrupts?: Array<{ value?
 async function sendTodoPlan(
   threadId: string,
   send: (e: SseEvent) => Promise<void>,
-  rawState?: string,
 ): Promise<void> {
   try {
-    // 优先用节点输出里的 todoState（避免 checkpoint 写入竞态）；缺失才回读 checkpoint
-    let raw = rawState;
-    if (!raw) {
-      const ckpt = await graph.getState(runConfig(threadId));
-      raw = ckpt?.values?.todoState as string | undefined;
-    }
+    // tools 节点（含 Command 工具更新）结束后 checkpoint 即为最新，直接读取
+    const ckpt = await graph.getState(runConfig(threadId));
+    const raw = ckpt?.values?.todoState as string | undefined;
     if (!raw) return;
     const parsed = JSON.parse(raw) as {
       steps?: Array<{ id: number; label: string; status: string }>;
@@ -373,15 +369,10 @@ async function runGraph(
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
         }
-      }
-      // updateTodo 节点在 tools 之后运行，此时 todoState 才真正更新 →
-      // 直接取节点输出的 todoState 下发完整清单（plan 首次 / advance 推进都覆盖）。
-      if (nodeName === 'updateTodo') {
-        const rawState = (ev as any)?.data?.output?.todoState as string | undefined;
-        if (rawState) {
-          await sendTodoPlan(threadId, send, rawState);
-        } else if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
-          await sendTodoPlan(threadId, send); // 回退：从 checkpoint 读取
+        // plan_steps / advance_step 现在由自包含的 Command 工具在 tools 节点内更新 todoState，
+        // 此刻 checkpoint 已是最新 → 读取并下发完整清单（plan 首次 / advance 推进都覆盖）。
+        if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
+          await sendTodoPlan(threadId, send);
         }
       }
     } else if (ev.event === 'on_chain_error') {

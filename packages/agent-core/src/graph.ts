@@ -5,9 +5,11 @@ import {
   MemorySaver,
   BaseCheckpointSaver,
   messagesStateReducer,
+  Command,
+  getCurrentTaskInput,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
+import { SystemMessage, ToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -99,6 +101,17 @@ export const PLAN_STEPS_TOOL = 'plan_steps';
 /** TODO 步骤推进工具 */
 export const ADVANCE_STEP_TOOL = 'advance_step';
 
+// ── 工具内访问图状态的类型安全辅助（避免 any）──
+interface ToolRunConfig { toolCall?: { id?: string } }
+/** 从当前图执行上下文读取 todoState（仅在 LangGraph 节点/工具执行期间有效） */
+function currentTodoState(): string | undefined {
+  return (getCurrentTaskInput() as { todoState?: string } | undefined)?.todoState;
+}
+/** 取本次工具调用的 tool_call_id（ToolNode 注入到 config.toolCall） */
+function toolCallId(config: unknown): string | undefined {
+  return (config as ToolRunConfig | undefined)?.toolCall?.id;
+}
+
 const exitSessionSchema = z.object({
   summary: z.string().describe('本次学习的总结评价'),
   score: z.number().min(0).max(100).describe('综合评分(0-100)'),
@@ -115,10 +128,29 @@ const advanceStepSchema = z.object({
   stepId: z.number().int().min(1).describe('已完成步骤的编号（如 1 表示第一步已完成）'),
   note: z.string().optional().describe('完成该步骤的备注，如学生表现等'),
 });
-const advanceStepTool = tool(async ({ stepId }) => {
-  // 注意：实际工具结果会被 updateTodoState 用「更新后的完整 TodoState」覆盖（见 todoToolResult）。
-  // 此处仅为兜底文本，须与状态机一致——调用即推进，不再要求二次确认。
-  return `第 ${stepId} 步已完成，已进入下一步。`;
+// 自包含的状态更新工具：读取当前 todoState → 推进 → 把「更新后的完整 TodoState」
+// 作为工具结果返回（Command 同时更新 todoState 通道与该工具的 ToolMessage）。
+const advanceStepTool = tool(async ({ stepId }, config) => {
+  const id = toolCallId(config);
+  const raw = currentTodoState();
+  const msg = (content: string) => new ToolMessage({ content, tool_call_id: id ?? '' });
+  if (!raw) {
+    return new Command({ update: { messages: [msg(`尚未制定学习计划，请先调用 ${PLAN_STEPS_TOOL} 工具。`)] } });
+  }
+  try {
+    const todo = JSON.parse(raw);
+    const targetId = Number(stepId) || todo.currentStep;
+    const step = todo.steps.find((s: any) => s.id === targetId);
+    if (step) step.status = 'completed';
+    const next = todo.steps.find((s: any) => s.status === 'pending');
+    if (next) { next.status = 'in_progress'; todo.currentStep = next.id; }
+    else { todo.currentStep = todo.steps.length + 1; }
+    const todoState = JSON.stringify(todo);
+    const lead = step ? `✅ 第 ${step.id} 步已完成。` : '✅ 已记录进度。';
+    return new Command({ update: { todoState, messages: [msg(todoToolResult(todoState, lead))] } });
+  } catch {
+    return new Command({ update: { messages: [msg('进度更新失败，请重试。')] } });
+  }
 }, {
   name: ADVANCE_STEP_TOOL,
   description: '当学生确认准备好进入下一步时调用此工具。调用前必须先征得学生同意。',
@@ -130,8 +162,19 @@ const planStepsSchema = z.object({
     label: z.string().describe('步骤描述，如"了解学员基础"、"核心概念讲解"、"例题演练"'),
   })).min(3).describe('TODO 步骤清单，至少 3 步'),
 });
-const planStepsTool = tool(async ({ steps }) => {
-  return `已规划 ${steps.length} 步学习计划。请开始第一步教学。`;
+const planStepsTool = tool(async ({ steps }, config) => {
+  const id = toolCallId(config);
+  const msg = (content: string) => new ToolMessage({ content, tool_call_id: id ?? '' });
+  const existing = currentTodoState();
+  if (existing) {
+    // 已有计划，不重复创建，回显当前进度
+    return new Command({ update: { messages: [msg(todoToolResult(existing, '学习计划已存在。'))] } });
+  }
+  const todoState = JSON.stringify({
+    steps: steps.map((s, i) => ({ id: i + 1, label: s.label, status: i === 0 ? 'in_progress' : 'pending' })),
+    currentStep: 1,
+  });
+  return new Command({ update: { todoState, messages: [msg(todoToolResult(todoState, `✅ 学习计划已制定（共 ${steps.length} 步）。`))] } });
 }, {
   name: PLAN_STEPS_TOOL,
   description: '根据学习内容规划 TODO 步骤清单（至少 3 步）。教学开始前必须先调用此工具设定学习计划。',
@@ -181,8 +224,14 @@ const switchModeTools: any[] = [
 
 /** 学科切换工具（模型可主动切换当前教学学科） */
 export const SWITCH_SUBJECT_TOOL = 'switch_subject';
-const switchSubjectTool = tool(async ({ subject }) => {
-  return `已切换到 ${subject} 学科。知识库已更新。`;
+const switchSubjectTool = tool(async ({ subject }, config) => {
+  // 自包含：直接更新 subject 状态通道，并返回确认结果
+  return new Command({
+    update: {
+      subject,
+      messages: [new ToolMessage({ content: `已切换到 ${subject} 学科。知识库已更新。`, tool_call_id: toolCallId(config) ?? '' })],
+    },
+  });
 }, {
   name: SWITCH_SUBJECT_TOOL,
   description: '将当前教学学科切换到指定学科。当用户询问其他学科内容、或教学需要跨学科知识时调用此工具。调用后系统会自动更新知识库和界面风格。',
@@ -418,70 +467,9 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     return state.questionResumeType === 'skip' ? '__end__' : 'agent';
   }
 
-  // ── 节点：TODO 状态更新（在 ToolNode 之后运行）─
-  const updateTodoState = async (state: State): Promise<Partial<State>> => {
-    // 找到最后一个 AIMessage 的 tool_calls
-    let aiMsg: AIMessage | undefined;
-    for (let i = state.messages.length - 1; i >= 0; i--) {
-      if (isAIMessage(state.messages[i])) { aiMsg = state.messages[i] as AIMessage; break; }
-    }
-    if (!aiMsg?.tool_calls?.length) return {};
-
-    // 构造覆盖回 ToolNode 产出的 ToolMessage：复用其 id，messagesStateReducer 会按 id 替换，
-    // 从而把「更新后的完整 TodoState」作为该工具的结果喂回模型。
-    const overwriteToolMessage = (toolCallId: string | undefined, content: string) => {
-      const existing = toolCallId
-        ? state.messages.find((m) => isToolMessage(m) && (m as ToolMessage).tool_call_id === toolCallId) as ToolMessage | undefined
-        : undefined;
-      // 必须有 existing.id 才能让 messagesStateReducer 按 id 替换；否则会追加成重复的
-      // tool 结果（同一 tool_call 两个响应），故放弃覆盖、依赖 system prompt 中的进度。
-      if (!existing?.id) return undefined;
-      return new ToolMessage({ id: existing.id, tool_call_id: toolCallId!, content });
-    };
-
-    const planCall = aiMsg.tool_calls.find((c: any) => c.name === PLAN_STEPS_TOOL);
-    if (planCall && !state.todoState) {
-      const args = planCall.args as { steps?: Array<{ label: string }> } | undefined;
-      if (args?.steps?.length) {
-        const todoState = JSON.stringify({
-          steps: args.steps.map((s: any, i: number) => ({
-            id: i + 1, label: s.label,
-            status: i === 0 ? 'in_progress' : 'pending',
-          })),
-          currentStep: 1,
-        });
-        const msg = overwriteToolMessage(planCall.id, todoToolResult(todoState, `✅ 学习计划已制定（共 ${args.steps.length} 步）。`));
-        return msg ? { todoState, messages: [msg] } : { todoState };
-      }
-    }
-
-    const advanceCall = aiMsg.tool_calls.find((c: any) => c.name === ADVANCE_STEP_TOOL);
-    if (advanceCall && state.todoState) {
-      try {
-        const todo = JSON.parse(state.todoState);
-        const stepId = Number((advanceCall.args as any)?.stepId) || todo.currentStep;
-        const step = todo.steps.find((s: any) => s.id === stepId);
-        if (step) step.status = 'completed';
-        const nextStep = todo.steps.find((s: any) => s.status === 'pending');
-        if (nextStep) { nextStep.status = 'in_progress'; todo.currentStep = nextStep.id; }
-        else { todo.currentStep = todo.steps.length + 1; }
-        const todoState = JSON.stringify(todo);
-        const lead = step ? `✅ 第 ${step.id} 步已完成。` : '✅ 已记录进度。';
-        const msg = overwriteToolMessage(advanceCall.id, todoToolResult(todoState, lead));
-        return msg ? { todoState, messages: [msg] } : { todoState };
-      } catch {}
-    }
-
-    const subjectCall = aiMsg.tool_calls.find((c: any) => c.name === SWITCH_SUBJECT_TOOL);
-    if (subjectCall) {
-      const args = subjectCall.args as { subject?: string } | undefined;
-      if (args?.subject) {
-        return { subject: args.subject as any };
-      }
-    }
-
-    return {};
-  };
+  // 说明：原 updateTodo 节点已移除。plan_steps / advance_step / switch_subject
+  // 改为自包含的 Command 型工具，在 ToolNode 内直接读取并更新 todoState / subject，
+  // 并把「更新后的完整 TodoState」作为工具结果返回（见上方工具定义）。
 
   // ── ToolNode（仅执行无需学生输入的工具）───────────────────
   // 出题工具由 awaitQuestion 的 interrupt/Command 协议处理，不会自动执行。
@@ -495,7 +483,6 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     .addNode('agent', callModel)
     .addNode('tools', toolNode)
     .addNode('awaitQuestion', awaitQuestion)
-    .addNode('updateTodo', updateTodoState)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'agent')
@@ -504,8 +491,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       awaitQuestion: 'awaitQuestion',
       __end__: '__end__',
     })
-    .addEdge('tools', 'updateTodo')
-    .addEdge('updateTodo', 'agent')
+    .addEdge('tools', 'agent')
     .addConditionalEdges('awaitQuestion', continueAfterQuestion, {
       agent: 'agent',
       __end__: '__end__',
