@@ -64,7 +64,7 @@ const ELO_K_BASE = 6;
 const ELO_SCALING = 15;      // logistic scaling factor
 const ELO_DEFAULT_DIFFICULTY = 50;
 
-/** 各模式下对 Elo K-factor 的倍增器（不是直接控制 observed，而是控制更新幅度的权重） */
+/** 各模式下对 K-factor 的倍增器（只影响更新幅度，不扭曲观测值 observed） */
 export const MODE_ELO_MULTIPLIERS: Record<string, number> = {
   qa: 1.0,
   preview: 0.7,
@@ -122,8 +122,8 @@ export function computeProficiencyDelta(
   const now = Math.floor(Date.now() / 1000);
   const sigmaBefore = applyForgetting(oldSigma, lastUpdated, now);
   const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
-  const modeMult = MODE_ELO_MULTIPLIERS[mode] ?? 1.0;
-  const observed = maxScore > 0 ? Math.min(1, (score / maxScore) * modeMult) : 0;
+  // observed 只用原始正确率，modeMult 只影响 K（通过 updateRatingElo → computeKFactor）
+  const observed = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
   const { newRating, newSigma, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, mode);
   return { newRating: Math.round(newRating), newSigma, delta: Math.round(delta * 10) / 10 };
 }
@@ -296,9 +296,8 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
   // 2. 期望正确率
   const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
 
-  // 3. 观测值：得分比例 × 模式倍数
-  const modeMult = MODE_ELO_MULTIPLIERS[modeKey] ?? 1.0;
-  const observed = maxScore > 0 ? Math.min(1, (score / maxScore) * modeMult) : 0;
+  // 3. 观测值：原始正确率（modeMult 只影响 K，不直接影响 observed）
+  const observed = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
 
   // 4. Elo 更新
   const { newRating, newSigma, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, modeKey);
