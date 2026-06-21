@@ -1928,18 +1928,20 @@ async function autoCollectMistakes(
       now,
     );
 
-    // 知识点映射
+    // 知识点映射（before 取答题前的值，after 取 DB 当前值）
     const kpTitle = q.knowledgePoint;
-    if (kpTitle) {
-      const node = findKnowledgePointNode(kpTitle, subject);
-      if (node) {
-        // 读取当前熟练度（考试判分时已更新，此处记录到错题映射中）
-        const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
-        const afterScore = profRow?.weighted_score ?? null;
-        db.prepare(`
-          INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
-          VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
-        `).run(id, node.id, afterScore, afterScore, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
+    if (kpTitle && results.proficiencyChanges) {
+      const qBefore = results.proficiencyChanges.find(p => p.kpTitle === kpTitle);
+      if (qBefore) {
+        const node = findKnowledgePointNode(kpTitle, subject);
+        if (node) {
+          const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+          const afterScore = profRow?.weighted_score ?? null;
+          db.prepare(`
+            INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
+            VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
+          `).run(id, node.id, qBefore.before, afterScore, JSON.stringify({ evidence: `exam:${examId}`, source: 'auto_collect' }));
+        }
       }
     }
 

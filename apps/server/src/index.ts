@@ -1579,6 +1579,8 @@ function autoCollectChatMistake(
   answer: AnswerPayload,
   result: { correct: boolean | null; score: number; maxScore: number; reference?: string; explanation?: string; knowledgePoints?: string[]; knowledgePointId?: number },
   chatModel?: BaseChatModel,
+  /** 答题前的熟练度分数（用于 before_score，未传则读 DB 当前值） */
+  beforeProficiencyScore?: number | null,
 ): void {
   // 仅归集得分率 < 60% 的题目
   if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
@@ -1633,7 +1635,7 @@ function autoCollectChatMistake(
       now,
     );
 
-    // 知识点映射
+    // 知识点映射（before 用传入的前值，after 读 DB 当前值）
     if (result.knowledgePointId && knowledgePoint) {
       const node = db.prepare("SELECT id FROM kg_nodes WHERE id=? AND type='knowledge_point' AND subject=?")
         .get(result.knowledgePointId, subject) as { id: number } | undefined;
@@ -1643,7 +1645,7 @@ function autoCollectChatMistake(
         db.prepare(`
           INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
           VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
-        `).run(id, node.id, afterScore, afterScore, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
+        `).run(id, node.id, beforeProficiencyScore ?? afterScore, afterScore, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
       }
     }
 
@@ -1715,6 +1717,13 @@ app.post('/api/answer', async (c) => {
         ...JSON.parse(toolContent),
         databaseTaxonomy: taxonomy,
       });
+
+      // 先读取答题前的熟练度（供错题归集用，必须在画像更新前）
+      let beforeProfScore: number | null = null;
+      if (userId && result.knowledgePointId) {
+        const br = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, result.knowledgePointId) as { weighted_score: number } | undefined;
+        if (br) beforeProfScore = br.weighted_score;
+      }
 
       // 更新知识画像：只使用经数据库校验的知识点 ID。
       const profChanges: Array<{ kp: string; before: number; after: number }> = [];
@@ -1800,7 +1809,7 @@ app.post('/api/answer', async (c) => {
         const chatSubject = (state.values as any)?.subject ?? 'math';
         const chatGrade = String((state.values as any)?.grade ?? '7');
         const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
-        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model);
+        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore);
       } catch { /* 归集失败不影响主流程 */ }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂
