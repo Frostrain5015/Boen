@@ -1691,8 +1691,8 @@ app.post('/api/answer', async (c) => {
         throw new Error('题目已结束或与当前等待作答的题目不匹配，请重新开始一轮。');
       }
 
-      // 简答题走 LLM 语义评分（只有简答题需要，避免不必要开销）
-      const shortAnswerGrader = target.name === 'ask_short_answer' ? createShortAnswerGrader(model) : undefined;
+      // 简答题/填空题走 LLM 语义评分（填空题的模糊匹配无法覆盖数学表达式等价性等场景）
+      const shortAnswerGrader = (target.name === 'ask_short_answer' || target.name === 'ask_fill_blank') ? createShortAnswerGrader(model) : undefined;
 
       // 判分
       const { result, toolContent } = await gradeAnswer(target.name, target.args, body.answer, shortAnswerGrader);

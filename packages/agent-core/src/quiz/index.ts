@@ -237,26 +237,60 @@ export async function gradeAnswer(
     result = commonResult({ correct, score: correct ? 1 : 0, maxScore: 1, reference: refText, explanation: a.explanation });
   } else if (toolName === 'ask_fill_blank' && answer.type === 'fill_blank') {
     const a = fillBlankSchema.parse(rawArgs);
-    const detailedResults = a.blanks.map((b, i) =>
-      fuzzyMatchBlankDetailed(answer.answers[i] ?? '', b.acceptedAnswers),
-    );
-    const perBlank = detailedResults.map((r) => r.matched);
-    const score = perBlank.filter(Boolean).length;
     const reference = a.blanks.map((b, i) => `空${i + 1}：${b.acceptedAnswers.join(' / ')}`).join('；');
-    result = commonResult({
-      correct: perBlank.every(Boolean),
-      score,
-      maxScore: a.blanks.length,
-      reference,
-      explanation: a.explanation,
-      perBlank,
-      perBlankDetails: detailedResults.map((r) => ({
-        matched: r.matched,
-        level: r.level,
-        userNorm: r.userNorm,
-        acceptedNorms: r.acceptedNorms,
-      })),
-    });
+    if (gradeShortAnswer) {
+      // LLM 语义评分：逐空调用 LLM 判断等价性（可覆盖模糊匹配无法处理的场景）
+      const perBlank: boolean[] = [];
+      const perBlankDetails: Array<{ matched: boolean; level: string; userNorm: string; acceptedNorms: string[] }> = [];
+      for (let i = 0; i < a.blanks.length; i++) {
+        const userAns = answer.answers[i] ?? '';
+        const graderResult = await gradeShortAnswer({
+          stem: a.stem,
+          referenceAnswer: a.blanks[i].acceptedAnswers.join(' / '),
+          keyPoints: null,
+          userAnswer: userAns,
+          maxScore: 1,
+        });
+        perBlank.push(graderResult.correct ?? false);
+        perBlankDetails.push({
+          matched: graderResult.correct ?? false,
+          level: graderResult.correct ? 'exact' : 'llm_mismatch',
+          userNorm: userAns,
+          acceptedNorms: a.blanks[i].acceptedAnswers,
+        });
+      }
+      const score = perBlank.filter(Boolean).length;
+      result = commonResult({
+        correct: perBlank.every(Boolean),
+        score,
+        maxScore: a.blanks.length,
+        reference,
+        explanation: a.explanation,
+        perBlank,
+        perBlankDetails,
+      });
+    } else {
+      // 无 LLM 评分器时回退到模糊匹配
+      const detailedResults = a.blanks.map((b, i) =>
+        fuzzyMatchBlankDetailed(answer.answers[i] ?? '', b.acceptedAnswers),
+      );
+      const perBlank = detailedResults.map((r) => r.matched);
+      const score = perBlank.filter(Boolean).length;
+      result = commonResult({
+        correct: perBlank.every(Boolean),
+        score,
+        maxScore: a.blanks.length,
+        reference,
+        explanation: a.explanation,
+        perBlank,
+        perBlankDetails: detailedResults.map((r) => ({
+          matched: r.matched,
+          level: r.level,
+          userNorm: r.userNorm,
+          acceptedNorms: r.acceptedNorms,
+        })),
+      });
+    }
   } else if (toolName === 'ask_true_false' && answer.type === 'true_false') {
     const a = trueFalseSchema.parse(rawArgs);
     const correct = answer.value === a.answer;
