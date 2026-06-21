@@ -80,10 +80,7 @@ export const useUiStore = defineStore('ui', () => {
         { type: 'vocabulary', label: '\u5355\u8bcd\u5b66\u4e60', hint: '\u5f00\u59cb\u5355\u8bcd\u5b66\u4e60' },
       ],
     };
-    // \u901a\u7528\u6a21\u5f0f\u4e0b\u663e\u793a\u6240\u6709\u5b66\u79d1\u7684\u5168\u90e8\u4e13\u9879\u7ec3\u4e60
-    if (!activeMode.value || activeMode.value === 'none') {
-      return Object.values(all).flat();
-    }
+    // \u53ea\u663e\u793a\u5f53\u524d\u5b66\u79d1\u5339\u914d\u7684\u4e13\u9879\u7ec3\u4e60\uff08\u4e0d\u8de8\u5b66\u79d1\u5c55\u793a\uff09
     return all[subject.value] ?? [];
   });
 
