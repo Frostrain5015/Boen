@@ -547,7 +547,7 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   const related: string[] = [];
   const compactCandidates = '';
   const concisePrompt = [
-    'Extract every question from this school-paper OCR text. Return only a compact JSON array.',
+    'Extract every question from this school-paper OCR text. Return a JSON object with a "questions" field containing the array.',
     'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, isCorrect, confidence, questionType, difficulty, scenarioType, reasoningPattern, distractorPattern, styleText, and knowledgeNodes.',
     'isCorrect is a boolean judging whether the student actually answered correctly. Word/application problems: the student often writes full working such as "740-492=248(个) 答：北区有248个洞窟。" while the reference answer is terse like "248个" — judge by whether the final result is right, never by text overlap. When correct, set isCorrect=true and errorType="none". Set isCorrect=false only for genuine errors; if the student left the answer blank, set isCorrect=false and errorType="unanswered".',
     'questionType MUST be one of the Chinese enum: 选择题/填空题/判断题/计算题/应用题/解答题/阅读题/其他 (never English).',
@@ -565,8 +565,10 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
     new HumanMessage(concisePrompt),
   ]);
   const conciseContent = typeof conciseResponse.content === 'string' ? conciseResponse.content : String(JSON.stringify(conciseResponse.content ?? null));
-  const conciseParsed = safeParseJson(String(conciseContent || '[]'));
-  return Array.isArray(conciseParsed) ? conciseParsed as AnalysisJson[] : conciseParsed ? [conciseParsed as AnalysisJson] : [];
+  const conciseParsed = safeParseJson(String(conciseContent || '{}'));
+  // 兼容裸数组（旧版 DS）和 {"questions": [...]}（Kimi JSON Mode）
+  const arr = Array.isArray(conciseParsed) ? conciseParsed : (conciseParsed && typeof conciseParsed === 'object' ? (conciseParsed as any).questions ?? (conciseParsed as any).items ?? [conciseParsed] : []);
+  return arr as AnalysisJson[];
 
   const candidateText = params.candidates
     .slice(0, 24)
@@ -1093,23 +1095,25 @@ async function consolidateBatchSkills(
     `你是出题风格归纳器。以下是同一批 ${subject} ${grade}年级 题目的风格信息。`,
     `请激进地把它们归并成【最多 ${MAX_BATCH_SKILLS} 个】可复用的"出题风格技能"：相似的题型/情境/推理结构必须合并为一条，绝不逐题罗列。`,
     '每个技能字段：questionType(中文枚举:选择题/填空题/判断题/计算题/应用题/解答题/阅读题/其他)、difficulty(easy|medium|hard)、scenarioType(具体情境,如"购物找零""行程问题")、reasoningPattern(核心推理结构)、distractorPattern(常见易错/干扰点)、styleText(50字内泛化风格摘要,只描述结构与风格,不含具体数字或原文)。',
-    '严格输出 JSON 数组，不要解释、不要 Markdown。',
+    '输出 JSON 对象，skills 字段为技能数组，如 {"skills": [...]}。不要解释、不要 Markdown。',
     '题目风格信息：',
     questionSummaries.slice(0, 80).map((s, i) => `${i + 1}. ${s}`).join('\n'),
   ].join('\n\n');
   const resp = await model.invoke([
-    new SystemMessage('你只输出可解析 JSON 数组。'),
+    new SystemMessage('你只输出可解析 JSON。'),
     new HumanMessage(prompt),
   ]);
   const content = typeof resp.content === 'string' ? resp.content : String(JSON.stringify(resp.content ?? null));
   let parsed: unknown;
   try {
-    parsed = safeParseJson(String(content || '[]'));
+    parsed = safeParseJson(String(content || '{}'));
   } catch (err) {
     console.warn('[mistakes] consolidateBatchSkills JSON 解析失败，回退为逐条独立技能。原始响应前 300 字符:', content.slice(0, 300));
     parsed = questionSummaries.map(() => ({}));
   }
-  const arr = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  // 兼容 {"skills": [...]} 和裸数组
+  const skillArr = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? (parsed as any).skills ?? (parsed as any).items ?? [] : []);
+  const arr = Array.isArray(skillArr) ? skillArr : [];
   return arr.slice(0, MAX_BATCH_SKILLS).map(coerceConsolidatedSkill);
 }
 
@@ -1148,7 +1152,7 @@ export async function consolidateGlobalSkills(model: BaseChatModel, subject: str
     `下面是 ${subject} ${grade}年级 已沉淀的 ${rows.length} 个出题风格技能（带编号）。`,
     `请把高度相似的技能聚类合并，输出合并后的技能组，组数明显减少（目标不超过 ${target} 组）。`,
     '每组输出 { memberIndexes:[原编号...], questionType, difficulty(easy|medium|hard), scenarioType, reasoningPattern, distractorPattern, styleText(50字内泛化摘要) }。',
-    '每个原编号必须且只能出现在一组里；不可遗漏、不可重复。严格输出 JSON 数组，不要解释。',
+    '每个原编号必须且只能出现在一组里；不可遗漏、不可重复。输出 JSON 对象，groups 字段放数组。不要解释。',
     '技能列表：',
     listText,
   ].join('\n\n');
@@ -1156,12 +1160,13 @@ export async function consolidateGlobalSkills(model: BaseChatModel, subject: str
   let groups: Array<{ memberIndexes: number[]; skill: ConsolidatedSkill }> = [];
   try {
     const resp = await model.invoke([
-      new SystemMessage('你只输出可解析 JSON 数组。'),
+      new SystemMessage('你只输出可解析 JSON。'),
       new HumanMessage(prompt),
     ]);
     const content = typeof resp.content === 'string' ? resp.content : String(JSON.stringify(resp.content ?? null));
-    const parsed = safeParseJson(String(content || '[]'));
-    const arr = Array.isArray(parsed) ? parsed : [];
+    const parsed = safeParseJson(String(content || '{}'));
+    // 兼容 {"groups": [...]} 和裸数组
+    const arr = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? (parsed as any).groups ?? [] : []) as any[];
     groups = arr.map((g: any) => ({
       memberIndexes: Array.isArray(g?.memberIndexes) ? g.memberIndexes.map(Number).filter(Number.isFinite) : [],
       skill: coerceConsolidatedSkill(g),
