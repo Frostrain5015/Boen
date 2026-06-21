@@ -548,8 +548,10 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   const compactCandidates = '';
   const concisePrompt = [
     'Extract every question from this school-paper OCR text. Return only a compact JSON array.',
-    'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, isCorrect, confidence, questionType, difficulty, and knowledgeNodes.',
+    'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, isCorrect, confidence, questionType, difficulty, scenarioType, reasoningPattern, distractorPattern, styleText, and knowledgeNodes.',
     'isCorrect is a boolean judging whether the student actually answered correctly. Word/application problems: the student often writes full working such as "740-492=248(个) 答：北区有248个洞窟。" while the reference answer is terse like "248个" — judge by whether the final result is right, never by text overlap. When correct, set isCorrect=true and errorType="none". Set isCorrect=false only for genuine errors; if the student left the answer blank, set isCorrect=false and errorType="unanswered".',
+    'questionType MUST be one of the Chinese enum: 选择题/填空题/判断题/计算题/应用题/解答题/阅读题/其他 (never English).',
+    'scenarioType = the concrete real-world context in Chinese (e.g. 购物找零/行程问题/图形周长/分类计数); reasoningPattern = the core reasoning structure (e.g. 逆运算求未知数/分步累加); distractorPattern = the common pitfall/wrong-answer pattern (e.g. 加减混淆/进退位出错); styleText = a generalized style summary within 50 Chinese characters describing structure and style ONLY — never copy specific numbers or original wording. These fields are required for every item.',
     'knowledgeNodes is an array of { kgNodeId, title, role, confidence, evidence }. Only use IDs from the candidate list. Keep explanations under 100 Chinese characters.',
     `Subject: ${params.subject}; grade: ${params.grade}`,
     `Candidates: ${compactCandidates || 'none'}`,
@@ -1054,6 +1056,196 @@ function sedimentGlobalStyleSkill(opts: {
   }
 }
 
+// ── LLM 驱动的风格技能整合 ──
+/** 一次流程最多生成的技能数（激进合并） */
+const MAX_BATCH_SKILLS = 3;
+/** 单桶技能数超过此值触发 LLM 二次整合 */
+const MAX_SKILLS_PER_BUCKET = 12;
+
+/** 合并后的风格技能（与 AnalysisJson 的风格字段同形，可直接喂 buildSkillText） */
+type ConsolidatedSkill = Pick<AnalysisJson, 'questionType' | 'difficulty' | 'scenarioType' | 'reasoningPattern' | 'distractorPattern' | 'styleText'>;
+
+function coerceConsolidatedSkill(s: unknown): ConsolidatedSkill {
+  const o = (s && typeof s === 'object' ? s : {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  return {
+    questionType: str(o.questionType) ?? '其他',
+    difficulty: normalizeDifficulty(o.difficulty),
+    scenarioType: str(o.scenarioType),
+    reasoningPattern: str(o.reasoningPattern),
+    distractorPattern: str(o.distractorPattern),
+    styleText: str(o.styleText),
+  };
+}
+
+/**
+ * 把一份作业里多道题的风格信息激进归并成 ≤MAX_BATCH_SKILLS 个可复用技能。
+ * 相似题型/情境/推理结构必须合并为一条，不逐题罗列。
+ */
+async function consolidateBatchSkills(
+  model: BaseChatModel,
+  questionSummaries: string[],
+  subject: string,
+  grade: string,
+): Promise<ConsolidatedSkill[]> {
+  if (!questionSummaries.length) return [];
+  const prompt = [
+    `你是出题风格归纳器。以下是同一批 ${subject} ${grade}年级 题目的风格信息。`,
+    `请激进地把它们归并成【最多 ${MAX_BATCH_SKILLS} 个】可复用的"出题风格技能"：相似的题型/情境/推理结构必须合并为一条，绝不逐题罗列。`,
+    '每个技能字段：questionType(中文枚举:选择题/填空题/判断题/计算题/应用题/解答题/阅读题/其他)、difficulty(easy|medium|hard)、scenarioType(具体情境,如"购物找零""行程问题")、reasoningPattern(核心推理结构)、distractorPattern(常见易错/干扰点)、styleText(50字内泛化风格摘要,只描述结构与风格,不含具体数字或原文)。',
+    '严格输出 JSON 数组，不要解释、不要 Markdown。',
+    '题目风格信息：',
+    questionSummaries.slice(0, 80).map((s, i) => `${i + 1}. ${s}`).join('\n'),
+  ].join('\n\n');
+  const resp = await model.invoke([
+    new SystemMessage('你只输出可解析 JSON 数组。'),
+    new HumanMessage(prompt),
+  ]);
+  const content = typeof resp.content === 'string' ? resp.content : String(JSON.stringify(resp.content ?? null));
+  const parsed = safeParseJson(String(content || '[]'));
+  const arr = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+  return arr.slice(0, MAX_BATCH_SKILLS).map(coerceConsolidatedSkill);
+}
+
+/** 把整合出的技能逐个 embedding 后沉淀进全局库（create-or-reinforce） */
+async function sedimentConsolidatedSkills(skills: ConsolidatedSkill[], subject: string, grade: string, userId: string): Promise<void> {
+  for (const skill of skills) {
+    const skillText = buildSkillText(skill);
+    let vector: number[] | null = null;
+    try {
+      const [v] = await embedTexts([skillText]);
+      vector = v ?? null;
+    } catch {
+      vector = null;
+    }
+    sedimentGlobalStyleSkill({ subject, grade, userId, kgNodeId: null, analysis: skill, vector });
+  }
+}
+
+/**
+ * LLM 二次整合：当某桶技能过多时，把高度相似的技能聚类合并，计数累加保留，明显收敛技能数。
+ * 返回 { before, after }。失败时安全 no-op。
+ */
+export async function consolidateGlobalSkills(model: BaseChatModel, subject: string, grade: string): Promise<{ before: number; after: number }> {
+  const rows = db.prepare(`
+    SELECT id, skill_text, reinforce_count, distinct_user_count, source_user_ids, kg_node_id, created_at
+    FROM style_skills WHERE subject=? AND grade=? ORDER BY reinforce_count DESC, id
+  `).all(subject, grade) as Array<{
+    id: number; skill_text: string; reinforce_count: number; distinct_user_count: number;
+    source_user_ids: string | null; kg_node_id: number | null; created_at: number;
+  }>;
+  if (rows.length <= MAX_BATCH_SKILLS) return { before: rows.length, after: rows.length };
+
+  const target = Math.max(MAX_BATCH_SKILLS, Math.ceil(rows.length / 3));
+  const listText = rows.map((r, i) => `${i + 1}. ${r.skill_text.replace(/\s+/g, ' ').slice(0, 120)}`).join('\n');
+  const prompt = [
+    `下面是 ${subject} ${grade}年级 已沉淀的 ${rows.length} 个出题风格技能（带编号）。`,
+    `请把高度相似的技能聚类合并，输出合并后的技能组，组数明显减少（目标不超过 ${target} 组）。`,
+    '每组输出 { memberIndexes:[原编号...], questionType, difficulty(easy|medium|hard), scenarioType, reasoningPattern, distractorPattern, styleText(50字内泛化摘要) }。',
+    '每个原编号必须且只能出现在一组里；不可遗漏、不可重复。严格输出 JSON 数组，不要解释。',
+    '技能列表：',
+    listText,
+  ].join('\n\n');
+
+  let groups: Array<{ memberIndexes: number[]; skill: ConsolidatedSkill }> = [];
+  try {
+    const resp = await model.invoke([
+      new SystemMessage('你只输出可解析 JSON 数组。'),
+      new HumanMessage(prompt),
+    ]);
+    const content = typeof resp.content === 'string' ? resp.content : String(JSON.stringify(resp.content ?? null));
+    const parsed = safeParseJson(String(content || '[]'));
+    const arr = Array.isArray(parsed) ? parsed : [];
+    groups = arr.map((g: any) => ({
+      memberIndexes: Array.isArray(g?.memberIndexes) ? g.memberIndexes.map(Number).filter(Number.isFinite) : [],
+      skill: coerceConsolidatedSkill(g),
+    })).filter((g) => g.memberIndexes.length > 0);
+  } catch (err) {
+    console.warn('[mistakes] 二次整合 LLM 调用失败（跳过）:', err instanceof Error ? err.message : String(err));
+    return { before: rows.length, after: rows.length };
+  }
+
+  // 校验分组覆盖：每个编号恰好出现一次，否则放弃（安全 no-op）
+  const seen = new Set<number>();
+  let valid = groups.length > 0 && groups.length < rows.length;
+  for (const g of groups) {
+    for (const idx of g.memberIndexes) {
+      if (idx < 1 || idx > rows.length || seen.has(idx)) { valid = false; break; }
+      seen.add(idx);
+    }
+  }
+  if (!valid || seen.size !== rows.length) {
+    console.warn('[mistakes] 二次整合分组未完整覆盖，跳过');
+    return { before: rows.length, after: rows.length };
+  }
+
+  // embedding 不能在 sqlite 事务里 await：先把每组合并技能的向量算好（失败用首个成员旧向量兜底，保证 NOT NULL）
+  const prepared: Array<{ members: typeof rows; skill: ConsolidatedSkill; embedding: Buffer }> = [];
+  for (const g of groups) {
+    const members = g.memberIndexes.map((i) => rows[i - 1]);
+    const skillText = buildSkillText(g.skill);
+    let embedding: Buffer | null = null;
+    try {
+      const [v] = await embedTexts([skillText]);
+      embedding = v ? vectorToBlob(v) : null;
+    } catch {
+      embedding = null;
+    }
+    if (!embedding) {
+      const fallback = db.prepare(`SELECT embedding FROM style_skills WHERE id=?`).get(members[0].id) as { embedding: Buffer } | undefined;
+      embedding = fallback?.embedding ?? null;
+    }
+    if (!embedding) {
+      console.warn('[mistakes] 二次整合无法获得向量，跳过');
+      return { before: rows.length, after: rows.length };
+    }
+    prepared.push({ members, skill: g.skill, embedding });
+  }
+
+  const now = nowSec();
+  db.transaction(() => {
+    for (const { members, skill, embedding } of prepared) {
+      const reinforce = members.reduce((s, m) => s + m.reinforce_count, 0);
+      const users = new Set<string>();
+      for (const m of members) for (const u of (m.source_user_ids ? safeJson<string[]>(m.source_user_ids, []) : [])) users.add(u);
+      const distinctUsers = Math.max(users.size, ...members.map((m) => m.distinct_user_count));
+      const kgNodeId = members.find((m) => m.kg_node_id != null)?.kg_node_id ?? null;
+      const createdAt = Math.min(...members.map((m) => m.created_at));
+      for (const m of members) db.prepare(`DELETE FROM style_skills WHERE id=?`).run(m.id);
+      db.prepare(`
+        INSERT INTO style_skills (
+          subject, grade, kg_node_id, question_type, difficulty, skill_text,
+          embedding, reinforce_count, distinct_user_count, source_user_ids, quality_weight,
+          created_at, updated_at, last_seen_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        subject, grade, kgNodeId,
+        skill.questionType ?? '其他',
+        normalizeDifficulty(skill.difficulty),
+        buildSkillText(skill),
+        embedding,
+        reinforce, distinctUsers,
+        JSON.stringify([...users].slice(0, STYLE_SKILL_SOURCE_USER_CAP)),
+        computeStyleSkillWeight(reinforce, distinctUsers),
+        createdAt, now, now,
+      );
+    }
+  })();
+  return { before: rows.length, after: prepared.length };
+}
+
+/** 桶内技能数超阈值时触发 LLM 二次整合 */
+async function maybeConsolidateBucket(model: BaseChatModel, subject: string, grade: string): Promise<void> {
+  const count = (db.prepare(`SELECT COUNT(*) AS c FROM style_skills WHERE subject=? AND grade=?`).get(subject, grade) as { c: number }).c;
+  if (count <= MAX_SKILLS_PER_BUCKET) return;
+  try {
+    const r = await consolidateGlobalSkills(model, subject, grade);
+    console.log(`[mistakes] 二次整合 ${subject}/G${grade}: ${r.before} → ${r.after} 个技能`);
+  } catch (err) {
+    console.warn('[mistakes] 二次整合失败（已忽略）:', err instanceof Error ? err.message : String(err));
+  }
+}
+
 /**
  * 将一道题的分析结果应用到指定 mistake 记录：更新 DB、映射知识点、写熟练度、存风格特征。
  * questionIndex / totalQuestions 用于进度条计算（仅 progress 数值，不做除法）
@@ -1202,15 +1394,11 @@ async function applyAnalysisToMistake(
     }
   }
 
-  // ── 风格特征 ──
+  // ── 风格特征（仅写 per-user 审计行；全局技能改为流程末尾批量 LLM 整合）──
   // 题型沉淀逻辑不受答案正确率判断影响：做对的题同样沉淀出题风格
   await onProgress?.({ step: 'style', message: `沉淀题型风格（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
   if (status === 'analyzed' || isCorrect) {
-    const { vector } = await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
-    // 复用刚算好的向量，把风格沉淀进全服务器风格技能库（create-or-reinforce）
-    // 用 detectedSubject 入桶，与错题记录最终学科保持一致
-    const primaryKgNodeId = (mappings.find((m) => m.role === 'primary') ?? mappings[0])?.kgNodeId ?? null;
-    sedimentGlobalStyleSkill({ subject: detectedSubject, grade: row.grade, userId, kgNodeId: primaryKgNodeId, analysis, vector });
+    await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
   }
 
   await onProgress?.({ step: 'complete', message: status === 'analyzed' ? `第 ${questionIndex + 1} 题分析完成` : '错题已保存，需补充知识点', progress: pct(1) });
@@ -1305,6 +1493,28 @@ export async function analyzeMistake(
       ocrProvider, ocrRaw, i, analyses.length, onProgress,
     );
     await onMistake?.(item);
+  }
+
+  // ── 4. 批量整合风格技能：每流程激进合并成 ≤3 个有效技能，沉淀进全局库 ──
+  try {
+    await onProgress?.({ step: 'style', message: '整合并沉淀出题风格技能', progress: 99 });
+    const summaries = analyses
+      .filter((a) => (a.promptText || a.title))
+      .map((a) => [
+        `题型:${a.questionType ?? '?'}`,
+        `难度:${a.difficulty ?? '?'}`,
+        a.scenarioType ? `情境:${a.scenarioType}` : '',
+        a.reasoningPattern ? `推理:${a.reasoningPattern}` : '',
+        a.distractorPattern ? `易错:${a.distractorPattern}` : '',
+        `题面:${(a.promptText || a.title || '').replace(/\s+/g, ' ').slice(0, 60)}`,
+      ].filter(Boolean).join(' '));
+    if (summaries.length) {
+      const skills = await consolidateBatchSkills(model, summaries, effectiveSubject, row.grade);
+      await sedimentConsolidatedSkills(skills, effectiveSubject, row.grade, userId);
+      await maybeConsolidateBucket(model, effectiveSubject, row.grade);
+    }
+  } catch (err) {
+    console.warn('[mistakes] 批量风格技能整合失败（已忽略）:', err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -1503,6 +1713,102 @@ export function backfillStyleSkills(): { created: number; reinforced: number; sc
   }
   const created = (db.prepare(`SELECT COUNT(*) AS c FROM style_skills`).get() as { c: number }).c;
   return { created, reinforced: Math.max(0, scanned - created), scanned };
+}
+
+/** 删除无题面的空壳错题（含级联的风格特征/映射）。dryRun 只统计不删。 */
+export function purgeEmptyMistakes(dryRun = false): { empties: number } {
+  const rows = db.prepare(`SELECT id FROM mistake_items WHERE prompt_text IS NULL OR trim(prompt_text)=''`).all() as Array<{ id: string }>;
+  if (!dryRun && rows.length) {
+    const del = db.prepare(`DELETE FROM mistake_items WHERE id=?`);
+    db.transaction(() => { for (const r of rows) del.run(r.id); })();
+  }
+  return { empties: rows.length };
+}
+
+/**
+ * 清洗重复/高度相似题目，避免重复题干扰技能权重。
+ * 同 用户+学科+年级 桶内：题面归一化完全相同 = 重复；或题面 embedding 余弦≥阈值 = 高度相似。
+ * 保留最早一条，删除其余（级联删风格特征/映射）。dryRun 只统计与给样例。
+ */
+export async function dedupeMistakes(opts: { dryRun?: boolean; threshold?: number } = {}): Promise<{ scanned: number; duplicates: number; kept: number; sample: string[] }> {
+  const dryRun = opts.dryRun ?? false;
+  const threshold = opts.threshold ?? 0.95;
+  const rows = db.prepare(`
+    SELECT id, user_id, subject, grade, prompt_text, created_at
+    FROM mistake_items WHERE prompt_text IS NOT NULL AND trim(prompt_text)<>''
+    ORDER BY created_at ASC, id
+  `).all() as Array<{ id: string; user_id: string; subject: string; grade: string; prompt_text: string; created_at: number }>;
+  if (!rows.length) return { scanned: 0, duplicates: 0, kept: 0, sample: [] };
+
+  let vectors: number[][] = [];
+  try {
+    vectors = await embedTexts(rows.map((r) => r.prompt_text.replace(/\s+/g, ' ').slice(0, 512)));
+  } catch (err) {
+    console.warn('[mistakes] dedupe embedding 失败，仅按归一化精确去重:', err instanceof Error ? err.message : String(err));
+    vectors = [];
+  }
+
+  const dupIds: string[] = [];
+  const sample: string[] = [];
+  const buckets = new Map<string, Array<{ idx: number; norm: string }>>();
+  rows.forEach((r, idx) => {
+    const key = `${r.user_id}|${r.subject}|${r.grade}`;
+    const norm = r.prompt_text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+    const kept = buckets.get(key) ?? [];
+    let dup = false;
+    for (const k of kept) {
+      if (k.norm && k.norm === norm) { dup = true; break; }
+      if (vectors.length && cosineSim(vectors[idx], vectors[k.idx]) >= threshold) { dup = true; break; }
+    }
+    if (dup) {
+      dupIds.push(r.id);
+      if (sample.length < 8) sample.push(r.prompt_text.replace(/\s+/g, ' ').slice(0, 50));
+    } else {
+      kept.push({ idx, norm });
+      buckets.set(key, kept);
+    }
+  });
+
+  if (!dryRun && dupIds.length) {
+    const del = db.prepare(`DELETE FROM mistake_items WHERE id=?`);
+    db.transaction(() => { for (const id of dupIds) del.run(id); })();
+  }
+  return { scanned: rows.length, duplicates: dupIds.length, kept: rows.length - dupIds.length, sample };
+}
+
+/**
+ * 用 LLM 从现存原题重建全局风格技能库（Step 3）。
+ * 清空 style_skills → 按 学科+年级 分桶 → 每桶分块(15题)激进整合成 ≤3 技能 → 沉淀 → 桶内二次整合。
+ */
+export async function rebuildStyleSkillsWithLLM(model: BaseChatModel): Promise<{ buckets: number; skills: number }> {
+  db.exec(`DELETE FROM style_skills`);
+  const buckets = db.prepare(`
+    SELECT DISTINCT subject, grade FROM mistake_items
+    WHERE prompt_text IS NOT NULL AND trim(prompt_text)<>'' AND (status='analyzed' OR is_correct=1)
+  `).all() as Array<{ subject: string; grade: string }>;
+  const CHUNK = 15;
+  for (const b of buckets) {
+    const items = db.prepare(`
+      SELECT user_id, prompt_text, student_answer, correct_answer, error_type, error_reason
+      FROM mistake_items
+      WHERE subject=? AND grade=? AND prompt_text IS NOT NULL AND trim(prompt_text)<>'' AND (status='analyzed' OR is_correct=1)
+      ORDER BY created_at ASC
+    `).all(b.subject, b.grade) as Array<{ user_id: string; prompt_text: string; student_answer: string | null; correct_answer: string | null; error_type: string | null; error_reason: string | null }>;
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const chunk = items.slice(i, i + CHUNK);
+      const summaries = chunk.map((r) => [
+        `题面:${(r.prompt_text || '').replace(/\s+/g, ' ').slice(0, 80)}`,
+        r.student_answer ? `学生:${r.student_answer}` : '',
+        r.correct_answer ? `正确:${r.correct_answer}` : '',
+        (r.error_reason || r.error_type) ? `错因:${r.error_reason || r.error_type}` : '',
+      ].filter(Boolean).join(' '));
+      const skills = await consolidateBatchSkills(model, summaries, b.subject, b.grade);
+      await sedimentConsolidatedSkills(skills, b.subject, b.grade, chunk[0]?.user_id ?? 'rebuild');
+    }
+    await maybeConsolidateBucket(model, b.subject, b.grade);
+  }
+  const skills = (db.prepare(`SELECT COUNT(*) AS c FROM style_skills`).get() as { c: number }).c;
+  return { buckets: buckets.length, skills };
 }
 
 export function formatMistakePracticePrompt(mistake: MistakeItem) {

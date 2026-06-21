@@ -15,7 +15,8 @@
     "seed:weights": "tsx src/kg-weights.ts",
     "verify:curriculum": "tsx src/verify-curriculum.ts",
     "seed:kp": "tsx src/seed-kp.ts",
-    "backfill:style-skills": "tsx src/scripts/backfill-style-skills.ts"
+    "backfill:style-skills": "tsx src/scripts/backfill-style-skills.ts",
+    "skills:clean-rebuild": "tsx src/scripts/clean-rebuild-skills.ts"
   },
   "dependencies": {
     "@alicloud/ocr-api20210707": "^3.1.3",
