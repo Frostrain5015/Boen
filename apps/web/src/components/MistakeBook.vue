@@ -177,6 +177,7 @@ function resetProgress() {
 
 function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
   if (event.type === 'mistake_progress') {
+    console.log('[错题分析] 进度:', event.step, event.message, event.progress);
     activeStep.value = event.step;
     progress.value = event.progress;
     progressMessage.value = event.message;
@@ -186,6 +187,7 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     }
     completedSteps.value = next;
   } else if (event.type === 'mistake_ready') {
+    console.log('[错题分析] 完成, promptText.length:', event.mistake.promptText?.length ?? 0);
     batchMistakes.value.push(event.mistake);
     currentBatchIndex.value = batchMistakes.value.length - 1;
     selectedMistake.value = event.mistake;

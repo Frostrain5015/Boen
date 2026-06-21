@@ -141,6 +141,7 @@ async function streamAuthorizedSse(
   onEvent: (e: AnalyzeMistakeEvent) => void,
 ): Promise<void> {
   const token = getToken();
+  console.log('[SSE] 开始请求', url);
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -148,11 +149,17 @@ async function streamAuthorizedSse(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[SSE] HTTP 错误', res.status, errText);
+    throw new Error(errText);
+  }
   if (!res.body) throw new Error('无响应流');
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let eventCount = 0;
+  let hasError = false;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -163,12 +170,24 @@ async function streamAuthorizedSse(
       const line = frame.split('\n').find((l) => l.startsWith('data:'));
       if (!line) continue;
       try {
-        onEvent(JSON.parse(line.slice(5).trim()) as AnalyzeMistakeEvent);
-      } catch {
+        const parsed = JSON.parse(line.slice(5).trim());
+        eventCount++;
+        if (parsed.type === 'error') {
+          console.error('[SSE] 服务端错误:', parsed.message);
+          hasError = true;
+          throw new Error(parsed.message || '分析失败');
+        }
+        if (parsed.type !== 'mistake_progress' && parsed.type !== 'mistake_ready' && parsed.type !== 'done') {
+          console.log('[SSE] 未知事件类型:', parsed.type, parsed);
+        }
+        onEvent(parsed as AnalyzeMistakeEvent);
+      } catch (e) {
+        if ((e as any)?.message?.startsWith('分析失败') || (e as any)?.message?.includes('OCR')) throw e;
         /* ignore malformed SSE frame */
       }
     }
   }
+  console.log('[SSE] 流结束, 共', eventCount, '个事件, hasError=', hasError);
 }
 
 /** 获取用户的所有对话 */
