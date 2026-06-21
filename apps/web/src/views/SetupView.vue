@@ -150,7 +150,6 @@ function handleBack() {
                 class="w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none transition-colors"
                 style="border-color: var(--line); color: var(--ink)"
                 @focus="($event.target as HTMLElement).style.borderColor = 'var(--accent)'"
-                @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
               />
             </label>
           </div>
