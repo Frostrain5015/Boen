@@ -330,8 +330,9 @@ function aliyunQueryString(params: Record<string, string>): string {
 }
 
 /**
- * 直接调用阿里云 OCR RecognizeEduPaperStructed API（绕过 SDK，
- * 避免 @alicloud/openapi-core v1.0.7 与 Node.js 20 的 stream 兼容问题）。
+ * 调用阿里云 OCR RecognizeEduPaperStructed API。
+ * SDK v3 与 Node.js 20 的 stream 不兼容，改用原生 HTTP 调用。
+ * 图片作为原始 bytes 放在 HTTP body 中（非 form 字段），签名的 query 不包含 body。
  */
 async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grade: string): Promise<OcrResult> {
   const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
@@ -339,10 +340,8 @@ async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grad
   if (!accessKeyId || !accessKeySecret) throw new Error('阿里云 OCR 未配置');
 
   const imageBytes = readFileSync(filePath);
-  const imageBase64 = imageBytes.toString('base64');
-  const imageMime = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
-  // RPC 公共参数 + 业务参数
+  // RPC 公共参数 + 业务参数（图片不参与签名，通过 HTTP body 发送）
   const params: Record<string, string> = {
     Action: 'RecognizeEduPaperStructed',
     Format: 'json',
@@ -357,26 +356,29 @@ async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grad
     OutputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false' ? 'true' : 'false',
   };
 
-  // body 字段放 base64 图片
-  params.body = `data:${imageMime};base64,${imageBase64}`;
-
-  // 计算签名
+  // 计算签名（不含 body）
   const queryStr = aliyunQueryString(params);
   const signStr = `POST&%2F&${encodeURIComponent(queryStr)}`;
   params.Signature = signString(signStr, `${accessKeySecret}&`);
 
-  // 发送 POST 请求
+  // 发送 POST：query 中带签名参数，raw image bytes 作为 body
   const endpoint = process.env.ALIYUN_OCR_ENDPOINT ?? 'ocr-api.cn-hangzhou.aliyuncs.com';
   const finalQuery = aliyunQueryString(params);
-  const response = await fetch(`https://${endpoint}`, {
+  const url = `https://${endpoint}/?${finalQuery}`;
+  console.log(`[OCR] 请求 ${endpoint}, 图片 ${imageBytes.length} bytes, subject=${params.Subject}`);
+  const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: finalQuery,
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: imageBytes,
   });
+  const respText = await response.text();
   if (!response.ok) {
-    throw new Error(`阿里云 OCR HTTP ${response.status}: ${await response.text()}`);
+    console.error(`[OCR] HTTP ${response.status}: ${respText.slice(0, 300)}`);
+    throw new Error(`阿里云 OCR HTTP ${response.status}`);
   }
-  const result = (await response.json()) as any;
+  let result: any;
+  try { result = JSON.parse(respText); } catch { result = { code: '500', message: respText.slice(0, 100) }; }
+  console.log(`[OCR] 响应 code=${result.code}, msg=${String(result.message ?? '').slice(0, 200)}`);
   if (result.code && result.code !== '200') {
     throw new Error(`阿里云 OCR 识别失败：${result.message ?? result.code}`);
   }
@@ -1000,19 +1002,23 @@ export async function analyzeMistake(
   if (row.status === 'archived') throw new Error('错题已归档');
 
   // ── 1. OCR ──
-  await onProgress?.({ step: 'ocr', message: row.source_type === 'text' ? '读取文本录入' : '调用阿里云教育 OCR 识别', progress: 8 });
+  await onProgress?.({ step: 'ocr', message: row.source_type === 'text' ? '读取文本录入' : '调用 OCR 识别', progress: 8 });
   let recognizedText = String(row.prompt_text ?? '').trim();
   let ocrProvider: string | null = row.ocr_provider ?? null;
   let ocrRaw: unknown = row.ocr_raw ? safeJson(row.ocr_raw, {}) : null;
-  if (row.source_type === 'image') {
+  if (!recognizedText.trim() && row.source_type === 'image') {
     const assetPath = getOriginalAssetPath(mistakeId);
     if (!assetPath) throw new Error('找不到原始图片');
     const ocr = await recognizeWithAliyunEduOcr(assetPath, row.subject, row.grade);
     recognizedText = ocr.text || recognizedText;
     ocrProvider = ocr.provider;
     ocrRaw = ocr.raw;
+    // 写回 DB 供前端展示
+    if (recognizedText.trim()) {
+      db.prepare(`UPDATE mistake_items SET prompt_text=?, ocr_provider=?, updated_at=? WHERE id=?`).run(recognizedText, ocrProvider, Math.floor(Date.now() / 1000), mistakeId);
+    }
   }
-  if (!recognizedText.trim()) throw new Error('OCR 未识别到有效题目文本，请换一张更清晰的图片或使用文本补录');
+  if (!recognizedText.trim()) throw new Error('OCR 未识别到有效题目文本，请补充题面后重试');
 
   // ── 2. LLM 分析（返回所有题目） ──
   await onProgress?.({ step: 'analyze', message: 'LLM 识别全部题目', progress: 30 });
