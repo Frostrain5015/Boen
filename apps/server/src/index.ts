@@ -1581,6 +1581,8 @@ function autoCollectChatMistake(
   chatModel?: BaseChatModel,
   /** 答题前的熟练度分数（用于 before_score，未传则读 DB 当前值） */
   beforeProficiencyScore?: number | null,
+  /** 缓存模式下的预期熟练度分数（用于 after_score，优先于 DB 值） */
+  afterExpectedScore?: number | null,
 ): void {
   // 仅归集得分率 < 60% 的题目
   if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
@@ -1627,7 +1629,7 @@ function autoCollectChatMistake(
       correctAnswer,
       (result.explanation ?? toolArgs.explanation ?? '').slice(0, 2000) || null,
       errorType,
-      `对话模式(${mode})作答错误，得分 ${result.score}/${result.maxScore}`,
+      `答题错误（${result.score}/${result.maxScore} 分）`,
       0.3,
       matchScore,
       0,
@@ -1642,10 +1644,11 @@ function autoCollectChatMistake(
       if (node) {
         const profRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
         const afterScore = profRow?.weighted_score ?? null;
+        const finalAfterScore = afterExpectedScore ?? afterScore;
         db.prepare(`
           INSERT OR IGNORE INTO mistake_kp_map (mistake_id, kg_node_id, role, confidence, before_score, after_score, evidence_json)
           VALUES (?, ?, 'primary', 0.7, ?, ?, ?)
-        `).run(id, node.id, beforeProficiencyScore ?? afterScore, afterScore, JSON.stringify({ evidence: `chat:${mode}`, source: 'auto_collect_chat' }));
+        `).run(id, node.id, beforeProficiencyScore ?? finalAfterScore, finalAfterScore, JSON.stringify({ evidence: '来源：课堂对话', source: 'auto_collect_chat' }));
       }
     }
 
@@ -1804,12 +1807,26 @@ app.post('/api/answer', async (c) => {
       // 发送判分结果（含熟练度变化）
       await send({ type: 'grading', toolCallId: body.toolCallId, result });
 
+      // 缓存模式下读取预期熟练度（供错题归集用，比 DB 值更准确）
+      let afterExpectedScore: number | null = null;
+      const isCachedMistake = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(((state.values as any)?.mode as string) ?? '');
+      if (isCachedMistake && userId && result.knowledgePointId) {
+        try {
+          const sum = getCachedProficiencySum(userId, body.threadId, result.knowledgePointId);
+          if (sum && sum.score > 0) {
+            const dbR = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, result.knowledgePointId) as any;
+            const cachedState = getCachedProficiencyExpected(userId, body.threadId, result.knowledgePointId, dbR?.rating ?? 0, dbR?.rating_sigma ?? 20, dbR?.last_updated ?? 0);
+            if (cachedState.rating > 0) afterExpectedScore = cachedState.rating;
+          }
+        } catch { /* 静默 */ }
+      }
+
       // 错题自动归集（得分率 < 60% 时写入错题本）
       try {
         const chatSubject = (state.values as any)?.subject ?? 'math';
         const chatGrade = String((state.values as any)?.grade ?? '7');
         const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
-        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore);
+        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore, afterExpectedScore);
       } catch { /* 归集失败不影响主流程 */ }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂

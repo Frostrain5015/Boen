@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import StarDisplay from '@/components/StarDisplay.vue';
 import {
   AlertCircle,
   ArrowLeft,
@@ -821,7 +822,11 @@ onBeforeUnmount(() => {
                 <div v-else class="space-y-2">
                   <div v-for="m in mappedScoreDelta" :key="m.kgNodeId" class="flex items-center gap-2 rounded-2xl bg-[var(--paper)] px-3 py-2">
                     <span class="min-w-0 flex-1 truncate text-xs font-bold text-[var(--ink)]">{{ m.title }}</span>
-                    <span class="font-display text-xs font-bold" :class="(m.afterScore ?? 0) < (m.beforeScore ?? 0) ? 'text-[var(--error)]' : 'text-[#18a558]'">{{ Math.round(m.beforeScore ?? 0) }} → {{ Math.round(m.afterScore ?? 0) }}</span>
+                    <span class="inline-flex items-center gap-1">
+                      <StarDisplay :score="m.afterScore ?? 0" :animateFrom="m.beforeScore ?? undefined" />
+                      <span v-if="(m.afterScore ?? 0) > (m.beforeScore ?? 0)" class="inline-flex items-center rounded-md bg-[#e7f7ee] px-1 py-0.5 text-[10px] font-bold leading-none text-[#18a558]">↑</span>
+                      <span v-else-if="(m.afterScore ?? 0) < (m.beforeScore ?? 0)" class="inline-flex items-center rounded-md bg-[#fdeaef] px-1 py-0.5 text-[10px] font-bold leading-none text-[#f2557a]">↓</span>
+                    </span>
                   </div>
                 </div>
               </div>
