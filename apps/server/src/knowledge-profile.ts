@@ -245,6 +245,7 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
         update.expectedSigma,
         now,
       );
+      console.log(`[flush] KP#${kgNodeId}: expRating=${update.expectedRating}, score=${update.score}/${update.maxScore}, oldCorr=${oldCorrect}, oldTot=${oldTotal}, before=${before}, toDB=${Math.round(update.expectedRating)}`);
 
       // 前驱反向传播（明显答对时给前驱小幅 boost）
       if (update.expectedRating > ELO_RATING_INIT + 1 || update.score > update.maxScore * 0.6) {

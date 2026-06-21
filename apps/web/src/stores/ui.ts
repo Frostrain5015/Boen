@@ -97,8 +97,8 @@ export const useUiStore = defineStore('ui', () => {
     sessionActive.value = false;
     console.log(`[Boen 类课堂] ✅ 会话结束 — 耗时: ${new Date().toLocaleTimeString()}`);
     activeMode.value = 'none';
-    // 课堂结束保留清单供回看，仅关闭面板；切换/新建对话由 resetTodoList 彻底清空
     todoPanelOpen.value = false;
+    resetTodoList(); // 清空 TODO 清单，按钮回到空态
   }
 
   // ── 课堂进度清单同步 ──────────────────────────────────────
