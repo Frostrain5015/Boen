@@ -1730,39 +1730,29 @@ export function purgeEmptyMistakes(dryRun = false): { empties: number } {
  * 同 用户+学科+年级 桶内：题面归一化完全相同 = 重复；或题面 embedding 余弦≥阈值 = 高度相似。
  * 保留最早一条，删除其余（级联删风格特征/映射）。dryRun 只统计与给样例。
  */
-export async function dedupeMistakes(opts: { dryRun?: boolean; threshold?: number } = {}): Promise<{ scanned: number; duplicates: number; kept: number; sample: string[] }> {
+export async function dedupeMistakes(opts: { dryRun?: boolean } = {}): Promise<{ scanned: number; duplicates: number; kept: number; sample: string[] }> {
   const dryRun = opts.dryRun ?? false;
-  const threshold = opts.threshold ?? 0.95;
-  // 复用 mistake_style_features 里已存好的向量做近似判定，绝不重新 embedding（避免 CPU 打满）。
-  // 没有存量向量的题退化为题面归一化精确去重。
+  // 仅按题面归一化精确去重（只删真正重复上传的同一道题）。
+  // 不用 embedding 近似：现存风格向量多为旧版空壳模板（情境/推理全默认），
+  // 不同题目向量也高度相似，近似去重会误删distinct题。
   const rows = db.prepare(`
-    SELECT mi.id, mi.user_id, mi.subject, mi.grade, mi.prompt_text, mi.created_at,
-           (SELECT sf.embedding FROM mistake_style_features sf WHERE sf.mistake_id = mi.id ORDER BY sf.id DESC LIMIT 1) AS embedding
-    FROM mistake_items mi
-    WHERE mi.prompt_text IS NOT NULL AND trim(mi.prompt_text)<>''
-    ORDER BY mi.created_at ASC, mi.id
-  `).all() as Array<{ id: string; user_id: string; subject: string; grade: string; prompt_text: string; created_at: number; embedding: Buffer | null }>;
+    SELECT id, user_id, subject, grade, prompt_text, created_at
+    FROM mistake_items
+    WHERE prompt_text IS NOT NULL AND trim(prompt_text)<>''
+    ORDER BY created_at ASC, id
+  `).all() as Array<{ id: string; user_id: string; subject: string; grade: string; prompt_text: string; created_at: number }>;
   if (!rows.length) return { scanned: 0, duplicates: 0, kept: 0, sample: [] };
 
   const dupIds: string[] = [];
   const sample: string[] = [];
-  const buckets = new Map<string, Array<{ norm: string; vec: number[] | null }>>();
+  const seen = new Map<string, true>();
   for (const r of rows) {
-    const key = `${r.user_id}|${r.subject}|${r.grade}`;
-    const norm = r.prompt_text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
-    const vec = r.embedding ? blobToVector(r.embedding) : null;
-    const kept = buckets.get(key) ?? [];
-    let dup = false;
-    for (const k of kept) {
-      if (k.norm && k.norm === norm) { dup = true; break; }
-      if (vec && k.vec && cosineSim(vec, k.vec) >= threshold) { dup = true; break; }
-    }
-    if (dup) {
+    const norm = `${r.user_id}|${r.subject}|${r.grade}|` + r.prompt_text.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+    if (seen.has(norm)) {
       dupIds.push(r.id);
       if (sample.length < 8) sample.push(r.prompt_text.replace(/\s+/g, ' ').slice(0, 50));
     } else {
-      kept.push({ norm, vec });
-      buckets.set(key, kept);
+      seen.set(norm, true);
     }
   }
 
