@@ -71,15 +71,21 @@ export function consumeTikzRateLimit(userId: string): void {
 }
 
 function sanitizeRenderedSvg(svg: string): string {
-  if (!/^\s*<svg\b/i.test(svg)) {
+  // dvisvgm 输出以 <?xml ...?> 声明 + 注释开头，先剥离前导 BOM / XML 声明 / 注释，
+  // 再校验主体确为 <svg>，否则下面的 <svg 开头检查会误判为 invalid。
+  const body = svg
+    .replace(/^﻿/, '')
+    .replace(/^\s*<\?xml[^>]*\?>\s*/i, '')
+    .replace(/^(?:\s*<!--[\s\S]*?-->\s*)+/, '');
+  if (!/^\s*<svg\b/i.test(body)) {
     throw new TikzRenderError('renderer returned invalid SVG', 500);
   }
-  if (/<(?:script|foreignObject|iframe|object|embed|audio|video)\b/i.test(svg)
-    || /\son\w+\s*=/i.test(svg)
-    || /\b(?:xlink:)?href\s*=\s*["']\s*(?:javascript:|https?:|file:|data:)/i.test(svg)) {
+  if (/<(?:script|foreignObject|iframe|object|embed|audio|video)\b/i.test(body)
+    || /\son\w+\s*=/i.test(body)
+    || /\b(?:xlink:)?href\s*=\s*["']\s*(?:javascript:|https?:|file:|data:)/i.test(body)) {
     throw new TikzRenderError('renderer returned unsafe SVG', 500);
   }
-  return svg;
+  return body;
 }
 
 function documentFor(code: string): string {
@@ -120,7 +126,9 @@ export async function renderTikzSvg(code: string, requestId: string): Promise<st
         `-output-directory=${tmpDir}`,
         texPath,
       ], { cwd: tmpDir, timeout: 12_000 });
-      await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `-o=${svgPath}`, pdfPath], { cwd: tmpDir, timeout: 8_000 });
+      // 注意：dvisvgm 短选项 -o 不支持 `=` 语法（-o=path 会把文件名当成「=path」导致写入失败，
+      // 且仍返回 exit 0），必须用长选项 --output=path。
+      await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `--output=${svgPath}`, pdfPath], { cwd: tmpDir, timeout: 8_000 });
 
       return sanitizeRenderedSvg(await readFile(svgPath, 'utf8'));
     });

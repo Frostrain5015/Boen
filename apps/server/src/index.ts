@@ -215,10 +215,18 @@ function getPendingQuestion(state: { tasks?: Array<{ interrupts?: Array<{ value?
  * 数据源是 plan_steps/advance_step 工具维护的权威状态机，确保每步状态
  * （pending / in_progress / completed）与服务端一致。
  */
-async function sendTodoPlan(threadId: string, send: (e: SseEvent) => Promise<void>): Promise<void> {
+async function sendTodoPlan(
+  threadId: string,
+  send: (e: SseEvent) => Promise<void>,
+  rawState?: string,
+): Promise<void> {
   try {
-    const ckpt = await graph.getState(runConfig(threadId));
-    const raw = ckpt?.values?.todoState as string | undefined;
+    // 优先用节点输出里的 todoState（避免 checkpoint 写入竞态）；缺失才回读 checkpoint
+    let raw = rawState;
+    if (!raw) {
+      const ckpt = await graph.getState(runConfig(threadId));
+      raw = ckpt?.values?.todoState as string | undefined;
+    }
     if (!raw) return;
     const parsed = JSON.parse(raw) as {
       steps?: Array<{ id: number; label: string; status: string }>;
@@ -233,6 +241,7 @@ async function sendTodoPlan(threadId: string, send: (e: SseEvent) => Promise<voi
         'pending' | 'in_progress' | 'completed',
     }));
     await send({ type: 'todo_plan', steps, currentStep: parsed.currentStep ?? 1 });
+    console.log(`[Boen 类课堂] 📋 todo_plan 下发 — ${steps.length} 步，当前第 ${parsed.currentStep ?? 1} 步 | ${new Date().toLocaleTimeString()}`);
   } catch { /* 解析失败则跳过本次下发 */ }
 }
 
@@ -364,9 +373,15 @@ async function runGraph(
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
         }
-        // plan_steps / advance_step 改动了 todoState → 重新读取最新清单并实时下发
-        if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
-          await sendTodoPlan(threadId, send);
+      }
+      // updateTodo 节点在 tools 之后运行，此时 todoState 才真正更新 →
+      // 直接取节点输出的 todoState 下发完整清单（plan 首次 / advance 推进都覆盖）。
+      if (nodeName === 'updateTodo') {
+        const rawState = (ev as any)?.data?.output?.todoState as string | undefined;
+        if (rawState) {
+          await sendTodoPlan(threadId, send, rawState);
+        } else if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
+          await sendTodoPlan(threadId, send); // 回退：从 checkpoint 读取
         }
       }
     } else if (ev.event === 'on_chain_error') {
