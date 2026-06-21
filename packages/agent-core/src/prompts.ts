@@ -291,6 +291,8 @@ export function systemPromptForPractice(type: PracticeType, gradeBand: GradeBand
     '- 必须调用出题工具出题（ask_multiple_choice / ask_fill_blank / ask_short_answer），不要把题目写在文字回复里。写在文字里的题目无法记录到学生的知识画像中。',
     '- 每道题作答后必须标注错因，不能只打对错',
     '- 练习结束后给出本次小结和下次复习建议',
+    '- 【⚠️ 出题强制令】需要出题时，必须调用出题工具出题，不要写在文字回复里。',
+    '- 【计划强制令】开始教学前，你必须首先调用 plan_steps 工具来规划至少 3 步 TODO，然后再开始教学。未规划步骤前，advance_step 无法使用。',
     '- 【步骤推进强制令】你**必须**在完成每一步后调用 advance_step 工具。**未完成的步骤内容被隐藏了（显示为"？？？"），不调工具就看不到。** 完成当前步 → 调 advance_step → 系统显示下一步。',
     '- 【⚠️ exit_session 强制令】**全部步骤完成后，必须调用 exit_session 工具结束学习并提交评分。** 如果学生中途提前结束，也调用 exit_session 按已完成步数如实评分。不调用 exit_session = 学习未正式结束。',
     '- 【⚠️ 学科切换强制令】学生的问题属于其他学科时（如英语练习中突然问数学），**必须立即调用 switch_subject 工具切换到对应学科**，不得以"我是XX学科助手"为由拒绝回答。切换后知识库自动更新。',

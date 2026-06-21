@@ -352,7 +352,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
         const pending = state.pendingModeSwitch;
         if (pending.startsWith('practice:')) {
           const type = pending.split(':')[1] ?? 'mental-arithmetic';
-          return { mode: 'qa', practiceType: type, forceQuiz: false, pendingModeSwitch: undefined };
+          return { mode: 'practice', practiceType: type, forceQuiz: false, pendingModeSwitch: undefined };
         }
         return { mode: pending as BoenMode, forceQuiz: false, quizTool: undefined, reviewPhase: 'teaching', pendingModeSwitch: undefined };
       }
