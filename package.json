@@ -11,12 +11,18 @@
   "scripts": {
     "dev": "npm run dev --workspace @boen/server & npm run dev --workspace @boen/web",
     "dev:server": "npm run dev --workspace @boen/server",
-    "dev:web": "npm run dev --workspace @boen/web"
+    "dev:web": "npm run dev --workspace @boen/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:stress": "vitest run apps/server/src/__tests__/stress.test.ts --reporter=verbose"
   },
   "engines": {
     "node": ">=20"
   },
   "overrides": {
     "better-sqlite3": "^12.11.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.9"
   }
 }
