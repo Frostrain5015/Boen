@@ -566,7 +566,49 @@ export function listMistakes(userId: string, filters: {
   sql += ` ORDER BY updated_at DESC LIMIT ?`;
   params.push(Math.min(Math.max(filters.limit ?? 30, 1), 100));
   const rows = db.prepare(sql).all(...params) as any[];
-  return { mistakes: rows.map(toMistake) };
+  const mistakes = rows.map((row) => {
+    const item = toMistake(row);
+    // 加载映射、资产、风格特征（与 loadMistakeRows 一致，但批量一次查）
+    const assets = db.prepare(`SELECT * FROM mistake_assets WHERE mistake_id=? ORDER BY id`).all(item.id) as any[];
+    item.assets = assets.map(toPublicAsset);
+    const mappings = db.prepare(`
+      SELECT m.*, n.title, u.title AS unit_title
+      FROM mistake_kp_map m
+      JOIN kg_nodes n ON n.id = m.kg_node_id
+      LEFT JOIN curriculum_units u ON u.id = m.unit_id
+      WHERE m.mistake_id=?
+      ORDER BY CASE m.role WHEN 'primary' THEN 0 WHEN 'related' THEN 1 ELSE 2 END, m.confidence DESC
+    `).all(item.id) as any[];
+    item.mappings = mappings.map((m): MistakeKpMapping => ({
+      mistakeId: m.mistake_id,
+      kgNodeId: m.kg_node_id,
+      title: m.title,
+      unitId: m.unit_id ?? undefined,
+      unitTitle: m.unit_title ?? undefined,
+      role: m.role,
+      confidence: m.confidence,
+      beforeScore: m.before_score ?? undefined,
+      afterScore: m.after_score ?? undefined,
+      evidence: m.evidence_json ? safeJson<{ evidence?: string }>(m.evidence_json, {}).evidence : undefined,
+    }));
+    const style = db.prepare(`SELECT * FROM mistake_style_features WHERE mistake_id=? ORDER BY id LIMIT 1`).get(item.id) as any;
+    if (style) {
+      item.styleFeature = {
+        id: style.id,
+        mistakeId: style.mistake_id,
+        questionType: style.question_type,
+        difficulty: normalizeDifficulty(style.difficulty),
+        scenarioType: style.scenario_type,
+        reasoningPattern: style.reasoning_pattern,
+        distractorPattern: style.distractor_pattern ?? undefined,
+        presentationFeatures: style.presentation_features ? safeJson(style.presentation_features, {}) : undefined,
+        styleText: style.style_text,
+        createdAt: style.created_at,
+      };
+    }
+    return item;
+  });
+  return { mistakes };
 }
 
 export function getMistakeDetail(mistakeId: string, userId: string): MistakeDetailResponse | null {
