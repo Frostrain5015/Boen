@@ -162,7 +162,12 @@ export const useChatStore = defineStore('chat', () => {
           break;
         }
       }
+    } else if (e.type === 'todo_plan') {
+      // 服务端权威进度清单 → 实时镜像到 ui store（备课工具 plan_steps 数据源）
+      useUiStore().syncTodoList(e.steps);
     } else if (e.type === 'todo_fail') {
+      // 同步把进行中的步骤标记为失败，进度面板与内联工具卡片状态一致
+      if (e.action === 'plan' || e.action === 'advance') useUiStore().markTodoFailed();
       for (let i = items.value.length - 1; i >= 0; i--) {
         const item = items.value[i];
         if (item?.kind === 'tool_pending' && item.action === e.action) {
@@ -221,6 +226,7 @@ export const useChatStore = defineStore('chat', () => {
       _sessionActive = true;
       _sessionStartTime = Date.now();
       _lastLoggedStep = 0;
+      uiStore.resetTodoList(); // 清空上一轮课堂的进度清单
       uiStore.startSession();
     }
 
@@ -322,6 +328,7 @@ export const useChatStore = defineStore('chat', () => {
   async function handleNewConversation() {
     const uiStore = useUiStore();
     if (uiStore.sessionActive) uiStore.endSession();
+    uiStore.resetTodoList();
     try {
       const { conversation } = await apiCreateConversation('\u65b0\u5bf9\u8bdd', uiStore.subject);
       conversations.value.unshift(conversation);
@@ -357,6 +364,7 @@ export const useChatStore = defineStore('chat', () => {
   async function selectConversation(id: string) {
     const uiStore = useUiStore();
     if (uiStore.sessionActive) uiStore.endSession();
+    uiStore.resetTodoList();
     currentConversationId.value = id;
     try {
       const { conversation: conv, messages: msgs } = await getConversation(id);

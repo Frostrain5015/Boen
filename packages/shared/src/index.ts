@@ -449,6 +449,16 @@ export interface SubscriptionStatus {
 // SSE 事件
 // ─────────────────────────────────────────────────────────────
 
+/** 类课堂步骤状态：待进行 / 进行中 / 已完成 / 失败 */
+export type TodoStepStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+
+/** 类课堂 TODO 单步（备课工具 plan_steps 生成的步骤清单项） */
+export interface TodoStep {
+  id: number;
+  label: string;
+  status: TodoStepStatus;
+}
+
 export type SseEvent =
   | { type: 'token'; value: string }
   | { type: 'mode'; value: BoenMode }
@@ -466,6 +476,7 @@ export type SseEvent =
   | { type: 'loading_knowledge_base' }
   | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'conversation_created'; conversationId: string; title: string }
+  | { type: 'todo_plan'; steps: TodoStep[]; currentStep: number }
   | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
   | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
   | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; error: string }

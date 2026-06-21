@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, computed, ref } from 'vue';
-import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic } from 'lucide-vue-next';
+import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2 } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
@@ -28,6 +28,21 @@ const practiceMenuStyle = computed(() => {
     left: rect.left + 'px',
     bottom: (window.innerHeight - rect.top) + 'px',
     minWidth: '140px',
+  };
+});
+
+// ── 课堂进度 todo 浮层定位（从按钮左上方向上弹出，Teleport 到 body 避免裁切）──
+const todoBtnRef = ref<HTMLElement | null>(null);
+const todoPanelStyle = computed(() => {
+  // 依赖 todoPanelOpen 触发重算，确保每次打开都读取最新按钮位置
+  if (!uiStore.todoPanelOpen) return null;
+  const btn = todoBtnRef.value;
+  if (!btn) return null;
+  const rect = btn.getBoundingClientRect();
+  return {
+    left: rect.left + 'px',
+    bottom: (window.innerHeight - rect.top + 8) + 'px',
+    width: 'min(20rem, calc(100vw - 2rem))',
   };
 });
 
@@ -78,6 +93,20 @@ onMounted(() => {
           </div>
         </Transition>
         <div class="clay clay-glass flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
+          <!-- 课堂进度 todo 按钮（仅类课堂生成清单后显示） -->
+          <button
+            v-if="uiStore.hasTodoList"
+            ref="todoBtnRef"
+            @click="uiStore.toggleTodoPanel()"
+            class="relative grid h-11 w-11 shrink-0 place-items-center self-center rounded-[18px] border transition-all active:scale-[0.96]"
+            :class="uiStore.todoPanelOpen ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+            :title="`课堂进度 ${uiStore.todoProgress.done}/${uiStore.todoProgress.total}`"
+            aria-label="课堂进度"
+          >
+            <ListChecks class="h-5 w-5" />
+            <!-- 进度角标 -->
+            <span class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">{{ uiStore.todoProgress.done }}/{{ uiStore.todoProgress.total }}</span>
+          </button>
           <!-- 免费用户用量环 -->
           <div
             v-if="authStore.authenticated && !authStore.isPremium"
@@ -131,10 +160,81 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 课堂进度浮层（Teleport 到 body，从 todo 按钮左上方弹出） -->
+    <Teleport to="body">
+      <Transition name="todo-panel">
+        <div
+          v-if="uiStore.todoPanelOpen && todoPanelStyle"
+          class="fixed z-50"
+          :style="todoPanelStyle"
+        >
+          <div class="clay-sm overflow-hidden bg-[var(--surface)] shadow-xl">
+            <!-- 头部 -->
+            <div class="flex items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
+              <div class="flex items-center gap-2">
+                <ListChecks class="h-4 w-4 text-[var(--accent-strong)]" />
+                <span class="font-display text-sm font-bold text-[var(--ink)]">课堂进度</span>
+              </div>
+              <span class="text-xs font-semibold text-[var(--ink-soft)]">{{ uiStore.todoProgress.done }}/{{ uiStore.todoProgress.total }} 步</span>
+            </div>
+            <!-- 步骤列表 -->
+            <ul class="max-h-[50vh] space-y-1 overflow-y-auto p-2">
+              <li
+                v-for="step in uiStore.todoList"
+                :key="step.id"
+                class="flex items-start gap-2.5 rounded-xl px-2.5 py-2 transition-colors"
+                :class="step.status === 'in_progress' ? 'bg-[var(--accent-soft)]/60' : ''"
+              >
+                <!-- 三态图标（参考工具标签：进行中=脉冲点 / 完成=绿勾 / 失败=红叉 / 待进行=空心点） -->
+                <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full"
+                  :class="step.status === 'completed' ? 'bg-[#d4f0dd] text-[#18a558]'
+                    : step.status === 'failed' ? 'bg-[#fee2e2] text-[#dc2626]'
+                    : step.status === 'in_progress' ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'
+                    : 'bg-[var(--line)]/60 text-[var(--ink-soft)]'">
+                  <CheckCircle v-if="step.status === 'completed'" class="h-3.5 w-3.5" />
+                  <XCircle v-else-if="step.status === 'failed'" class="h-3.5 w-3.5" />
+                  <Loader2 v-else-if="step.status === 'in_progress'" class="h-3.5 w-3.5 animate-spin" />
+                  <span v-else class="h-1.5 w-1.5 rounded-full bg-current opacity-60"></span>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[13px] leading-snug"
+                    :class="step.status === 'completed' ? 'text-[var(--ink-soft)] line-through decoration-[var(--ink-soft)]/40'
+                      : step.status === 'in_progress' ? 'font-semibold text-[var(--ink)]'
+                      : step.status === 'failed' ? 'font-medium text-[#dc2626]'
+                      : 'text-[var(--ink)]'">
+                    <span class="mr-1 text-[var(--ink-soft)]">{{ step.id }}.</span>{{ step.label }}
+                  </p>
+                  <span v-if="step.status === 'in_progress'" class="text-[11px] font-medium text-[var(--accent-strong)]">进行中…</span>
+                  <span v-else-if="step.status === 'failed'" class="text-[11px] font-medium text-[#dc2626]">未完成</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+    <!-- 点击外部关闭进度浮层 -->
+    <Teleport to="body">
+      <div v-if="uiStore.todoPanelOpen" class="fixed inset-0 z-40" @click="uiStore.closeTodoPanel()" />
+    </Teleport>
   </footer>
 </template>
 
 <style scoped>
+/* ── 课堂进度浮层弹入 ── */
+.todo-panel-enter-active {
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+}
+.todo-panel-leave-active {
+  transition: transform 0.18s ease, opacity 0.15s ease;
+}
+.todo-panel-enter-from,
+.todo-panel-leave-to {
+  transform: translateY(8px) scale(0.96);
+  opacity: 0;
+}
+
 /* ── 吉祥物弹入动画 ── */
 .mascot-pop-enter-active {
   transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;

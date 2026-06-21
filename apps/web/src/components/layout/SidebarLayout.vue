@@ -128,6 +128,36 @@ watch(() => route.name, (name) => {
 watch(() => route.path, () => {
   if (uiStore.isMobile) uiStore.sidebarOpen = false;
 });
+
+// ── 二级菜单展开/收起过渡 ───────────────────────────────
+// v-if 直接挂载/卸载会让菜单瞬间跳出/消失，导致切换模块时视觉跳变。
+// 用 JS 钩子在 enter/leave 间把 height 从 0 平滑过渡到内容真实高度（再回落到 auto），
+// 既保留 height:auto 的自适应，又获得顺滑动画。
+const reduceMotion = typeof window !== 'undefined'
+  && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+function onSubmenuEnter(el: Element) {
+  const e = el as HTMLElement;
+  if (reduceMotion) return;
+  e.style.height = '0';
+  e.style.opacity = '0';
+  // 触发重排后再设目标高度，确保过渡生效
+  void e.offsetHeight;
+  e.style.height = `${e.scrollHeight}px`;
+  e.style.opacity = '1';
+}
+function onSubmenuAfterEnter(el: Element) {
+  (el as HTMLElement).style.height = 'auto';
+}
+function onSubmenuLeave(el: Element) {
+  const e = el as HTMLElement;
+  if (reduceMotion) return;
+  e.style.height = `${e.scrollHeight}px`;
+  e.style.opacity = '1';
+  void e.offsetHeight;
+  e.style.height = '0';
+  e.style.opacity = '0';
+}
 </script>
 
 <template>
@@ -170,7 +200,8 @@ watch(() => route.path, () => {
           <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="uiStore.expandedSection === 'chat' ? '' : '-rotate-90'" />
         </button>
         <!-- 对话二级菜单 -->
-        <div v-if="uiStore.expandedSection === 'chat'" class="mb-1 mt-1 space-y-0.5 pl-2">
+        <Transition name="submenu" @enter="onSubmenuEnter" @after-enter="onSubmenuAfterEnter" @leave="onSubmenuLeave">
+        <div v-if="uiStore.expandedSection === 'chat'" class="submenu-panel mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="chatStore.handleNewConversation()" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--accent-strong)] transition-colors hover:bg-[var(--accent-soft)]">
             <Plus class="h-3.5 w-3.5" /> 新建对话
           </button>
@@ -199,6 +230,7 @@ watch(() => route.path, () => {
             </button>
           </div>
         </div>
+        </Transition>
 
         <!-- ═══ 考试 ═══ -->
         <button
@@ -212,7 +244,8 @@ watch(() => route.path, () => {
           <ChevronDown class="h-4 w-4 shrink-0 transition-transform" :class="(uiStore.expandedSection as string) === 'exam' ? '' : '-rotate-90'" />
         </button>
         <!-- 考试二级菜单 -->
-        <div v-if="(uiStore.expandedSection as string) === 'exam'" class="mb-1 mt-1 space-y-0.5 pl-2">
+        <Transition name="submenu" @enter="onSubmenuEnter" @after-enter="onSubmenuAfterEnter" @leave="onSubmenuLeave">
+        <div v-if="(uiStore.expandedSection as string) === 'exam'" class="submenu-panel mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="startNewExam" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#5848d6] transition-colors hover:bg-[#e8e4ff]">
             <Plus class="h-3.5 w-3.5" /> 新考试
           </button>
@@ -243,6 +276,7 @@ watch(() => route.path, () => {
             </button>
           </div>
         </div>
+        </Transition>
 
         <!-- ═══ 错题本 ═══ -->
         <button
@@ -326,3 +360,22 @@ watch(() => route.path, () => {
     <ChevronRight class="h-5 w-5 text-[var(--ink-soft)]" />
   </button>
 </template>
+
+<style scoped>
+/* ── 二级菜单展开/收起过渡 ── */
+.submenu-panel {
+  overflow: hidden;
+  will-change: height, opacity;
+}
+.submenu-enter-active,
+.submenu-leave-active {
+  transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .submenu-enter-active,
+  .submenu-leave-active {
+    transition: opacity 0.15s ease;
+  }
+}
+</style>

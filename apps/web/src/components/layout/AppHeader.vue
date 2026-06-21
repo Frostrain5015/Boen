@@ -11,7 +11,11 @@ const chatStore = useChatStore();
     :class="chatStore.hasItems ? 'pl-18' : ''"
   >
     <div class="leading-tight">
-      <h1 class="brand-text text-2xl font-bold tracking-tight">博文 Boen</h1>
+      <!-- 双层渐变：下层固定色，上层随学科 accent 交叉淡变（与侧边栏品牌字一致） -->
+      <h1 class="relative inline-block text-2xl font-bold tracking-tight">
+        <span class="brand-text-bg">博文 Boen</span>
+        <span class="brand-text-overlay">博文 Boen</span>
+      </h1>
       <p class="text-xs font-semibold text-[var(--ink-soft)]">你的学习小伙伴</p>
     </div>
 

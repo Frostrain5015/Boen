@@ -210,6 +210,32 @@ function getPendingQuestion(state: { tasks?: Array<{ interrupts?: Array<{ value?
   return undefined;
 }
 
+/**
+ * 从 checkpoint 读取最新 todoState，并把完整步骤清单实时下发给前端。
+ * 数据源是 plan_steps/advance_step 工具维护的权威状态机，确保每步状态
+ * （pending / in_progress / completed）与服务端一致。
+ */
+async function sendTodoPlan(threadId: string, send: (e: SseEvent) => Promise<void>): Promise<void> {
+  try {
+    const ckpt = await graph.getState(runConfig(threadId));
+    const raw = ckpt?.values?.todoState as string | undefined;
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as {
+      steps?: Array<{ id: number; label: string; status: string }>;
+      currentStep?: number;
+    };
+    if (!parsed.steps?.length) return;
+    const steps = parsed.steps.map((s) => ({
+      id: s.id,
+      label: s.label,
+      // todoState 仅有 pending/in_progress/completed；failed 由 todo_fail 事件在前端叠加
+      status: (['pending', 'in_progress', 'completed'].includes(s.status) ? s.status : 'pending') as
+        'pending' | 'in_progress' | 'completed',
+    }));
+    await send({ type: 'todo_plan', steps, currentStep: parsed.currentStep ?? 1 });
+  } catch { /* 解析失败则跳过本次下发 */ }
+}
+
 /** 流式跑一次图：推送 token，并返回最后消息及持久化的人机题目暂停点。 */
 async function runGraph(
   input: Record<string, unknown> | Command<QuestionResume>,
@@ -337,6 +363,10 @@ async function runGraph(
         }
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
+        }
+        // plan_steps / advance_step 改动了 todoState → 重新读取最新清单并实时下发
+        if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
+          await sendTodoPlan(threadId, send);
         }
       }
     } else if (ev.event === 'on_chain_error') {

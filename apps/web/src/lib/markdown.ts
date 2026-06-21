@@ -10,7 +10,15 @@ const PURIFY_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
 };
 
 const md = new MarkdownIt({ breaks: false, linkify: true, html: true });
-md.use(katex, { throwOnError: false, errorColor: 'var(--error)' });
+md.use(katex, {
+  throwOnError: false,
+  errorColor: 'var(--error)',
+  // 圈号/中文标点等无字体度量的 Unicode 字符在数学模式里会触发 KaTeX 警告与
+  // “No character metrics” 报错。liberateCircledFromMath 已尽量把它们移出公式，
+  // 这里再兜底：把这两类告警降级为 ignore，避免控制台刷屏（不影响真正的语法错误）。
+  strict: (errorCode: string): 'ignore' | 'warn' | 'error' =>
+    errorCode === 'unknownSymbol' || errorCode === 'unicodeTextInMathMode' ? 'ignore' : 'warn',
+});
 
 function sanitizeGeneratedHtml(text: string): string {
   return String(text ?? '')
@@ -141,6 +149,43 @@ function normalizeXlop(text: string): string {
 const BLANK_RE = /\_{3,}/g;
 const MATH_SPAN_RE = /(\$\$[\s\S]*?\$\$|\$[^$\n]*?\$)/g;
 
+// 无字体度量、本质是题号/步骤标记而非数学符号的 Unicode 字符
+// （圈号 ①-⑳、带括号数字 ⑴-⒇、带点数字 ⒈-⒛）。
+const NON_MATH_MARKER = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳⑴⑵⑶⑷⑸⑹⑺⑻⑼⑽⑾⑿⒀⒁⒂⒃⒄⒅⒆⒇⒈⒉⒊⒋⒌⒍⒎⒏⒐⒑⒒⒓⒔⒕⒖⒗⒘⒙⒚⒛';
+const MARKER_CLASS = `[${NON_MATH_MARKER}]`;
+// 公式首/尾的标记（含相邻空白），应整体移到 $ 外部
+const LEADING_MARKERS = new RegExp(`^((?:${MARKER_CLASS}\\s*)+)`);
+const TRAILING_MARKERS = new RegExp(`((?:\\s*${MARKER_CLASS})+)$`);
+const ANY_MARKER = new RegExp(MARKER_CLASS, 'g');
+const HAS_MARKER = new RegExp(MARKER_CLASS); // 无 g 标志，test() 无状态副作用
+
+/**
+ * 把题号/步骤类圈号字符移出数学模式：
+ * - 紧贴 $ 边界的标记 → 提到公式外作为普通文本；
+ * - 夹在公式中间的标记 → 用 \text{} 包裹，保证 KaTeX 语法合法。
+ * 这样既消除 “Unrecognized Unicode character / No character metrics” 噪音，
+ * 也让圈号以正常字体渲染。
+ */
+function liberateCircledFromMath(text: string): string {
+  if (!HAS_MARKER.test(text)) return text;
+  return text.replace(MATH_SPAN_RE, (span) => {
+    const isBlock = span.startsWith('$$');
+    const fence = isBlock ? '$$' : '$';
+    let inner = span.slice(fence.length, span.length - fence.length);
+    if (!HAS_MARKER.test(inner)) return span;
+
+    let before = '';
+    let after = '';
+    inner = inner.replace(LEADING_MARKERS, (m) => { before += m.replace(/\s+/g, ''); return ''; });
+    inner = inner.replace(TRAILING_MARKERS, (m) => { after = m.replace(/\s+/g, '') + after; return ''; });
+    // 剩余夹在中间的标记 → \text{} 包裹
+    inner = inner.replace(ANY_MARKER, (m) => `\\text{${m}}`);
+
+    if (inner.trim() === '') return `${before}${after}`; // 公式只剩标记，整体降级为文本
+    return `${before}${fence}${inner}${fence}${after}`;
+  });
+}
+
 function normalizeBlanks(text: string): string {
   // 先提取数学区间占位
   const mathSpans: Record<string, string> = {};
@@ -160,14 +205,34 @@ function normalizeBlanks(text: string): string {
 }
 
 /**
+ * 折叠「单 $ 行内公式」内部的异常换行。
+ * 模型偶尔会在一段行内公式中间吐出换行（如 `$\sqrt{⏎2}$`），随后的逐行
+ * 自动闭合逻辑会把每行落单的 $ 各补一个，从而把一条公式撕成两段坏公式。
+ * 这里在自动闭合之前，把跨行的行内 $...$ 内部换行折叠为空格；$$ 块级公式
+ * 跨行是合法的（KaTeX 会忽略其中的空白），先用占位保护、不受影响。
+ */
+function joinInlineMathNewlines(text: string): string {
+  if (!text.includes('$')) return text;
+  const blocks: string[] = [];
+  const protectedText = text.replace(/\$\$[\s\S]*?\$\$/g, (m) => {
+    blocks.push(m);
+    return `\x00BLK${blocks.length - 1}\x00`;
+  });
+  const joined = protectedText.replace(/\$([^$]+?)\$/g, (whole, inner: string) =>
+    inner.includes('\n') ? `$${inner.replace(/\s*\n\s*/g, ' ')}$` : whole,
+  );
+  return joined.replace(/\x00BLK(\d+)\x00/g, (_, i) => blocks[Number(i)] ?? '');
+}
+
+/**
  * 渲染 Markdown + 数学公式 + TikZ 图形。
  * 先把 OpenAI 系模型常用的 \( \) / \[ \] 定界符归一化为 $ / $$，
  * 再交给 markdown-it-katex（支持 $行内$ 与 $$块级$$）。
  * 同时将模型中出现的 \opadd 等 xlop 命令转换为 KaTeX array。
  */
 export function renderMarkdown(text: string): string {
-  // 自动闭合未配对的 $（模型有时遗漏闭合定界符）
-  const autoClosed = text.split('\n').map(line => {
+  // 先折叠行内公式内的异常换行，再自动闭合未配对的 $（模型有时遗漏闭合定界符）
+  const autoClosed = joinInlineMathNewlines(text).split('\n').map(line => {
     // 统计行中 $ 个数，奇数则补一个闭合
     const dollars = line.match(/\$/g);
     if (dollars && dollars.length % 2 === 1) {
@@ -188,14 +253,14 @@ export function renderMarkdown(text: string): string {
       if (prefix?.includes('$')) return _;
       return `${prefix || ''}\n$$\n\\begin{array}${body}\\end{array}\n$$\n`;
     });
-  return DOMPurify.sanitize(md.render(normalizeXlop(normalizeBlanks(normalized))), PURIFY_CONFIG);
+  return DOMPurify.sanitize(md.render(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized)))), PURIFY_CONFIG);
 }
 
 /**
  * 行内渲染（不包 <p>、不产生块级间距），用于选项文字等短文本场景。
  */
 export function renderMarkdownInline(text: string): string {
-  const autoClosed = text.split('\n').map(line => {
+  const autoClosed = joinInlineMathNewlines(text).split('\n').map(line => {
     const dollars = line.match(/\$/g);
     if (dollars && dollars.length % 2 === 1) return line + '$';
     return line;
@@ -203,7 +268,7 @@ export function renderMarkdownInline(text: string): string {
   const normalized = sanitizeGeneratedHtml(autoClosed)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
-  return DOMPurify.sanitize(md.renderInline(normalizeXlop(normalizeBlanks(normalized))), PURIFY_CONFIG);
+  return DOMPurify.sanitize(md.renderInline(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized)))), PURIFY_CONFIG);
 }
 
 // ── TikZ 代码块：服务端已下线，降级为占位 ──────────────

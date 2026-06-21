@@ -32,6 +32,9 @@ export const useUiStore = defineStore('ui', () => {
   const practiceMenuOpen = ref(false);
   const modeTagSent = ref(false);
   const showUserMenu = ref(false);
+  // ── 类课堂进度清单（数据源：备课工具 plan_steps 生成的 TODO，由 SSE todo_plan 实时同步）──
+  const todoList = ref<import('@boen/shared').TodoStep[]>([]);
+  const todoPanelOpen = ref(false);
 
   // ── Getters ───────────────────────────────────────────────
   /** 当前年级过滤后的可选学科列表 */
@@ -47,6 +50,15 @@ export const useUiStore = defineStore('ui', () => {
   const isCollege = computed(() => useAuthStore().userProfile?.grade === 'college');
 
   const voiceLocale = computed(() => subject.value === 'english' ? 'en-US' : 'zh-CN');
+
+  /** 进度概览：已完成步数 / 总步数 */
+  const todoProgress = computed(() => {
+    const total = todoList.value.length;
+    const done = todoList.value.filter((s) => s.status === 'completed').length;
+    return { done, total };
+  });
+  /** 是否存在可展示的课堂进度（用于决定是否显示 todo 按钮） */
+  const hasTodoList = computed(() => todoList.value.length > 0);
 
   const practiceMenu = computed(() => {
     const all: Record<string, Array<{ type: string; label: string; hint: string }>> = {
@@ -83,6 +95,30 @@ export const useUiStore = defineStore('ui', () => {
     sessionActive.value = false;
     console.log(`[Boen 类课堂] ✅ 会话结束 — 耗时: ${new Date().toLocaleTimeString()}`);
     activeMode.value = 'none';
+    // 课堂结束保留清单供回看，仅关闭面板；切换/新建对话由 resetTodoList 彻底清空
+    todoPanelOpen.value = false;
+  }
+
+  // ── 课堂进度清单同步 ──────────────────────────────────────
+  /** 用服务端权威清单整体替换本地 todoList（todo_plan 事件驱动） */
+  function syncTodoList(steps: import('@boen/shared').TodoStep[]) {
+    todoList.value = steps;
+  }
+  /** 标记某一步失败（todo_fail 事件驱动，优先匹配进行中的步骤） */
+  function markTodoFailed() {
+    const active = todoList.value.find((s) => s.status === 'in_progress');
+    if (active) active.status = 'failed';
+  }
+  /** 清空进度清单（新会话开始或对话切换时调用） */
+  function resetTodoList() {
+    todoList.value = [];
+    todoPanelOpen.value = false;
+  }
+  function toggleTodoPanel() {
+    todoPanelOpen.value = !todoPanelOpen.value;
+  }
+  function closeTodoPanel() {
+    todoPanelOpen.value = false;
   }
 
   function activateMode(mode: 'review' | 'preview' | 'weakness') {
@@ -188,15 +224,24 @@ export const useUiStore = defineStore('ui', () => {
     practiceMenuOpen,
     modeTagSent,
     showUserMenu,
+    todoList,
+    todoPanelOpen,
     // getters
     subjectIndex,
     availableSubjects,
     voiceLocale,
     isCollege,
     practiceMenu,
+    todoProgress,
+    hasTodoList,
     // actions
     startSession,
     endSession,
+    syncTodoList,
+    markTodoFailed,
+    resetTodoList,
+    toggleTodoPanel,
+    closeTodoPanel,
     activateMode,
     togglePracticeMenu,
     closePracticeMenu,
