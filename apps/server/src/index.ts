@@ -1724,7 +1724,9 @@ app.post('/api/answer', async (c) => {
             // 用本次答题的得分（非累计值）算单题 Elo 增量
             const { newRating, newSigma } = computeProficiencyDelta(oldRating, oldSigma, result.score, result.maxScore, currentMode, lastUpdated, qDifficulty);
             setCachedProficiencyExpected(userId, body.threadId, node.id, newRating, newSigma);
-            profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
+            // before 为 -1 表示无 DB 记录，前端展示「新」而非 0 星
+            const beforeVal = dbRow ? Math.round(oldRating) : -1;
+            profChanges.push({ kp: node.title, before: beforeVal, after: newRating });
           } else {
             // 普通模式：直接写库后读取新值
             const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
@@ -1732,7 +1734,8 @@ app.post('/api/answer', async (c) => {
             updateProficiency(userId, node.id, result.score, result.maxScore, currentMode, qDifficulty);
             const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
             const after = newRow?.weighted_score ?? -1;
-            profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });
+            // before 保持 -1（无记录），前端据此展示「新」而不是 0 星
+            profChanges.push({ kp: node.title, before, after: Math.max(0, after) });
           }
         }
       }
