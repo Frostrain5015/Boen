@@ -83,7 +83,8 @@ async function main() {
 
   for (const tb of textbooks) {
     if (hasKnowledgePoints(tb.id)) {
-      console.log(`  [跳过] ${SUBJECT_LABEL[tb.subject] ?? tb.subject} ${gradeLabel(tb.grade)} ${tb.volume}（已有 ${db.prepare(`SELECT COUNT(*) AS c FROM unit_knowledge_map ukm JOIN curriculum_units u ON u.id=ukm.unit_id WHERE u.textbook_id=?`).get(tb.id) as { c: number }} 条知识点）`);
+      const existingCount = (db.prepare(`SELECT COUNT(*) AS c FROM unit_knowledge_map ukm JOIN curriculum_units u ON u.id=ukm.unit_id WHERE u.textbook_id=?`).get(tb.id) as { c: number }).c;
+      console.log(`  [跳过] ${SUBJECT_LABEL[tb.subject] ?? tb.subject} ${gradeLabel(tb.grade)} ${tb.volume}（已有 ${existingCount} 条知识点）`);
       continue;
     }
 
