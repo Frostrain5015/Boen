@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
 import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Crown, Lock, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
+import PremiumGate from '@/components/PremiumGate.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -252,40 +253,9 @@ function handleBack() {
       </div>
     </div>
 
-    <!-- ═══ 会员弹窗（复用 PremiumGate 设计） ═══ -->
+    <!-- ═══ 会员弹窗（统一 PremiumGate） ═══ -->
     <div v-if="showPremiumDialog" class="fixed inset-0 z-[1000] grid place-items-center bg-black/20 p-4" @click.self="showPremiumDialog = false">
-      <div class="clay clay-glass flex w-full max-w-[360px] flex-col items-center px-8 py-10"
-        v-motion
-        :initial="{ opacity: 0, scale: 0.92, y: 16 }"
-        :enter="{ opacity: 1, scale: 1, y: 0, transition: { duration: 500, ease: [0.34, 1.56, 0.64, 1] } }"
-      >
-        <button class="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]" @click="showPremiumDialog = false"><X :size="16" /></button>
-        <div class="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl" style="background: var(--locked-surface); border: 1.5px solid var(--locked-line)">
-          <Crown class="h-8 w-8" style="color: var(--locked-ink)" />
-        </div>
-        <h2 class="mb-1.5 text-center font-display text-xl font-bold" style="color: var(--ink)">会员专属功能</h2>
-        <p class="mb-4 text-center text-sm" style="color: var(--ink-soft)"><strong>DeepSeek 大模型</strong> — 极速响应、深度推理</p>
-        <div class="mb-6 flex flex-col gap-2 self-start text-sm" style="color: var(--ink-soft)">
-          <div class="flex items-center gap-2"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs" style="color: var(--accent-strong)">✦</span> DeepSeek V4 Flash — 日常学习首选</div>
-          <div class="flex items-center gap-2"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs" style="color: var(--accent-strong)">✦</span> DeepSeek V4 Pro — 复杂题目攻克</div>
-          <div class="flex items-center gap-2"><span class="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs" style="color: var(--accent-strong)">✦</span> 全题型练习、学习报告等更多功能</div>
-        </div>
-        <div class="mb-6 w-full px-8"><div class="h-px w-full" style="background: var(--line)"></div></div>
-        <div class="mb-6 flex flex-col items-center gap-2">
-          <div class="flex items-center gap-2">
-            <span class="font-display text-2xl font-bold" style="color: var(--premium-gold-strong)">¥9.9</span>
-            <span class="rounded-full px-2 py-0.5 text-xs font-semibold" style="background: var(--premium-gold-soft); color: var(--premium-gold-strong)">首月</span>
-          </div>
-          <p class="text-sm" style="color: var(--ink-soft)">次月起 ¥19.9/月</p>
-        </div>
-        <button @click="showPremiumDialog = false"
-          class="mb-3 w-full rounded-[18px] px-6 py-3 text-sm font-semibold text-white transition-all"
-          style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%); box-shadow: 0 12px 24px -10px var(--premium-gold-glow), inset 0 -3px 0 rgba(0,0,0,0.14), inset 0 2px 0 rgba(255,255,255,0.28);"
-        >联系管理员开通</button>
-        <button @click="showPremiumDialog = false" class="text-xs underline opacity-60" style="color: var(--ink-soft)">
-          继续使用 Kimi K2.6（免费）
-        </button>
-      </div>
+      <PremiumGate feature-name="DeepSeek 大模型" :extra-benefits="['三模型自由切换']" standalone @close="showPremiumDialog = false" class="w-full max-w-[360px]" />
     </div>
   </div>
 </template>

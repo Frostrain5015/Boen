@@ -1,16 +1,34 @@
 <script setup lang="ts">
-import type { Component } from 'vue';
-import { Crown } from 'lucide-vue-next';
+import { computed, type Component } from 'vue';
+import { Crown, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
 
 const authStore = useAuthStore();
 const toast = useToast();
 
-defineProps<{
+const props = defineProps<{
   featureName: string;
   icon?: Component;
+  /** 额外权益列表，叠加在默认权益之上 */
+  extraBenefits?: string[];
+  /** 独立卡片模式（无包裹容器/遮罩/占位slot），用于内嵌到自定义弹窗 */
+  standalone?: boolean;
 }>();
+
+const emit = defineEmits<{ close: [] }>();
+
+const defaultBenefits = [
+  'DeepSeek V4 Flash — 极速响应，日常学习首选',
+  'DeepSeek V4 Pro — 深度推理，复杂题目攻克',
+  '全题型练习（考试/测验/错题本）',
+  '学习报告与知识画像分析',
+];
+const premiumBenefits = computed(() =>
+  props.extraBenefits?.length
+    ? [...new Set([...defaultBenefits, ...props.extraBenefits])]
+    : defaultBenefits,
+);
 
 function handleContact() {
   toast.info('请联系管理员开通会员');
@@ -22,12 +40,15 @@ function handleContact() {
   <slot v-if="authStore.isPremium" />
 
   <!-- 免费用户：付费墙覆盖 -->
-  <div v-else class="relative h-full w-full">
+  <div v-else :class="standalone ? '' : 'relative h-full w-full'">
     <!-- 毛玻璃遮罩 -->
-    <div class="premium-overlay">
-      <div
-        class="clay clay-glass flex w-full max-w-[380px] flex-col items-center px-8 py-10"
+    <div :class="standalone ? '' : 'premium-overlay'">
+      <div class="relative clay clay-glass flex w-full max-w-[380px] flex-col items-center px-8 py-10"
         v-motion
+      >
+        <button v-if="standalone" @click="emit('close')"
+          class="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
+        ><X :size="16" /></button>
         :initial="{ opacity: 0, scale: 0.92, y: 16 }"
         :enter="{ opacity: 1, scale: 1, y: 0, transition: { duration: 500, ease: [0.34, 1.56, 0.64, 1] } }"
       >
@@ -53,11 +74,19 @@ function handleContact() {
           会员专属功能
         </h2>
         <p
-          class="mb-6 text-center"
+          class="mb-2 text-center"
           style="font-family: var(--font-body); font-size: 0.9rem; color: var(--ink-soft)"
         >
           {{ featureName }}
         </p>
+
+        <!-- 会员权益列表 -->
+        <div class="mb-5 flex flex-col gap-1.5 self-start px-2 text-sm" style="color: var(--ink-soft)">
+          <div v-for="item in premiumBenefits" :key="item" class="flex items-center gap-2">
+            <span class="flex h-5 w-5 items-center justify-center rounded-full text-xs shrink-0" style="background: var(--accent-soft); color: var(--accent-strong)">✦</span>
+            {{ item }}
+          </div>
+        </div>
 
         <!-- 分隔线 -->
         <div class="mb-6 w-full px-12">
@@ -112,7 +141,7 @@ function handleContact() {
     </div>
 
     <!-- 底层内容（被遮罩覆盖，仅占位保持布局） -->
-    <div class="invisible">
+    <div v-if="!standalone" class="invisible">
       <slot />
     </div>
   </div>
