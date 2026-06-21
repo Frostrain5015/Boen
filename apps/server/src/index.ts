@@ -5,6 +5,14 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
+
+// ── 全局未捕获异常兜底（防止进程静默退出导致 SSE 流中断） ──────
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err instanceof Error ? err.stack : err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] unhandledRejection:', reason instanceof Error ? reason.stack : reason);
+});
 import { HumanMessage, SystemMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -312,7 +320,14 @@ async function runGraph(
   } catch { /* 首轮无 checkpoint */ }
   const stepTimestamps: number[] = [Date.now()];
 
-  for await (const ev of events) {
+  // SSE keepalive：LLM 长时间思考时每 30s 发一次空事件，防止 nginx/proxy 断开
+  const pingTimer = setInterval(() => {
+    send({ type: 'token' as any, value: '' }).catch(() => {});
+  }, 30_000);
+
+  try {
+    try {
+      for await (const ev of events) {
     if (ev.event === 'on_chat_model_stream') {
       const chunk = ev.data?.chunk as
         | { content?: unknown; tool_call_chunks?: Array<{ name?: string }>; tool_calls?: Array<{ name?: string }> }
@@ -457,6 +472,11 @@ async function runGraph(
         }
       }
     }
+  }
+  } catch (err) {
+    console.error('[runGraph] 流式执行异常:', err instanceof Error ? err.message : err);
+  } finally {
+    clearInterval(pingTimer);
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });
   const msgs = (state.values?.messages ?? []) as BaseMessage[];
