@@ -254,6 +254,17 @@ export function getCachedProficiencySum(userId: string, threadId: string, kgNode
 }
 
 /**
+ * 检查该知识点是否已有缓存的预期 Running Rating（用于判断是否首次计算）。
+ * 必须在 getCachedProficiencyExpected 之前调用，因为后者会将初始化状态覆盖。
+ */
+export function hasCachedExpectedRating(userId: string, threadId: string, kgNodeId: number): boolean {
+  const key = cacheKey(userId, threadId);
+  const userCache = PROFICIENCY_CACHE.get(key);
+  const entry = userCache?.get(kgNodeId);
+  return entry !== undefined && entry.expectedRating >= 0;
+}
+
+/**
  * 读取或初始化该知识点的预期 Running Rating。
  * 第一次答题时从 DB 读取，后续答题使用缓存中上一次计算的结果，
  * 实现「逐题增量展示」：每道题的 before/after 反映的是本题带来的变化，

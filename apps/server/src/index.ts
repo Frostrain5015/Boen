@@ -25,7 +25,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, hasCachedExpectedRating, computeProficiencyDelta, difficultyLevelToValue, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -1714,6 +1714,9 @@ app.post('/api/answer', async (c) => {
             // 每道题用 result.score/maxScore 算单题变化，并累进到
             // expectedRating，下一题的 oldRating 就是上一题的 newRating。
             cacheProficiencyUpdate(userId, body.threadId, node.id, result.score, result.maxScore, currentMode);
+            // 先检查缓存是否已有 running rating（必须在 getCachedProficiencyExpected 之前，
+            // 因为后者会把首次访问的条目初始化为 dbRating，覆盖「是否是首次」的信号）
+            const hadCache = hasCachedExpectedRating(userId, body.threadId, node.id);
             const dbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
             const { rating: oldRating, sigma: oldSigma, lastUpdated } = getCachedProficiencyExpected(
               userId, body.threadId, node.id,
@@ -1724,8 +1727,9 @@ app.post('/api/answer', async (c) => {
             // 用本次答题的得分（非累计值）算单题 Elo 增量
             const { newRating, newSigma } = computeProficiencyDelta(oldRating, oldSigma, result.score, result.maxScore, currentMode, lastUpdated, qDifficulty);
             setCachedProficiencyExpected(userId, body.threadId, node.id, newRating, newSigma);
-            // before 为 -1 表示无 DB 记录，前端展示「新」而非 0 星
-            const beforeVal = dbRow ? Math.round(oldRating) : -1;
+            // 仅当「无 DB 记录且缓存中无运行值」才显示「新」；缓存有运行值说明是同一会话中
+            // 的后续题目，应显示增量变化而非「新」
+            const beforeVal = (dbRow || hadCache) ? Math.round(oldRating) : -1;
             profChanges.push({ kp: node.title, before: beforeVal, after: newRating });
           } else {
             // 普通模式：直接写库后读取新值
