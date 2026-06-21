@@ -12,20 +12,19 @@ export type UserProfile = { name: string; grade: Grade };
 /** Map legacy gradeBand to a representative grade */
 const BAND_TO_GRADE: Record<string, Grade> = { primary: '3', middle: '8', undergrad: 'college' };
 
-function loadProfile(): UserProfile | null {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
-    if (p.name && p.grade) return { name: p.name, grade: p.grade };
-    // Legacy: { name, gradeBand } -> representative grade
-    if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
-  } catch { /* ignore corrupt data */ }
+/** 初始化时尝试所有可能的 key（scoped + unscoped），scoped 优先级高 */
+function loadProfileFallback(sub?: string): UserProfile | null {
+  const keys = sub ? [`${PROFILE_KEY}_${sub}`, PROFILE_KEY] : [PROFILE_KEY];
+  for (const key of keys) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const p = JSON.parse(raw);
+      if (p.name && p.grade) return { name: p.name, grade: p.grade };
+      if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+    } catch { /* ignore */ }
+  }
   return null;
-}
-
-function saveProfileToStorage(p: UserProfile) {
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -35,7 +34,8 @@ export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<FrostUser | null>(null);
   const isOAuthCallback = ref(window.location.pathname === '/auth/callback');
   const showSetupDialog = ref(false);
-  const userProfile = ref<UserProfile | null>(loadProfile());
+  // 初始化时还没有 currentUser，只能扫 unscoped key；scoped 的稍后在 checkAuth 中补扫
+  const userProfile = ref<UserProfile | null>(loadProfileFallback());
   const subscription = ref<SubscriptionStatus | null>(null);
 
   // ── Computed ──────────────────────────────────────────────
@@ -69,22 +69,39 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function loadProfileFromStorage(): UserProfile | null {
+    // 1. 优先 scoped key（saveProfile 的写入路径）
+    const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : null;
+    if (scopedKey) {
+      try {
+        const raw = localStorage.getItem(scopedKey);
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p.name && p.grade) return p;
+          if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+        }
+      } catch { /* ignore */ }
+    }
+    // 2. 降级到 unscoped key（旧版本遗留数据）
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p.name && p.grade) return p;
+        if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
   async function checkAuth() {
     if (isOAuthCallback.value) return;
     const auth = isAuthenticated();
     authenticated.value = auth;
     if (auth) {
       currentUser.value = await getCurrentUser();
-      // 加载用户隔离的 profile（saveProfile 保存时带 sub scope，loadProfile 无 scope 读不到）
-      const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : PROFILE_KEY;
-      try {
-        const raw = localStorage.getItem(scopedKey);
-        if (raw) {
-          const p = JSON.parse(raw);
-          if (p.name && p.grade) userProfile.value = p;
-          else if (p.name && p.gradeBand) userProfile.value = { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
-        }
-      } catch { /* ignore corrupt data */ }
+      // 初始化时 loadProfile() 读不到 scoped key，这里从双 key 重新加载
+      userProfile.value = loadProfileFromStorage();
       const chatStore = useChatStore();
       const examStore = useExamStore();
       await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription()]);
@@ -99,18 +116,7 @@ export const useAuthStore = defineStore('auth', () => {
     authChecked.value = true;
     getCurrentUser().then((user) => {
       currentUser.value = user;
-      // 按用户 ID 隔离 profile 数据（不同账户登录不串）
-      const scopedKey = user?.sub ? `${PROFILE_KEY}_${user.sub}` : PROFILE_KEY;
-      try {
-        const raw = localStorage.getItem(scopedKey);
-        if (raw) {
-          const p = JSON.parse(raw);
-          if (p.name && p.grade) userProfile.value = p;
-          else if (p.name && p.gradeBand) userProfile.value = { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
-        } else {
-          userProfile.value = null;
-        }
-      } catch { userProfile.value = null; }
+      userProfile.value = loadProfileFallback(user?.sub);
       if (!userProfile.value) router.push('/setup');
     });
     fetchSubscription();
