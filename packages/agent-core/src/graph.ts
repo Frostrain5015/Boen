@@ -440,8 +440,19 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
 
   const awaitQuestion = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
-    const quiz = last?.tool_calls?.find((call) => QUIZ_TOOL_NAMES.has(call.name));
+    if (!last?.tool_calls?.length) throw new Error('没有工具调用');
+    const quiz = last.tool_calls.find((call) => QUIZ_TOOL_NAMES.has(call.name));
     if (!quiz?.id) throw new Error('出题工具缺少可恢复的调用 ID');
+
+    // 为非出题工具生成空 ToolMessage，防止 LangChain 校验失败
+    // （模型可能同时调用了 advance_step + ask_multiple_choice，
+    //   路由到 awaitQuestion 后只处理出题，非出题工具的 tool_call 会无对应响应）
+    const stubMessages: ToolMessage[] = [];
+    for (const call of last.tool_calls) {
+      if (!QUIZ_TOOL_NAMES.has(call.name) && call.id) {
+        stubMessages.push(new ToolMessage({ content: '', tool_call_id: call.id }));
+      }
+    }
 
     const resume = interrupt<QuestionInterrupt, QuestionResume>({
       type: 'question',
@@ -459,7 +470,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       tool_call_id: quiz.id,
     });
 
-    return { messages: [answerMessage], questionResumeType: resume.type };
+    return { messages: [answerMessage, ...stubMessages], questionResumeType: resume.type };
   };
 
   function continueAfterQuestion(state: State): 'agent' | '__end__' {
