@@ -50,11 +50,12 @@ async function main() {
   console.log('\n[Step2] 删除空壳题…', purgeEmptyMistakes(false));
   console.log('[Step2] 去重…', await dedupeMistakes({ dryRun: false }));
 
-  // Step 3：LLM 重建技能库
-  const apiKey = process.env.BOEN_API_KEY ?? process.env.DEEPSEEK_API_KEY;
+  // Step 3：LLM 重建技能库（与 index.ts createModel('default') 完全一致）
+  const provider = (process.env.BOEN_PROVIDER === 'anthropic' || process.env.BOEN_PROVIDER === 'deepseek') ? process.env.BOEN_PROVIDER : 'openai';
+  const apiKey = process.env.BOEN_API_KEY ?? process.env.DEEPSEEK_API_KEY ?? '';
   if (!apiKey) throw new Error('缺少 BOEN_API_KEY / DEEPSEEK_API_KEY，无法调用 LLM 重建');
   const model = getChatModel({
-    provider: (process.env.BOEN_PROVIDER === 'anthropic' || process.env.BOEN_PROVIDER === 'deepseek') ? process.env.BOEN_PROVIDER : 'deepseek',
+    provider,
     model: process.env.BOEN_MODEL ?? 'deepseek-v4-flash',
     apiKey,
     baseUrl: process.env.BOEN_BASE_URL,
