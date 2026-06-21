@@ -133,7 +133,8 @@ export const useChatStore = defineStore('chat', () => {
       if (cur && cur.kind === 'assistant' && !cur.text.trim()) items.value.splice(idx.value, 1);
       items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
       idx.value = -1;
-      scrollDown(true);
+      // 题目卡片渲染后（含 Markdown/TikZ）滚动到最新
+      nextTick(() => scrollDown(true));
     } else if (e.type === 'title_updated') {
       const conv = conversations.value.find((c) => c.id === e.conversationId);
       if (conv) conv.title = e.title;

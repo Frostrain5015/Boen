@@ -1,19 +1,40 @@
 # 更新日志
 
-## v0.3.3（当前）
+## v0.3.5（当前）
 
-### 可靠性与安全
-- TikZ 渲染改为受限异步子进程：并发队列、用户级限流、TikZ 子集校验、SVG 安全检查与结构化日志
-- 流式请求必须收到 SSE `done` 帧才视为成功；断线后同步已保存会话，避免盲目重放生成请求
-- 增加全局离线提示、离线发送拦截与移动端断点实时同步
+### 熟练度系统重写
+- Elo 参数全面校准：`ELO_RATING_INIT=0`、`ELO_K_BASE=8`、`ELO_SCALING=15`
+- 结构化学习模式 `modeMult=2.0`（review/weakness/exam），qa=1.0、preview=0.7、explore=0.4
+- 逐题增量追踪：缓存模式用 running `expectedRating` 而非 DB 静态值，每题展示该题带来的增量变化
+- 前驱反向传播：缓存模式下答对知识点时，前驱节点同步获得小幅 boost，前端一并展示
+- `flushProficiencyCache` 直接以 `expectedRating` 写入，不再经过 `updateProficiency` 的累计单次 Elo
+- StarDisplay 统一线性映射 `Math.round(v/10)/2`，`starDiffers` 与之对齐
+- 结算弹窗显示详细熟练度变化，箭头从裸文字改为绿色/粉色 badge 样式
+- 移除「新」徽章，首次答题即显示 0 星
 
-### 前端体验
-- 流式正文全程保留 pending 动画；工具卡片文案移除句点，由尾部状态标记统一表达
-- 删除最后一条错题后正确回退到“暂无错题记录”空态；修复筛选刷新、图片竞态与侧边栏路由同步
+### 错误修复
+- 出题卡片消失：`awaitQuestion` 恢复后为非出题工具 `tool_call` 注入空 ToolMessage
+- 提交答案中断：`shouldContinue` 保持原始路由，stub 消息直接操作 `state.messages` 
+- 专项练习规划卡死：`BoenMode` 补 `practice`，`mode` 设为 `practice` 而非 `qa`
+- 选择题选项重复：prompt + schema + `cleanMultipleChoiceStem` 三重防护
+- 课堂空章节：`seed-kp.ts` 补全 3 年级数学知识点（33+39 KPs）
+- 年级重置初二：`checkAuth` 补扫 scoped profile key
+- 登录崩溃：修复 `as any[]` 链式 filter 的 esbuild 编译错误
+- SSE 流中断：`process.on('uncaughtException')` 兜底 + `for await` try-catch + keepalive ping
+- nginx `send_timeout` 设 86400s，覆盖默认 60s
+- 前驱箭头反向：去掉 `before` 的 `Math.round`，前后都用原始 float 比较
+- 结算重复覆盖：`handleSessionExit` 在 cache 为空时不发 settlement
+- 错题本映射始终为空：`listMistakes` 批量加载 mappings/assets/styleFeature
+- 填空题 LLM 评分：逐空调 N 次改为整题一次调用 + 考试模式统一接口
+- 填空题证据改为中文、错因诊断改进、缓存模式用预期熟练度、分数改为星星
 
-### 文档与版本
-- 全部 workspace manifest、前端版本标记升级至 v0.3.3
-- README 与课程文档更正 SQLite、包目录和课程覆盖范围说明
+### 测试
+- 新增 105 项测试：33 纯函数验证 + 14 缓存机制 + 41 场景精算 + 17 压力测试
+- vitest 配置 + 4 个测试文件覆盖全部 7 种模式
+
+### 工程
+- PM2 `watch` 自动重启，git push 后无需手动部署
+- 全部 workspace manifest 升级至 v0.3.5
 
 ---
 
