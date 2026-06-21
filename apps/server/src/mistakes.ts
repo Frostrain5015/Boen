@@ -1102,7 +1102,13 @@ async function consolidateBatchSkills(
     new HumanMessage(prompt),
   ]);
   const content = typeof resp.content === 'string' ? resp.content : String(JSON.stringify(resp.content ?? null));
-  const parsed = safeParseJson(String(content || '[]'));
+  let parsed: unknown;
+  try {
+    parsed = safeParseJson(String(content || '[]'));
+  } catch (err) {
+    console.warn('[mistakes] consolidateBatchSkills JSON 解析失败，回退为逐条独立技能。原始响应前 300 字符:', content.slice(0, 300));
+    parsed = questionSummaries.map(() => ({}));
+  }
   const arr = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
   return arr.slice(0, MAX_BATCH_SKILLS).map(coerceConsolidatedSkill);
 }
@@ -1789,8 +1795,12 @@ export async function rebuildStyleSkillsWithLLM(model: BaseChatModel): Promise<{
         r.correct_answer ? `正确:${r.correct_answer}` : '',
         (r.error_reason || r.error_type) ? `错因:${r.error_reason || r.error_type}` : '',
       ].filter(Boolean).join(' '));
-      const skills = await consolidateBatchSkills(model, summaries, b.subject, b.grade);
-      await sedimentConsolidatedSkills(skills, b.subject, b.grade, chunk[0]?.user_id ?? 'rebuild');
+      try {
+        const skills = await consolidateBatchSkills(model, summaries, b.subject, b.grade);
+        await sedimentConsolidatedSkills(skills, b.subject, b.grade, chunk[0]?.user_id ?? 'rebuild');
+      } catch (err) {
+        console.warn(`[mistakes] rebuild 桶 ${b.subject}/${b.grade} chunk ${i}-${i+CHUNK} 失败（跳过）:`, err instanceof Error ? err.message : String(err));
+      }
     }
     await maybeConsolidateBucket(model, b.subject, b.grade);
   }
