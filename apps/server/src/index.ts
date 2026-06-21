@@ -326,7 +326,6 @@ async function runGraph(
   }, 30_000);
 
   try {
-    try {
       for await (const ev of events) {
     if (ev.event === 'on_chat_model_stream') {
       const chunk = ev.data?.chunk as
