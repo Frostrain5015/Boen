@@ -75,6 +75,16 @@ export const useAuthStore = defineStore('auth', () => {
     authenticated.value = auth;
     if (auth) {
       currentUser.value = await getCurrentUser();
+      // 加载用户隔离的 profile（saveProfile 保存时带 sub scope，loadProfile 无 scope 读不到）
+      const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : PROFILE_KEY;
+      try {
+        const raw = localStorage.getItem(scopedKey);
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p.name && p.grade) userProfile.value = p;
+          else if (p.name && p.gradeBand) userProfile.value = { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+        }
+      } catch { /* ignore corrupt data */ }
       const chatStore = useChatStore();
       const examStore = useExamStore();
       await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription()]);
