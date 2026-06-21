@@ -4,9 +4,9 @@ import confetti from 'canvas-confetti';
 import { CheckCircle2, XCircle, Sparkles, Lightbulb, PencilLine, ChevronDown, ChevronUp, GraduationCap, BrainCircuit } from 'lucide-vue-next';
 import StarDisplay from '@/components/StarDisplay.vue';
 
-/** 判断两个分数对应的星级是否不同（仅在半星阈值变化时显示） */
+/** 判断两个分数对应的星级是否不同（需与 StarDisplay.starVal 线性映射一致） */
 function starDiffers(before: number, after: number): boolean {
-  const s = (v: number) => { if (v < 0) return 0; return Math.round(Math.round(5 * Math.pow(v / 100, 0.7) * 2) / 2 * 2) / 2; };
+  const s = (v: number) => { if (v < 0) return 0; return Math.round(Math.max(0, v) / 10) / 2; };
   return s(before) !== s(after);
 }
 import type { QuestionPayload, AnswerPayload, GradingResult } from '@boen/shared';
@@ -329,7 +329,7 @@ watch(
               <span class="text-[var(--ink-soft)]">{{ pc.kp }}</span>
               <span v-if="pc.before >= 0" class="inline-flex items-center gap-1">
                 <StarDisplay v-if="starDiffers(pc.before, pc.after)" :score="pc.after" :animateFrom="pc.before" />
-                <StarDisplay v-else :score="pc.before" />
+                <StarDisplay v-else :score="pc.after" />
               </span>
               <span v-else class="font-semibold text-[var(--accent-strong)]">新</span>
             </div>

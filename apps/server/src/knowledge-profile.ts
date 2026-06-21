@@ -117,14 +117,14 @@ export function computeProficiencyDelta(
   maxScore: number,
   mode: string,
   lastUpdated: number,
-): { newRating: number; delta: number } {
+): { newRating: number; newSigma: number; delta: number } {
   const now = Math.floor(Date.now() / 1000);
   const sigmaBefore = applyForgetting(oldSigma, lastUpdated, now);
   const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
   const modeMult = MODE_ELO_MULTIPLIERS[mode] ?? 1.0;
   const observed = maxScore > 0 ? Math.min(1, (score / maxScore) * modeMult) : 0;
-  const { newRating, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, mode);
-  return { newRating: Math.round(newRating), delta: Math.round(delta * 10) / 10 };
+  const { newRating, newSigma, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, mode);
+  return { newRating: Math.round(newRating), newSigma, delta: Math.round(delta * 10) / 10 };
 }
 
 /** 遗忘：距上次练习每过一天 sigma 涨 0.5，上限 ELO_SIGMA_MAX */
@@ -160,6 +160,12 @@ export interface CachedUpdate {
   maxScore: number;
   mode: string;
   count: number;
+  /** 逐题增量展示用的预期 Running Rating（初始从 DB 读，每答一题更新） */
+  expectedRating: number;
+  /** 对应的预期 sigma */
+  expectedSigma: number;
+  /** 最近一次逐题计算的时间戳 */
+  computedAt: number;
 }
 
 const PROFICIENCY_CACHE = new Map<string, Map<number, CachedUpdate>>();
@@ -169,7 +175,9 @@ function cacheKey(userId: string, threadId: string): string {
 }
 
 /**
- * 缓存一次熟练度更新（结构化学习模式下使用）
+ * 缓存一次熟练度更新（结构化学习模式下使用）。
+ * score/maxScore 累计用于结算 flush；expectedRating/expectedSigma 由
+ * initCachedProficiencyExpected / updateCachedProficiencyExpected 管理。
  */
 export function cacheProficiencyUpdate(userId: string, threadId: string, kgNodeId: number, score: number, maxScore: number, mode: string): void {
   const key = cacheKey(userId, threadId);
@@ -181,7 +189,12 @@ export function cacheProficiencyUpdate(userId: string, threadId: string, kgNodeI
     existing.maxScore += maxScore;
     existing.count++;
   } else {
-    userCache.set(kgNodeId, { score, maxScore, mode, count: 1 });
+    userCache.set(kgNodeId, {
+      score, maxScore, mode, count: 1,
+      expectedRating: -1,     // -1 = 未初始化，由 initCached… 填
+      expectedSigma: -1,
+      computedAt: 0,
+    });
   }
 }
 
@@ -219,6 +232,48 @@ export function getCachedProficiencySum(userId: string, threadId: string, kgNode
   if (!userCache) return null;
   const entry = userCache.get(kgNodeId);
   return entry ? { score: entry.score, maxScore: entry.maxScore, mode: entry.mode } : null;
+}
+
+/**
+ * 读取或初始化该知识点的预期 Running Rating。
+ * 第一次答题时从 DB 读取，后续答题使用缓存中上一次计算的结果，
+ * 实现「逐题增量展示」：每道题的 before/after 反映的是本题带来的变化，
+ * 而不是从会话起点累计的总额变化。
+ */
+export function getCachedProficiencyExpected(
+  userId: string, threadId: string, kgNodeId: number,
+  dbRating: number, dbSigma: number, dbLastUpdated: number,
+): { rating: number; sigma: number; lastUpdated: number } {
+  const key = cacheKey(userId, threadId);
+  const userCache = PROFICIENCY_CACHE.get(key);
+  const entry = userCache?.get(kgNodeId);
+  if (entry && entry.expectedRating >= 0) {
+    return { rating: entry.expectedRating, sigma: entry.expectedSigma, lastUpdated: entry.computedAt };
+  }
+  // 第一次：初始化为 DB 值（或默认值）
+  if (entry) {
+    entry.expectedRating = dbRating;
+    entry.expectedSigma = dbSigma;
+    entry.computedAt = dbLastUpdated || Math.floor(Date.now() / 1000);
+  }
+  return { rating: dbRating, sigma: dbSigma, lastUpdated: dbLastUpdated };
+}
+
+/**
+ * 更新缓存中该知识点的预期 Running Rating（每次答题计算后调用）。
+ */
+export function setCachedProficiencyExpected(
+  userId: string, threadId: string, kgNodeId: number,
+  newRating: number, newSigma: number,
+): void {
+  const key = cacheKey(userId, threadId);
+  const userCache = PROFICIENCY_CACHE.get(key);
+  const entry = userCache?.get(kgNodeId);
+  if (entry) {
+    entry.expectedRating = newRating;
+    entry.expectedSigma = newSigma;
+    entry.computedAt = Math.floor(Date.now() / 1000);
+  }
 }
 
 // ── CRUD ─────────────────────────────────────

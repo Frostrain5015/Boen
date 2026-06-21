@@ -25,7 +25,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, computeProficiencyDelta, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -1705,18 +1705,23 @@ app.post('/api/answer', async (c) => {
           const isCached = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(currentMode);
 
           if (isCached) {
-            // 结构化学习模式：先缓存累加，再用缓存累计值计算预期熟练度变化（不写库）。
-            // 这样即使结算前多道题命中同一知识点，每题的预期变化都能正确叠加展示。
+            // 结构化学习模式：不写库，用缓存累计 score/maxScore 用于结算 flush。
+            // 逐题展示时不用累计值（否则 oldRating 来自 DB 静态值，展示的是从
+            // 会话起点累计的总额），而是追踪内存中的预期 Running Rating：
+            // 每道题用 result.score/maxScore 算单题变化，并累进到
+            // expectedRating，下一题的 oldRating 就是上一题的 newRating。
             cacheProficiencyUpdate(userId, body.threadId, node.id, result.score, result.maxScore, currentMode);
-            const cached = getCachedProficiencySum(userId, body.threadId, node.id);
-            if (cached) {
-              const dbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
-              const oldRating = dbRow?.rating ?? ELO_RATING_INIT;
-              const oldSigma = dbRow?.rating_sigma ?? ELO_SIGMA_INIT;
-              const lastUpdated = dbRow?.last_updated ?? 0;
-              const { newRating } = computeProficiencyDelta(oldRating, oldSigma, cached.score, cached.maxScore, cached.mode, lastUpdated);
-              profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
-            }
+            const dbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
+            const { rating: oldRating, sigma: oldSigma, lastUpdated } = getCachedProficiencyExpected(
+              userId, body.threadId, node.id,
+              dbRow?.rating ?? ELO_RATING_INIT,
+              dbRow?.rating_sigma ?? ELO_SIGMA_INIT,
+              dbRow?.last_updated ?? 0,
+            );
+            // 用本次答题的得分（非累计值）算单题 Elo 增量
+            const { newRating, newSigma } = computeProficiencyDelta(oldRating, oldSigma, result.score, result.maxScore, currentMode, lastUpdated);
+            setCachedProficiencyExpected(userId, body.threadId, node.id, newRating, newSigma);
+            profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
           } else {
             // 普通模式：直接写库后读取新值
             const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
