@@ -1747,6 +1747,32 @@ app.post('/api/answer', async (c) => {
             setCachedProficiencyExpected(userId, body.threadId, node.id, newRating, newSigma);
             // before 始终用 oldRating（首次答题时为 ELO_RATING_INIT=0），不再显示「新」
             profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
+
+            // ── 前驱反向传播：明显答对时给前置知识点小幅 boost ──
+            if (result.score > result.maxScore * 0.6) {
+              const prereqRows = db.prepare(`
+                SELECT e.source_id AS id, n.title FROM kg_edges e
+                JOIN kg_nodes n ON n.id=e.source_id
+                WHERE e.target_id=? AND e.type='prerequisite'
+              `).all(node.id) as Array<{ id: number; title: string }>;
+              for (const pre of prereqRows) {
+                // 读取或初始化前驱的 cache expected
+                const preDbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, pre.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
+                // 先确保缓存中有该前驱的条目（用 score=0 初始化，不累计正确数）
+                cacheProficiencyUpdate(userId, body.threadId, pre.id, 0, 0, currentMode);
+                const preState = getCachedProficiencyExpected(
+                  userId, body.threadId, pre.id,
+                  preDbRow?.rating ?? ELO_RATING_INIT,
+                  preDbRow?.rating_sigma ?? ELO_SIGMA_INIT,
+                  preDbRow?.last_updated ?? 0,
+                );
+                const preExpected = expectedCorrectness(preState.rating, qDifficulty);
+                const preDelta = 2 * (1.0 - preExpected); // ELO_K_PROPAGATE = 2
+                const preNewRating = Math.max(0, Math.min(100, preState.rating + preDelta));
+                setCachedProficiencyExpected(userId, body.threadId, pre.id, preNewRating, preState.sigma);
+                profChanges.push({ kp: pre.title, before: Math.round(preState.rating), after: Math.round(preNewRating) });
+              }
+            }
           } else {
             // 普通模式：直接写库后读取新值
             const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;

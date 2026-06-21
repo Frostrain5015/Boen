@@ -216,20 +216,58 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
   const userCache = PROFICIENCY_CACHE.get(key);
   if (!userCache || userCache.size === 0) return { count: 0, changes: [] };
   const changes: Array<{ kpTitle: string; before: number; after: number }> = [];
+  const now = Math.floor(Date.now() / 1000);
   for (const [kgNodeId, update] of userCache) {
-    // 读旧值
-    const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
+    // 读旧值（含答题计数）
+    const oldRow = db.prepare('SELECT weighted_score, correct_count, total_count FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number; correct_count: number; total_count: number } | undefined;
     const before = oldRow?.weighted_score ?? -1;
-    // 用累计 correct_count/total_count 更新（保留答题计数准确）
-    updateProficiency(userId, kgNodeId, update.score, update.maxScore, update.mode);
-    // 用缓存的预期 Running Rating 覆盖单次累计计算的 rating（更准确）
-    // 因为 updateProficiency 把累计 score/maxScore 当单次观测计算，会丢失逐题 sigma 衰减
+    const oldCorrect = oldRow?.correct_count ?? 0;
+    const oldTotal = oldRow?.total_count ?? 0;
+
+    // 直接用缓存的预期 Running Rating 写库（不经过 updateProficiency 的累计单次 Elo）
+    // correct_count / total_count 累加 DB 旧值，避免重复计数
     if (update.expectedRating >= 0) {
       db.prepare(`
-        UPDATE user_kp_proficiency SET rating=?, rating_sigma=?, weighted_score=?
-        WHERE user_id=? AND kg_node_id=?
-      `).run(update.expectedRating, update.expectedSigma, Math.round(update.expectedRating), userId, kgNodeId);
+        INSERT INTO user_kp_proficiency (user_id, kg_node_id, correct_count, total_count, weighted_score, rating, rating_sigma, last_updated)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, kg_node_id) DO UPDATE SET
+          correct_count = excluded.correct_count,
+          total_count = excluded.total_count,
+          weighted_score = excluded.weighted_score,
+          rating = excluded.rating,
+          rating_sigma = excluded.rating_sigma,
+          last_updated = excluded.last_updated
+      `).run(userId, kgNodeId,
+        oldCorrect + update.score,
+        oldTotal + update.maxScore,
+        Math.round(update.expectedRating),
+        update.expectedRating,
+        update.expectedSigma,
+        now,
+      );
+
+      // 前驱反向传播（明显答对时给前驱小幅 boost）
+      if (update.expectedRating > ELO_RATING_INIT + 1 || update.score > update.maxScore * 0.6) {
+        const prereqs = db.prepare(`
+          SELECT e.source_id FROM kg_edges e WHERE e.target_id=? AND e.type='prerequisite'
+        `).all(kgNodeId) as Array<{ source_id: number }>;
+        for (const prereq of prereqs) {
+          const prev = db.prepare(`SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, prereq.source_id) as any;
+          if (!prev) continue;
+          const preSigma = applyForgetting(prev.rating_sigma ?? ELO_SIGMA_INIT, prev.last_updated ?? 0, now);
+          const preExpected = expectedCorrectness(prev.rating ?? ELO_RATING_INIT, ELO_DEFAULT_DIFFICULTY);
+          const preDelta = ELO_K_PROPAGATE * (1.0 - preExpected);
+          const preNewRating = Math.max(0, Math.min(100, (prev.rating ?? ELO_RATING_INIT) + preDelta));
+          const preNewSigma = Math.max(ELO_SIGMA_MIN, Math.min(ELO_SIGMA_MAX, preSigma * 0.9));
+          db.prepare(`UPDATE user_kp_proficiency SET rating=?, rating_sigma=?, last_updated=? WHERE user_id=? AND kg_node_id=?`)
+            .run(Math.round(preNewRating * 10) / 10, Math.round(preNewSigma * 10) / 10, now, userId, prereq.source_id);
+        }
+      }
+    } else {
+      // 兜底：expectedRating 未初始化时回退到 updateProficiency
+      updateProficiency(userId, kgNodeId, update.score, update.maxScore, update.mode);
     }
+
     // 读新值
     const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
     const after = newRow?.weighted_score ?? -1;
