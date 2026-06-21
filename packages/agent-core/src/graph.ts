@@ -429,17 +429,10 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     if (!last || !isAIMessage(last) || !last.tool_calls?.length) return '__end__';
 
-    const hasQuiz = last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name));
-    const hasNonQuiz = last.tool_calls.some((call) => !QUIZ_TOOL_NAMES.has(call.name));
-
-    // 既出题又调其他工具（如 advance_step + ask_multiple_choice），
-    // 先走 ToolNode 执行非出题工具，再让 agent 重跑只发出题调用。
-    if (hasQuiz && hasNonQuiz) return 'tools';
-
     // 题目工具是人机协作边界，不是立即执行的服务端函数。它进入
     // awaitQuestion 节点，以 interrupt 持久化暂停；学生作答后再由
     // Command.resume 回到同一节点，写入 ToolMessage 并继续教学。
-    if (hasQuiz) return 'awaitQuestion';
+    if (last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name))) return 'awaitQuestion';
 
     // 备课、步骤推进、知识点查询等工具仍由 ToolNode 正常执行。
     return 'tools';
@@ -449,6 +442,16 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
     const quiz = last?.tool_calls?.find((call) => QUIZ_TOOL_NAMES.has(call.name));
     if (!quiz?.id) throw new Error('出题工具缺少可恢复的调用 ID');
+
+    // 为非出题工具注入 ToolMessage，防止 LangChain 校验失败
+    // ⚠ 直接操作 state.messages 数组：interrupt 前的变更会被 checkpoint 持久化
+    for (const call of last?.tool_calls ?? []) {
+      if (!QUIZ_TOOL_NAMES.has(call.name) && call.id) {
+        (state.messages as any[]).push(
+          new ToolMessage({ content: '已拦截（非出题工具）', tool_call_id: call.id }),
+        );
+      }
+    }
 
     const resume = interrupt<QuestionInterrupt, QuestionResume>({
       type: 'question',
