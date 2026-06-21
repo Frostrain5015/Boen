@@ -60,7 +60,7 @@ export const ELO_RATING_INIT = 0;
 export const ELO_SIGMA_INIT = 20;
 const ELO_SIGMA_MIN = 3;
 const ELO_SIGMA_MAX = 25;
-const ELO_K_BASE = 12;
+const ELO_K_BASE = 8;
 const ELO_SCALING = 15;      // logistic scaling factor
 const ELO_DEFAULT_DIFFICULTY = 50;
 

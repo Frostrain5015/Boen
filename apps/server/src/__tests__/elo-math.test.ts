@@ -35,7 +35,7 @@ describe('starVal（线性映射）', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// review 模式 (modeMult=2.0, K_BASE=12)
+// review 模式 (modeMult=2.0, K_BASE=8)
 // ═══════════════════════════════════════════════════════════
 describe('review 模式 — 5 道全对', () => {
   const MODE = 'review';
@@ -61,12 +61,12 @@ describe('review 模式 — 5 道全对', () => {
     });
   });
 
-  it('第 4 题应达 4.0★（rating≥75）', () => {
-    expect(results[3].stars).toBeGreaterThanOrEqual(4.0);
+  it('第 4 题应达 3.5★（rating≥65）', () => {
+    expect(results[3].stars).toBeGreaterThanOrEqual(3.5);
   });
 
-  it('第 5 题应达 4.5★（rating≥85）', () => {
-    expect(results[4].stars).toBeGreaterThanOrEqual(4.5);
+  it('第 5 题应达 4.0★（rating≥75）', () => {
+    expect(results[4].stars).toBeGreaterThanOrEqual(4.0);
   });
 });
 
@@ -94,8 +94,8 @@ describe('review 模式 — 1 错 4 对', () => {
     expect(snapshots[0]).toBeLessThanOrEqual(5);
   });
 
-  it('最终应恢复到 4.0★ 以上（rating≥75）', () => {
-    expect(snapshots[4]).toBeGreaterThanOrEqual(75);
+  it('最终应恢复到 3.5★ 以上（rating≥65）', () => {
+    expect(snapshots[4]).toBeGreaterThanOrEqual(65);
   });
 });
 
@@ -132,10 +132,10 @@ describe('qa 模式 — 5 道全对', () => {
     sigma = r.newSigma;
   }
 
-  it('最终应在 3.0★~3.5★ 区间', () => {
+  it('最终应在 2.5★~3.0★ 区间', () => {
     const stars = starVal(rating);
-    expect(stars).toBeGreaterThanOrEqual(3.0);
-    expect(stars).toBeLessThanOrEqual(3.5);
+    expect(stars).toBeGreaterThanOrEqual(2.5);
+    expect(stars).toBeLessThanOrEqual(3.0);
   });
 });
 

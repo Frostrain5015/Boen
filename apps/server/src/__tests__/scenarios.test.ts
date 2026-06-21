@@ -38,11 +38,11 @@ const SCENARIOS: Scenario[] = [
   // ═══ exam 模式（同 review，modeMult=2.0）═══
   { name: 'exam-5全对', mode: 'exam', steps: '11111', expectMinStars: 4.0, expectMaxStars: 5.0 },
   // ═══ qa 模式（modeMult=1.0）═══
-  { name: 'qa-5全对', mode: 'qa', steps: '11111', expectMinStars: 3.0, expectMaxStars: 4.0 },
-  { name: 'qa-1错4对', mode: 'qa', steps: '01111', expectMinStars: 2.5, expectMaxStars: 4.0 },
+  { name: 'qa-5全对', mode: 'qa', steps: '11111', expectMinStars: 2.5, expectMaxStars: 3.5 },
+  { name: 'qa-1错4对', mode: 'qa', steps: '01111', expectMinStars: 2.0, expectMaxStars: 3.5 },
   { name: 'qa-5全错', mode: 'qa', steps: '00000', expectMinStars: 0, expectMaxStars: 1.0 },
   // ═══ preview 模式（modeMult=0.7）═══
-  { name: 'preview-5全对', mode: 'preview', steps: '11111', expectMinStars: 2.5, expectMaxStars: 3.5 },
+  { name: 'preview-5全对', mode: 'preview', steps: '11111', expectMinStars: 2.0, expectMaxStars: 3.0 },
   // ═══ explore 模式（modeMult=0.4）═══
   { name: 'explore-5全对', mode: 'explore', steps: '11111', expectMinStars: 1.0, expectMaxStars: 2.0 },
 ];
@@ -103,8 +103,8 @@ describe('所有模式下 rating 不越界', () => {
 
 describe('难度组合场景', () => {
   const SCENARIOS: { name: string; difficulties: string[]; steps: string; expectStars: number }[] = [
-    { name: 'easy 题全对 → 涨得少', difficulties: ['easy', 'easy', 'easy', 'easy', 'easy'], steps: '11111', expectStars: 3.5 },
-    { name: 'hard 题全对 → 涨得多', difficulties: ['hard', 'hard', 'hard', 'hard', 'hard'], steps: '11111', expectStars: 5.0 },
+    { name: 'easy 题全对 → 涨得少', difficulties: ['easy', 'easy', 'easy', 'easy', 'easy'], steps: '11111', expectStars: 3.0 },
+    { name: 'hard 题全对 → 涨得多', difficulties: ['hard', 'hard', 'hard', 'hard', 'hard'], steps: '11111', expectStars: 4.5 },
   ];
 
   for (const sc of SCENARIOS) {
