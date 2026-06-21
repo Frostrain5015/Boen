@@ -1750,27 +1750,30 @@ app.post('/api/answer', async (c) => {
 
             // ── 前驱反向传播：明显答对时给前置知识点小幅 boost ──
             if (result.score > result.maxScore * 0.6) {
-              const prereqRows = db.prepare(`
-                SELECT e.source_id AS id, n.title FROM kg_edges e
-                JOIN kg_nodes n ON n.id=e.source_id
-                WHERE e.target_id=? AND e.type='prerequisite'
-              `).all(node.id) as Array<{ id: number; title: string }>;
-              for (const pre of prereqRows) {
-                // 读取或初始化前驱的 cache expected
-                const preDbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, pre.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
-                // 先确保缓存中有该前驱的条目（用 score=0 初始化，不累计正确数）
-                cacheProficiencyUpdate(userId, body.threadId, pre.id, 0, 0, currentMode);
-                const preState = getCachedProficiencyExpected(
-                  userId, body.threadId, pre.id,
-                  preDbRow?.rating ?? ELO_RATING_INIT,
-                  preDbRow?.rating_sigma ?? ELO_SIGMA_INIT,
-                  preDbRow?.last_updated ?? 0,
-                );
-                const preExpected = expectedCorrectness(preState.rating, qDifficulty);
-                const preDelta = 2 * (1.0 - preExpected); // ELO_K_PROPAGATE = 2
-                const preNewRating = Math.max(0, Math.min(100, preState.rating + preDelta));
-                setCachedProficiencyExpected(userId, body.threadId, pre.id, preNewRating, preState.sigma);
-                profChanges.push({ kp: pre.title, before: Math.round(preState.rating), after: preNewRating });
+              try {
+                const prereqRows = db.prepare(`
+                  SELECT e.source_id AS id, n.title FROM kg_edges e
+                  JOIN kg_nodes n ON n.id=e.source_id
+                  WHERE e.target_id=? AND e.type='prerequisite'
+                `).all(node.id) as Array<{ id: number; title: string }>;
+                for (const pre of prereqRows) {
+                  const preDbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, pre.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
+                  cacheProficiencyUpdate(userId, body.threadId, pre.id, 0, 0, currentMode);
+                  const preState = getCachedProficiencyExpected(
+                    userId, body.threadId, pre.id,
+                    preDbRow?.rating ?? ELO_RATING_INIT,
+                    preDbRow?.rating_sigma ?? ELO_SIGMA_INIT,
+                    preDbRow?.last_updated ?? 0,
+                  );
+                  const preExpected = expectedCorrectness(preState.rating, qDifficulty);
+                  const preDelta = 2 * (1.0 - preExpected);
+                  const preNewRating = Math.max(0, Math.min(100, preState.rating + preDelta));
+                  setCachedProficiencyExpected(userId, body.threadId, pre.id, preNewRating, preState.sigma);
+                  profChanges.push({ kp: pre.title, before: Math.round(preState.rating), after: preNewRating });
+                  console.log(`[前驱传播] ${pre.title}: ${Math.round(preState.rating)} → ${preNewRating.toFixed(1)} (delta=${preDelta.toFixed(2)})`);
+                }
+              } catch (preErr) {
+                console.warn('[前驱传播] 执行异常:', preErr instanceof Error ? preErr.message : preErr);
               }
             }
           } else {

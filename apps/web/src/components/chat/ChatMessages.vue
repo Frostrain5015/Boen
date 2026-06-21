@@ -176,8 +176,8 @@ onMounted(() => {
                 <span class="flex-1 min-w-0 truncate font-medium text-[var(--ink)]">{{ pc.kpTitle }}</span>
                 <span class="inline-flex items-center gap-0.5">
                   <StarDisplay :score="pc.after" :animateFrom="pc.before" />
-                  <span v-if="pc.after > pc.before" class="text-[11px] leading-none text-[#18a558]">↑</span>
-                  <span v-else-if="pc.after < pc.before" class="text-[11px] leading-none text-[#f2557a]">↓</span>
+                  <span v-if="pc.after > pc.before" class="inline-flex items-center rounded-md bg-[#e7f7ee] px-1 py-0.5 text-[10px] font-bold leading-none text-[#18a558]">↑</span>
+                  <span v-else-if="pc.after < pc.before" class="inline-flex items-center rounded-md bg-[#fdeaef] px-1 py-0.5 text-[10px] font-bold leading-none text-[#f2557a]">↓</span>
                 </span>
               </div>
             </div>
