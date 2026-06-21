@@ -129,12 +129,14 @@ export const useChatStore = defineStore('chat', () => {
       isGeneratingQuiz.value = true;
     } else if (e.type === 'question') {
       isGeneratingQuiz.value = false;
-      const cur = items.value[idx.value];
-      if (cur && cur.kind === 'assistant' && !cur.text.trim()) items.value.splice(idx.value, 1);
       items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
       idx.value = -1;
-      // 题目卡片渲染后（含 Markdown/TikZ）滚动到最新
-      nextTick(() => scrollDown(true));
+      // 题目卡片渲染后滚动到最新（多次尝试以覆盖 Markdown/TikZ 等异步渲染）
+      nextTick(() => {
+        scrollDown(true);
+        setTimeout(() => scrollDown(true), 100);
+        setTimeout(() => scrollDown(true), 500);
+      });
     } else if (e.type === 'title_updated') {
       const conv = conversations.value.find((c) => c.id === e.conversationId);
       if (conv) conv.title = e.title;

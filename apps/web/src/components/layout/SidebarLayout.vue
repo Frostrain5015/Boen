@@ -181,7 +181,7 @@ function onSubmenuLeave(el: Element) {
             <span class="brand-text-bg">博文 Boen</span>
             <span class="brand-text-overlay">博文 Boen</span>
           </span>
-          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.3</span>
+          <span class="text-[10px] font-medium text-(--ink-soft)/60 ml-0.5 mt-0.5">v0.3.5</span>
         </div>
         <button @click="uiStore.sidebarOpen = false" class="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50" title="收起侧栏">
           <ChevronLeft class="h-4 w-4 text-[var(--ink-soft)]" />

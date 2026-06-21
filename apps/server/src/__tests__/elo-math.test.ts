@@ -35,7 +35,7 @@ describe('starVal（线性映射）', () => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// review 模式 (modeMult=2.0, K_BASE=8)
+// review 模式 (modeMult=2.0, K_BASE=12)
 // ═══════════════════════════════════════════════════════════
 describe('review 模式 — 5 道全对', () => {
   const MODE = 'review';
@@ -132,10 +132,10 @@ describe('qa 模式 — 5 道全对', () => {
     sigma = r.newSigma;
   }
 
-  it('最终应在 2.5★~3.0★ 区间', () => {
+  it('最终应在 3.0★~3.5★ 区间', () => {
     const stars = starVal(rating);
-    expect(stars).toBeGreaterThanOrEqual(2.5);
-    expect(stars).toBeLessThanOrEqual(3.0);
+    expect(stars).toBeGreaterThanOrEqual(3.0);
+    expect(stars).toBeLessThanOrEqual(3.5);
   });
 });
 
