@@ -33,7 +33,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, expectedCorrectness, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,

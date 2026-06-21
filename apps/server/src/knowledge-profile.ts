@@ -90,7 +90,7 @@ export function difficultyLevelToValue(level?: string): number {
 }
 
 /** 逻辑期望：给定 rating 和题目难度，预期正确率 */
-function expectedCorrectness(rating: number, difficulty: number): number {
+export function expectedCorrectness(rating: number, difficulty: number): number {
   return 1 / (1 + Math.exp(-(rating - difficulty) / ELO_SCALING));
 }
 
