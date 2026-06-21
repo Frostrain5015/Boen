@@ -11,6 +11,7 @@
     "repair:kg": "tsx src/production-kg.ts",
     "verify:kg": "tsx src/production-kg.ts --verify",
     "verify:taxonomy": "tsx src/verify-question-taxonomy.ts",
+    "verify:interrupt": "tsx src/verify-question-interrupt.ts",
     "seed:weights": "tsx src/kg-weights.ts",
     "verify:curriculum": "tsx src/verify-curriculum.ts",
     "seed:kp": "tsx src/seed-kp.ts"

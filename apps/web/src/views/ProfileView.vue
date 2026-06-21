@@ -51,6 +51,21 @@ async function handleExplore(detail: { title: string; subject: Subject; grade: s
       for (const m of messages) {
         if (m.role === 'user') restored.push({ kind: 'user', text: m.content, createdAt: m.createdAt });
         else if (m.role === 'assistant') restored.push({ kind: 'assistant', text: m.content, done: true, createdAt: m.createdAt });
+        else if (m.role === 'system') {
+          try {
+            const meta = JSON.parse(m.content);
+            if (meta.__boen_type === 'question' && meta.payload) {
+              restored.push({
+                kind: 'question',
+                toolCallId: meta.toolCallId ?? '',
+                question: meta.payload,
+                answered: meta.answered === true,
+                grading: meta.grading,
+                userAnswer: meta.userAnswer,
+              });
+            }
+          } catch { /* ignore non-question system records */ }
+        }
       }
       chatStore.items = restored;
     }

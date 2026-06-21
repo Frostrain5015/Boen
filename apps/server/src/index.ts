@@ -5,7 +5,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
-import { HumanMessage, SystemMessage, ToolMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
   getChatModel,
@@ -16,7 +16,9 @@ import {
   gradeAnswer,
   EXIT_SESSION_TOOL, ADVANCE_STEP_TOOL, PLAN_STEPS_TOOL, SWITCH_SUBJECT_TOOL, LOOKUP_KNOWLEDGE_POINT_TOOL,
 } from '@boen/agent-core';
+import type { QuestionInterrupt, QuestionResume } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
+import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
@@ -185,13 +187,36 @@ function checkAndIncrementUsage(userId: string): { allowed: boolean; remaining: 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
 const runConfig = (threadId: string) => ({ version: 'v2' as const, configurable: { thread_id: threadId }, recursionLimit: 50 });
 
-/** 流式跑一次图：推送 token，结束后返回最后一条消息 */
+type GraphRunResult = {
+  last?: BaseMessage;
+  question?: ToolCall;
+};
+
+function getPendingQuestion(state: { tasks?: Array<{ interrupts?: Array<{ value?: unknown }> }> }): ToolCall | undefined {
+  for (const task of state.tasks ?? []) {
+    for (const interrupt of task.interrupts ?? []) {
+      const value = interrupt.value as Partial<QuestionInterrupt> | undefined;
+      if (
+        value?.type === 'question'
+        && typeof value.toolCallId === 'string'
+        && typeof value.toolName === 'string'
+        && value.args
+        && typeof value.args === 'object'
+      ) {
+        return { id: value.toolCallId, name: value.toolName, args: value.args as Record<string, unknown> };
+      }
+    }
+  }
+  return undefined;
+}
+
+/** 流式跑一次图：推送 token，并返回最后消息及持久化的人机题目暂停点。 */
 async function runGraph(
-  input: Record<string, unknown>,
+  input: Record<string, unknown> | Command<QuestionResume>,
   threadId: string,
   send: (e: SseEvent) => Promise<void>,
-): Promise<BaseMessage | undefined> {
-  const events = graph.streamEvents(input, runConfig(threadId));
+): Promise<GraphRunResult> {
+  const events = graph.streamEvents(input as any, runConfig(threadId));
   let quizSignaled = false; // 「博文正在出题」只发一次
   let toolNameBuf = '';     // 累积可能被切分到多个 chunk 的工具名片段
   // 出题工具名均以 ask_ 开头；前缀 + 全名双重匹配，兼容模型分片/整块返回 tool_call
@@ -337,11 +362,12 @@ async function runGraph(
   }
   const state = await graph.getState({ configurable: { thread_id: threadId } });
   const msgs = (state.values?.messages ?? []) as BaseMessage[];
+  const question = getPendingQuestion(state);
   // 返回最后一条 AI 消息（含 tool_calls），而非 exitSession 节点产生的 ToolMessage
   for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i]._getType() === 'ai') return msgs[i];
+    if (msgs[i]._getType() === 'ai') return { last: msgs[i], question };
   }
-  return msgs[msgs.length - 1];
+  return { last: msgs[msgs.length - 1], question };
 }
 
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
@@ -446,32 +472,32 @@ function databaseQuestionPayload(quiz: ToolCall, scope: QuestionScope): import('
   return { ...payload, ...taxonomy };
 }
 
-async function emitQuestionIfAny(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, scope: QuestionScope) {
-  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
-  const quiz = calls.find((c) => QUIZ_TOOL_NAMES.has(c.name));
+async function emitQuestionIfAny(quiz: ToolCall | undefined, send: (e: SseEvent) => Promise<void>, scope: QuestionScope) {
   if (quiz?.id) {
     await send({ type: 'question', toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) });
   }
 }
 
 /**
- * 若上一轮留下未作答的出题工具调用（AIMessage 带 tool_calls 但无 ToolMessage 响应），
- * 生成「跳过」ToolMessage 以保持消息序列合法——否则紧跟 HumanMessage 会让模型 API 报错。
+ * 对尚未作答的题目执行原生 interrupt 恢复，并将其标为跳过。
+ * awaitQuestion 节点会直接结束该轮，因此下一条用户消息可安全启动新一轮图执行。
  */
-async function pendingSkipToolMessages(threadId: string): Promise<ToolMessage[]> {
+async function resumePendingQuestionAsSkipped(threadId: string, send: (e: SseEvent) => Promise<void>): Promise<boolean> {
   const state = await graph.getState({ configurable: { thread_id: threadId } });
-  const msgs = (state.values?.messages ?? []) as BaseMessage[];
-  const last = msgs[msgs.length - 1] as AIMessage | undefined;
-  const calls = (last?.tool_calls ?? []) as ToolCall[];
-  return calls
-    .filter((t) => t.id)
-    .map((t) => new ToolMessage({ content: '（用户未作答此题，已跳过）', tool_call_id: t.id! }));
+  const question = getPendingQuestion(state);
+  if (!question?.id) return false;
+  await runGraph(new Command<QuestionResume>({
+    resume: {
+      type: 'skip',
+      toolCallId: question.id,
+      toolContent: '（用户未作答此题，已跳过）',
+    },
+  }), threadId, send);
+  return true;
 }
 
-/** 获取出题工具调用的结果（若最后一条消息触发了出题） */
-function extractQuestionPayload(last: BaseMessage | undefined, scope: QuestionScope): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
-  const calls = ((last as AIMessage | undefined)?.tool_calls ?? []) as ToolCall[];
-  const quiz = calls.find((c) => QUIZ_TOOL_NAMES.has(c.name));
+/** 将 LangGraph interrupt 中的题目调用转换为可持久化的题卡。 */
+function extractQuestionPayload(quiz: ToolCall | undefined, scope: QuestionScope): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
   if (quiz?.id) {
     return { toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) };
   }
@@ -1233,8 +1259,9 @@ app.post('/api/chat', async (c) => {
             })
           : null;
 
-      // 若存在未作答的题目卡片，先补「跳过」ToolMessage，避免悬空 tool_calls 触发 API 报错
-      const skipMsgs = await pendingSkipToolMessages(body.threadId);
+      // 若上一轮正暂停等待作答，先以原生 interrupt 恢复并标记跳过，
+      // 再开始新的用户回合，保证 ToolMessage 在历史中的顺序合法。
+      await resumePendingQuestionAsSkipped(body.threadId, send);
 
       // 突破模式：加载知识画像中的薄弱点数据
       let weaknessData: string | undefined;
@@ -1273,9 +1300,9 @@ app.post('/api/chat', async (c) => {
         if (modePrompt) modeSystemMsg = new SystemMessage(modePrompt);
       }
 
-      const last = await runGraph(
+      const { last, question } = await runGraph(
         {
-          messages: [modeSystemMsg, ...skipMsgs, new HumanMessage(body.message)].filter(Boolean),
+          messages: [modeSystemMsg, new HumanMessage(body.message)].filter(Boolean),
           gradeBand: body.gradeBand ?? 'middle',
           grade: body.grade,
           subject: body.subject ?? 'math',
@@ -1314,13 +1341,13 @@ app.post('/api/chat', async (c) => {
           content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
         }
         // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
-        const qData = extractQuestionPayload(last, { subject: body.subject ?? 'math', grade: body.grade });
+        const qData = extractQuestionPayload(question, { subject: body.subject ?? 'math', grade: body.grade });
         if (qData) {
           addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
         }
       }
 
-      await emitQuestionIfAny(last, send, { subject: body.subject ?? 'math', grade: body.grade });
+      await emitQuestionIfAny(question, send, { subject: body.subject ?? 'math', grade: body.grade });
       // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
       await handleSessionExit(last, send, userId, body.threadId);
       await emitReviewCompleteIfAny(last, send);
@@ -1355,7 +1382,7 @@ app.post('/api/explore', async (c) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     await send({ type: 'conversation_created', conversationId: threadId, title: entry.label });
     try {
-      const last = await runGraph(
+      const { last, question } = await runGraph(
         {
           messages: [
             new SystemMessage(entry.prompt),
@@ -1399,6 +1426,11 @@ app.post('/api/explore', async (c) => {
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
       }
+      const qData = extractQuestionPayload(question, { subject: body.subject ?? 'math', grade: body.grade });
+      if (qData) {
+        addMessage(threadId, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
+      }
+      await emitQuestionIfAny(question, send, { subject: body.subject ?? 'math', grade: body.grade });
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -1531,21 +1563,10 @@ app.post('/api/answer', async (c) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
       const state = await graph.getState({ configurable: { thread_id: body.threadId } });
-      const msgs = (state.values?.messages ?? []) as BaseMessage[];
-      const aiMsg = [...msgs]
-        .reverse()
-        .find((m) => ((m as AIMessage).tool_calls ?? []).some((t) => t.id === body.toolCallId)) as
-        | AIMessage
-        | undefined;
-      const calls = (aiMsg?.tool_calls ?? []) as ToolCall[];
-      const target = calls.find((t) => t.id === body.toolCallId);
-      if (!target) throw new Error('找不到对应的题目，请重新开始一轮。');
-
-      // 该题已被作答或跳过（历史里已存在对应 ToolMessage）：避免重复回灌触发 API 报错
-      const alreadyAnswered = msgs.some(
-        (m) => (m as ToolMessage).tool_call_id === body.toolCallId,
-      );
-      if (alreadyAnswered) throw new Error('这道题已经结束啦，换道新题试试～');
+      const target = getPendingQuestion(state);
+      if (!target?.id || target.id !== body.toolCallId) {
+        throw new Error('题目已结束或与当前等待作答的题目不匹配，请重新开始一轮。');
+      }
 
       // 简答题走 LLM 语义评分（只有简答题需要，避免不必要开销）
       const shortAnswerGrader = target.name === 'ask_short_answer' ? createShortAnswerGrader(model) : undefined;
@@ -1566,6 +1587,7 @@ app.post('/api/answer', async (c) => {
       result.knowledgePointId = taxonomy.knowledgePointId;
       result.knowledgePoints = [taxonomy.knowledgePoint];
       result.literacies = taxonomy.literacies;
+      const persistedQuestion = databaseQuestionPayload(target, { subject, grade: grade || undefined });
       const safeToolContent = JSON.stringify({
         ...JSON.parse(toolContent),
         databaseTaxonomy: taxonomy,
@@ -1613,23 +1635,30 @@ app.post('/api/answer', async (c) => {
         updateQuestionMessage(body.conversationId, body.toolCallId, JSON.stringify({
           __boen_type: 'question',
           toolCallId: body.toolCallId,
-          payload: null, // 原始 payload 在旧消息中，但前端优先使用 messages 里的原始 question 消息
+          payload: persistedQuestion,
           answered: true,
           grading: result,
           userAnswer: body.answer,
         }));
       }
 
-      // 答复该 AIMessage 的全部 tool_calls，保证消息序列合法（正常只有一个）
-      const toolMsgs: ToolMessage[] = calls.map((t) =>
-        t.id === body.toolCallId
-          ? new ToolMessage({ content: safeToolContent, tool_call_id: t.id })
-          : new ToolMessage({ content: '（已跳过）', tool_call_id: t.id! }),
-      );
-
-      const last = await runGraph({ messages: toolMsgs }, body.threadId, send);
+      // 通过 LangGraph 的原生 Command.resume 回到 awaitQuestion 节点。
+      // 节点会写入 ToolMessage 后继续 agent，而非由 HTTP 层手动拼接消息。
+      const { last, question } = await runGraph(new Command<QuestionResume>({
+        resume: {
+          type: 'answer',
+          toolCallId: target.id,
+          toolContent: safeToolContent,
+        },
+      }), body.threadId, send);
       await handleSessionExit(last, send, userId, body.threadId);
-      await emitQuestionIfAny(last, send, { subject, grade: grade || undefined });
+      if (body.conversationId) {
+        const nextQuestion = extractQuestionPayload(question, { subject, grade: grade || undefined });
+        if (nextQuestion) {
+          addMessage(body.conversationId, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: nextQuestion.toolCallId, payload: nextQuestion.question, answered: false }));
+        }
+      }
+      await emitQuestionIfAny(question, send, { subject, grade: grade || undefined });
       await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {

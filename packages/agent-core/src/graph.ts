@@ -1,11 +1,12 @@
 import {
   StateGraph,
   Annotation,
+  interrupt,
   MemorySaver,
   BaseCheckpointSaver,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { SystemMessage, isToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
+import { SystemMessage, ToolMessage, isToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -13,7 +14,7 @@ import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
 import { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness, systemPromptForPractice } from './prompts.js';
 import type { PracticeType } from './prompts.js';
-import { quizTools } from './quiz/index.js';
+import { quizTools, QUIZ_TOOL_NAMES } from './quiz/index.js';
 import {
   LOOKUP_KNOWLEDGE_POINT_TOOL,
   lookupKnowledgePointTool,
@@ -38,12 +39,29 @@ export const BoenState = Annotation.Root({
   styleExamples: Annotation<string | undefined>(),
   practiceType: Annotation<string | undefined>(),
   pendingModeSwitch: Annotation<string | undefined>(),
+  /** The last human-in-the-loop question resolution, used only for graph routing. */
+  questionResumeType: Annotation<QuestionResume['type'] | undefined>(),
   /** TODO 状态机 JSON */
   todoState: Annotation<string | undefined>(),
 });
 
 type State = typeof BoenState.State;
 type ToolCall = { id?: string; name: string; args?: unknown };
+
+/** A pending interactive question persisted in the LangGraph checkpoint. */
+export type QuestionInterrupt = {
+  type: 'question';
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+};
+
+/** Server-validated response used to resume an interrupted question node. */
+export type QuestionResume = {
+  type: 'answer' | 'skip';
+  toolCallId: string;
+  toolContent: string;
+};
 
 export interface BoenGraphDeps {
   retrieveCurriculum?: (args: { grade?: string; subject?: string; query?: string }) => Promise<string>;
@@ -328,10 +346,46 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   };
 
   // ── 路由：判断是否继续工具循环 ──────────────
-  function shouldContinue(state: State): 'tools' | '__end__' {
+  function shouldContinue(state: State): 'tools' | 'awaitQuestion' | '__end__' {
     const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
-    if (last && isAIMessage(last) && last.tool_calls?.length) return 'tools';
-    return '__end__';
+    if (!last || !isAIMessage(last) || !last.tool_calls?.length) return '__end__';
+
+    // 题目工具是人机协作边界，不是立即执行的服务端函数。它进入
+    // awaitQuestion 节点，以 interrupt 持久化暂停；学生作答后再由
+    // Command.resume 回到同一节点，写入 ToolMessage 并继续教学。
+    if (last.tool_calls.some((call) => QUIZ_TOOL_NAMES.has(call.name))) return 'awaitQuestion';
+
+    // 备课、步骤推进、知识点查询等工具仍由 ToolNode 正常执行。
+    return 'tools';
+  }
+
+  const awaitQuestion = (state: State): Partial<State> => {
+    const last = state.messages[state.messages.length - 1] as AIMessage | undefined;
+    const quiz = last?.tool_calls?.find((call) => QUIZ_TOOL_NAMES.has(call.name));
+    if (!quiz?.id) throw new Error('出题工具缺少可恢复的调用 ID');
+
+    const resume = interrupt<QuestionInterrupt, QuestionResume>({
+      type: 'question',
+      toolCallId: quiz.id,
+      toolName: quiz.name,
+      args: (quiz.args ?? {}) as Record<string, unknown>,
+    });
+
+    if (!resume || resume.toolCallId !== quiz.id) {
+      throw new Error('题目恢复请求与当前等待的题目不匹配');
+    }
+
+    const answerMessage = new ToolMessage({
+      content: resume.toolContent,
+      tool_call_id: quiz.id,
+    });
+
+    return { messages: [answerMessage], questionResumeType: resume.type };
+  };
+
+  function continueAfterQuestion(state: State): 'agent' | '__end__' {
+    // 新问题覆盖未作答题目时，只完成工具协议，不再生成一段多余回复。
+    return state.questionResumeType === 'skip' ? '__end__' : 'agent';
   }
 
   // ── 节点：TODO 状态更新（在 ToolNode 之后运行）─
@@ -384,8 +438,8 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     return {};
   };
 
-  // ── ToolNode（LangGraph 内置，自动执行所有工具调用）──
-  // 需注册所有可能被调用的工具
+  // ── ToolNode（仅执行无需学生输入的工具）───────────────────
+  // 出题工具由 awaitQuestion 的 interrupt/Command 协议处理，不会自动执行。
   const allTools = Array.from(new Set([...reviewTools, ...qaTools, lookupKnowledgePointTool].flat())) as any[];
   const toolNode = new ToolNode(allTools);
 
@@ -395,16 +449,22 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     .addNode('loadCurriculum', loadCurriculum)
     .addNode('agent', callModel)
     .addNode('tools', toolNode)
+    .addNode('awaitQuestion', awaitQuestion)
     .addNode('updateTodo', updateTodoState)
     .addEdge('__start__', 'router')
     .addEdge('router', 'loadCurriculum')
     .addEdge('loadCurriculum', 'agent')
     .addConditionalEdges('agent', shouldContinue, {
       tools: 'tools',
+      awaitQuestion: 'awaitQuestion',
       __end__: '__end__',
     })
     .addEdge('tools', 'updateTodo')
-    .addEdge('updateTodo', 'agent');
+    .addEdge('updateTodo', 'agent')
+    .addConditionalEdges('awaitQuestion', continueAfterQuestion, {
+      agent: 'agent',
+      __end__: '__end__',
+    });
 
   return graph.compile({ checkpointer: checkpointer ?? new MemorySaver() });
 }
