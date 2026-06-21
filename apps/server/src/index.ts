@@ -1772,7 +1772,7 @@ app.post('/api/answer', async (c) => {
                   const preDelta = 2 * (1.0 - preExpected);
                   const preNewRating = Math.max(0, Math.min(100, preState.rating + preDelta));
                   setCachedProficiencyExpected(userId, body.threadId, pre.id, preNewRating, preState.sigma);
-                  profChanges.push({ kp: pre.title, before: Math.round(preState.rating), after: preNewRating });
+                  profChanges.push({ kp: pre.title, before: preState.rating, after: preNewRating });
                   console.log(`[前驱传播] ${pre.title}: ${Math.round(preState.rating)} → ${preNewRating.toFixed(1)} (delta=${preDelta.toFixed(2)})`);
                 }
               } catch (preErr) {
