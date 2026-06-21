@@ -211,6 +211,38 @@ function getPendingQuestion(state: { tasks?: Array<{ interrupts?: Array<{ value?
 }
 
 /**
+ * 从 Command 工具输出（plan_steps/advance_step 返回）提取 todoState 并下发给前端。
+ * 避免在 on_chain_end 中依赖 checkpoint 读取时序（superstep 刚结束时可能尚未持久化）。
+ */
+async function sendTodoPlanFromCommand(
+  command: { update?: { todoState?: unknown } },
+  send: (e: SseEvent) => Promise<void>,
+): Promise<boolean> {
+  const raw = command?.update?.todoState;
+  if (!raw || typeof raw !== 'string') return false;
+  try {
+    const parsed = JSON.parse(raw) as {
+      steps?: Array<{ id: number; label: string; status: string }>;
+      currentStep?: number;
+    };
+    if (!parsed.steps?.length) return false;
+    const steps = parsed.steps.map((s) => ({
+      id: s.id,
+      label: s.label,
+      // todoState 仅有 pending/in_progress/completed；failed 由 todo_fail 事件在前端叠加
+      status: (['pending', 'in_progress', 'completed'].includes(s.status) ? s.status : 'pending') as
+        'pending' | 'in_progress' | 'completed',
+    }));
+    await send({ type: 'todo_plan', steps, currentStep: parsed.currentStep ?? 1 });
+    console.log(`[Boen 类课堂] 📋 todo_plan 下发（来自 Command）— ${steps.length} 步，当前第 ${parsed.currentStep ?? 1} 步 | ${new Date().toLocaleTimeString()}`);
+    return true;
+  } catch (err) {
+    console.warn('[Boen 类课堂] ⚠️ 从 Command 解析 todoState 失败:', err);
+    return false;
+  }
+}
+
+/**
  * 从 checkpoint 读取最新 todoState，并把完整步骤清单实时下发给前端。
  * 数据源是 plan_steps/advance_step 工具维护的权威状态机，确保每步状态
  * （pending / in_progress / completed）与服务端一致。
@@ -223,12 +255,18 @@ async function sendTodoPlan(
     // tools 节点（含 Command 工具更新）结束后 checkpoint 即为最新，直接读取
     const ckpt = await graph.getState(runConfig(threadId));
     const raw = ckpt?.values?.todoState as string | undefined;
-    if (!raw) return;
+    if (!raw) {
+      console.warn(`[Boen 类课堂] ⚠️ sendTodoPlan 读取 checkpoint 为空，跳过下发 | ${new Date().toLocaleTimeString()}`);
+      return;
+    }
     const parsed = JSON.parse(raw) as {
       steps?: Array<{ id: number; label: string; status: string }>;
       currentStep?: number;
     };
-    if (!parsed.steps?.length) return;
+    if (!parsed.steps?.length) {
+      console.warn(`[Boen 类课堂] ⚠️ sendTodoPlan 读取到 steps 为空，跳过下发 | ${new Date().toLocaleTimeString()}`);
+      return;
+    }
     const steps = parsed.steps.map((s) => ({
       id: s.id,
       label: s.label,
@@ -237,8 +275,10 @@ async function sendTodoPlan(
         'pending' | 'in_progress' | 'completed',
     }));
     await send({ type: 'todo_plan', steps, currentStep: parsed.currentStep ?? 1 });
-    console.log(`[Boen 类课堂] 📋 todo_plan 下发 — ${steps.length} 步，当前第 ${parsed.currentStep ?? 1} 步 | ${new Date().toLocaleTimeString()}`);
-  } catch { /* 解析失败则跳过本次下发 */ }
+    console.log(`[Boen 类课堂] 📋 todo_plan 下发（来自 checkpoint）— ${steps.length} 步，当前第 ${parsed.currentStep ?? 1} 步 | ${new Date().toLocaleTimeString()}`);
+  } catch (err) {
+    console.warn('[Boen 类课堂] ⚠️ sendTodoPlan 解析失败:', err);
+  }
 }
 
 /** 流式跑一次图：推送 token，并返回最后消息及持久化的人机题目暂停点。 */
@@ -259,6 +299,7 @@ async function runGraph(
   };
   // TODO 状态机工具检测缓存 + 计时
   let todoStepSent = new Set<string>();
+  let todoPlanSent = false; // 避免 on_tool_end 与 on_chain_end 重复下发 todo_plan
   // 从 checkpoint 读取已完成的步数，避免每轮重置
   let stepCount = 0;
   try {
@@ -349,6 +390,15 @@ async function runGraph(
         await send({ type: 'subject_changed', subject });
         console.log(`[Boen 类课堂] 🔄 switch_subject(完整args) → ${subject} | ${new Date().toLocaleTimeString()}`);
       }
+    } else if (ev.event === 'on_tool_end') {
+      // Command 型工具（plan_steps/advance_step）返回的 update.todoState 是最新权威状态，
+      // 在 on_chain_end 读取 checkpoint 前直接下发，避免 checkpoint 保存时序导致的空态。
+      const name = (ev as any)?.name ?? '';
+      const output = (ev as any)?.data?.output;
+      if (name === PLAN_STEPS_TOOL || name === ADVANCE_STEP_TOOL) {
+        const sent = await sendTodoPlanFromCommand(output, send);
+        if (sent) todoPlanSent = true;
+      }
     } else if (ev.event === 'on_chain_end') {
       const nodeName = (ev as any)?.name ?? '';
       if (nodeName === 'tools' && todoStepSent.size > 0) {
@@ -369,10 +419,22 @@ async function runGraph(
         if (todoStepSent.has(LOOKUP_KNOWLEDGE_POINT_TOOL)) {
           await send({ type: 'todo_done', action: 'query', detail: '教材库查询完成' });
         }
-        // plan_steps / advance_step 现在由自包含的 Command 工具在 tools 节点内更新 todoState，
-        // 此刻 checkpoint 已是最新 → 读取并下发完整清单（plan 首次 / advance 推进都覆盖）。
-        if (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL)) {
-          await sendTodoPlan(threadId, send);
+        // plan_steps / advance_step 现在由自包含的 Command 工具在 tools 节点内更新 todoState。
+        // 优先从 ToolNode 返回的 Command 输出中直接提取 todoState 下发；若取不到（如非 Command 输出），
+        // 再回退到读取 checkpoint，避免 checkpoint 保存时序导致的空态。
+        if (!todoPlanSent && (todoStepSent.has(PLAN_STEPS_TOOL) || todoStepSent.has(ADVANCE_STEP_TOOL))) {
+          const output = (ev as any)?.data?.output;
+          const commands = Array.isArray(output) ? output : [output];
+          for (const cmd of commands) {
+            const sent = await sendTodoPlanFromCommand(cmd, send);
+            if (sent) {
+              todoPlanSent = true;
+              break;
+            }
+          }
+          if (!todoPlanSent) {
+            await sendTodoPlan(threadId, send);
+          }
         }
       }
     } else if (ev.event === 'on_chain_error') {
