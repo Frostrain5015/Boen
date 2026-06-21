@@ -60,7 +60,7 @@ export const ELO_RATING_INIT = 0;
 export const ELO_SIGMA_INIT = 20;
 const ELO_SIGMA_MIN = 3;
 const ELO_SIGMA_MAX = 25;
-const ELO_K_BASE = 6;
+const ELO_K_BASE = 12;
 const ELO_SCALING = 15;      // logistic scaling factor
 const ELO_DEFAULT_DIFFICULTY = 50;
 
@@ -68,11 +68,11 @@ const ELO_DEFAULT_DIFFICULTY = 50;
 export const MODE_ELO_MULTIPLIERS: Record<string, number> = {
   qa: 1.0,
   preview: 0.7,
-  /** 课堂复习巩固：5 道全对 → ~4 星（rating≈78），配合 K_BASE=6 */
-  review: 1.5,
-  /** 薄弱点/主动练习：与 review 一致，5 道全对可达 4 星 */
-  weakness: 1.5,
-  exam: 1.5,
+  /** 课堂复习巩固 */
+  review: 2.0,
+  /** 薄弱点/主动练习 */
+  weakness: 2.0,
+  exam: 2.0,
   /** 探索课：超低权重，鼓励而非评估 */
   explore: 0.4,
 };
