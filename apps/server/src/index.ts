@@ -25,7 +25,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -1703,6 +1703,8 @@ app.post('/api/answer', async (c) => {
         for (const node of nodesToUpdate) {
           const currentMode = ((state.values as any)?.mode as string) ?? 'qa';
           const isCached = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(currentMode);
+          // 题目难度影响 expected 正确率：easy→35, medium→50(默认), hard→65
+          const qDifficulty = difficultyLevelToValue((target.args as Record<string, unknown>)?.difficulty as string | undefined);
 
           if (isCached) {
             // 结构化学习模式：不写库，用缓存累计 score/maxScore 用于结算 flush。
@@ -1719,14 +1721,14 @@ app.post('/api/answer', async (c) => {
               dbRow?.last_updated ?? 0,
             );
             // 用本次答题的得分（非累计值）算单题 Elo 增量
-            const { newRating, newSigma } = computeProficiencyDelta(oldRating, oldSigma, result.score, result.maxScore, currentMode, lastUpdated);
+            const { newRating, newSigma } = computeProficiencyDelta(oldRating, oldSigma, result.score, result.maxScore, currentMode, lastUpdated, qDifficulty);
             setCachedProficiencyExpected(userId, body.threadId, node.id, newRating, newSigma);
             profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
           } else {
             // 普通模式：直接写库后读取新值
             const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
             const before = oldRow?.weighted_score ?? -1;
-            updateProficiency(userId, node.id, result.score, result.maxScore, currentMode);
+            updateProficiency(userId, node.id, result.score, result.maxScore, currentMode, qDifficulty);
             const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
             const after = newRow?.weighted_score ?? -1;
             profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });

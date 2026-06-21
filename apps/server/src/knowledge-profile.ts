@@ -70,7 +70,8 @@ export const MODE_ELO_MULTIPLIERS: Record<string, number> = {
   preview: 0.7,
   /** 课堂复习巩固：5 道全对 → ~4 星（rating≈78），配合 K_BASE=6 */
   review: 1.5,
-  weakness: 1.3,
+  /** 薄弱点/主动练习：与 review 一致，5 道全对可达 4 星 */
+  weakness: 1.5,
   exam: 1.5,
   /** 探索课：超低权重，鼓励而非评估 */
   explore: 0.4,
@@ -80,6 +81,13 @@ export const MODE_ELO_MULTIPLIERS: Record<string, number> = {
 const ELO_K_PROPAGATE = 2;
 
 // ── Elo 辅助函数 ──────────────────────────────
+
+/** easy/medium/hard → Elo difficulty value（rating 偏移量） */
+export function difficultyLevelToValue(level?: string): number {
+  if (level === 'easy') return 35;
+  if (level === 'hard') return 65;
+  return 50; // 'medium' 或 undefined
+}
 
 /** 逻辑期望：给定 rating 和题目难度，预期正确率 */
 function expectedCorrectness(rating: number, difficulty: number): number {
@@ -118,10 +126,11 @@ export function computeProficiencyDelta(
   maxScore: number,
   mode: string,
   lastUpdated: number,
+  difficulty: number = ELO_DEFAULT_DIFFICULTY,
 ): { newRating: number; newSigma: number; delta: number } {
   const now = Math.floor(Date.now() / 1000);
   const sigmaBefore = applyForgetting(oldSigma, lastUpdated, now);
-  const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
+  const expected = expectedCorrectness(oldRating, difficulty);
   // observed 只用原始正确率，modeMult 只影响 K（通过 updateRatingElo → computeKFactor）
   const observed = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
   const { newRating, newSigma, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, mode);
@@ -279,7 +288,7 @@ export function setCachedProficiencyExpected(
 
 // ── CRUD ─────────────────────────────────────
 
-export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string): KpProficiency {
+export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string, difficulty: number = ELO_DEFAULT_DIFFICULTY): KpProficiency {
   const existing = db.prepare(`SELECT * FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, kgNodeId) as any;
   const correct = existing ? existing.correct_count + score : score;
   const total = existing ? existing.total_count + maxScore : maxScore;
@@ -293,8 +302,8 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
   // 1. 遗忘：先增长 sigma
   const sigmaBefore = applyForgetting(oldSigma, existing?.last_updated ?? 0, now);
 
-  // 2. 期望正确率
-  const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
+  // 2. 期望正确率（区分题目难度）
+  const expected = expectedCorrectness(oldRating, difficulty);
 
   // 3. 观测值：原始正确率（modeMult 只影响 K，不直接影响 observed）
   const observed = maxScore > 0 ? Math.min(1, score / maxScore) : 0;
