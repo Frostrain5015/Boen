@@ -56,8 +56,8 @@ export function getProficiencyLevel(weightedScore: number): ProficiencyLevel {
 }
 
 // ── Elo 常量 ──────────────────────────────────
-const ELO_RATING_INIT = 50;
-const ELO_SIGMA_INIT = 20;
+export const ELO_RATING_INIT = 50;
+export const ELO_SIGMA_INIT = 20;
 const ELO_SIGMA_MIN = 3;
 const ELO_SIGMA_MAX = 25;
 const ELO_K_BASE = 5;
@@ -65,7 +65,7 @@ const ELO_SCALING = 15;      // logistic scaling factor
 const ELO_DEFAULT_DIFFICULTY = 50;
 
 /** 各模式下对 Elo K-factor 的倍增器（不是直接控制 observed，而是控制更新幅度的权重） */
-const MODE_ELO_MULTIPLIERS: Record<string, number> = {
+export const MODE_ELO_MULTIPLIERS: Record<string, number> = {
   qa: 1.0,
   preview: 0.7,
   review: 1.0,
@@ -105,6 +105,28 @@ function updateRatingElo(
   return { newRating: Math.round(newRating * 10) / 10, newSigma: Math.round(newSigma * 10) / 10, delta: Math.round(delta * 10) / 10 };
 }
 
+/**
+ * 纯函数：仅计算预期的熟练度变化（不写库），用于结构化学习模式下
+ * 实时下发给前端展示「预期熟练度变化」。与 updateProficiency 中的
+ * Elo 计算逻辑保持一致。
+ */
+export function computeProficiencyDelta(
+  oldRating: number,
+  oldSigma: number,
+  score: number,
+  maxScore: number,
+  mode: string,
+  lastUpdated: number,
+): { newRating: number; delta: number } {
+  const now = Math.floor(Date.now() / 1000);
+  const sigmaBefore = applyForgetting(oldSigma, lastUpdated, now);
+  const expected = expectedCorrectness(oldRating, ELO_DEFAULT_DIFFICULTY);
+  const modeMult = MODE_ELO_MULTIPLIERS[mode] ?? 1.0;
+  const observed = maxScore > 0 ? Math.min(1, (score / maxScore) * modeMult) : 0;
+  const { newRating, delta } = updateRatingElo(oldRating, sigmaBefore, observed, expected, mode);
+  return { newRating: Math.round(newRating), delta: Math.round(delta * 10) / 10 };
+}
+
 /** 遗忘：距上次练习每过一天 sigma 涨 0.5，上限 ELO_SIGMA_MAX */
 function applyForgetting(sigma: number, lastUpdated: number, now: number): number {
   if (lastUpdated <= 0) return sigma;
@@ -132,7 +154,8 @@ const MODE_WEIGHTS: Record<string, number> = {
 // ── 结构化会话熟练度缓存 ─────────────────────
 // 学习过程中先缓存，结算时批量写入
 
-interface CachedUpdate {
+/** 熟练度缓存条目（内存累计，结算时批量 flush） */
+export interface CachedUpdate {
   score: number;
   maxScore: number;
   mode: string;
@@ -184,6 +207,18 @@ export function flushProficiencyCache(userId: string, threadId: string): number 
 export function discardProficiencyCache(userId: string, threadId: string): void {
   const key = cacheKey(userId, threadId);
   PROFICIENCY_CACHE.delete(key);
+}
+
+/**
+ * 读取缓存中指定知识点的累计 score/maxScore，用于计算预期熟练度变化。
+ * 若缓存中不存在该知识点则返回 null。
+ */
+export function getCachedProficiencySum(userId: string, threadId: string, kgNodeId: number): { score: number; maxScore: number; mode: string } | null {
+  const key = cacheKey(userId, threadId);
+  const userCache = PROFICIENCY_CACHE.get(key);
+  if (!userCache) return null;
+  const entry = userCache.get(kgNodeId);
+  return entry ? { score: entry.score, maxScore: entry.maxScore, mode: entry.mode } : null;
 }
 
 // ── CRUD ─────────────────────────────────────

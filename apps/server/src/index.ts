@@ -25,7 +25,7 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, computeProficiencyDelta, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -1701,18 +1701,31 @@ app.post('/api/answer', async (c) => {
           if (node) nodesToUpdate.push(node);
         }
         for (const node of nodesToUpdate) {
-          const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
-          const before = oldRow?.weighted_score ?? -1;
           const currentMode = ((state.values as any)?.mode as string) ?? 'qa';
-          // 结构化学习模式：缓存更新，结算时批量写入
-          if (['review', 'preview', 'weakness', 'practice', 'explore'].includes(currentMode)) {
+          const isCached = ['review', 'preview', 'weakness', 'practice', 'explore'].includes(currentMode);
+
+          if (isCached) {
+            // 结构化学习模式：先缓存累加，再用缓存累计值计算预期熟练度变化（不写库）。
+            // 这样即使结算前多道题命中同一知识点，每题的预期变化都能正确叠加展示。
             cacheProficiencyUpdate(userId, body.threadId, node.id, result.score, result.maxScore, currentMode);
+            const cached = getCachedProficiencySum(userId, body.threadId, node.id);
+            if (cached) {
+              const dbRow = db.prepare('SELECT rating, rating_sigma, last_updated FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { rating?: number; rating_sigma?: number; last_updated?: number } | undefined;
+              const oldRating = dbRow?.rating ?? ELO_RATING_INIT;
+              const oldSigma = dbRow?.rating_sigma ?? ELO_SIGMA_INIT;
+              const lastUpdated = dbRow?.last_updated ?? 0;
+              const { newRating } = computeProficiencyDelta(oldRating, oldSigma, cached.score, cached.maxScore, cached.mode, lastUpdated);
+              profChanges.push({ kp: node.title, before: Math.round(oldRating), after: newRating });
+            }
           } else {
+            // 普通模式：直接写库后读取新值
+            const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+            const before = oldRow?.weighted_score ?? -1;
             updateProficiency(userId, node.id, result.score, result.maxScore, currentMode);
+            const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
+            const after = newRow?.weighted_score ?? -1;
+            profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });
           }
-          const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, node.id) as { weighted_score: number } | undefined;
-          const after = newRow?.weighted_score ?? -1;
-          profChanges.push({ kp: node.title, before: Math.max(0, before), after: Math.max(0, after) });
         }
       }
       if (profChanges.length) { (result as any).proficiencyChanges = profChanges; }
