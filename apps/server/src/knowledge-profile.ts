@@ -220,8 +220,16 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
     // 读旧值
     const oldRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
     const before = oldRow?.weighted_score ?? -1;
-    // 写新值
+    // 用累计 correct_count/total_count 更新（保留答题计数准确）
     updateProficiency(userId, kgNodeId, update.score, update.maxScore, update.mode);
+    // 用缓存的预期 Running Rating 覆盖单次累计计算的 rating（更准确）
+    // 因为 updateProficiency 把累计 score/maxScore 当单次观测计算，会丢失逐题 sigma 衰减
+    if (update.expectedRating >= 0) {
+      db.prepare(`
+        UPDATE user_kp_proficiency SET rating=?, rating_sigma=?, weighted_score=?
+        WHERE user_id=? AND kg_node_id=?
+      `).run(update.expectedRating, update.expectedSigma, Math.round(update.expectedRating), userId, kgNodeId);
+    }
     // 读新值
     const newRow = db.prepare('SELECT weighted_score FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number } | undefined;
     const after = newRow?.weighted_score ?? -1;

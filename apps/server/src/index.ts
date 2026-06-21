@@ -512,7 +512,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
 
   if (exitCall?.args && userId && threadId) {
     const args = exitCall.args as Record<string, unknown>;
-    const { count: updatedKps } = flushProficiencyCache(userId, threadId);
+    const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, threadId);
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
     await send({
       type: 'settlement',
@@ -521,6 +521,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
       stepsCompleted: Number(args.stepsCompleted ?? 0),
       totalSteps: Number(args.totalSteps ?? 0),
       updatedKps,
+      proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
     });
   }
 }
@@ -1526,7 +1527,7 @@ app.post('/api/explore', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
 
-          const { count: flushedCount } = flushProficiencyCache(userId, threadId);
+          const { count: flushedCount, changes: profChanges } = flushProficiencyCache(userId, threadId);
           const { findKnowledgePointNode } = await import('./exam.js');
           const node = findKnowledgePointNode(body.title, body.subject);
           if (node) {
@@ -1540,6 +1541,7 @@ app.post('/api/explore', async (c) => {
             stepsCompleted,
             totalSteps,
             updatedKps: flushedCount + (node ? 1 : 0),
+            proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
           });
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
