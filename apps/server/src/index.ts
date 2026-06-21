@@ -64,6 +64,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, '../../../.env') });
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
+const BOEN_PROVIDER = process.env.BOEN_PROVIDER === 'anthropic' || process.env.BOEN_PROVIDER === 'deepseek'
+  ? process.env.BOEN_PROVIDER
+  : 'openai';
+const BOEN_API_KEY = process.env.BOEN_API_KEY ?? DEEPSEEK_API_KEY;
+const BOEN_MODEL = process.env.BOEN_MODEL ?? 'deepseek-v4-flash';
+const BOEN_BASE_URL = process.env.BOEN_BASE_URL;
 
 // DeepSeek 模型列表
 const DEEPSEEK_MODELS: Record<string, string> = {
@@ -73,6 +79,15 @@ const DEEPSEEK_MODELS: Record<string, string> = {
 };
 
 function createModel(provider: string): BaseChatModel {
+  if (provider === 'default') {
+    return getChatModel({
+      provider: BOEN_PROVIDER,
+      model: BOEN_MODEL,
+      apiKey: BOEN_API_KEY,
+      baseUrl: BOEN_BASE_URL,
+      enableThinking: false,
+    });
+  }
   const modelName = DEEPSEEK_MODELS[provider] ?? 'deepseek-v4-flash';
   return getChatModel({
     provider: 'deepseek',

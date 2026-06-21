@@ -8,6 +8,7 @@ export interface ModelConfig {
   apiKey: string;
   baseUrl?: string;
   temperature?: number;
+  maxTokens?: number;
   /** DeepSeek 专用：是否启用 thinking 模式（默认 true）。关闭后 tool_choice/function calling 可用 */
   enableThinking?: boolean;
 }
@@ -39,6 +40,7 @@ export function getChatModel(cfg: ModelConfig): BaseChatModel {
     apiKey: cfg.apiKey,
     temperature: cfg.temperature ?? 0.7,
     timeout: 120000,
+    maxTokens: cfg.maxTokens ?? 4096,
     maxRetries: 2,
     streamUsage: false,
     modelKwargs: Object.keys(modelKwargs).length > 0 ? modelKwargs : undefined,

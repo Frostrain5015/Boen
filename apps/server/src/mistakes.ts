@@ -1,4 +1,5 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
@@ -6,8 +7,11 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import * as OcrPkg from '@alicloud/ocr-api20210707';
 const OcrRuntime = OcrPkg as any;
-const OcrClient = (OcrRuntime.default ?? OcrRuntime) as new (config: any) => { recognizeEduPaperStructed(req: any): Promise<any> };
-const { RecognizeEduPaperStructedRequest } = OcrRuntime;
+const OcrClient = (OcrRuntime.default?.default ?? OcrRuntime.default ?? OcrRuntime) as new (config: any) => {
+  recognizeEduPaperOcr(req: any): Promise<any>;
+  recognizeEduPaperStructed(req: any): Promise<any>;
+};
+const { RecognizeEduPaperOcrRequest, RecognizeEduPaperStructedRequest } = OcrRuntime;
 import * as OpenApi from '@alicloud/openapi-client';
 import type {
   Difficulty,
@@ -286,20 +290,36 @@ function collectTextValues(value: unknown, acc: string[] = [], depth = 0): strin
 function normalizeOcrText(rawData: string | undefined): { raw: unknown; text: string } {
   if (!rawData) return { raw: {}, text: '' };
   const raw = safeJson<unknown>(rawData, rawData);
+  const payload = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {};
+
+  // RecognizeEduPaperOcr returns reading-order text in `content`. Recursively
+  // collecting every response string duplicates words and metadata, which
+  // causes unreliable downstream question splitting.
+  const content = typeof payload.content === 'string' ? payload.content.trim() : '';
+  if (content) return { raw, text: content };
+
+  const words = Array.isArray(payload.prism_wordsInfo)
+    ? payload.prism_wordsInfo
+      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
+      .map((item) => ({
+        text: typeof item.word === 'string' ? item.word.trim() : '',
+        y: Number(item.y ?? (item.pos as any)?.[0]?.y ?? 0),
+        x: Number(item.x ?? (item.pos as any)?.[0]?.x ?? 0),
+      }))
+      .filter((item) => item.text)
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+    : [];
+  if (words.length) return { raw, text: words.map((item) => item.text).join('\n') };
+
   const texts = collectTextValues(raw)
     .map((s) => s.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
-  const seen = new Set<string>();
-  const unique = texts.filter((text) => {
-    const key = text.slice(0, 120);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return { raw, text: unique.slice(0, 80).join('\n') };
+  return { raw, text: [...new Set(texts)].slice(0, 80).join('\n') };
 }
 
-function subjectForAliyun(subject: string, grade: string) {
+function legacySubjectForAliyun(subject: string, grade: string) {
   const n = Number(grade);
   const isPrimary = Number.isFinite(n) && n >= 1 && n <= 6;
   const isMiddle = Number.isFinite(n) && n >= 7 && n <= 9;
@@ -322,10 +342,7 @@ function subjectForAliyun(subject: string, grade: string) {
 
 /** 用 Buffer 替代 ReadStream 传给 SDK（避免 @alicloud/openapi-core v1.0.7 的 stream 兼容问题） */
 function readableFromBuffer(buf: Buffer): Readable {
-  const r = new Readable();
-  r.push(buf);
-  r.push(null);
-  return r;
+  return Readable.from(buf);
 }
 
 let aliyunClient: InstanceType<typeof OcrClient> | null = null;
@@ -346,27 +363,49 @@ function getAliyunOcrClient() {
   return aliyunClient;
 }
 
-async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grade: string): Promise<OcrResult> {
+export async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grade: string): Promise<OcrResult> {
   const client = getAliyunOcrClient();
   const imageBuf = readFileSync(filePath);
-  const request = new RecognizeEduPaperStructedRequest({
+  const request = new RecognizeEduPaperOcrRequest({
     subject: subjectForAliyun(subject, grade),
-    needRotate: (process.env.ALIYUN_OCR_NEED_ROTATE ?? 'true') !== 'false',
+    imageType: process.env.ALIYUN_OCR_IMAGE_TYPE ?? 'photo',
     outputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false',
     // 用 Buffer 创建的 Readable 替代 createReadStream，避免 SDK 的 stream 兼容问题
     body: readableFromBuffer(imageBuf) as any,
   });
   console.log(`[OCR] SDK 请求, 图片 ${imageBuf.length} bytes, subject=${request.subject}`);
-  const response = await client.recognizeEduPaperStructed(request);
+  const response = await client.recognizeEduPaperOcr(request);
   const body = response.body;
   console.log(`[OCR] SDK 响应 code=${body?.code}, msg=${String(body?.message ?? '').slice(0, 200)}`);
-  if (body?.code && body.code !== '200') {
+  if (response.statusCode !== 200 || (body?.code && body.code !== '200')) {
     throw new Error(`阿里云 OCR 识别失败：${body.message ?? body.code}`);
   }
   const normalized = normalizeOcrText(body?.data);
+  if (!normalized.text.trim()) {
+    throw new Error('阿里云 OCR 未返回可用题目文本');
+  }
+
+  // Structed returns layout/cut coordinates rather than text. Keep it as
+  // optional traceability metadata, never as the source of LLM input.
+  let structure: unknown = undefined;
+  if ((process.env.ALIYUN_OCR_USE_STRUCTURE ?? 'true') !== 'false') {
+    try {
+      const structureResponse = await client.recognizeEduPaperStructed(new RecognizeEduPaperStructedRequest({
+        subject: subjectForAliyun(subject, grade),
+        needRotate: (process.env.ALIYUN_OCR_NEED_ROTATE ?? 'true') !== 'false',
+        outputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false',
+        body: readableFromBuffer(imageBuf) as any,
+      }));
+      if (structureResponse.statusCode === 200 && (!structureResponse.body?.code || structureResponse.body.code === '200')) {
+        structure = safeJson<unknown>(structureResponse.body?.data ?? '', structureResponse.body?.data ?? null);
+      }
+    } catch (err) {
+      console.warn('[OCR] 结构化切题元数据不可用，将继续使用整页识别结果:', err instanceof Error ? err.message : String(err));
+    }
+  }
   return {
-    provider: 'aliyun:RecognizeEduPaperStructed',
-    raw: { requestId: body?.requestId, code: body?.code, data: normalized.raw },
+    provider: 'aliyun:RecognizeEduPaperOcr+RecognizeEduPaperStructed',
+    raw: { requestId: body?.requestId, code: body?.code, data: normalized.raw, structure },
     text: normalized.text,
   };
 }
@@ -444,6 +483,20 @@ function findCandidateByTitle(title: string, subject: string, grade: string): Ca
   return { id: fuzzy.id, title: fuzzy.title, subject: fuzzy.subject, unitId: fuzzy.unit_id, unitTitle: fuzzy.unit_title };
 }
 
+function redactOcrPersonalInfo(text: string): string {
+  // Photos of school papers often put a name, student number, and class on the
+  // same line as the title. Keep the question body local and do not send those
+  // identifiers to the analysis model.
+  return text
+    .replace(
+      /(?:班级|姓名|学号|考号|座位号)\s*[：:][\s\S]{0,100}?(?=(?:基础知识|积累与运用|一[、.．]|二[、.．]|三[、.．]|四[、.．]|五[、.．]|\d+[、.．]))/g,
+      '',
+    )
+    .replace(/(?:姓名|学号|考号|座位号)\s*[：:]\s*[^\n]{0,40}/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 async function analyzeWithLlm(model: BaseChatModel, params: {
   subject: string;
   grade: string;
@@ -451,9 +504,33 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   studentAnswer?: string;
   candidates: CandidateNode[];
 }): Promise<AnalysisJson[]> {
-  const related = await retrieveRelated(params.grade, params.subject, params.recognizedText, 8).catch(() => []);
+  const analysisText = redactOcrPersonalInfo(params.recognizedText);
+  // Embedding retrieval initializes an ONNX runtime in-process. Keep the OCR
+  // transaction independent from that optional enrichment so a local embedding
+  // failure cannot terminate the model request or block mistake intake.
+  const related: string[] = [];
+  const compactCandidates = '';
+  const concisePrompt = [
+    'Extract every question from this school-paper OCR text. Return only a compact JSON array.',
+    'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, confidence, questionType, difficulty, and knowledgeNodes.',
+    'knowledgeNodes is an array of { kgNodeId, title, role, confidence, evidence }. Only use IDs from the candidate list. Keep explanations under 100 Chinese characters.',
+    `Subject: ${params.subject}; grade: ${params.grade}`,
+    `Candidates: ${compactCandidates || 'none'}`,
+    `OCR text:\n${analysisText}`,
+    params.studentAnswer ? `Student answer:\n${params.studentAnswer}` : '',
+    related.length ? `Curriculum context:\n${related.join('\n')}` : '',
+  ].filter(Boolean).join('\n\n');
+  console.log(`[mistakes] LLM analysis input: ${concisePrompt.length} characters, ${params.candidates.length} candidate nodes`);
+  const conciseResponse = await model.invoke([
+    new SystemMessage('Return valid JSON only.'),
+    new HumanMessage(concisePrompt),
+  ]);
+  const conciseContent = typeof conciseResponse.content === 'string' ? conciseResponse.content : String(JSON.stringify(conciseResponse.content ?? null));
+  const conciseParsed = safeParseJson(String(conciseContent || '[]'));
+  return Array.isArray(conciseParsed) ? conciseParsed as AnalysisJson[] : conciseParsed ? [conciseParsed as AnalysisJson] : [];
+
   const candidateText = params.candidates
-    .slice(0, 80)
+    .slice(0, 24)
     .map((n) => `- [${n.id}] ${n.title}${n.unitTitle ? `（${n.unitTitle}）` : ''}`)
     .join('\n');
   const prompt = [
@@ -466,7 +543,7 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
     `年级: ${params.grade}`,
     '',
     'OCR/录入文本:',
-    params.recognizedText || '（空）',
+    analysisText || '（空）',
     params.studentAnswer ? `\n学生补充答案:\n${params.studentAnswer}` : '',
     related.length ? `\n课程检索上下文:\n${related.map((r) => `- ${r}`).join('\n')}` : '',
     '',
@@ -499,12 +576,13 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
     }),
   ].filter(Boolean).join('\n');
 
+  console.log(`[mistakes] LLM analysis input: ${prompt.length} characters, ${params.candidates.length} candidate nodes`);
   const response = await model.invoke([
     new SystemMessage('你只输出可解析 JSON。'),
     new HumanMessage(prompt),
   ]);
-  const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
-  const parsed = safeParseJson(content);
+  const content = typeof response.content === 'string' ? response.content : String(JSON.stringify(response.content ?? null));
+  const parsed = safeParseJson(String(content || '[]'));
   // 兼容：如果 LLM 返回单个对象而非数组，包装成数组
   if (parsed && !Array.isArray(parsed)) {
     return [parsed as AnalysisJson];
@@ -880,6 +958,32 @@ async function applyAnalysisToMistake(
       evidence: rawMap.evidence,
       evidenceJson: JSON.stringify({ evidence: rawMap.evidence ?? '', llmTitle: rawMap.title ?? '' }),
     });
+  }
+
+  // Some compatible models omit the candidate IDs even when they correctly
+  // extract the question. Retain a low-confidence, auditable lexical fallback
+  // so the item is still filed and can improve from later user corrections.
+  if (!mappings.length && candidates.length) {
+    const questionText = `${analysis.title ?? ''} ${analysis.promptText ?? recognizedText}`;
+    const scored = candidates.map((candidate) => {
+      const terms = candidate.title.match(/[\u4e00-\u9fff]{2,}|[A-Za-z0-9]+/g) ?? [];
+      const score = terms.reduce((total, term) => total + (questionText.includes(term) ? term.length : 0), 0);
+      return { candidate, score };
+    }).sort((a, b) => b.score - a.score || a.candidate.id - b.candidate.id);
+    const best = scored[0]?.candidate;
+    if (best) {
+      mappings.push({
+        mistakeId,
+        kgNodeId: best.id,
+        title: best.title,
+        unitId: best.unitId,
+        unitTitle: best.unitTitle,
+        role: 'primary',
+        confidence: Math.max(0.35, Math.min(0.58, 0.35 + (scored[0].score > 0 ? 0.15 : 0))),
+        evidence: '根据题面关键词自动匹配，待后续复核',
+        evidenceJson: JSON.stringify({ evidence: 'lexical fallback', llmTitle: analysis.title ?? '' }),
+      });
+    }
   }
 
   const status: MistakeStatus = mappings.length > 0 ? 'analyzed' : 'needs_review';
