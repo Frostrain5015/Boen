@@ -133,6 +133,7 @@ defineExpose({ flip, isFlipped });
           </ul>
         </div>
       </div>
+      </div>
     </div>
     <!-- 卡片下方价格文本（仅广告模式显示） -->
     <div v-if="showPrice && !holderDisplay" class="card-price-label">
