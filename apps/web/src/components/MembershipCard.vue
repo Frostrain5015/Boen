@@ -19,7 +19,7 @@ const isFlipped = ref(props.showBack);
 const cardRef = ref<HTMLDivElement | null>(null);
 
 const isMonthly = computed(() => props.type === 'monthly');
-const cardName = computed(() => (isMonthly.value ? '星月卡' : '星耀卡'));
+const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
 const cardPrice = computed(() => (isMonthly.value ? '¥18/月' : '¥188/年'));
 const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价 ¥238.8'));
 

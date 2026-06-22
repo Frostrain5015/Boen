@@ -32,16 +32,17 @@ async function handleRedeem() {
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
       redeemInput.value = '';
       showSuccessAnimation.value = true;
-      setTimeout(() => {
-        showSuccessAnimation.value = false;
-        emit('close');
-      }, 3500);
     } else {
       toast.error(r.message ?? '兑换失败');
     }
   } finally {
     redeeming.value = false;
   }
+}
+
+function handleSuccessDismiss() {
+  showSuccessAnimation.value = false;
+  emit('close');
 }
 
 const props = defineProps<{
@@ -118,15 +119,20 @@ const cardMotion = {
 
   <!-- 兑换成功动画 -->
   <Teleport to="body">
-    <div v-if="showSuccessAnimation" class="success-animation-overlay">
-      <div ref="flyingCardRef" class="flying-card" :class="redeemedTier">
-        <MembershipCard :type="redeemedTier" size="lg" />
+    <Transition name="success-fade">
+      <div v-if="showSuccessAnimation" class="success-animation-overlay">
+        <div class="success-card-wrapper">
+          <MembershipCard :type="redeemedTier" size="lg" />
+        </div>
+        <div class="success-text">
+          <Sparkles class="success-icon" />
+          <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
+        </div>
+        <button @click="handleSuccessDismiss" class="success-dismiss-btn">
+          我知道了
+        </button>
       </div>
-      <div class="success-text">
-        <Sparkles class="success-icon" />
-        <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
-      </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -140,20 +146,18 @@ const cardMotion = {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(251, 246, 238, 0.9);
-  backdrop-filter: blur(8px);
-  animation: fadeIn 0.3s ease;
+  background: rgba(251, 246, 238, 0.92);
+  backdrop-filter: blur(12px);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+.success-fade-enter-active { transition: opacity 0.3s ease; }
+.success-fade-leave-active { transition: opacity 0.5s ease; }
+.success-fade-enter-from,
+.success-fade-leave-to { opacity: 0; }
 
-.flying-card {
+.success-card-wrapper {
   animation: cardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-             cardShine 0.8s ease-in-out 0.4s forwards,
-             cardFlyAway 0.8s cubic-bezier(0.4, 0, 0.2, 1) 1.8s forwards;
+             cardShine 0.8s ease-in-out 0.4s forwards;
 }
 
 @keyframes cardAppear {
@@ -171,17 +175,6 @@ const cardMotion = {
   0% { filter: brightness(1); }
   50% { filter: brightness(1.3); }
   100% { filter: brightness(1); }
-}
-
-@keyframes cardFlyAway {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.3) translate(-200px, 200px);
-  }
 }
 
 .success-text {
@@ -210,5 +203,26 @@ const cardMotion = {
 @keyframes iconSpin {
   from { transform: rotate(-180deg) scale(0); }
   to { transform: rotate(0) scale(1); }
+}
+
+.success-dismiss-btn {
+  margin-top: 32px;
+  padding: 10px 40px;
+  border-radius: 99px;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: textFadeIn 0.4s ease 0.9s both;
+}
+
+.success-dismiss-btn:hover {
+  color: var(--ink);
+  border-color: var(--premium-gold);
+  box-shadow: 0 4px 12px -4px var(--premium-gold-glow);
 }
 </style>
