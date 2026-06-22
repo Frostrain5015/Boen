@@ -59,6 +59,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 兑换码开通会员：成功后写入最新订阅状态（后端已即时失效缓存） */
+  async function redeemCode(code: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const token = getToken();
+    if (!token) return { ok: false, error: 'unauthorized', message: '请先登录' };
+    try {
+      const res = await fetch('/api/subscription/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ code }),
+      });
+      const data = (await res.json()) as Partial<SubscriptionStatus> & { error?: string; message?: string };
+      if (res.ok) {
+        subscription.value = data as SubscriptionStatus;
+        return { ok: true };
+      }
+      return { ok: false, error: data.error, message: data.message };
+    } catch {
+      return { ok: false, error: 'network', message: '网络错误，请稍后再试' };
+    }
+  }
+
   function decrementDailyUsage() {
     if (subscription.value && !subscription.value.isPremium && subscription.value.dailyRemaining != null) {
       subscription.value = {
@@ -165,6 +186,7 @@ export const useAuthStore = defineStore('auth', () => {
     saveProfile,
     openSetupDialog,
     fetchSubscription,
+    redeemCode,
     decrementDailyUsage,
   };
 });

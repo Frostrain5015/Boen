@@ -1,11 +1,32 @@
 <script setup lang="ts">
-import { computed, type Component } from 'vue';
+import { computed, ref, type Component } from 'vue';
 import { Crown, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
 
 const authStore = useAuthStore();
 const toast = useToast();
+
+const redeemInput = ref('');
+const redeeming = ref(false);
+
+async function handleRedeem() {
+  const code = redeemInput.value.trim();
+  if (!code || redeeming.value) return;
+  redeeming.value = true;
+  try {
+    const r = await authStore.redeemCode(code);
+    if (r.ok) {
+      toast.success('🎉 兑换成功，会员已开通');
+      redeemInput.value = '';
+      emit('close'); // standalone 弹窗关闭；内嵌门禁会因 isPremium 翻转自动显示内容
+    } else {
+      toast.error(r.message ?? '兑换失败');
+    }
+  } finally {
+    redeeming.value = false;
+  }
+}
 
 const props = defineProps<{
   featureName: string;
@@ -83,17 +104,30 @@ const pricingMotion = {
           <p class="text-sm" style="color: var(--ink-soft)">次月起 ¥19.9/月</p>
         </div>
 
-        <button @click="handleContact"
-          class="mb-3 w-full rounded-[18px] px-6 py-3 text-sm font-semibold text-white transition-all"
-          style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
-            box-shadow: 0 12px 24px -10px var(--premium-gold-glow),
-                        inset 0 -3px 0 rgba(0,0,0,0.14),
-                        inset 0 2px 0 rgba(255,255,255,0.28);"
-          @mouseenter="($event.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'"
-          @mouseleave="($event.currentTarget as HTMLElement).style.transform = ''"
-        >联系管理员开通</button>
+        <!-- 兑换码开通 -->
+        <div class="mb-3 flex w-full gap-2">
+          <input
+            v-model="redeemInput"
+            @keydown.enter="handleRedeem"
+            :disabled="redeeming"
+            placeholder="输入兑换码"
+            maxlength="48"
+            class="min-w-0 flex-1 rounded-[16px] border bg-white px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60"
+            style="border-color: var(--line); color: var(--ink)"
+            @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
+            @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
+          />
+          <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
+            class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+            style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
+              box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
+                          inset 0 -2px 0 rgba(0,0,0,0.12),
+                          inset 0 1px 0 rgba(255,255,255,0.28);"
+          >{{ redeeming ? '兑换中…' : '兑换' }}</button>
+        </div>
 
-        <p class="text-xs" style="color: var(--ink-soft); opacity: 0.7">开通后即刻解锁全部高级功能</p>
+        <button @click="handleContact" class="text-xs underline-offset-2 transition-colors hover:underline"
+          style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
       </div>
     </div>
 

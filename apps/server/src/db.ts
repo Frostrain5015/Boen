@@ -362,4 +362,32 @@ db.exec(`
   db.exec(`CREATE INDEX IF NOT EXISTS idx_mistakes_correct ON mistake_items(user_id, is_correct)`);
 }
 
+// ── 兑换码：消费流水 + 撤销 denylist ─────────────────────────
+// 兑换码采用「自描述签名码」：可复用?/面值天数/有效期/批次等条款编码进码内并由 HMAC 签名，
+// 服务端离线可验，无需在库中预存码。库里只保留逻辑上不属于码本身的「状态」：
+//   1) code_redemptions —— 消费流水：审计 + PK(nonce,user_id) 防同人重复兑换；
+//      限次上限来自码内 maxUses，已用次数 = COUNT(*) WHERE nonce=?。
+//   2) code_revocations —— 撤销名单：按单码 nonce 或整批 batch 作废（batch 在码内，无需存已发码）。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS code_redemptions (
+    nonce         TEXT NOT NULL,
+    user_id       TEXT NOT NULL,
+    duration_days INTEGER NOT NULL,
+    granted_until INTEGER NOT NULL,
+    created_at    INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (nonce, user_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_code_redemptions_nonce ON code_redemptions(nonce);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS code_revocations (
+    scope      TEXT NOT NULL CHECK(scope IN ('nonce', 'batch')),
+    value      TEXT NOT NULL,
+    reason     TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (scope, value)
+  );
+`);
+
 export default db;

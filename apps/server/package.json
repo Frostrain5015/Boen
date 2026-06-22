@@ -16,7 +16,9 @@
     "verify:curriculum": "tsx src/verify-curriculum.ts",
     "seed:kp": "tsx src/seed-kp.ts",
     "backfill:style-skills": "tsx src/scripts/backfill-style-skills.ts",
-    "skills:clean-rebuild": "tsx src/scripts/clean-rebuild-skills.ts"
+    "skills:clean-rebuild": "tsx src/scripts/clean-rebuild-skills.ts",
+    "gen:codes": "tsx src/scripts/gen-codes.ts",
+    "revoke:codes": "tsx src/scripts/revoke-codes.ts"
   },
   "dependencies": {
     "@alicloud/ocr-api20210707": "^3.1.3",

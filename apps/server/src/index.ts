@@ -58,6 +58,7 @@ import {
   updateMistake,
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
+import { redeemForUser } from './redeem.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -115,6 +116,10 @@ const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0
 const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
 const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
 
+// 兑换码签名密钥（自描述签名码用，仅存服务端 .env）。未配置则兑换接口拒绝服务。
+const REDEEM_CODE_SECRET = process.env.REDEEM_CODE_SECRET ?? '';
+if (!REDEEM_CODE_SECRET) console.warn('[redeem] REDEEM_CODE_SECRET 未配置，兑换码功能将拒绝服务');
+
 // 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
 const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null } }>();
 async function resolveUserId(c: Context): Promise<string | null> {
@@ -134,6 +139,27 @@ async function resolveUserId(c: Context): Promise<string | null> {
     console.error('[auth] userinfo failed:', err);
     return null;
   }
+}
+
+/** 失效某用户的订阅缓存，使兑换后即时生效（不等 5 分钟 TTL） */
+function invalidateSubscriptionCache(userId: string) {
+  for (const entry of userIdCache.values()) {
+    if (entry.sub === userId) entry.subscription = undefined;
+  }
+}
+
+// 兑换尝试限流：每用户每分钟 5 次，防签名爆破
+const redeemAttempts = new Map<string, { count: number; resetAt: number }>();
+function checkRedeemRate(userId: string): boolean {
+  const now = Date.now();
+  const e = redeemAttempts.get(userId);
+  if (!e || e.resetAt < now) {
+    redeemAttempts.set(userId, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (e.count >= 5) return false;
+  e.count += 1;
+  return true;
 }
 
 // ── 订阅系统辅助函数 ──────────────────────────────
@@ -1253,6 +1279,44 @@ app.get('/api/subscription/status', async (c) => {
     dailyLimit: result.sub.isPremium ? null : FREE_DAILY_LIMIT,
     dailyUsed,
     dailyRemaining: result.sub.isPremium ? null : Math.max(0, FREE_DAILY_LIMIT - (dailyUsed ?? 0)),
+  });
+});
+
+// ── 兑换码开通会员 ──────────────────────────────
+app.post('/api/subscription/redeem', async (c) => {
+  if (!REDEEM_CODE_SECRET) return c.json({ error: 'unavailable', message: '兑换功能未启用' }, 503);
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
+
+  let code = '';
+  try {
+    code = String((await c.req.json<{ code?: string }>()).code ?? '').trim();
+  } catch { /* 忽略 body 解析错误，下方按空码处理 */ }
+  if (!code) return c.json({ error: 'invalid_code', message: '请输入兑换码' }, 400);
+
+  const result = redeemForUser(userId, code, REDEEM_CODE_SECRET);
+  if (!result.ok) {
+    const msgMap: Record<string, string> = {
+      invalid_code: '兑换码无效',
+      code_expired: '兑换码已过期',
+      code_disabled: '兑换码已失效',
+      code_used: '兑换码已被领完',
+      already_redeemed: '你已兑换过此码',
+    };
+    return c.json({ error: result.error, message: msgMap[result.error] ?? '兑换失败' }, 400);
+  }
+
+  // 即时生效：清掉订阅缓存，返回与 /status 同结构的最新状态
+  invalidateSubscriptionCache(userId);
+  return c.json({
+    tier: 'premium',
+    isPremium: true,
+    expiresAt: result.until,
+    dailyLimit: null,
+    dailyUsed: null,
+    dailyRemaining: null,
+    redeemed: { durationDays: result.durationDays, until: result.until },
   });
 });
 
