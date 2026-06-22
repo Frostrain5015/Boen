@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, nextTick } from 'vue';
+import { onMounted, nextTick, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { BrainCircuit } from 'lucide-vue-next';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
 import PremiumGate from '@/components/PremiumGate.vue';
+import MembershipCard from '@/components/MembershipCard.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useExamStore } from '@/stores/exam';
@@ -20,7 +21,20 @@ const uiStore = useUiStore();
 const examStore = useExamStore();
 const onboarding = useOnboardingStore();
 
-// 首次进入学习档案（会员 + 非大学通用模式，内容可见时）播放一次引导
+// 计算到期天数
+const daysRemaining = computed(() => {
+  if (!authStore.subscription?.expiresAt) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const days = Math.ceil((authStore.subscription.expiresAt - now) / 86400);
+  return Math.max(0, days);
+});
+
+// 是否即将到期（7天内）
+const isExpiringSoon = computed(() => {
+  return daysRemaining.value !== null && daysRemaining.value <= 7 && daysRemaining.value > 0;
+});
+
+// 首次进入学习档案（星月卡用户 + 非大学通用模式，内容可见时）播放一次引导
 onMounted(() => {
   if (!authStore.isPremium || uiStore.isCollege) return;
   nextTick(() => onboarding.maybeStart('profile'));
@@ -87,6 +101,20 @@ async function handleExplore(detail: { title: string; subject: Subject; grade: s
 
 <template>
   <PremiumGate v-if="!uiStore.isCollege" feature-name="知识画像分析" :icon="BrainCircuit">
+    <!-- 星月卡卡片展示区域 -->
+    <div v-if="authStore.isPremium" class="flex flex-col items-center px-4 pt-4 pb-2">
+      <MembershipCard
+        :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
+        :expires-at="authStore.subscription?.expiresAt"
+        size="md"
+      />
+      <!-- 到期提醒 -->
+      <div v-if="isExpiringSoon" class="mt-2 flex items-center gap-1.5 text-xs"
+        style="color: var(--error)">
+        <span>⚠️</span>
+        <span>星月卡即将到期（剩余 {{ daysRemaining }} 天），请及时续费</span>
+      </div>
+    </div>
     <KnowledgeProfile class="flex-1" @back="handleBack" @practice="handlePractice" @exam="handleExam" @explore="handleExplore" />
   </PremiumGate>
   <div v-else class="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">

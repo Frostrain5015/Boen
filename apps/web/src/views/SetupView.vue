@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
-import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Crown, Lock, X } from 'lucide-vue-next';
+import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Crown, Star, Lock, X } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import PremiumGate from '@/components/PremiumGate.vue';
 
@@ -57,7 +57,7 @@ function autoSave() {
   }).catch(() => {});
 }
 
-/** 选择模型：非会员点 DS 弹窗，否则立即切换+保存 */
+/** 选择模型：非星月卡点 DS 弹窗，否则立即切换+保存 */
 function setProvider(val: string) {
   if (val !== 'default' && !authStore.isPremium) {
     showPremiumDialog.value = true;
@@ -138,8 +138,9 @@ function handleBack() {
                   {{ authStore.currentUser?.email ?? '' }}
                 </div>
               </div>
-              <span v-if="authStore.isPremium" class="badge-premium shrink-0">
-                <Crown class="h-3 w-3" /> 会员
+              <span v-if="authStore.isPremium" :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'">
+                <component :is="authStore.subscription?.tier === 'yearly' ? Crown : Star" class="h-3 w-3" />
+                {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
               </span>
             </div>
             <!-- 名字 -->
@@ -248,7 +249,7 @@ function handleBack() {
       </div>
     </div>
 
-    <!-- ═══ 会员弹窗（统一 PremiumGate） ═══ -->
+    <!-- ═══ 星月卡弹窗（统一 PremiumGate） ═══ -->
     <div v-if="showPremiumDialog" class="fixed inset-0 z-[1000] grid place-items-center bg-black/20 p-4" @click.self="showPremiumDialog = false">
       <PremiumGate feature-name="DeepSeek 大模型" :extra-benefits="['三模型自由切换']" standalone @close="showPremiumDialog = false" class="w-full max-w-[360px]" />
     </div>

@@ -19,7 +19,7 @@ const NONCE_BYTES = 4;
 const MAX_USES = 0x7;    // 3 bit
 const MAX_BATCH = 0x1ff; // 9 bit
 const MAX_VERSION = 0x7; // 3 bit
-// 会员面值仅两档（月卡/年卡）
+// 星月卡面值仅两档（月卡/年卡）
 const DURATION_30 = 30;
 const DURATION_365 = 365;
 // Crockford Base32（去掉 I/L/O/U，避免人眼歧义）
@@ -145,7 +145,7 @@ export function generateCode(
 // ── 兑换 ─────────────────────────────────────────────────────
 
 /**
- * 校验并为用户兑换会员（纯服务端、原子事务）。
+ * 校验并为用户兑换星月卡（纯服务端、原子事务）。
  * better-sqlite3 同步串行 + 事务内 count 检查 + PK(nonce,user_id) 三重保证一次性码不双花。
  */
 export function redeemForUser(userId: string, rawCode: string, secret: string): RedeemResult {
@@ -174,7 +174,7 @@ export function redeemForUser(userId: string, rawCode: string, secret: string): 
       const subRow = db.prepare(`SELECT expires_at FROM subscriptions WHERE user_id=?`).get(userId) as
         | { expires_at: number | null }
         | undefined;
-      // 已是有效会员则在原到期时间上叠加，避免临期兑换损失天数
+      // 已是有效星月卡用户则在原到期时间上叠加，避免临期兑换损失天数
       const base = subRow?.expires_at && subRow.expires_at > now ? subRow.expires_at : now;
       const until = base + p.durationDays * 86400;
 
@@ -182,15 +182,16 @@ export function redeemForUser(userId: string, rawCode: string, secret: string): 
         `INSERT INTO code_redemptions (nonce, user_id, duration_days, granted_until) VALUES (?, ?, ?, ?)`,
       ).run(p.nonce, userId, p.durationDays, until);
 
+      const tier = p.durationDays >= 365 ? 'yearly' : 'monthly';
       db.prepare(`
         INSERT INTO subscriptions (user_id, tier, activated_at, expires_at, updated_at)
-        VALUES (?, 'premium', ?, ?, unixepoch())
+        VALUES (?, ?, ?, ?, unixepoch())
         ON CONFLICT(user_id) DO UPDATE SET
-          tier='premium',
+          tier=excluded.tier,
           expires_at=excluded.expires_at,
           activated_at=COALESCE(subscriptions.activated_at, excluded.activated_at),
           updated_at=unixepoch()
-      `).run(userId, now, until);
+      `).run(userId, tier, now, until);
 
       return { ok: true, until, durationDays: p.durationDays };
     })();

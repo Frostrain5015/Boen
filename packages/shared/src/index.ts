@@ -437,7 +437,7 @@ export interface ExamQualityReport {
 // ─────────────────────────────────────────────────────────────
 
 export interface SubscriptionStatus {
-  tier: 'free' | 'premium';
+  tier: 'free' | 'monthly' | 'yearly';
   isPremium: boolean;
   expiresAt: number | null;
   dailyLimit: number | null;

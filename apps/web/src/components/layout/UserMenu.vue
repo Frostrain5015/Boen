@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, LogOut, Settings, Crown, MessageSquare } from 'lucide-vue-next';
+import { User, LogOut, Settings, Crown, MessageSquare, Moon } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useToast } from '@/composables/useToast';
@@ -54,10 +54,11 @@ onUnmounted(() => {
         <p class="text-sm font-semibold text-[var(--ink)]">{{ authStore.currentUser?.username ?? '用户' }}</p>
         <p class="text-xs text-[var(--ink-soft)]">{{ authStore.currentUser?.email ?? '' }}</p>
       </div>
-      <!-- 会员状态 -->
+      <!-- 卡片状态 -->
       <div v-if="authStore.isPremium" class="flex items-center gap-1.5 px-4 py-2">
-        <span class="badge-premium">
-          <Crown class="h-3 w-3" /> 会员
+        <span :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'">
+          <component :is="authStore.subscription?.tier === 'yearly' ? Crown : Moon" class="h-3 w-3" />
+          {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '星月卡' }}
         </span>
         <span v-if="authStore.subscription?.expiresAt" class="text-xs" style="color: var(--ink-soft)">
           · 到期 {{ new Date(authStore.subscription.expiresAt * 1000).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) }}
@@ -78,12 +79,12 @@ onUnmounted(() => {
         </button>
         <button
           v-if="!authStore.isPremium"
-          @click="toast.info('请联系管理员开通会员'); uiStore.showUserMenu = false"
+          @click="toast.info('请联系管理员激活星月卡'); uiStore.showUserMenu = false"
           class="flex w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-[var(--premium-gold-soft)]"
           style="color: var(--premium-gold-strong)"
         >
           <Crown class="h-4 w-4" />
-          <span>升级会员</span>
+          <span>升级星月卡</span>
         </button>
         <button
           @click="authStore.doLogout()"

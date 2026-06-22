@@ -14,7 +14,7 @@ const authStore = useAuthStore();
 const uiStore = useUiStore();
 const onboarding = useOnboardingStore();
 
-// 首次进入错题本（会员可见内容时）播放一次引导
+// 首次进入错题本（星月卡用户可见内容时）播放一次引导
 onMounted(() => {
   if (!authStore.isPremium) return;
   nextTick(() => onboarding.maybeStart('mistakes'));

@@ -166,7 +166,7 @@ function checkRedeemRate(userId: string): boolean {
 const FREE_DAILY_LIMIT = 10;
 
 interface SubscriptionInfo {
-  tier: 'free' | 'premium';
+  tier: 'free' | 'monthly' | 'yearly';
   isPremium: boolean;
   expiresAt: number | null;
 }
@@ -190,8 +190,8 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
     | undefined;
   const now = Math.floor(Date.now() / 1000);
   const sub: SubscriptionInfo = {
-    tier: (row?.tier === 'premium' ? 'premium' : 'free') as 'free' | 'premium',
-    isPremium: row?.tier === 'premium' && row?.expires_at != null && row.expires_at > now,
+    tier: (row?.tier === 'monthly' ? 'monthly' : row?.tier === 'yearly' ? 'yearly' : 'free') as 'free' | 'monthly' | 'yearly',
+    isPremium: (row?.tier === 'monthly' || row?.tier === 'yearly') && row?.expires_at != null && row.expires_at > now,
     expiresAt: row?.expires_at ?? null,
   };
   // 回写缓存
@@ -206,7 +206,7 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
 function requirePremium(c: Context, result: { userId: string; sub: SubscriptionInfo } | null) {
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   if (!result.sub.isPremium) {
-    return c.json({ error: 'premium_required', message: '此功能需要订阅会员才能使用' }, 403);
+    return c.json({ error: 'premium_required', message: '此功能需要星月卡才能使用' }, 403);
   }
   return null;
 }
@@ -1282,7 +1282,7 @@ app.get('/api/subscription/status', async (c) => {
   });
 });
 
-// ── 兑换码开通会员 ──────────────────────────────
+// ── 兑换码激活卡片 ──────────────────────────────
 app.post('/api/subscription/redeem', async (c) => {
   if (!REDEEM_CODE_SECRET) return c.json({ error: 'unavailable', message: '兑换功能未启用' }, 503);
   const userId = await resolveUserId(c);
@@ -1308,8 +1308,9 @@ app.post('/api/subscription/redeem', async (c) => {
 
   // 即时生效：清掉订阅缓存，返回与 /status 同结构的最新状态
   invalidateSubscriptionCache(userId);
+  const redeemedTier = result.durationDays >= 365 ? 'yearly' : 'monthly';
   return c.json({
-    tier: 'premium',
+    tier: redeemedTier,
     isPremium: true,
     expiresAt: result.until,
     dailyLimit: null,
@@ -1435,7 +1436,7 @@ app.post('/api/chat', async (c) => {
   if (!result.sub.isPremium) {
     const usage = checkAndIncrementUsage(userId);
     if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或订阅会员', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
     usageInfo = { dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT - usage.remaining, dailyRemaining: usage.remaining };
   }
@@ -1761,7 +1762,7 @@ app.post('/api/answer', async (c) => {
   if (subInfo && !subInfo.sub.isPremium) {
     const usage = checkAndIncrementUsage(userId);
     if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或订阅会员', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
   }
 

@@ -7,7 +7,7 @@ defineProps<{ show: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 function handleUpgrade() {
-  toast.info('请联系管理员开通会员');
+  toast.info('请联系管理员激活星月卡');
 }
 </script>
 
@@ -26,7 +26,7 @@ function handleUpgrade() {
         class="shrink-0 text-[0.85rem] font-semibold transition-all hover:underline"
         style="color: var(--premium-gold-strong)"
       >
-        升级会员
+        升级星月卡
       </button>
       <button
         @click="emit('close')"
