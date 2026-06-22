@@ -121,8 +121,6 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
           <svg v-if="isMonthly" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
           <svg v-else viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </div>
-        <div class="surf surf-light" aria-hidden="true" />
-        <div class="surf surf-noise" aria-hidden="true" />
 
         <!-- 顶部装饰线 -->
         <div class="card-stripe" />
@@ -278,28 +276,6 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 .card-monthly .surf-watermark { color: #fff; opacity: 0.11; }
 .card-yearly .surf-watermark { color: #fff; opacity: 0.12; }
 
-/* 受光：定向高光 + 一道镜面光带 + 极淡暗角 + 发丝亮边（整体偏弱） */
-.surf-light {
-  z-index: 2;
-  background:
-    radial-gradient(120% 85% at 16% 8%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 42%),
-    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.12) 49%, rgba(255, 255, 255, 0.02) 56%, transparent 64%),
-    radial-gradient(130% 120% at 50% 40%, transparent 60%, rgba(0, 0, 0, 0.06));
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
-    inset 0 -12px 26px -20px rgba(0, 0, 0, 0.2);
-}
-/* 星耀为彩色面，白光更显——进一步压低光感预算 */
-.card-yearly .surf-light { opacity: 0.6; }
-
-/* 细噪点：消除色带、增加纸/金属肌理 */
-.surf-noise {
-  z-index: 3;
-  opacity: 0.45;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
 /* 文字内容抬到质感层之上；扫光层置于最顶 */
 .card-front > .card-stripe { z-index: 4; }
 .card-front > .card-brand,
@@ -309,15 +285,15 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 .card-front > .card-shimmer { z-index: 5; }
 
 .card-monthly {
-  /* 冷调铂金/银 */
-  background: linear-gradient(135deg, #eef1f3 0%, #e2e7ea 45%, #cfd6db 100%);
-  border: 1px solid rgba(160, 170, 178, 0.45);
+  /* 冷调铂金/银 —— 基础渐变与背面对齐（以背面为基准） */
+  background: linear-gradient(135deg, #f3f5f6 0%, #e8ecef 45%, #dde3e7 100%);
+  border: 1px solid rgba(160, 170, 178, 0.4);
 }
 
 .card-yearly {
-  /* 雾面紫罗兰：降低强度预算（明度落差 ~14、饱和收敛），与皓月同档、无金 */
-  background: linear-gradient(135deg, #efe8f4 0%, #e0d3ea 50%, #cbb6dd 100%);
-  border: 1px solid rgba(170, 140, 198, 0.45);
+  /* 雾面紫罗兰（无金）—— 基础渐变与背面对齐（以背面为基准） */
+  background: linear-gradient(135deg, #f4eef8 0%, #e7dcf1 45%, #d7c6e6 100%);
+  border: 1px solid rgba(170, 140, 198, 0.4);
 }
 
 /* 顶部装饰线 */
@@ -549,18 +525,6 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   border: 1px solid rgba(170, 140, 198, 0.4);
 }
 
-/* 背面同样叠一层极淡噪点，保持正反材质一致 */
-.card-back::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  pointer-events: none;
-  opacity: 0.4;
-  mix-blend-mode: soft-light;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-.back-content { position: relative; z-index: 1; }
 
 .back-content {
   width: 100%;
