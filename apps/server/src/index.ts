@@ -63,40 +63,38 @@ import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(__dirname, '../../../.env') });
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? '';
-const BOEN_PROVIDER = process.env.BOEN_PROVIDER === 'anthropic' || process.env.BOEN_PROVIDER === 'deepseek'
-  ? process.env.BOEN_PROVIDER
-  : 'openai';
-const BOEN_API_KEY = process.env.BOEN_API_KEY ?? DEEPSEEK_API_KEY;
-const BOEN_MODEL = process.env.BOEN_MODEL ?? 'deepseek-v4-flash';
-const BOEN_BASE_URL = process.env.BOEN_BASE_URL;
+// 已下线讯飞 provider，全部走 DeepSeek（OpenAI 兼容）。
+// 旧 BOEN_API_KEY 作为 DEEPSEEK_API_KEY 的兜底，方便本地复用同一份密钥。
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? process.env.BOEN_API_KEY ?? '';
 
-// DeepSeek 模型列表
+// 用户可选档位 → 实际 DeepSeek 模型。default = 免费 Flash 档。
 const DEEPSEEK_MODELS: Record<string, string> = {
   default: 'deepseek-v4-flash',
   deepseek: 'deepseek-v4-flash',
   'deepseek-pro': 'deepseek-v4-pro',
 };
 
-function createModel(provider: string): BaseChatModel {
-  if (provider === 'default') {
-    return getChatModel({
-      provider: BOEN_PROVIDER,
-      model: BOEN_MODEL,
-      apiKey: BOEN_API_KEY,
-      baseUrl: BOEN_BASE_URL,
-      enableThinking: false,
-    });
-  }
+/** 出卷专用：开启 thinking，放大输出上限与超时（思考耗时长，质量优先）。 */
+const EXAM_MODEL_OPTS = { thinking: true, maxTokens: 8192, timeout: 300000 } as const;
+
+function createModel(
+  provider: string,
+  opts?: { thinking?: boolean; maxTokens?: number; timeout?: number },
+): BaseChatModel {
   const modelName = DEEPSEEK_MODELS[provider] ?? 'deepseek-v4-flash';
   return getChatModel({
     provider: 'deepseek',
     model: modelName,
     apiKey: DEEPSEEK_API_KEY,
-    enableThinking: false, // 现阶段追求快速出结果，关闭 thinking 模式
+    enableThinking: opts?.thinking ?? false, // 默认关闭：聊天追求快速出结果
+    maxTokens: opts?.maxTokens,
+    timeout: opts?.timeout,
   });
 }
-let model = createModel('default');
+let currentProvider = 'default';
+let model = createModel(currentProvider);
+// 出卷沿用用户所选档位，但开启 thinking（延迟被异步进度条吸收）
+let examModel = createModel(currentProvider, EXAM_MODEL_OPTS);
 
 // LangGraph 对话状态持久化到 SQLite（重启不丢失）
 const checkpointer = new SqliteSaver(db);
@@ -105,7 +103,9 @@ let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, 
 
 /** 切换模型并重建 LangGraph 图 */
 function switchModel(provider: string) {
+  currentProvider = provider;
   model = createModel(provider);
+  examModel = createModel(provider, EXAM_MODEL_OPTS);
   graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
   return provider;
 }
@@ -1054,7 +1054,7 @@ app.post('/api/exam/generate', async (c) => {
     try {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
-        model,
+        examModel,
         { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes, totalScore: body.totalScore },
         (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
         userId,

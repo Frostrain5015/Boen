@@ -100,14 +100,7 @@ function handleSave() {
               <button
                 @click="modelProvider = 'default'"
                 class="flex flex-1 items-center justify-center gap-1 rounded-xl border-1.5 py-2 px-3 font-display text-xs font-bold transition-all active:scale-[0.97]"
-                :class="modelProvider === 'default' ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
-              >
-                <span>Kimi K2.6</span>
-              </button>
-              <button
-                @click="modelProvider = 'deepseek'"
-                class="flex flex-1 items-center justify-center gap-1 rounded-xl border-1.5 py-2 px-3 font-display text-xs font-bold transition-all active:scale-[0.97]"
-                :class="modelProvider === 'deepseek' ? 'border-[#4A6CF7] bg-[#e8edff] text-[#2b4ad0]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[#4A6CF7]'"
+                :class="(modelProvider === 'default' || modelProvider === 'deepseek') ? 'border-[#4A6CF7] bg-[#e8edff] text-[#2b4ad0]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[#4A6CF7]'"
               >
                 <span>DeepSeek V4 Flash</span>
               </button>
