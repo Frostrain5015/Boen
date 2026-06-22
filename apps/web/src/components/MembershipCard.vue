@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Star, Sparkles } from 'lucide-vue-next';
+import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -10,6 +10,14 @@ interface Props {
   size?: 'sm' | 'md' | 'lg';
   /** 是否在卡面上显示价格（广告页显示，已有卡不显示） */
   showPrice?: boolean;
+  /** 背面是否内嵌兑换码输入框 */
+  redeemable?: boolean;
+  /** 兑换码（v-model:redeemCode） */
+  redeemCode?: string;
+  /** 兑换请求进行中 */
+  redeeming?: boolean;
+  /** 输入框提示文案 */
+  redeemPlaceholder?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -18,7 +26,20 @@ const props = withDefaults(defineProps<Props>(), {
   showBack: false,
   size: 'md',
   showPrice: true,
+  redeemable: false,
+  redeemCode: '',
+  redeeming: false,
+  redeemPlaceholder: '输入兑换码',
 });
+
+const emit = defineEmits<{
+  (e: 'update:redeemCode', value: string): void;
+  (e: 'redeem'): void;
+}>();
+
+function onRedeemInput(e: Event) {
+  emit('update:redeemCode', (e.target as HTMLInputElement).value);
+}
 
 const isFlipped = ref(props.showBack);
 const cardRef = ref<HTMLDivElement | null>(null);
@@ -133,11 +154,39 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             {{ cardName }}权益
           </div>
           <ul class="back-benefits" :class="fontSizes[size].desc">
-            <li><span class="benefit-dot" />DeepSeek V4 Pro 大模型</li>
-            <li><span class="benefit-dot" />考试与全题型练习</li>
-            <li><span class="benefit-dot" />错题本智能归因</li>
+            <li><span class="benefit-dot" />V4 Pro 大模型</li>
+            <li><span class="benefit-dot" />全题型考试</li>
+            <li><span class="benefit-dot" />错题智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>
+
+          <!-- 背面内嵌兑换码（无边框，底部细线 + 占位提示） -->
+          <div v-if="redeemable" class="back-redeem" @click.stop>
+            <div class="back-redeem-row">
+              <Ticket class="back-redeem-icon" :size="14" />
+              <input
+                class="back-redeem-input"
+                :value="redeemCode"
+                @input="onRedeemInput"
+                @keydown.enter="emit('redeem')"
+                @click.stop
+                :disabled="redeeming"
+                :placeholder="redeemPlaceholder"
+                maxlength="48"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button
+                class="back-redeem-btn"
+                @click.stop="emit('redeem')"
+                :disabled="redeeming || !redeemCode.trim()"
+                :title="redeemPlaceholder"
+              >
+                <LoaderCircle v-if="redeeming" :size="14" class="back-redeem-spin" />
+                <ArrowRight v-else :size="14" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       </div>
@@ -415,9 +464,9 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 .card-back {
   transform: rotateY(180deg);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  padding: 20px;
+  padding: 16px 18px;
   box-shadow:
     0 8px 32px -8px rgba(0, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
@@ -435,6 +484,9 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 
 .back-content {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .back-header {
@@ -443,8 +495,8 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   gap: 6px;
   font-family: var(--font-display);
   font-weight: 700;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 7px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -466,7 +518,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .back-benefits li {
@@ -496,5 +548,93 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 
 .card-yearly-back .benefit-dot {
   background: #b07dd6;
+}
+
+/* ── 背面内嵌兑换码（无边框：仅底部细线作为输入提示）── */
+.back-redeem {
+  margin-top: auto;       /* 贴卡片底部 */
+  padding-top: 9px;
+  cursor: default;
+}
+
+.back-redeem-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+  transition: border-color 0.2s ease;
+}
+.back-redeem-row:focus-within {
+  border-bottom-color: currentColor;
+}
+
+.back-redeem-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.back-redeem-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: inherit;
+  padding: 1px 0;
+}
+.back-redeem-input::placeholder {
+  color: currentColor;
+  opacity: 0.45;
+  letter-spacing: 0.02em;
+}
+.back-redeem-input:disabled {
+  opacity: 0.6;
+}
+
+.back-redeem-btn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+.back-redeem-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.back-redeem-btn:not(:disabled):active {
+  transform: scale(0.9);
+}
+
+.card-monthly-back .back-redeem,
+.card-monthly-back .back-redeem-icon {
+  color: #6a6560;
+}
+.card-monthly-back .back-redeem-btn {
+  background: linear-gradient(180deg, #9a948c 0%, #7a756e 100%);
+}
+
+.card-yearly-back .back-redeem,
+.card-yearly-back .back-redeem-icon {
+  color: #5c3a80;
+}
+.card-yearly-back .back-redeem-btn {
+  background: linear-gradient(180deg, #9b72bf 0%, #7b4da8 100%);
+}
+
+.back-redeem-spin {
+  animation: back-redeem-spin 0.8s linear infinite;
+}
+@keyframes back-redeem-spin {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -83,6 +83,11 @@ async function startRedeemAnimation(opts: {
   animPhase.value = 'init';
   showCenterUI.value = false;
   cardTransform.value = 'translate(0px, 0px) scale(1)';
+  // 续期/升级：用户在卡片背面输入，先把已购卡翻回正面再起飞
+  if (opts.wasPremium && premiumCardRef.value?.isFlipped) {
+    premiumCardRef.value.flip();
+    await new Promise((resolve) => setTimeout(resolve, 480));
+  }
   animActive.value = true; // 抬升卡面层 + 挂载遮罩（透明）
   // 等待左侧切换为已购卡面后再测量其原位（即飞回的归宿）
   await nextTick();
@@ -255,62 +260,49 @@ function handleBack() {
               :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
               :show-price="false"
               size="md"
+              redeemable
+              v-model:redeem-code="redeemInput"
+              :redeeming="redeeming"
+              redeem-placeholder="兑换码续期 / 升级"
+              @redeem="handleRedeem"
             />
           </div>
-          <!-- 续费兑换码 -->
-          <div class="flex gap-2">
-            <input
-              v-model="redeemInput"
-              @keydown.enter="handleRedeem"
-              :disabled="redeeming"
-              placeholder="输入兑换码续期或升级"
-              maxlength="48"
-              class="min-w-0 flex-1 rounded-[16px] border bg-white/80 px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60 backdrop-blur-sm"
-              style="border-color: var(--line); color: var(--ink)"
-              @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
-              @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
-            />
-            <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
-              class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
-              style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
-                box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
-                            inset 0 -2px 0 rgba(0,0,0,0.12),
-                            inset 0 1px 0 rgba(255,255,255,0.28);"
-            >{{ redeeming ? '兑换中…' : '兑换' }}</button>
-          </div>
+          <p class="text-xs text-center" style="color: var(--ink-soft)">
+            <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
+            点击卡片翻面，在背面输入兑换码续期或升级
+          </p>
         </template>
 
         <!-- 无星月卡：广告展示（上下叠放） -->
         <template v-else>
           <div class="flex flex-col items-center gap-3">
-            <MembershipCard ref="adYearlyRef" type="yearly" size="md" :show-price="true" />
-            <MembershipCard ref="adMonthlyRef" type="monthly" size="md" :show-price="true" />
+            <MembershipCard
+              ref="adYearlyRef"
+              type="yearly"
+              size="md"
+              :show-price="true"
+              redeemable
+              v-model:redeem-code="redeemInput"
+              :redeeming="redeeming"
+              redeem-placeholder="输入兑换码激活"
+              @redeem="handleRedeem"
+            />
+            <MembershipCard
+              ref="adMonthlyRef"
+              type="monthly"
+              size="md"
+              :show-price="true"
+              redeemable
+              v-model:redeem-code="redeemInput"
+              :redeeming="redeeming"
+              redeem-placeholder="输入兑换码激活"
+              @redeem="handleRedeem"
+            />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
             <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
-            悬停卡片查看权益，点击翻转
+            点击卡片翻面，在背面输入兑换码激活
           </p>
-          <!-- 兑换码激活 -->
-          <div class="flex gap-2">
-            <input
-              v-model="redeemInput"
-              @keydown.enter="handleRedeem"
-              :disabled="redeeming"
-              placeholder="输入兑换码激活星月卡"
-              maxlength="48"
-              class="min-w-0 flex-1 rounded-[16px] border bg-white/80 px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60 backdrop-blur-sm"
-              style="border-color: var(--line); color: var(--ink)"
-              @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
-              @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
-            />
-            <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
-              class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
-              style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
-                box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
-                            inset 0 -2px 0 rgba(0,0,0,0.12),
-                            inset 0 1px 0 rgba(255,255,255,0.28);"
-            >{{ redeeming ? '激活中…' : '激活' }}</button>
-          </div>
           <button @click="toast.info('请联系管理员激活星月卡')" class="text-xs underline-offset-2 transition-colors hover:underline"
             style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
         </template>
