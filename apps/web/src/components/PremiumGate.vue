@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, type Component } from 'vue';
-import { Crown, X } from 'lucide-vue-next';
+import { Crown, X, ClipboardPaste } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
 
@@ -9,6 +9,15 @@ const toast = useToast();
 
 const redeemInput = ref('');
 const redeeming = ref(false);
+
+async function handlePaste() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text.trim()) redeemInput.value = text.trim();
+  } catch {
+    toast.error('无法读取剪贴板，请手动粘贴');
+  }
+}
 
 async function handleRedeem() {
   const code = redeemInput.value.trim();
@@ -117,6 +126,10 @@ const pricingMotion = {
             @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
             @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
           />
+          <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
+            class="grid shrink-0 place-items-center rounded-[16px] border px-3 transition-colors hover:bg-[var(--accent-soft)]"
+            style="border-color: var(--line); color: var(--ink-soft)"
+          ><ClipboardPaste class="h-4 w-4" /></button>
           <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
             class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
             style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);

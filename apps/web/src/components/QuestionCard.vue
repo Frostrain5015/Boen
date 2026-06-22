@@ -269,6 +269,7 @@ watch(
               v-else
               v-model="blanks[i]"
               :disabled="answered"
+              @keydown.enter.prevent="submit"
               class="field"
               :class="answered && grading?.perBlank ? (grading.perBlank[i] ? 'field-ok' : 'field-no') : ''"
               placeholder="填写答案…"
@@ -287,7 +288,7 @@ watch(
           class="mathfield mathfield-area"
           @input="onShortInput"
         ></math-field>
-        <textarea v-else v-model="shortText" :disabled="answered" rows="4" class="field" placeholder="写下你的思路与答案…" />
+        <textarea v-else v-model="shortText" :disabled="answered" @keydown.enter.exact.prevent="submit" rows="4" class="field" placeholder="写下你的思路与答案…（回车提交，Shift+回车换行）" />
       </div>
 
       <!-- 提交 -->

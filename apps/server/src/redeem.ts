@@ -2,38 +2,39 @@ import { createHmac, timingSafeEqual, randomBytes } from 'node:crypto';
 import db from './db.js';
 
 // ── 自描述签名兑换码 ─────────────────────────────────────────
-// 码 = Crockford-Base32( payload(14B) ‖ HMAC-SHA256(payload)[:6B] )，共 20 字节 → 32 个 base32 字符。
-// 条款全部编码进 payload 并由 HMAC 签名，服务端离线可验、无需查库。库中只保留逻辑上不属于码本身的
+// 码 = Crockford-Base32( payload(6B) ‖ HMAC-SHA256(payload)[:4B] )，共 10 字节 → 16 个 base32 字符。
+// 条款编码进 payload 并由 HMAC 签名，服务端离线可验、无需查库。库中只保留逻辑上不属于码本身的
 // 「消费状态」(code_redemptions) 与「撤销名单」(code_revocations)。
+// 不含码自身有效期：作废靠 code_revocations（单码 nonce 或整批 batch）。
 //
-// payload 字节布局（大端）：
-//   [0]    version        u8   —— 密钥/格式轮换预留
-//   [1]    maxUses        u8   —— 0=无限(可复用)；1=一次性；N=限 N 次
-//   [2-3]  durationDays   u16  —— 兑换得到的会员天数
-//   [4-5]  codeExpiryDay  u16  —— 码失效日（距 EPOCH 的天数；0=永不过期）
-//   [6-7]  batch          u16  —— 批次号，用于整批撤销/统计
-//   [8-13] nonce          6B   —— 随机唯一码 id（hex 存库，作消费流水主键）
+// payload 48 bit：
+//   terms 16 bit（高→低）：version(3) maxUses(3,0=无限) durationBit(1,0=30天/1=365天) batch(9)
+//   nonce 32 bit：随机唯一码 id（hex 存库，作消费流水主键）
 
 const VERSION = 1;
-const EPOCH = Math.floor(Date.UTC(2024, 0, 1) / 1000); // 秒
-const PAYLOAD_LEN = 14;
-const SIG_LEN = 6;
-const TOTAL_LEN = PAYLOAD_LEN + SIG_LEN; // 20
+const PAYLOAD_LEN = 6;
+const SIG_LEN = 4;
+const TOTAL_LEN = PAYLOAD_LEN + SIG_LEN; // 10
+const NONCE_BYTES = 4;
+const MAX_USES = 0x7;    // 3 bit
+const MAX_BATCH = 0x1ff; // 9 bit
+const MAX_VERSION = 0x7; // 3 bit
+// 会员面值仅两档（月卡/年卡）
+const DURATION_30 = 30;
+const DURATION_365 = 365;
 // Crockford Base32（去掉 I/L/O/U，避免人眼歧义）
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export interface CodePayload {
   version: number;
-  maxUses: number;       // 0 = 无限
-  durationDays: number;
-  codeExpiryDay: number; // 0 = 永不过期
+  maxUses: number;      // 0 = 无限
+  durationDays: number; // 30 或 365
   batch: number;
-  nonce: string;         // hex(6 字节)
+  nonce: string;        // hex(4 字节)
 }
 
 export type RedeemError =
   | 'invalid_code'
-  | 'code_expired'
   | 'code_disabled'
   | 'code_used'
   | 'already_redeemed';
@@ -49,24 +50,26 @@ function sign(payload: Buffer, secret: string): Buffer {
 }
 
 function packPayload(p: CodePayload): Buffer {
+  const durationBit = p.durationDays === DURATION_365 ? 1 : 0;
+  const term =
+    ((p.version & MAX_VERSION) << 13) |
+    ((p.maxUses & MAX_USES) << 10) |
+    (durationBit << 9) |
+    (p.batch & MAX_BATCH);
   const b = Buffer.alloc(PAYLOAD_LEN);
-  b.writeUInt8(p.version, 0);
-  b.writeUInt8(p.maxUses, 1);
-  b.writeUInt16BE(p.durationDays, 2);
-  b.writeUInt16BE(p.codeExpiryDay, 4);
-  b.writeUInt16BE(p.batch, 6);
-  Buffer.from(p.nonce, 'hex').copy(b, 8, 0, 6);
+  b.writeUInt16BE(term, 0);
+  Buffer.from(p.nonce, 'hex').copy(b, 2, 0, NONCE_BYTES);
   return b;
 }
 
 function unpackPayload(b: Buffer): CodePayload {
+  const term = b.readUInt16BE(0);
   return {
-    version: b.readUInt8(0),
-    maxUses: b.readUInt8(1),
-    durationDays: b.readUInt16BE(2),
-    codeExpiryDay: b.readUInt16BE(4),
-    batch: b.readUInt16BE(6),
-    nonce: b.subarray(8, 14).toString('hex'),
+    version: (term >> 13) & MAX_VERSION,
+    maxUses: (term >> 10) & MAX_USES,
+    durationDays: (term >> 9) & 1 ? DURATION_365 : DURATION_30,
+    batch: term & MAX_BATCH,
+    nonce: b.subarray(2, 6).toString('hex'),
   };
 }
 
@@ -131,18 +134,11 @@ export function decodeCode(code: string, secret: string): CodePayload | null {
 
 // ── 生成（CLI 用）─────────────────────────────────────────────
 
-/** 把「距今天数」换算成 payload 的 codeExpiryDay 字段（0/缺省 = 永久） */
-export function expiryDaysToField(days: number | undefined): number {
-  if (!days || days <= 0) return 0;
-  const expSec = Math.floor(Date.now() / 1000) + days * 86400;
-  return Math.floor((expSec - EPOCH) / 86400);
-}
-
 export function generateCode(
-  opts: { maxUses: number; durationDays: number; codeExpiryDay: number; batch: number },
+  opts: { maxUses: number; durationDays: number; batch: number },
   secret: string,
 ): { code: string; nonce: string } {
-  const nonce = randomBytes(6).toString('hex');
+  const nonce = randomBytes(NONCE_BYTES).toString('hex');
   return { code: encodeCode({ version: VERSION, ...opts, nonce }, secret), nonce };
 }
 
@@ -157,9 +153,6 @@ export function redeemForUser(userId: string, rawCode: string, secret: string): 
   if (!p || p.version !== VERSION) return { ok: false, error: 'invalid_code' };
 
   const now = Math.floor(Date.now() / 1000);
-  if (p.codeExpiryDay !== 0 && now > EPOCH + p.codeExpiryDay * 86400) {
-    return { ok: false, error: 'code_expired' };
-  }
 
   // 撤销名单：单码 nonce 或整批 batch
   const revoked = db

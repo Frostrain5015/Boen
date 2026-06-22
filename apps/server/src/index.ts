@@ -1299,7 +1299,6 @@ app.post('/api/subscription/redeem', async (c) => {
   if (!result.ok) {
     const msgMap: Record<string, string> = {
       invalid_code: '兑换码无效',
-      code_expired: '兑换码已过期',
       code_disabled: '兑换码已失效',
       code_used: '兑换码已被领完',
       already_redeemed: '你已兑换过此码',
