@@ -5,16 +5,19 @@ import { Moon, Star, Sparkles } from 'lucide-vue-next';
 interface Props {
   type: 'monthly' | 'yearly';
   expiresAt?: number | null;
-  userId?: string;
+  holderName?: string;
   showBack?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  /** 是否在卡面上显示价格（广告页显示，已有卡不显示） */
+  showPrice?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   expiresAt: null,
-  userId: '',
+  holderName: '',
   showBack: false,
   size: 'md',
+  showPrice: true,
 });
 
 const isFlipped = ref(props.showBack);
@@ -23,12 +26,12 @@ const cardRef = ref<HTMLDivElement | null>(null);
 const isMonthly = computed(() => props.type === 'monthly');
 const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
 const cardPrice = computed(() => (isMonthly.value ? '¥18/月' : '¥188/年'));
-const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价 ¥238.8'));
+const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价¥238.8'));
 
-// 用户编号：取 userId 前8位大写
-const userNo = computed(() => {
-  if (!props.userId) return '';
-  return props.userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+// 持卡人名字
+const holderDisplay = computed(() => {
+  if (!props.holderName) return '';
+  return props.holderName.length > 8 ? props.holderName.substring(0, 8) + '…' : props.holderName;
 });
 
 // 到期日格式化
@@ -44,9 +47,9 @@ const sizeClasses = {
 };
 
 const fontSizes = {
-  sm: { title: 'text-base', subtitle: 'text-[11px]', price: 'text-lg', desc: 'text-[10px]' },
-  md: { title: 'text-lg', subtitle: 'text-xs', price: 'text-xl', desc: 'text-[11px]' },
-  lg: { title: 'text-xl', subtitle: 'text-sm', price: 'text-2xl', desc: 'text-xs' },
+  sm: { title: 'text-base', subtitle: 'text-[11px]', icon: 36, desc: 'text-[10px]' },
+  md: { title: 'text-lg', subtitle: 'text-xs', icon: 48, desc: 'text-[11px]' },
+  lg: { title: 'text-xl', subtitle: 'text-sm', icon: 56, desc: 'text-xs' },
 };
 
 function handleMouseMove(e: MouseEvent) {
@@ -70,13 +73,14 @@ defineExpose({ flip, isFlipped });
 </script>
 
 <template>
-  <div
-    class="membership-card-container"
-    :class="sizeClasses[size]"
-    @mousemove="handleMouseMove"
-    @mouseleave="handleMouseLeave"
-    @click="flip"
-  >
+  <div class="membership-card-outer">
+    <div
+      class="membership-card-container"
+      :class="sizeClasses[size]"
+      @mousemove="handleMouseMove"
+      @mouseleave="handleMouseLeave"
+      @click="flip"
+    >
     <div
       ref="cardRef"
       class="membership-card"
@@ -92,26 +96,20 @@ defineExpose({ flip, isFlipped });
           <span class="brand-text" :class="fontSizes[size].subtitle">博文·星月卡</span>
         </div>
 
-        <!-- 中央图标 -->
+        <!-- 中央图标（增大） -->
         <div class="card-icon-wrapper">
           <div class="card-icon-glow" />
-          <component :is="isMonthly ? Moon : Star" class="card-icon" :class="fontSizes[size].title" />
+          <component :is="isMonthly ? Moon : Star" :size="fontSizes[size].icon" class="card-icon" />
         </div>
 
         <!-- 卡片名称 -->
         <div class="card-name-section">
           <h3 class="card-name" :class="fontSizes[size].title">{{ cardName }}</h3>
-          <p class="card-price" :class="fontSizes[size].price">
-            {{ cardPrice }}
-            <span v-if="cardOriginalPrice" class="card-original-price" :class="fontSizes[size].desc">
-              {{ cardOriginalPrice }}
-            </span>
-          </p>
         </div>
 
-        <!-- 底部：No. + 到期日 -->
+        <!-- 底部：持卡人 + 到期日 -->
         <div class="card-footer" :class="fontSizes[size].desc">
-          <span v-if="userNo" class="card-footer-no">No. {{ userNo }}</span>
+          <span v-if="holderDisplay" class="card-footer-holder">{{ holderDisplay }}</span>
           <span v-else />
           <span v-if="expiresDate" class="card-footer-expires">{{ expiresDate }}到期</span>
         </div>
@@ -136,10 +134,22 @@ defineExpose({ flip, isFlipped });
         </div>
       </div>
     </div>
+    <!-- 卡片下方价格文本（仅广告模式显示） -->
+    <div v-if="showPrice && !holderDisplay" class="card-price-label">
+      <span class="card-price-value" :class="{ 'card-price-value-yearly': !isMonthly }">{{ cardPrice }}</span>
+      <span v-if="cardOriginalPrice" class="card-price-original">{{ cardOriginalPrice }}</span>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.membership-card-outer {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .membership-card-container {
   perspective: 1000px;
   cursor: pointer;
@@ -230,24 +240,22 @@ defineExpose({ flip, isFlipped });
   opacity: 0.7;
 }
 
-/* 中央图标 */
+/* 中央图标（增大版） */
 .card-icon-wrapper {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 8px;
+  margin: auto auto 8px;
   border-radius: 50%;
 }
 
 .card-icon-glow {
   position: absolute;
-  inset: -4px;
+  inset: -8px;
   border-radius: 50%;
   opacity: 0.15;
-  filter: blur(8px);
+  filter: blur(12px);
 }
 
 .card-monthly .card-icon-glow {
@@ -261,8 +269,6 @@ defineExpose({ flip, isFlipped });
 .card-icon {
   position: relative;
   z-index: 1;
-  width: 28px;
-  height: 28px;
 }
 
 .card-monthly .card-icon {
@@ -276,14 +282,12 @@ defineExpose({ flip, isFlipped });
 /* 卡片名称区域 */
 .card-name-section {
   text-align: center;
-  margin-bottom: auto;
 }
 
 .card-name {
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0.06em;
-  margin-bottom: 4px;
 }
 
 .card-monthly .card-name {
@@ -294,34 +298,12 @@ defineExpose({ flip, isFlipped });
   color: #4a3508;
 }
 
-.card-price {
-  font-family: var(--font-display);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.card-monthly .card-price {
-  color: #7a756e;
-}
-
-.card-yearly .card-price {
-  color: #6b4e0a;
-}
-
-.card-original-price {
-  text-decoration: line-through;
-  opacity: 0.5;
-}
-
-/* 底部 No. + 到期日 */
+/* 底部 */
 .card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  opacity: 0.6;
+  opacity: 0.7;
   padding-top: 8px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
 }
@@ -340,8 +322,60 @@ defineExpose({ flip, isFlipped });
   letter-spacing: 0.04em;
 }
 
+/* 持卡人名字 */
+.card-footer-holder {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .card-footer-expires {
   font-family: var(--font-body);
+}
+
+/* 底部价格强调文本 */
+.card-footer-price {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15em;
+  letter-spacing: 0.02em;
+  color: #5c5852;
+}
+
+.card-footer-price-yearly {
+  color: var(--premium-gold-strong);
+}
+
+.card-footer-original {
+  font-family: var(--font-display);
+  text-decoration: line-through;
+  opacity: 0.45;
+}
+
+/* 卡片下方价格标签 */
+.card-price-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.card-price-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: #5c5852;
+}
+
+.card-price-value-yearly {
+  color: var(--premium-gold-strong);
+}
+
+.card-price-original {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  text-decoration: line-through;
+  opacity: 0.45;
+  color: var(--ink-soft);
 }
 
 /* 闪光动画 */

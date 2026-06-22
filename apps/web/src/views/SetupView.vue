@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
-import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock, ClipboardPaste } from 'lucide-vue-next';
+import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipCard from '@/components/MembershipCard.vue';
@@ -18,15 +18,6 @@ const redeemedTier = ref<'monthly' | 'yearly'>('monthly');
 // ── 星月卡兑换 ──
 const redeemInput = ref('');
 const redeeming = ref(false);
-
-async function handlePaste() {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text.trim()) redeemInput.value = text.trim();
-  } catch {
-    toast.error('无法读取剪贴板，请手动粘贴');
-  }
-}
 
 async function handleRedeem() {
   const code = redeemInput.value.trim();
@@ -160,7 +151,8 @@ function handleBack() {
           <MembershipCard
             :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
             :expires-at="authStore.subscription?.expiresAt"
-            :user-id="authStore.currentUser?.sub ?? ''"
+            :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
+            :show-price="false"
             size="md"
           />
           <!-- 续费兑换码 -->
@@ -176,10 +168,6 @@ function handleBack() {
               @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
               @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
             />
-            <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
-              class="grid shrink-0 place-items-center rounded-[16px] border bg-white/60 px-3 backdrop-blur-sm transition-colors hover:bg-[var(--accent-soft)]"
-              style="border-color: var(--line); color: var(--ink-soft)"
-            ><ClipboardPaste class="h-4 w-4" /></button>
             <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
               class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
               style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
@@ -190,11 +178,11 @@ function handleBack() {
           </div>
         </template>
 
-        <!-- 无星月卡：广告展示 -->
+        <!-- 无星月卡：广告展示（上下叠放） -->
         <template v-else>
-          <div class="flex items-center gap-4 justify-center">
-            <MembershipCard type="monthly" size="sm" />
-            <MembershipCard type="yearly" size="sm" />
+          <div class="flex flex-col items-center gap-3">
+            <MembershipCard type="monthly" size="md" :show-price="true" />
+            <MembershipCard type="yearly" size="md" :show-price="true" />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
             <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
@@ -213,10 +201,6 @@ function handleBack() {
               @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
               @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
             />
-            <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
-              class="grid shrink-0 place-items-center rounded-[16px] border bg-white/60 px-3 backdrop-blur-sm transition-colors hover:bg-[var(--accent-soft)]"
-              style="border-color: var(--line); color: var(--ink-soft)"
-            ><ClipboardPaste class="h-4 w-4" /></button>
             <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
               class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
               style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
