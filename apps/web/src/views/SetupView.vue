@@ -444,7 +444,7 @@ function handleBack() {
     <!-- 兑换成功动画：暗色遮罩 + 中央文案（卡面本身在左侧原地放大移入，见 anim-card-wrapper） -->
     <div v-if="animActive" class="redeem-overlay" :class="{ visible: overlayVisible }" />
     <div v-if="animActive" class="redeem-center-ui" :class="{ visible: showCenterUI }">
-      <div class="redeem-text">
+      <div class="redeem-text" :style="{ color: redeemedTier === 'yearly' ? '#e7d8f2' : '#e3e9ee' }">
         <Sparkles class="redeem-icon" />
         <span>{{ redeemHeadline }}</span>
       </div>
@@ -480,7 +480,7 @@ function handleBack() {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(20, 14, 8, 0.55);
+  background: rgba(18, 16, 22, 0.55);
   backdrop-filter: blur(6px);
   opacity: 0;
   transition: opacity 0.36s ease;
@@ -517,8 +517,8 @@ function handleBack() {
   font-family: var(--font-display);
   font-size: 1.125rem;
   font-weight: 700;
-  color: #fbe3b4;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  color: #e7e2ea;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
 }
 
 .redeem-icon {

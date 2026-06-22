@@ -12,6 +12,9 @@ AGENTS.md
 .workbuddy/
 .claude/
 
+# 兑换码清单（含有效会员码，禁止入库）
+兑换码-*.md
+
 # One-off knowledge-graph export and generation artifacts
 kp-export.json
 generate-english-mappings.cjs
