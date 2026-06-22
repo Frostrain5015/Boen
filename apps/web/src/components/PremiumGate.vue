@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, type Component, nextTick } from 'vue';
+import { ref, type Component } from 'vue';
 import { Crown, X, ClipboardPaste, Sparkles } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
@@ -12,7 +12,6 @@ const redeemInput = ref('');
 const redeeming = ref(false);
 const showSuccessAnimation = ref(false);
 const redeemedTier = ref<'monthly' | 'yearly'>('monthly');
-const flyingCardRef = ref<HTMLDivElement | null>(null);
 
 async function handlePaste() {
   try {
@@ -30,14 +29,9 @@ async function handleRedeem() {
   try {
     const r = await authStore.redeemCode(code);
     if (r.ok) {
-      // 判断兑换的是月卡还是年卡
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
       redeemInput.value = '';
-
-      // 播放成功动画
       showSuccessAnimation.value = true;
-
-      // 3秒后关闭动画并触发关闭事件
       setTimeout(() => {
         showSuccessAnimation.value = false;
         emit('close');
@@ -53,23 +47,10 @@ async function handleRedeem() {
 const props = defineProps<{
   featureName: string;
   icon?: Component;
-  extraBenefits?: string[];
   standalone?: boolean;
 }>();
 
 const emit = defineEmits<{ close: [] }>();
-
-const defaultBenefits = [
-  'DeepSeek V4 Pro 大模型 — 深度推理，难题也能讲到孩子听懂',
-  '考试与全题型练习 — 紧扣教材章节智能出题，针对薄弱点强化',
-  '错题本智能归因 — 拍照上传作业错题，自动定位知识漏洞',
-  '学习诊断报告与知识画像 — 一眼看清孩子的强弱项与每一步进步',
-];
-const premiumBenefits = computed(() =>
-  props.extraBenefits?.length
-    ? [...new Set([...defaultBenefits, ...props.extraBenefits])]
-    : defaultBenefits,
-);
 
 function handleContact() {
   toast.info('请联系管理员激活星月卡');
@@ -79,11 +60,6 @@ const cardMotion = {
   initial: { opacity: 0, scale: 0.92, y: 16 },
   enter: { opacity: 1, scale: 1, y: 0, transition: { duration: 500, ease: [0.34, 1.56, 0.64, 1] } },
 };
-
-const pricingMotion = {
-  initial: { opacity: 0, y: 12 },
-  enter: { opacity: 1, y: 0, transition: { duration: 400, delay: 200 } },
-};
 </script>
 
 <template>
@@ -91,81 +67,36 @@ const pricingMotion = {
 
   <div v-else :class="standalone ? '' : 'relative h-full w-full'">
     <div :class="standalone ? '' : 'premium-overlay'">
-      <div class="relative clay clay-glass flex w-full max-w-[420px] flex-col items-center px-6 py-8"
-        v-motion="cardMotion"
-      >
+      <div class="flex flex-col items-center gap-6" v-motion="cardMotion">
         <button v-if="standalone" @click="emit('close')"
           class="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--ink)]"
         ><X :size="16" /></button>
 
-        <!-- 顶部标题 -->
-        <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-          style="background: var(--locked-surface); border: 1.5px solid var(--locked-line)">
-          <component v-if="icon" :is="icon" class="h-7 w-7" style="color: var(--locked-ink)" />
-          <Crown v-else class="h-7 w-7" style="color: var(--locked-ink)" />
-        </div>
-
-        <h2 class="mb-1 text-center font-display text-xl font-bold" style="color: var(--ink)">星月卡专属功能</h2>
-        <p class="mb-3 text-center text-sm" style="color: var(--ink-soft)">{{ featureName }}</p>
-
         <!-- 两张卡片展示 -->
-        <div class="mb-4 flex flex-col items-center gap-3 w-full">
-          <div class="flex items-center gap-3 justify-center">
-            <MembershipCard type="monthly" size="sm" />
-            <MembershipCard type="yearly" size="sm" />
-          </div>
-          <p class="text-xs" style="color: var(--ink-soft)">
-            <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
-            悬停卡片查看权益，点击翻转
-          </p>
+        <div class="flex items-center gap-4 justify-center">
+          <MembershipCard type="monthly" size="sm" />
+          <MembershipCard type="yearly" size="sm" />
         </div>
+        <p class="text-xs" style="color: var(--ink-soft)">
+          <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
+          悬停卡片查看权益，点击翻转
+        </p>
 
-        <div class="mb-4 w-full px-8"><div class="h-px w-full" style="background: var(--line)"></div></div>
-
-        <!-- 权益列表 -->
-        <div class="mb-4 flex flex-col gap-1.5 self-start px-2 text-sm" style="color: var(--ink-soft)">
-          <div v-for="item in premiumBenefits" :key="item" class="flex items-center gap-2">
-            <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs"
-              style="background: var(--accent-soft); color: var(--accent-strong)">✦</span>
-            {{ item }}
-          </div>
-        </div>
-
-        <div class="mb-4 w-full px-8"><div class="h-px w-full" style="background: var(--line)"></div></div>
-
-        <!-- 定价信息 -->
-        <div class="mb-5 flex flex-col items-center gap-2" v-motion="pricingMotion">
-          <div class="flex items-center gap-3">
-            <div class="flex flex-col items-center">
-              <span class="font-display text-lg font-bold" style="color: #7a756e">¥18</span>
-              <span class="text-[10px]" style="color: var(--ink-soft)">皓月卡/月</span>
-            </div>
-            <div class="h-8 w-px" style="background: var(--line)"></div>
-            <div class="flex flex-col items-center">
-              <span class="font-display text-lg font-bold" style="color: var(--premium-gold-strong)">¥188</span>
-              <span class="text-[10px]" style="color: var(--ink-soft)">星耀卡/年</span>
-            </div>
-          </div>
-          <p class="text-xs" style="color: var(--premium-gold-strong)">
-            年卡立省 ¥50.8，更划算
-          </p>
-        </div>
-
-        <!-- 兑换码开通 -->
-        <div class="mb-3 flex w-full gap-2">
+        <!-- 兑换码激活 -->
+        <div class="flex gap-2 w-[360px]">
           <input
             v-model="redeemInput"
             @keydown.enter="handleRedeem"
             :disabled="redeeming"
             placeholder="输入兑换码激活星月卡"
             maxlength="48"
-            class="min-w-0 flex-1 rounded-[16px] border bg-white px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60"
+            class="min-w-0 flex-1 rounded-[16px] border bg-white/80 px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60 backdrop-blur-sm"
             style="border-color: var(--line); color: var(--ink)"
             @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
             @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
           />
           <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
-            class="grid shrink-0 place-items-center rounded-[16px] border px-3 transition-colors hover:bg-[var(--accent-soft)]"
+            class="grid shrink-0 place-items-center rounded-[16px] border bg-white/60 px-3 backdrop-blur-sm transition-colors hover:bg-[var(--accent-soft)]"
             style="border-color: var(--line); color: var(--ink-soft)"
           ><ClipboardPaste class="h-4 w-4" /></button>
           <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"

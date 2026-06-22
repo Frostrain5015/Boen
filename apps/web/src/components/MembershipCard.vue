@@ -24,13 +24,13 @@ const cardPrice = computed(() => (isMonthly.value ? '¥18/月' : '¥188/年'));
 const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价 ¥238.8'));
 
 const sizeClasses = {
-  sm: 'w-[240px] h-[151px]',
+  sm: 'w-[280px] h-[177px]',
   md: 'w-[340px] h-[214px]',
   lg: 'w-[400px] h-[252px]',
 };
 
 const fontSizes = {
-  sm: { title: 'text-sm', subtitle: 'text-[10px]', price: 'text-base', desc: 'text-[9px]' },
+  sm: { title: 'text-base', subtitle: 'text-[11px]', price: 'text-lg', desc: 'text-[10px]' },
   md: { title: 'text-lg', subtitle: 'text-xs', price: 'text-xl', desc: 'text-[11px]' },
   lg: { title: 'text-xl', subtitle: 'text-sm', price: 'text-2xl', desc: 'text-xs' },
 };
