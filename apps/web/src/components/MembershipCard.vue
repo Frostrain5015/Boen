@@ -195,8 +195,8 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly {
-  background: linear-gradient(135deg, #f5e6c8 0%, #e8d4a8 30%, #d4a853 70%, #b8862d 100%);
-  border: 1px solid rgba(184, 134, 45, 0.4);
+  background: linear-gradient(135deg, #f0e6f6 0%, #dbcce8 30%, #b99dd4 70%, #9b72bf 100%);
+  border: 1px solid rgba(155, 114, 191, 0.4);
 }
 
 /* 顶部装饰线 */
@@ -215,7 +215,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .card-stripe {
-  background: linear-gradient(90deg, transparent, #f5d89a, transparent);
+  background: linear-gradient(90deg, transparent, #c9a0e8, transparent);
 }
 
 /* 博文·星月卡标志 */
@@ -237,7 +237,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .brand-text {
-  color: #5c3d0e;
+  color: #5c3d7a;
   opacity: 0.7;
 }
 
@@ -247,7 +247,7 @@ defineExpose({ flip, isFlipped });
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 10px auto 6px;
+  margin: 16px auto 6px;
   border-radius: 50%;
 }
 
@@ -264,7 +264,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .card-icon-glow {
-  background: radial-gradient(circle, #f5d89a 0%, transparent 70%);
+  background: radial-gradient(circle, #c9a0e8 0%, transparent 70%);
 }
 
 .card-icon {
@@ -277,7 +277,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .card-icon {
-  color: #8b6914;
+  color: #7b4da8;
 }
 
 /* 卡片名称区域 */
@@ -300,7 +300,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .card-name {
-  color: #4a3508;
+  color: #4a2070;
 }
 
 /* 底部 */
@@ -318,7 +318,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly .card-footer {
-  color: #7a5c1a;
+  color: #6a3d8a;
 }
 
 .card-footer-no {
@@ -372,7 +372,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-price-value-yearly {
-  color: var(--premium-gold-strong);
+  color: #7b4da8;
 }
 
 .card-price-original {
@@ -422,8 +422,8 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly-back {
-  background: linear-gradient(135deg, #fdf3e0 0%, #f5e6c8 100%);
-  border: 1px solid rgba(184, 134, 45, 0.4);
+  background: linear-gradient(135deg, #f5ecf9 0%, #e6d4f0 100%);
+  border: 1px solid rgba(155, 114, 191, 0.4);
 }
 
 .back-content {
@@ -446,7 +446,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly-back .back-header {
-  color: #4a3508;
+  color: #4a2070;
 }
 
 .back-icon {
@@ -473,7 +473,7 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly-back .back-benefits li {
-  color: #5c4a1a;
+  color: #5c3a80;
 }
 
 .benefit-dot {
@@ -488,6 +488,6 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-yearly-back .benefit-dot {
-  background: #c9a04b;
+  background: #b07dd6;
 }
 </style>
