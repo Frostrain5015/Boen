@@ -247,7 +247,7 @@ defineExpose({ flip, isFlipped });
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: auto auto 8px;
+  margin: 0 auto 6px;
   border-radius: 50%;
 }
 
@@ -283,6 +283,7 @@ defineExpose({ flip, isFlipped });
 /* 卡片名称区域 */
 .card-name-section {
   text-align: center;
+  margin-bottom: auto;
 }
 
 .card-name {
