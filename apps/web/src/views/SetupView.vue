@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
 import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock } from 'lucide-vue-next';
@@ -12,12 +12,21 @@ const authStore = useAuthStore();
 const toast = useToast();
 
 const isFirstSetup = computed(() => !authStore.userProfile);
-const showSuccessAnimation = ref(false);
 const redeemedTier = ref<'monthly' | 'yearly'>('monthly');
 
 // ── 星月卡兑换 ──
 const redeemInput = ref('');
 const redeeming = ref(false);
+
+// ── 兑换成功动画（同一卡面 DOM 原地完成整个链路，不重建）──
+// 原位 → 放大移到中央 → 镜面闪光 → 停留展示"我知道了" → 缩小飞回原位 → 镜面闪光 → 常驻
+const animActive = ref(false);          // 控制遮罩/抬升层的挂载
+const overlayVisible = ref(false);      // 暗色遮罩淡入淡出
+const showCenterUI = ref(false);        // 中央文案 + "我知道了"
+const animPhase = ref<'enter' | 'leave'>('enter'); // 控制缓动曲线
+const cardTransform = ref('translate(0px, 0px) scale(1)');
+const animCardRef = ref<HTMLDivElement | null>(null);
+const premiumCardRef = ref<InstanceType<typeof MembershipCard> | null>(null);
 
 async function handleRedeem() {
   const code = redeemInput.value.trim();
@@ -28,7 +37,7 @@ async function handleRedeem() {
     if (r.ok) {
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
       redeemInput.value = '';
-      showSuccessAnimation.value = true;
+      await startRedeemAnimation();
     } else {
       toast.error(r.message ?? '兑换失败');
     }
@@ -37,8 +46,53 @@ async function handleRedeem() {
   }
 }
 
-function handleSuccessDismiss() {
-  showSuccessAnimation.value = false;
+/** 放大移到中央 → 镜面闪光 → 停留 */
+async function startRedeemAnimation() {
+  animPhase.value = 'enter';
+  showCenterUI.value = false;
+  cardTransform.value = 'translate(0px, 0px) scale(1)';
+  animActive.value = true; // 抬升卡面层 + 挂载遮罩（透明）
+  // 等待左侧切换为已购卡面后再测量其原位
+  await nextTick();
+  const el = animCardRef.value;
+  if (!el) {
+    animActive.value = false;
+    return;
+  }
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  // 目标：视口中央偏上，给下方文案/按钮留出空间
+  const dx = window.innerWidth / 2 - cx;
+  const dy = window.innerHeight / 2 - 56 - cy;
+  overlayVisible.value = true; // 遮罩淡入
+  // 下一帧再施加位移，确保从原位过渡到中央
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      cardTransform.value = `translate(${dx}px, ${dy}px) scale(1.28)`;
+    });
+  });
+  // 抵达中央后：镜面闪光 + 浮现文案
+  window.setTimeout(() => {
+    premiumCardRef.value?.playShimmer();
+    showCenterUI.value = true;
+  }, 660);
+}
+
+/** 缩小飞回原位 → 镜面闪光 → 常驻 */
+function handleRedeemDismiss() {
+  animPhase.value = 'leave';
+  showCenterUI.value = false;
+  cardTransform.value = 'translate(0px, 0px) scale(1)';
+  // 落回原位后：再次镜面闪光 + 遮罩淡出
+  window.setTimeout(() => {
+    premiumCardRef.value?.playShimmer();
+    overlayVisible.value = false;
+    // 遮罩淡出结束后撤掉抬升层，卡面常驻原位
+    window.setTimeout(() => {
+      animActive.value = false;
+    }, 360);
+  }, 620);
 }
 
 // ── 设置 ──
@@ -148,13 +202,21 @@ function handleBack() {
       <div class="flex w-[380px] shrink-0 flex-col gap-4">
         <!-- 已有星月卡：展示卡面 + 续费 -->
         <template v-if="authStore.isPremium">
-          <MembershipCard
-            :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
-            :expires-at="authStore.subscription?.expiresAt"
-            :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
-            :show-price="false"
-            size="md"
-          />
+          <div
+            ref="animCardRef"
+            class="anim-card-wrapper"
+            :class="[{ 'is-animating': animActive }, animActive ? `phase-${animPhase}` : '']"
+            :style="animActive ? { transform: cardTransform } : undefined"
+          >
+            <MembershipCard
+              ref="premiumCardRef"
+              :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
+              :expires-at="authStore.subscription?.expiresAt"
+              :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
+              :show-price="false"
+              size="md"
+            />
+          </div>
           <!-- 续费兑换码 -->
           <div class="flex gap-2">
             <input
@@ -347,110 +409,102 @@ function handleBack() {
       </div>
     </div>
 
-    <!-- 兑换成功动画 -->
-    <Teleport to="body">
-      <Transition name="success-fade">
-        <div v-if="showSuccessAnimation" class="success-animation-overlay">
-          <div class="success-card-wrapper">
-            <MembershipCard
-              :type="redeemedTier"
-              :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
-              :show-price="false"
-              size="lg"
-            />
-          </div>
-          <div class="success-text">
-            <Sparkles class="success-icon" />
-            <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
-          </div>
-          <button @click="handleSuccessDismiss" class="success-dismiss-btn">
-            我知道了
-          </button>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- 兑换成功动画：暗色遮罩 + 中央文案（卡面本身在左侧原地放大移入，见 anim-card-wrapper） -->
+    <div v-if="animActive" class="redeem-overlay" :class="{ visible: overlayVisible }" />
+    <div v-if="animActive" class="redeem-center-ui" :class="{ visible: showCenterUI }">
+      <div class="redeem-text">
+        <Sparkles class="redeem-icon" />
+        <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
+      </div>
+      <button @click="handleRedeemDismiss" class="redeem-dismiss-btn">我知道了</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.success-animation-overlay {
+/* ── 兑换成功动画 ── */
+/* 抬升层：让左侧同一卡面盖在暗色遮罩之上，原地用 transform 移动/缩放，不重建 DOM */
+.anim-card-wrapper {
+  display: flex;
+  justify-content: center;
+}
+.anim-card-wrapper.is-animating {
+  position: relative;
+  z-index: 1001;
+  will-change: transform;
+}
+.anim-card-wrapper.phase-enter {
+  transition: transform 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.anim-card-wrapper.phase-leave {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 暗色半透明遮罩，淡入淡出 */
+.redeem-overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 1000;
+  background: rgba(20, 14, 8, 0.55);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.36s ease;
+}
+.redeem-overlay.visible {
+  opacity: 1;
+}
+
+/* 中央文案 + 按钮（位于卡面下方） */
+.redeem-center-ui {
+  position: fixed;
+  left: 50%;
+  top: calc(50% + 150px);
+  z-index: 1002;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  background: rgba(251, 246, 238, 0.92);
-  backdrop-filter: blur(12px);
+  gap: 20px;
+  transform: translate(-50%, 8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.redeem-center-ui.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
 }
 
-.success-fade-enter-active { transition: opacity 0.3s ease; }
-.success-fade-leave-active { transition: opacity 0.5s ease; }
-.success-fade-enter-from,
-.success-fade-leave-to { opacity: 0; }
-
-.success-card-wrapper {
-  animation: cardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-             cardShine 0.8s ease-in-out 0.4s forwards;
-}
-
-@keyframes cardAppear {
-  from { opacity: 0; transform: scale(0.5) translateY(40px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-@keyframes cardShine {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.3); }
-  100% { filter: brightness(1); }
-}
-
-.success-text {
+.redeem-text {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 24px;
   font-family: var(--font-display);
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--premium-gold-strong);
-  animation: textFadeIn 0.4s ease 0.6s both;
+  color: #fbe3b4;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
 }
 
-@keyframes textFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.success-icon {
+.redeem-icon {
   width: 20px;
   height: 20px;
-  animation: iconSpin 0.6s ease 0.8s both;
 }
 
-@keyframes iconSpin {
-  from { transform: rotate(-180deg) scale(0); }
-  to { transform: rotate(0) scale(1); }
-}
-
-.success-dismiss-btn {
-  margin-top: 32px;
+.redeem-dismiss-btn {
   padding: 10px 40px;
   border-radius: 99px;
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--ink-soft);
+  color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line);
   cursor: pointer;
-  transition: all 0.2s ease;
-  animation: textFadeIn 0.4s ease 0.9s both;
+  transition: color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.success-dismiss-btn:hover {
-  color: var(--ink);
+.redeem-dismiss-btn:hover {
   border-color: var(--premium-gold);
   box-shadow: 0 4px 12px -4px var(--premium-gold-glow);
 }

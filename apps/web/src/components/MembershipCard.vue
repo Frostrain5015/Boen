@@ -69,7 +69,13 @@ function flip() {
   isFlipped.value = !isFlipped.value;
 }
 
-defineExpose({ flip, isFlipped });
+// 镜面闪光：递增 key 强制重建 shimmer 元素以重放 CSS 动画（卡片本体 DOM 不变）
+const shimmerKey = ref(0);
+function playShimmer() {
+  shimmerKey.value += 1;
+}
+
+defineExpose({ flip, isFlipped, playShimmer });
 </script>
 
 <template>
@@ -115,7 +121,7 @@ defineExpose({ flip, isFlipped });
         </div>
 
         <!-- 闪光效果 -->
-        <div class="card-shimmer" />
+        <div :key="shimmerKey" class="card-shimmer" />
       </div>
 
       <!-- 背面 -->
@@ -394,7 +400,7 @@ defineExpose({ flip, isFlipped });
     transparent 60%
   );
   background-size: 200% 100%;
-  animation: shimmer-sweep 4s ease-in-out infinite;
+  animation: shimmer-sweep 2s ease-in-out 1;
   pointer-events: none;
   border-radius: 16px;
 }
