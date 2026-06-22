@@ -417,12 +417,12 @@ defineExpose({ flip, isFlipped });
 }
 
 .card-monthly-back {
-  background: linear-gradient(135deg, #f5f0ea 0%, #ebe6e0 100%);
+  background: linear-gradient(135deg, #f5f0ea 0%, #ebe6e0 40%, #e0d9d1 100%);
   border: 1px solid rgba(180, 175, 170, 0.4);
 }
 
 .card-yearly-back {
-  background: linear-gradient(135deg, #f5ecf9 0%, #e6d4f0 100%);
+  background: linear-gradient(135deg, #f5ecf9 0%, #e6d4f0 40%, #d4b8e8 100%);
   border: 1px solid rgba(155, 114, 191, 0.4);
 }
 
