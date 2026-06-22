@@ -115,8 +115,8 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
       :class="{ 'is-flipped': isFlipped }"
     >
       <!-- 正面 -->
-      <div class="card-face card-front" :class="isMonthly ? 'card-monthly' : 'card-yearly'">
-        <!-- 表层质感（均在文字之下，pointer-events:none）：超大同色水印母题 / 受光 / 细噪点 -->
+      <div class="card-face card-front" :class="[isMonthly ? 'card-monthly' : 'card-yearly', { 'face-off': isFlipped }]">
+        <!-- 表层质感（文字之下，pointer-events:none）：超大同色水印母题 -->
         <div class="surf surf-watermark" aria-hidden="true">
           <svg v-if="isMonthly" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
           <svg v-else viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -153,7 +153,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
       </div>
 
       <!-- 背面 -->
-      <div class="card-face card-back" :class="isMonthly ? 'card-monthly-back' : 'card-yearly-back'">
+      <div class="card-face card-back" :class="[isMonthly ? 'card-monthly-back' : 'card-yearly-back', { 'face-off': !isFlipped }]">
         <div class="back-content">
           <div class="back-header" :class="fontSizes[size].subtitle">
             <Sparkles class="back-icon" :size="14" />
@@ -238,6 +238,12 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   backface-visibility: hidden;
   border-radius: 16px;
   overflow: hidden;
+}
+
+/* 背对用户的一面禁用命中测试：preserve-3d 下带 z-index 的内容会被压平、
+   即使 backface-visibility 隐藏了绘制，仍会拦截点击，导致背面输入框点不到。 */
+.card-face.face-off {
+  pointer-events: none;
 }
 
 /* ── 正面样式 ── */
