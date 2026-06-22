@@ -23,21 +23,45 @@ const redeeming = ref(false);
 const animActive = ref(false);          // 控制遮罩/抬升层的挂载
 const overlayVisible = ref(false);      // 暗色遮罩淡入淡出
 const showCenterUI = ref(false);        // 中央文案 + "我知道了"
-const animPhase = ref<'enter' | 'leave'>('enter'); // 控制缓动曲线
+const animPhase = ref<'init' | 'enter' | 'leave'>('init'); // init=无过渡定位起点
 const cardTransform = ref('translate(0px, 0px) scale(1)');
 const animCardRef = ref<HTMLDivElement | null>(null);
 const premiumCardRef = ref<InstanceType<typeof MembershipCard> | null>(null);
+const adYearlyRef = ref<InstanceType<typeof MembershipCard> | null>(null);
+const adMonthlyRef = ref<InstanceType<typeof MembershipCard> | null>(null);
+// 动画期间覆盖已购卡的显示档位（升级时先维持旧卡、闪光时再切新卡）
+const displayTierOverride = ref<'monthly' | 'yearly' | null>(null);
+const animWasPremium = ref(false);
+const animOldTier = ref<'monthly' | 'yearly'>('monthly');
+
+const ownedCardTier = computed<'monthly' | 'yearly'>(() =>
+  displayTierOverride.value ?? (authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'),
+);
+
+const redeemHeadline = computed(() => {
+  const cardName = redeemedTier.value === 'yearly' ? '星耀卡' : '皓月卡';
+  if (!animWasPremium.value) return `激活成功！${cardName}已到账`;
+  if (animOldTier.value === 'monthly' && redeemedTier.value === 'yearly') return '升级成功！星耀卡已到账';
+  return `续期成功！${cardName}已到账`;
+});
 
 async function handleRedeem() {
   const code = redeemInput.value.trim();
   if (!code || redeeming.value) return;
   redeeming.value = true;
+  // 兑换前先记录旧状态：用于动画起点、升级过渡、文案
+  const wasPremium = authStore.isPremium;
+  const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+  // 首开（广告页）：兑换前先测量两张广告卡的位置，避免重渲染后丢失正确起点
+  const adYearlyRect = wasPremium ? null : (adYearlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
+  const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
   try {
     const r = await authStore.redeemCode(code);
     if (r.ok) {
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
       redeemInput.value = '';
-      await startRedeemAnimation();
+      const srcRect = wasPremium ? null : (redeemedTier.value === 'yearly' ? adYearlyRect : adMonthlyRect);
+      await startRedeemAnimation({ wasPremium, oldTier, srcRect });
     } else {
       toast.error(r.message ?? '兑换失败');
     }
@@ -46,34 +70,49 @@ async function handleRedeem() {
   }
 }
 
-/** 放大移到中央 → 镜面闪光 → 停留 */
-async function startRedeemAnimation() {
-  animPhase.value = 'enter';
+/** 起点 → 放大移到中央 → 镜面闪光（升级时切档）→ 停留 */
+async function startRedeemAnimation(opts: {
+  wasPremium: boolean;
+  oldTier: 'monthly' | 'yearly';
+  srcRect: DOMRect | null;
+}) {
+  animWasPremium.value = opts.wasPremium;
+  animOldTier.value = opts.oldTier;
+  // 起始外观：升级时先维持旧卡，待中央闪光时再变新卡；首开/续期直接显示目标卡
+  displayTierOverride.value = opts.wasPremium ? opts.oldTier : redeemedTier.value;
+  animPhase.value = 'init';
   showCenterUI.value = false;
   cardTransform.value = 'translate(0px, 0px) scale(1)';
   animActive.value = true; // 抬升卡面层 + 挂载遮罩（透明）
-  // 等待左侧切换为已购卡面后再测量其原位
+  // 等待左侧切换为已购卡面后再测量其原位（即飞回的归宿）
   await nextTick();
   const el = animCardRef.value;
   if (!el) {
     animActive.value = false;
+    displayTierOverride.value = null;
     return;
   }
   const rect = el.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  // 目标：视口中央偏上，给下方文案/按钮留出空间
-  const dx = window.innerWidth / 2 - cx;
-  const dy = window.innerHeight / 2 - 56 - cy;
+  const restCx = rect.left + rect.width / 2;
+  const restCy = rect.top + rect.height / 2;
+  const centerTransform = `translate(${window.innerWidth / 2 - restCx}px, ${window.innerHeight / 2 - 56 - restCy}px) scale(1.28)`;
+  // 起点：首开从被兑换的广告卡位置起飞；续期/升级从已购卡原位起飞
+  if (opts.srcRect) {
+    const srcDx = opts.srcRect.left + opts.srcRect.width / 2 - restCx;
+    const srcDy = opts.srcRect.top + opts.srcRect.height / 2 - restCy;
+    cardTransform.value = `translate(${srcDx}px, ${srcDy}px) scale(1)`; // phase=init，无过渡，瞬间定位
+  }
   overlayVisible.value = true; // 遮罩淡入
-  // 下一帧再施加位移，确保从原位过渡到中央
+  // 待起点帧绘制后再开过渡飞向中央
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      cardTransform.value = `translate(${dx}px, ${dy}px) scale(1.28)`;
+      animPhase.value = 'enter';
+      cardTransform.value = centerTransform;
     });
   });
-  // 抵达中央后：镜面闪光 + 浮现文案
+  // 抵达中央：镜面闪光 +（升级时）切换卡档 + 浮现文案
   window.setTimeout(() => {
+    displayTierOverride.value = redeemedTier.value;
     premiumCardRef.value?.playShimmer();
     showCenterUI.value = true;
   }, 660);
@@ -88,9 +127,10 @@ function handleRedeemDismiss() {
   window.setTimeout(() => {
     premiumCardRef.value?.playShimmer();
     overlayVisible.value = false;
-    // 遮罩淡出结束后撤掉抬升层，卡面常驻原位
+    // 遮罩淡出结束后撤掉抬升层，卡面常驻原位（恢复跟随 store 档位）
     window.setTimeout(() => {
       animActive.value = false;
+      displayTierOverride.value = null;
     }, 360);
   }, 620);
 }
@@ -210,7 +250,7 @@ function handleBack() {
           >
             <MembershipCard
               ref="premiumCardRef"
-              :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
+              :type="ownedCardTier"
               :expires-at="authStore.subscription?.expiresAt"
               :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
               :show-price="false"
@@ -243,8 +283,8 @@ function handleBack() {
         <!-- 无星月卡：广告展示（上下叠放） -->
         <template v-else>
           <div class="flex flex-col items-center gap-3">
-            <MembershipCard type="monthly" size="md" :show-price="true" />
-            <MembershipCard type="yearly" size="md" :show-price="true" />
+            <MembershipCard ref="adYearlyRef" type="yearly" size="md" :show-price="true" />
+            <MembershipCard ref="adMonthlyRef" type="monthly" size="md" :show-price="true" />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
             <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
@@ -414,7 +454,7 @@ function handleBack() {
     <div v-if="animActive" class="redeem-center-ui" :class="{ visible: showCenterUI }">
       <div class="redeem-text">
         <Sparkles class="redeem-icon" />
-        <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
+        <span>{{ redeemHeadline }}</span>
       </div>
       <button @click="handleRedeemDismiss" class="redeem-dismiss-btn">我知道了</button>
     </div>
@@ -432,6 +472,9 @@ function handleBack() {
   position: relative;
   z-index: 1001;
   will-change: transform;
+}
+.anim-card-wrapper.phase-init {
+  transition: none; /* 瞬间把卡面定位到起飞点，不产生过渡 */
 }
 .anim-card-wrapper.phase-enter {
   transition: transform 0.62s cubic-bezier(0.34, 1.56, 0.64, 1);

@@ -22,6 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const isFlipped = ref(props.showBack);
 const cardRef = ref<HTMLDivElement | null>(null);
+const rootEl = ref<HTMLDivElement | null>(null);
 
 const isMonthly = computed(() => props.type === 'monthly');
 const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
@@ -75,11 +76,11 @@ function playShimmer() {
   shimmerKey.value += 1;
 }
 
-defineExpose({ flip, isFlipped, playShimmer });
+defineExpose({ flip, isFlipped, playShimmer, rootEl });
 </script>
 
 <template>
-  <div class="membership-card-outer">
+  <div ref="rootEl" class="membership-card-outer">
     <div
       class="membership-card-container"
       :class="sizeClasses[size]"
