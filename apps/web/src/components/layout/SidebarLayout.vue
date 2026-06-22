@@ -187,7 +187,7 @@ function onSubmenuLeave(el: Element) {
         </button>
       </div>
 
-      <div class="flex-1 overflow-y-auto px-2 py-2">
+      <div class="flex-1 overflow-y-auto px-2 py-2" data-tour="nav">
         <!-- ═══ 对话 ═══ -->
         <button
           @click="selectSection('chat')"

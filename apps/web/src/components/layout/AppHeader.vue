@@ -19,7 +19,7 @@ const chatStore = useChatStore();
       <p class="text-xs font-semibold text-[var(--ink-soft)]">你的学习小伙伴</p>
     </div>
 
-    <div class="ml-auto flex items-center gap-3">
+    <div class="ml-auto flex items-center gap-3" data-tour="subject">
       <SubjectSwitcher />
     </div>
   </header>

@@ -82,7 +82,7 @@ onMounted(() => {
   <footer class="px-4 pb-4 pt-16">
     <div class="mx-auto w-full max-w-2xl">
       <!-- 学习模式按钮（大学仅通用模式，不显示）。课堂中淡出按钮、改显当前模式高亮状态 -->
-      <div v-if="!uiStore.isCollege" class="relative mb-2 flex min-h-[34px] items-center gap-1.5 px-1">
+      <div v-if="!uiStore.isCollege" class="relative mb-2 flex min-h-[34px] items-center gap-1.5 px-1" data-tour="modes">
         <Transition name="mode-swap">
           <!-- 课堂中：当前模式高亮状态文本（不可点击） -->
           <div v-if="uiStore.sessionActive" key="status" class="flex shrink-0 items-center gap-1.5 rounded-2xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-xs font-semibold text-[var(--accent-strong)] shadow-[0_4px_10px_-6px_rgba(86,64,40,0.2)]">
@@ -124,7 +124,7 @@ onMounted(() => {
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
           </div>
         </Transition>
-        <div class="clay clay-glass flex items-end gap-2 p-2" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
+        <div class="clay clay-glass flex items-end gap-2 p-2" data-tour="input" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
           <!-- 课堂进度 todo 按钮（常驻显示；不在课堂时无角标、面板显示空态） -->
           <button
             ref="todoBtnRef"

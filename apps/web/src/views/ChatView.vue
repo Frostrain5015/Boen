@@ -1,12 +1,20 @@
 <script setup lang="ts">
+import { onMounted, nextTick } from 'vue';
 import { useChatStore } from '@/stores/chat';
 import { useUiStore } from '@/stores/ui';
+import { useOnboardingStore } from '@/stores/onboarding';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import ChatMessages from '@/components/chat/ChatMessages.vue';
 import InputArea from '@/components/chat/InputArea.vue';
 
 const chatStore = useChatStore();
 const uiStore = useUiStore();
+const onboarding = useOnboardingStore();
+
+// 首次登录完成设置后进入对话页：尝试开启新手引导（仅一次）
+onMounted(() => {
+  nextTick(() => onboarding.maybeStart());
+});
 </script>
 
 <template>

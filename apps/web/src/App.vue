@@ -8,6 +8,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import NetworkStatusBanner from '@/components/NetworkStatusBanner.vue';
 import SidebarLayout from '@/components/layout/SidebarLayout.vue';
 import MascotWidget from '@/components/layout/MascotWidget.vue';
+import OnboardingTour from '@/components/OnboardingTour.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useFavicon } from '@/composables/useFavicon';
@@ -80,6 +81,9 @@ onMounted(() => {
 
     <!-- 吉祥物 -->
     <MascotWidget />
+
+    <!-- 新手引导（首次登录完成设置后在对话页触发） -->
+    <OnboardingTour />
   </div>
 
   <!-- Toast 通知 & 确认弹窗（全局常驻） -->
