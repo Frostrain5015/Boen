@@ -2,16 +2,55 @@
 import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
-import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Crown, Star, Lock, X } from 'lucide-vue-next';
+import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock, ClipboardPaste } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
-import PremiumGate from '@/components/PremiumGate.vue';
+import { useToast } from '@/composables/useToast';
+import MembershipCard from '@/components/MembershipCard.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const isFirstSetup = computed(() => !authStore.userProfile);
-const showPremiumDialog = ref(false);
+const showSuccessAnimation = ref(false);
+const redeemedTier = ref<'monthly' | 'yearly'>('monthly');
 
+// ── 星月卡兑换 ──
+const redeemInput = ref('');
+const redeeming = ref(false);
+
+async function handlePaste() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text.trim()) redeemInput.value = text.trim();
+  } catch {
+    toast.error('无法读取剪贴板，请手动粘贴');
+  }
+}
+
+async function handleRedeem() {
+  const code = redeemInput.value.trim();
+  if (!code || redeeming.value) return;
+  redeeming.value = true;
+  try {
+    const r = await authStore.redeemCode(code);
+    if (r.ok) {
+      redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+      redeemInput.value = '';
+      showSuccessAnimation.value = true;
+    } else {
+      toast.error(r.message ?? '兑换失败');
+    }
+  } finally {
+    redeeming.value = false;
+  }
+}
+
+function handleSuccessDismiss() {
+  showSuccessAnimation.value = false;
+}
+
+// ── 设置 ──
 const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[] = [
   { band: '小学', items: ['一', '二', '三', '四', '五', '六'].map((c, i) => ({ value: String(i + 1) as Grade, label: `${c}年级` })) },
   { band: '初中', items: ['一', '二', '三'].map((c, i) => ({ value: String(i + 7) as Grade, label: `初${c}` })) },
@@ -60,7 +99,7 @@ function autoSave() {
 /** 选择模型：非星月卡点 DS 弹窗，否则立即切换+保存 */
 function setProvider(val: string) {
   if (val !== 'default' && !authStore.isPremium) {
-    showPremiumDialog.value = true;
+    toast.info('该功能为星月卡专属');
     return;
   }
   modelProvider.value = val;
@@ -91,29 +130,109 @@ function handleBack() {
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col items-center p-6 pt-8">
-    <div class="w-full max-w-lg">
-      <!-- 头部 -->
-      <div class="mb-6 flex items-center gap-3">
-        <button
-          v-if="!isFirstSetup"
-          @click="handleBack"
-          class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"
-        >
-          <ArrowLeft class="h-5 w-5" style="color: var(--ink-soft)" />
-        </button>
-        <div>
-          <h1 class="font-display text-xl font-bold" style="color: var(--ink)">
-            {{ isFirstSetup ? '初始设置' : '设置中心' }}
-          </h1>
-          <p class="text-sm" style="color: var(--ink-soft)">
-            {{ isFirstSetup ? '让我们先认识一下你' : '个性化你的学习体验' }}
+  <div class="flex min-h-full flex-col p-6 pt-8">
+    <!-- 头部 -->
+    <div class="mb-6 flex items-center gap-3">
+      <button
+        v-if="!isFirstSetup"
+        @click="handleBack"
+        class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"
+      >
+        <ArrowLeft class="h-5 w-5" style="color: var(--ink-soft)" />
+      </button>
+      <div>
+        <h1 class="font-display text-xl font-bold" style="color: var(--ink)">
+          {{ isFirstSetup ? '初始设置' : '个人中心' }}
+        </h1>
+        <p class="text-sm" style="color: var(--ink-soft)">
+          {{ isFirstSetup ? '让我们先认识一下你' : '个性化你的学习体验' }}
+        </p>
+      </div>
+    </div>
+
+    <!-- 主体：左右布局 -->
+    <div class="flex flex-1 gap-6 max-w-[900px] w-full mx-auto">
+
+      <!-- ═══ 左侧：星月卡区域 ═══ -->
+      <div class="flex w-[380px] shrink-0 flex-col gap-4">
+        <!-- 已有星月卡：展示卡面 + 续费 -->
+        <template v-if="authStore.isPremium">
+          <MembershipCard
+            :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
+            :expires-at="authStore.subscription?.expiresAt"
+            :user-id="authStore.currentUser?.sub ?? ''"
+            size="md"
+          />
+          <!-- 续费兑换码 -->
+          <div class="flex gap-2">
+            <input
+              v-model="redeemInput"
+              @keydown.enter="handleRedeem"
+              :disabled="redeeming"
+              placeholder="输入兑换码续期或升级"
+              maxlength="48"
+              class="min-w-0 flex-1 rounded-[16px] border bg-white/80 px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60 backdrop-blur-sm"
+              style="border-color: var(--line); color: var(--ink)"
+              @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
+              @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
+            />
+            <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
+              class="grid shrink-0 place-items-center rounded-[16px] border bg-white/60 px-3 backdrop-blur-sm transition-colors hover:bg-[var(--accent-soft)]"
+              style="border-color: var(--line); color: var(--ink-soft)"
+            ><ClipboardPaste class="h-4 w-4" /></button>
+            <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
+              class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+              style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
+                box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
+                            inset 0 -2px 0 rgba(0,0,0,0.12),
+                            inset 0 1px 0 rgba(255,255,255,0.28);"
+            >{{ redeeming ? '兑换中…' : '兑换' }}</button>
+          </div>
+        </template>
+
+        <!-- 无星月卡：广告展示 -->
+        <template v-else>
+          <div class="flex items-center gap-4 justify-center">
+            <MembershipCard type="monthly" size="sm" />
+            <MembershipCard type="yearly" size="sm" />
+          </div>
+          <p class="text-xs text-center" style="color: var(--ink-soft)">
+            <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
+            悬停卡片查看权益，点击翻转
           </p>
-        </div>
+          <!-- 兑换码激活 -->
+          <div class="flex gap-2">
+            <input
+              v-model="redeemInput"
+              @keydown.enter="handleRedeem"
+              :disabled="redeeming"
+              placeholder="输入兑换码激活星月卡"
+              maxlength="48"
+              class="min-w-0 flex-1 rounded-[16px] border bg-white/80 px-3.5 py-2.5 text-sm tracking-wide outline-none transition-colors disabled:opacity-60 backdrop-blur-sm"
+              style="border-color: var(--line); color: var(--ink)"
+              @focus="($event.target as HTMLElement).style.borderColor = 'var(--premium-gold)'"
+              @blur="($event.target as HTMLElement).style.borderColor = 'var(--line)'"
+            />
+            <button @click="handlePaste" title="粘贴兑换码" aria-label="粘贴兑换码"
+              class="grid shrink-0 place-items-center rounded-[16px] border bg-white/60 px-3 backdrop-blur-sm transition-colors hover:bg-[var(--accent-soft)]"
+              style="border-color: var(--line); color: var(--ink-soft)"
+            ><ClipboardPaste class="h-4 w-4" /></button>
+            <button @click="handleRedeem" :disabled="redeeming || !redeemInput.trim()"
+              class="shrink-0 rounded-[16px] px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+              style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
+                box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
+                            inset 0 -2px 0 rgba(0,0,0,0.12),
+                            inset 0 1px 0 rgba(255,255,255,0.28);"
+            >{{ redeeming ? '激活中…' : '激活' }}</button>
+          </div>
+          <button @click="toast.info('请联系管理员激活星月卡')" class="text-xs underline-offset-2 transition-colors hover:underline"
+            style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
+        </template>
       </div>
 
-      <div class="space-y-4">
-        <!-- ═══ 个人信息 ═══ -->
+      <!-- ═══ 右侧：设置列表 ═══ -->
+      <div class="flex-1 min-w-0 space-y-4">
+        <!-- 个人信息 -->
         <div class="clay clay-glass overflow-hidden">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3">
             <User class="h-4 w-4 text-[var(--accent)]" />
@@ -138,10 +257,6 @@ function handleBack() {
                   {{ authStore.currentUser?.email ?? '' }}
                 </div>
               </div>
-              <span v-if="authStore.isPremium" :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'">
-                <component :is="authStore.subscription?.tier === 'yearly' ? Crown : Star" class="h-3 w-3" />
-                {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
-              </span>
             </div>
             <!-- 名字 -->
             <label class="flex flex-col gap-1.5">
@@ -157,7 +272,7 @@ function handleBack() {
           </div>
         </div>
 
-        <!-- ═══ 学习配置 ═══ -->
+        <!-- 学习配置 -->
         <div class="clay clay-glass overflow-hidden">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3">
             <GraduationCap class="h-4 w-4 text-[var(--accent)]" />
@@ -196,7 +311,7 @@ function handleBack() {
           </div>
         </div>
 
-        <!-- ═══ 应用偏好 ═══ -->
+        <!-- 应用偏好 -->
         <div class="clay clay-glass overflow-hidden">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3">
             <Sparkles class="h-4 w-4 text-[var(--accent)]" />
@@ -244,14 +359,114 @@ function handleBack() {
           </div>
         </div>
 
-        <!-- 底部留白 -->
         <div class="pb-8"></div>
       </div>
     </div>
 
-    <!-- ═══ 星月卡弹窗（统一 PremiumGate） ═══ -->
-    <div v-if="showPremiumDialog" class="fixed inset-0 z-[1000] grid place-items-center bg-black/20 p-4" @click.self="showPremiumDialog = false">
-      <PremiumGate feature-name="DeepSeek 大模型" :extra-benefits="['三模型自由切换']" standalone @close="showPremiumDialog = false" class="w-full max-w-[360px]" />
-    </div>
+    <!-- 兑换成功动画 -->
+    <Teleport to="body">
+      <Transition name="success-fade">
+        <div v-if="showSuccessAnimation" class="success-animation-overlay">
+          <div class="success-card-wrapper">
+            <MembershipCard
+              :type="redeemedTier"
+              :user-id="authStore.currentUser?.sub ?? ''"
+              size="lg"
+            />
+          </div>
+          <div class="success-text">
+            <Sparkles class="success-icon" />
+            <span>激活成功！{{ redeemedTier === 'yearly' ? '星耀卡' : '皓月卡' }}已到账</span>
+          </div>
+          <button @click="handleSuccessDismiss" class="success-dismiss-btn">
+            我知道了
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.success-animation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(251, 246, 238, 0.92);
+  backdrop-filter: blur(12px);
+}
+
+.success-fade-enter-active { transition: opacity 0.3s ease; }
+.success-fade-leave-active { transition: opacity 0.5s ease; }
+.success-fade-enter-from,
+.success-fade-leave-to { opacity: 0; }
+
+.success-card-wrapper {
+  animation: cardAppear 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             cardShine 0.8s ease-in-out 0.4s forwards;
+}
+
+@keyframes cardAppear {
+  from { opacity: 0; transform: scale(0.5) translateY(40px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes cardShine {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+  100% { filter: brightness(1); }
+}
+
+.success-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--premium-gold-strong);
+  animation: textFadeIn 0.4s ease 0.6s both;
+}
+
+@keyframes textFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.success-icon {
+  width: 20px;
+  height: 20px;
+  animation: iconSpin 0.6s ease 0.8s both;
+}
+
+@keyframes iconSpin {
+  from { transform: rotate(-180deg) scale(0); }
+  to { transform: rotate(0) scale(1); }
+}
+
+.success-dismiss-btn {
+  margin-top: 32px;
+  padding: 10px 40px;
+  border-radius: 99px;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  animation: textFadeIn 0.4s ease 0.9s both;
+}
+
+.success-dismiss-btn:hover {
+  color: var(--ink);
+  border-color: var(--premium-gold);
+  box-shadow: 0 4px 12px -4px var(--premium-gold-glow);
+}
+</style>

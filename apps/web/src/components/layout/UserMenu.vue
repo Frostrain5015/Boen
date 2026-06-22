@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { User, LogOut, Settings, Crown, MessageSquare, Moon } from 'lucide-vue-next';
+import { User, LogOut, Settings, Crown, MessageSquare, Moon, Star } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useToast } from '@/composables/useToast';
@@ -55,15 +55,15 @@ onUnmounted(() => {
         <p class="text-xs text-[var(--ink-soft)]">{{ authStore.currentUser?.email ?? '' }}</p>
       </div>
       <!-- 卡片状态 -->
-      <div v-if="authStore.isPremium" class="flex items-center gap-1.5 px-4 py-2">
+      <router-link v-if="authStore.isPremium" to="/setup" class="flex items-center gap-1.5 px-4 py-2 transition-colors hover:bg-[var(--premium-gold-soft)] rounded-lg" @click="uiStore.showUserMenu = false">
         <span :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'">
-          <component :is="authStore.subscription?.tier === 'yearly' ? Crown : Moon" class="h-3 w-3" />
-          {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '星月卡' }}
+          <component :is="authStore.subscription?.tier === 'yearly' ? Star : Moon" class="h-3 w-3" />
+          {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
         </span>
         <span v-if="authStore.subscription?.expiresAt" class="text-xs" style="color: var(--ink-soft)">
           · 到期 {{ new Date(authStore.subscription.expiresAt * 1000).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) }}
         </span>
-      </div>
+      </router-link>
       <div v-else class="flex items-center gap-1.5 px-4 py-2">
         <span class="badge-free">
           <MessageSquare class="h-3 w-3" /> 今日剩余 {{ authStore.dailyRemaining ?? 0 }} 条

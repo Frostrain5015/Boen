@@ -14,8 +14,8 @@ import {
   Lock,
   Settings,
   User,
-  Crown,
   Moon,
+  Star,
   LogOut,
 } from 'lucide-vue-next';
 import Mascot from '@/components/Mascot.vue';
@@ -319,10 +319,10 @@ function onSubmenuLeave(el: Element) {
           <div class="min-w-0 flex-1">
             <p class="flex items-center gap-1.5 truncate text-xs font-bold text-[var(--ink)]">
               <span class="truncate">{{ authStore.userProfile?.name ?? authStore.currentUser?.username ?? '用户' }}</span>
-              <span v-if="authStore.isPremium" :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'" class="shrink-0">
-                <component :is="authStore.subscription?.tier === 'yearly' ? Crown : Moon" class="h-2.5 w-2.5" />
+              <router-link v-if="authStore.isPremium" to="/setup" :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'" class="shrink-0 cursor-pointer transition-opacity hover:opacity-80">
+                <component :is="authStore.subscription?.tier === 'yearly' ? Star : Moon" class="h-2.5 w-2.5" />
                 {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
-              </span>
+              </router-link>
             </p>
             <p class="text-[10px] text-[var(--ink-soft)]">{{ userGradeLabel }} · {{ userModelLabel }}</p>
           </div>

@@ -106,6 +106,7 @@ async function handleExplore(detail: { title: string; subject: Subject; grade: s
       <MembershipCard
         :type="authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly'"
         :expires-at="authStore.subscription?.expiresAt"
+        :user-id="authStore.currentUser?.sub ?? ''"
         size="md"
       />
       <!-- 到期提醒 -->

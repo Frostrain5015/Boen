@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Crown, Sparkles } from 'lucide-vue-next';
+import { Moon, Star, Sparkles } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
   expiresAt?: number | null;
+  userId?: string;
   showBack?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
 
 const props = withDefaults(defineProps<Props>(), {
   expiresAt: null,
+  userId: '',
   showBack: false,
   size: 'md',
 });
@@ -22,6 +24,18 @@ const isMonthly = computed(() => props.type === 'monthly');
 const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
 const cardPrice = computed(() => (isMonthly.value ? '¥18/月' : '¥188/年'));
 const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价 ¥238.8'));
+
+// 用户编号：取 userId 前8位大写
+const userNo = computed(() => {
+  if (!props.userId) return '';
+  return props.userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
+});
+
+// 到期日格式化
+const expiresDate = computed(() => {
+  if (!props.expiresAt) return '';
+  return new Date(props.expiresAt * 1000).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
+});
 
 const sizeClasses = {
   sm: 'w-[280px] h-[177px]',
@@ -73,16 +87,15 @@ defineExpose({ flip, isFlipped });
         <!-- 顶部装饰线 -->
         <div class="card-stripe" />
 
-        <!-- 博文标志 -->
+        <!-- 博文·星月卡 标志 -->
         <div class="card-brand">
-          <span class="brand-text" :class="fontSizes[size].subtitle">博文</span>
-          <span class="brand-dot" />
+          <span class="brand-text" :class="fontSizes[size].subtitle">博文·星月卡</span>
         </div>
 
         <!-- 中央图标 -->
         <div class="card-icon-wrapper">
           <div class="card-icon-glow" />
-          <component :is="isMonthly ? Moon : Crown" class="card-icon" :class="fontSizes[size].title" />
+          <component :is="isMonthly ? Moon : Star" class="card-icon" :class="fontSizes[size].title" />
         </div>
 
         <!-- 卡片名称 -->
@@ -96,12 +109,11 @@ defineExpose({ flip, isFlipped });
           </p>
         </div>
 
-        <!-- 底部有效期 -->
+        <!-- 底部：No. + 到期日 -->
         <div class="card-footer" :class="fontSizes[size].desc">
-          <span v-if="expiresAt">
-            有效期至 {{ new Date(expiresAt * 1000).toLocaleDateString('zh-CN') }}
-          </span>
-          <span v-else>激活后生效</span>
+          <span v-if="userNo" class="card-footer-no">No. {{ userNo }}</span>
+          <span v-else />
+          <span v-if="expiresDate" class="card-footer-expires">{{ expiresDate }}到期</span>
         </div>
 
         <!-- 闪光效果 -->
@@ -121,9 +133,6 @@ defineExpose({ flip, isFlipped });
             <li><span class="benefit-dot" />错题本智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>
-          <div class="back-hint" :class="fontSizes[size].desc">
-            点击翻转查看正面
-          </div>
         </div>
       </div>
     </div>
@@ -198,11 +207,10 @@ defineExpose({ flip, isFlipped });
   background: linear-gradient(90deg, transparent, #f5d89a, transparent);
 }
 
-/* 博文标志 */
+/* 博文·星月卡标志 */
 .card-brand {
   display: flex;
   align-items: center;
-  gap: 4px;
   margin-bottom: 8px;
 }
 
@@ -210,24 +218,16 @@ defineExpose({ flip, isFlipped });
   font-family: var(--font-display);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--ink-soft);
-  opacity: 0.7;
 }
 
 .card-monthly .brand-text {
   color: #7a756e;
+  opacity: 0.7;
 }
 
 .card-yearly .brand-text {
   color: #5c3d0e;
-}
-
-.brand-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 /* 中央图标 */
@@ -316,9 +316,11 @@ defineExpose({ flip, isFlipped });
   opacity: 0.5;
 }
 
-/* 底部有效期 */
+/* 底部 No. + 到期日 */
 .card-footer {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   opacity: 0.6;
   padding-top: 8px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
@@ -330,6 +332,16 @@ defineExpose({ flip, isFlipped });
 
 .card-yearly .card-footer {
   color: #7a5c1a;
+}
+
+.card-footer-no {
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.card-footer-expires {
+  font-family: var(--font-body);
 }
 
 /* 闪光动画 */
@@ -438,20 +450,5 @@ defineExpose({ flip, isFlipped });
 
 .card-yearly-back .benefit-dot {
   background: #c9a04b;
-}
-
-.back-hint {
-  text-align: center;
-  margin-top: 12px;
-  opacity: 0.4;
-  font-style: italic;
-}
-
-.card-monthly-back .back-hint {
-  color: #8a8580;
-}
-
-.card-yearly-back .back-hint {
-  color: #8b6914;
 }
 </style>
