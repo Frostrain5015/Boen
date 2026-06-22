@@ -354,7 +354,8 @@ function handleBack() {
           <div class="success-card-wrapper">
             <MembershipCard
               :type="redeemedTier"
-              :user-id="authStore.currentUser?.sub ?? ''"
+              :holder-name="authStore.userProfile?.name || authStore.currentUser?.username || ''"
+              :show-price="false"
               size="lg"
             />
           </div>
