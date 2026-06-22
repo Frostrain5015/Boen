@@ -244,7 +244,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
         </div>
 
         <!-- Overall big stars -->
-        <div class="clay clay-glass p-5 text-center" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
+        <div class="clay clay-glass p-5 text-center" data-tour="profile-overall" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
           <p class="mb-3 font-display text-xs font-semibold text-[var(--ink-soft)]">综合熟练度</p>
           <div class="flex justify-center">
             <span class="inline-flex gap-1">
@@ -276,7 +276,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
         </div>
 
         <!-- 诊断报告 -->
-        <button @click="generateReport" class="clay clay-glass flex w-full items-center gap-3 p-3 text-left transition-all hover:opacity-80 active:scale-[0.98]" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
+        <button @click="generateReport" data-tour="profile-report" class="clay clay-glass flex w-full items-center gap-3 p-3 text-left transition-all hover:opacity-80 active:scale-[0.98]" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
           <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent-soft)]">
             <FileText class="h-4 w-4 text-[var(--accent-strong)]" />
           </div>
@@ -288,7 +288,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
         </button>
 
         <!-- Recommendations -->
-        <div class="clay clay-glass overflow-hidden" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
+        <div class="clay clay-glass overflow-hidden" data-tour="profile-recommend" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 200 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
             <Target class="h-4 w-4 text-[var(--accent)]" />
             <span class="font-display text-xs font-bold text-[var(--ink)]">推荐练习</span>
@@ -324,7 +324,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
       </div>
 
       <!-- ═══ Right panel: Outline Tree ═══ -->
-      <div class="panel-scroll clay flex-1 overflow-y-auto" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
+      <div class="panel-scroll clay flex-1 overflow-y-auto" data-tour="profile-outline" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
         <div class="border-b border-[var(--line)] px-5 py-3">
           <h2 class="font-display text-sm font-bold text-[var(--ink)]">课程大纲 · {{ SUBJECTS.find(s => s.value === subject)?.label }} {{ gradeLabel(grade) }}</h2>
         </div>

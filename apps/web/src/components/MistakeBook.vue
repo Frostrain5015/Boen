@@ -470,11 +470,11 @@ onBeforeUnmount(() => {
 
     <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 px-4 pb-4 lg:grid-cols-[360px_minmax(0,1fr)]">
       <aside class="panel-scroll flex min-h-0 flex-col gap-4 overflow-y-auto">
-        <section class="clay clay-glass min-h-[220px] overflow-hidden" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
+        <section class="clay clay-glass min-h-[220px] overflow-hidden" data-tour="mistake-list" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 80 } }">
           <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-3">
             <FileImage class="h-4 w-4 text-[var(--accent)]" />
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">错题列表</h2>
-            <button @click="openCreateForm" class="ml-auto grid h-8 w-8 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-strong)] hover:scale-110 active:scale-95" aria-label="新增错题" title="新增错题">
+            <button @click="openCreateForm" data-tour="mistake-add" class="ml-auto grid h-8 w-8 place-items-center rounded-full bg-[var(--accent)] text-white shadow-sm transition-all hover:bg-[var(--accent-strong)] hover:scale-110 active:scale-95" aria-label="新增错题" title="新增错题">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
             <button @click="refreshMistakes(true)" class="grid h-8 w-8 place-items-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]" aria-label="刷新错题列表"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loadingList }" /></button>

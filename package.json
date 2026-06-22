@@ -1,7 +1,7 @@
 {
   "name": "boen",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "鍗氭枃 Boen 鈥?瀛︿範杈呭姪鏅鸿兘浣擄紙LangGraph.js 鍏?TS 鏍堬級",
   "type": "module",
   "workspaces": [

@@ -13,7 +13,7 @@ const onboarding = useOnboardingStore();
 
 // 首次登录完成设置后进入对话页：尝试开启新手引导（仅一次）
 onMounted(() => {
-  nextTick(() => onboarding.maybeStart());
+  nextTick(() => onboarding.maybeStart('chat'));
 });
 </script>
 

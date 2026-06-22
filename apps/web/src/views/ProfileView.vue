@@ -1,19 +1,30 @@
 <script setup lang="ts">
+import { onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { BrainCircuit } from 'lucide-vue-next';
 import KnowledgeProfile from '@/components/KnowledgeProfile.vue';
 import PremiumGate from '@/components/PremiumGate.vue';
+import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useExamStore } from '@/stores/exam';
 import { useChatStore } from '@/stores/chat';
+import { useOnboardingStore } from '@/stores/onboarding';
 import { getToken } from '@/services/auth';
 import { getConversation } from '@/services/chat';
 import type { Subject, ChatItem } from '@/stores/chat';
 import type { Grade } from '@boen/shared';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const uiStore = useUiStore();
 const examStore = useExamStore();
+const onboarding = useOnboardingStore();
+
+// 首次进入学习档案（会员 + 非大学通用模式，内容可见时）播放一次引导
+onMounted(() => {
+  if (!authStore.isPremium || uiStore.isCollege) return;
+  nextTick(() => onboarding.maybeStart('profile'));
+});
 
 function handleBack() {
   router.push('/');

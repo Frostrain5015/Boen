@@ -17,10 +17,10 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const defaultBenefits = [
-  'DeepSeek V4 Flash — 极速响应，日常学习首选',
-  'DeepSeek V4 Pro — 深度推理，复杂题目攻克',
-  '全题型练习（考试/测验/错题本）',
-  '学习报告与知识画像分析',
+  'DeepSeek V4 Pro 大模型 — 深度推理，难题也能讲到孩子听懂',
+  '考试与全题型练习 — 紧扣教材章节智能出题，针对薄弱点强化',
+  '错题本智能归因 — 拍照上传作业错题，自动定位知识漏洞',
+  '学习诊断报告与知识画像 — 一眼看清孩子的强弱项与每一步进步',
 ];
 const premiumBenefits = computed(() =>
   props.extraBenefits?.length

@@ -156,7 +156,7 @@ function onSkip() { tour.finish(); }
       <!-- 吉祥物 + 说话气泡 -->
       <div ref="boxRef" class="tour-box" :style="boxStyle">
         <div class="tour-mascot">
-          <Mascot :size="76" :state="tour.currentStep?.mascot ?? 'idle'" :float="true" :limbs="true" :animated="true" />
+          <Mascot :size="76" :state="tour.currentStep?.mascot ?? 'idle'" :float="true" :limbs="false" :animated="true" />
         </div>
 
         <div class="tour-bubble" :class="tailClass">

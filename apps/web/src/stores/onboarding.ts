@@ -16,26 +16,35 @@ export interface TourStep {
   mascot?: MascotState;
 }
 
-/** localStorage 标记键（按用户 sub 维度区分，与 profile 写入策略一致） */
-const SEEN_KEY = 'boen_onboarding_seen';
+/** 可独立播放（各自「没看过就播一次」）的引导 */
+export type TourId = 'chat' | 'mistakes' | 'profile';
+
+/** 各引导的 localStorage 标记键（按用户 sub 维度区分，与 profile 写入策略一致）。
+ *  chat 沿用历史键名，避免老用户重复看到。 */
+const SEEN_KEYS: Record<TourId, string> = {
+  chat: 'boen_onboarding_seen',
+  mistakes: 'boen_onboarding_mistakes_seen',
+  profile: 'boen_onboarding_profile_seen',
+};
 
 export const useOnboardingStore = defineStore('onboarding', () => {
-  const active = ref(false);
+  const activeTour = ref<TourId | null>(null);
   const stepIndex = ref(0);
   const steps = ref<TourStep[]>([]);
 
+  const active = computed(() => activeTour.value !== null);
   const currentStep = computed<TourStep | undefined>(() => steps.value[stepIndex.value]);
   const total = computed(() => steps.value.length);
   const isFirst = computed(() => stepIndex.value === 0);
   const isLast = computed(() => stepIndex.value === steps.value.length - 1);
 
-  function seenKey(): string {
+  function seenKey(tour: TourId): string {
     const sub = useAuthStore().currentUser?.sub;
-    return sub ? `${SEEN_KEY}_${sub}` : SEEN_KEY;
+    return sub ? `${SEEN_KEYS[tour]}_${sub}` : SEEN_KEYS[tour];
   }
 
-  /** 按当前用户情况组装步骤（大学用户无学科/学习模式，跳过对应步骤） */
-  function buildSteps(): TourStep[] {
+  // ── 各引导步骤 ──────────────────────────────────────────────
+  function buildChatSteps(): TourStep[] {
     const isCollege = useUiStore().isCollege;
     const list: TourStep[] = [
       {
@@ -84,22 +93,105 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     return list;
   }
 
-  /** 首次登录 + 已完成设置 + 未看过引导时自动开启（在对话页挂载时调用） */
-  function maybeStart() {
+  function buildMistakesSteps(): TourStep[] {
+    return [
+      {
+        title: '错题本来啦 📒',
+        text: '这里把你做错的题集中归档，自动分析错因并归入知识画像。带你看看怎么用～',
+        placement: 'center',
+        mascot: 'happy',
+      },
+      {
+        target: '[data-tour="mistake-add"]',
+        title: '新增错题',
+        text: '点这个加号，拍照上传整页试卷或单题照片，也能手动录入，我会自动识别切题。',
+        placement: 'bottom',
+        mascot: 'quiz',
+      },
+      {
+        target: '[data-tour="mistake-list"]',
+        title: '错题列表',
+        text: '所有错题按学科归档在这儿。点开任意一题，右侧会显示错因诊断、知识点归因和针对性练习。',
+        placement: 'right',
+        mascot: 'idle',
+      },
+      {
+        title: '随时来复盘！✨',
+        text: '错题越攒越少，说明你越来越强。需要讲解时随时叫我～',
+        placement: 'center',
+        mascot: 'happy',
+      },
+    ];
+  }
+
+  function buildProfileSteps(): TourStep[] {
+    return [
+      {
+        title: '这是你的学习档案 🧠',
+        text: '这里汇总你各知识点的熟练度，帮你看清强项和薄弱点。快速带你逛一圈～',
+        placement: 'center',
+        mascot: 'happy',
+      },
+      {
+        target: '[data-tour="profile-overall"]',
+        title: '综合熟练度',
+        text: '星级是你当前学科的整体掌握度，下面分别是待加强 / 良好 / 优秀的知识点数量。',
+        placement: 'right',
+        mascot: 'idle',
+      },
+      {
+        target: '[data-tour="profile-report"]',
+        title: '诊断报告',
+        text: '点一下，我会用 AI 生成一份学习诊断报告，分析薄弱点并给出学习建议。',
+        placement: 'right',
+        mascot: 'thinking',
+      },
+      {
+        target: '[data-tour="profile-recommend"]',
+        title: '推荐练习',
+        text: '我会挑出最该补强的知识点放在这里，点任意一项就能立刻开始针对练习。',
+        placement: 'right',
+        mascot: 'quiz',
+      },
+      {
+        target: '[data-tour="profile-outline"]',
+        title: '课程大纲',
+        text: '按教材章节展开知识点，可以逐章测试或深入探索，掌握进度一目了然。',
+        placement: 'left',
+        mascot: 'listening',
+      },
+      {
+        title: '一起变强吧！🎉',
+        text: '常回来看看档案，你的进步都会记录在这里。',
+        placement: 'center',
+        mascot: 'happy',
+      },
+    ];
+  }
+
+  const BUILDERS: Record<TourId, () => TourStep[]> = {
+    chat: buildChatSteps,
+    mistakes: buildMistakesSteps,
+    profile: buildProfileSteps,
+  };
+
+  /** 「没看过就播一次」：已登录 + 已完成设置 + 该引导未看过时自动开启 */
+  function maybeStart(tour: TourId) {
+    if (active.value) return; // 已有引导进行中，不打断
     const auth = useAuthStore();
     if (!auth.authenticated || !auth.userProfile) return;
     try {
-      if (localStorage.getItem(seenKey())) return;
+      if (localStorage.getItem(seenKey(tour))) return;
     } catch { /* localStorage 不可用则照常展示 */ }
-    start();
+    start(tour);
   }
 
-  function start() {
-    // 确保侧栏展开，导航栏可被聚光定位
-    useUiStore().sidebarOpen = true;
-    steps.value = buildSteps();
+  function start(tour: TourId) {
+    // chat 引导的导航步骤需要侧栏展开
+    if (tour === 'chat') useUiStore().sidebarOpen = true;
+    steps.value = BUILDERS[tour]();
     stepIndex.value = 0;
-    active.value = true;
+    activeTour.value = tour;
   }
 
   function next() {
@@ -112,11 +204,17 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   function finish() {
-    active.value = false;
-    try { localStorage.setItem(seenKey(), '1'); } catch { /* ignore */ }
+    const tour = activeTour.value;
+    if (tour) {
+      try { localStorage.setItem(seenKey(tour), '1'); } catch { /* ignore */ }
+    }
+    activeTour.value = null;
+    steps.value = [];
+    stepIndex.value = 0;
   }
 
   return {
+    activeTour,
     active,
     stepIndex,
     steps,
