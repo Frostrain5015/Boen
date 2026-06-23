@@ -41,9 +41,9 @@ const ownedCardTier = computed<'monthly' | 'yearly'>(() =>
 
 const redeemHeadline = computed(() => {
   const cardName = redeemedTier.value === 'yearly' ? '星耀卡' : '皓月卡';
-  if (!animWasPremium.value) return `激活成功！${cardName}已到账`;
-  if (animOldTier.value === 'monthly' && redeemedTier.value === 'yearly') return '升级成功！星耀卡已到账';
-  return `续期成功！${cardName}已到账`;
+  if (!animWasPremium.value) return `您的${cardName}已激活`;
+  if (animOldTier.value === 'monthly' && redeemedTier.value === 'yearly') return '您的星耀卡已激活';
+  return `您的${cardName}已续期`;
 });
 
 onMounted(() => { authStore.fetchCurrencyStatus(); });
@@ -476,7 +476,7 @@ function handleBack() {
 
       <!-- ═══ 二级确认弹窗 ═══ -->
       <Teleport to="body">
-        <Transition name="panel-scale">
+        <Transition name="confirm-fade">
           <div v-if="confirmState" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="closeConfirm">
             <div class="clay clay-glass mx-4 w-full max-w-sm overflow-hidden text-center">
               <div class="px-6 pt-6 pb-4">
@@ -730,4 +730,10 @@ function handleBack() {
   border-color: var(--premium-gold);
   box-shadow: 0 4px 12px -4px var(--premium-gold-glow);
 }
+
+/* ── 二级确认弹窗淡入淡出 ── */
+:global(.confirm-fade-enter-active) { transition: opacity 0.22s ease, transform 0.22s ease; }
+:global(.confirm-fade-leave-active) { transition: opacity 0.15s ease, transform 0.15s ease; }
+:global(.confirm-fade-enter-from) { opacity: 0; transform: scale(0.94); }
+:global(.confirm-fade-leave-to) { opacity: 0; transform: scale(0.96); }
 </style>
