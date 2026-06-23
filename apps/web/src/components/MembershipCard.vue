@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock, Coins } from 'lucide-vue-next';
+import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -211,16 +211,17 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
                 <ArrowRight v-else :size="14" />
               </button>
             </div>
-            <!-- 积分兑换按钮（仅皓月卡，卡片背面右下角） -->
+            <!-- 积分兑换入口（仅皓月卡，四角星圆形按钮，同提交按钮风格） -->
             <button
               v-if="props.pointsBalance !== undefined && isMonthly"
               class="back-points-btn"
               :class="{ 'back-points-btn-ready': props.pointsBalance >= 160, 'back-points-btn-short': props.pointsBalance < 160 }"
               @click.stop="emit('redeem-points')"
               :disabled="props.pointsBalance < 160 || props.pointsRedeeming"
+              :title="props.pointsBalance >= 160 ? '积分兑换皓月卡' : `还差${160 - props.pointsBalance}分`"
             >
-              <Coins :size="11" />
-              <span>{{ props.pointsRedeeming ? '兑换中…' : props.pointsBalance >= 160 ? '积分兑换 160分' : `还差${160 - props.pointsBalance}分` }}</span>
+              <LoaderCircle v-if="props.pointsRedeeming" :size="14" class="back-redeem-spin" />
+              <Sparkles v-else :size="14" />
             </button>
           </div>
         </div>
@@ -781,43 +782,35 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   to { transform: rotate(360deg); }
 }
 
-/* ── 积分兑换按钮（卡片背面右下角）── */
+/* ── 积分兑换圆形按钮（同提交按钮样式）── */
 .back-points-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 8px;
-  font-family: var(--font-display);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.15s ease;
   flex-shrink: 0;
-  line-height: 1;
-}
-.back-points-btn:active { transform: scale(0.94); }
-
-/* 余额足够 → 金色唤醒 */
-.back-points-btn-ready {
-  background: linear-gradient(180deg, #dab263, #d4a053);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
   color: #fff;
-  box-shadow: 0 4px 10px -5px rgba(212, 160, 83, 0.5);
+  transition: opacity 0.2s ease, transform 0.15s ease;
 }
-.back-points-btn-ready:hover { opacity: 0.88; }
-.back-points-btn-ready:disabled { opacity: 0.5; cursor: not-allowed; }
+.back-points-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.back-points-btn:not(:disabled):active { transform: scale(0.9); }
 
-/* 余额不足 → 暖灰静默 */
-.back-points-btn-short {
-  background: var(--locked-surface);
-  color: var(--locked-ink);
-  opacity: 0.55;
-  cursor: default;
+/* 余额足 → 同提交按钮梯度色，略提亮以示可用 */
+.card-monthly-back .back-points-btn-ready {
+  background: linear-gradient(180deg, #dab263, #c99a48);
+}
+.card-yearly-back .back-points-btn-ready {
+  background: linear-gradient(180deg, #9b72bf, #7b4da8);
 }
 
-.card-monthly-back .back-points-btn,
-.card-monthly-back .back-points-btn-icon { color: #6a6560; }
+/* 余额不足 → 灰掉 */
+.card-monthly-back .back-points-btn-short {
+  background: linear-gradient(180deg, #9a948c, #7a756e);
+}
+.card-yearly-back .back-points-btn-short {
+  background: linear-gradient(180deg, #9b72bf, #7b4da8);
+}
 </style>
