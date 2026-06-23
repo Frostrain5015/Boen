@@ -1,26 +1,39 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 
 const props = defineProps<{ score: number; sigma?: number; animateFrom?: number }>();
 const uid = 'st' + Math.random().toString(36).slice(2, 6);
 
-const displayScore = ref(props.animateFrom ?? props.score);
+// 默认就是目标值：即便动画因任何原因没跑（如 rAF 时序），渲染也始终正确。
+const displayScore = ref(props.score);
 
-watch(() => props.score, (newVal) => {
-  if (props.animateFrom !== undefined) {
-    const from = props.animateFrom;
-    const duration = 800;
-    const start = performance.now();
-    function step(now: number) {
-      const t = Math.min(1, (now - start) / duration);
-      displayScore.value = from + (newVal - from) * t;
-      if (t < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  } else {
-    displayScore.value = newVal;
+/** 从 from 平滑动画到 to（800ms ease）。结束时强制落到 to，避免停在中间帧。 */
+function animateTo(from: number, to: number): void {
+  if (from === to) { displayScore.value = to; return; }
+  const duration = 800;
+  const start = performance.now();
+  displayScore.value = from;
+  function step(now: number): void {
+    const t = Math.min(1, (now - start) / duration);
+    displayScore.value = from + (to - from) * t;
+    if (t < 1) requestAnimationFrame(step);
+    else displayScore.value = to;
   }
-}, { immediate: true });
+  requestAnimationFrame(step);
+}
+
+// 首次出现时若提供了 animateFrom（且与目标不同）则播放进度动画。
+// 用 onMounted（而非 immediate watcher，那会在 setup 阶段调度 rAF 导致动画不生效）。
+onMounted(() => {
+  if (props.animateFrom !== undefined && props.animateFrom !== props.score) {
+    animateTo(props.animateFrom, props.score);
+  }
+});
+
+// 后续 score 变化（如流式更新）也平滑过渡。
+watch(() => props.score, (newVal, oldVal) => {
+  animateTo(oldVal ?? newVal, newVal);
+});
 
 /** 线性映射：score ∈ [0,100] → stars ∈ [0,5]，半步长 */
 function starVal(s: number): number {
