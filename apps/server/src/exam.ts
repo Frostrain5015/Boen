@@ -24,7 +24,7 @@ import { writeFileSync, readFileSync, existsSync, rmSync, mkdtempSync } from 'no
 import { tmpdir } from 'node:os';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
 import { updateProficiency, getWeakPoints, getRecommendedKPs, getProfileOutline } from './knowledge-profile.js';
-import { earnPoints, SCORE_CONVERT } from './currency.js';
+import { earnPoints, computeScorePoints, computeStarBonus } from './currency.js';
 import db from './db.js';
 import { retrieveCurriculum } from './curriculum.js';
 import { retrieveGlobalStyleSkills } from './mistakes.js';
@@ -2126,15 +2126,15 @@ export async function submitExamSession(
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
 
-  // ── 星月积分结算：Elo 增量 + 考试得分 × SCORE_CONVERT 合并入账 ──
+  // ── 星月积分结算：评分(主) + 星级跨越奖(额外) ──
   try {
-    const eloGain = proficiencyChanges.reduce((s, c) => s + Math.max(0, c.after - c.before), 0);
-    const scoreGain = (results.percentage ?? 0) * SCORE_CONVERT;
-    const rawGain = eloGain + scoreGain;
-    if (rawGain > 0) {
-      const outline = getProfileOutline(session.subject, String(session.grade ?? ''), userId) as { overall?: { weightedScore?: number } };
-      const S = Math.max(0, outline.overall?.weightedScore ?? 0);
-      const earn = earnPoints(userId, rawGain, S, 'exam', examId);
+    const outline = getProfileOutline(session.subject, String(session.grade ?? ''), userId) as { overall?: { weightedScore?: number } };
+    const S = Math.max(0, outline.overall?.weightedScore ?? 0);
+    const scorePoints = computeScorePoints(results.percentage ?? 0, S);
+    const starBonus = computeStarBonus(proficiencyChanges, S);
+    const total = Math.max(0, Math.round(scorePoints + starBonus));
+    if (total > 0) {
+      const earn = earnPoints(userId, total, 'exam', examId);
       if (earn.earned > 0 || earn.capped) {
         results.pointsEarned = earn.earned;
         results.pointsBalance = earn.balance;

@@ -59,7 +59,7 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser } from './redeem.js';
-import { earnPoints, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, SCORE_CONVERT } from './currency.js';
+import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -530,10 +530,9 @@ async function runGraph(
 }
 
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
-/** 把一次结算的熟练度变化 + LLM 评分换算成星月积分并入账。
- *  rawGain = Σ max(0, after-before) + sessionScore × SCORE_CONVERT；
- *  S = 学科总熟练度；按日上限封顶。
- *  rawGain≤0 且无评分加成时返回 undefined（不附带积分字段）。 */
+/** 按 LLM 评分（主）+ 星级跨越奖（额外）结算积分并入账。
+ *  scorePoints + starBonus 合并后走 earnPoints 日上限封顶。
+ *  均为 0 时返回 undefined（不附带积分字段）。 */
 function awardSessionPoints(
   userId: string,
   changes: Array<{ before: number; after: number }>,
@@ -544,16 +543,16 @@ function awardSessionPoints(
   sessionScore?: number,
 ): { pointsEarned: number; pointsBalance: number; pointsCapped: boolean } | undefined {
   try {
-    const eloGain = changes.reduce((s, c) => s + Math.max(0, (c.after ?? 0) - (c.before ?? 0)), 0);
-    const scoreGain = (sessionScore ?? 0) * SCORE_CONVERT;
-    const rawGain = eloGain + scoreGain;
-    if (rawGain <= 0) return undefined;
     let S = 0;
     if (subject && grade) {
       const outline = getProfileOutline(subject, grade, userId) as { overall?: { weightedScore?: number } };
       S = Math.max(0, outline.overall?.weightedScore ?? 0);
     }
-    const res = earnPoints(userId, rawGain, S, reason, refId);
+    const scorePoints = computeScorePoints(sessionScore ?? 0, S);
+    const starBonus = computeStarBonus(changes, S);
+    const total = Math.max(0, Math.round(scorePoints + starBonus));
+    if (total <= 0) return undefined;
+    const res = earnPoints(userId, total, reason, refId);
     if (res.earned <= 0 && !res.capped) return undefined;
     return { pointsEarned: res.earned, pointsBalance: res.balance, pointsCapped: res.capped };
   } catch {
