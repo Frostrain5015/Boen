@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import type { Grade } from '@boen/shared';
 import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
+import { getToken } from '@/services/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipCard from '@/components/MembershipCard.vue';
 
@@ -70,11 +71,12 @@ async function handleRedeem() {
   }
 }
 
-const pointsRedeeming = ref(false);
-
 onMounted(() => { authStore.fetchCurrencyStatus(); });
 
-/** 用星月积分兑换皓月卡（复用兑换码同款发卡动画） */
+const pointsRedeeming = ref(false);
+const freeClaiming = ref(false);
+
+/** 用星月积分兑换皓月卡（限时折扣价 1500，复用发卡动画） */
 async function handlePointsRedeem() {
   if (pointsRedeeming.value || redeeming.value) return;
   pointsRedeeming.value = true;
@@ -82,7 +84,7 @@ async function handlePointsRedeem() {
   const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
   const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
   try {
-    const r = await authStore.redeemMembershipWithPoints('month');
+    const r = await authStore.redeemMembershipWithPoints('month_promo');
     if (r.ok) {
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
       await startRedeemAnimation({ wasPremium, oldTier, srcRect: adMonthlyRect });
@@ -91,6 +93,31 @@ async function handlePointsRedeem() {
     }
   } finally {
     pointsRedeeming.value = false;
+  }
+}
+
+/** 新用户免费领取皓月卡 */
+async function handleFreeClaim() {
+  if (freeClaiming.value || redeeming.value) return;
+  freeClaiming.value = true;
+  const token = getToken();
+  try {
+    const res = await fetch('/api/currency/claim-free-card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    const data = await res.json();
+    if (res.ok) {
+      await authStore.fetchSubscription();
+      redeemedTier.value = 'monthly';
+      await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: null });
+    } else {
+      toast.error(data.message ?? '领取失败');
+    }
+  } catch {
+    toast.error('领取失败，请稍后再试');
+  } finally {
+    freeClaiming.value = false;
   }
 }
 
@@ -346,19 +373,45 @@ function handleBack() {
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分兑换皓月卡</h2>
           </div>
           <div class="space-y-3 px-4 py-3">
-            <div class="flex items-center justify-center gap-2 rounded-2xl py-2 font-display text-base font-bold"
-              style="background: var(--premium-gold-soft); color: var(--premium-gold)">
-              <span>积攒 <Sparkles class="inline h-4 w-4" />2000 兑换一张 🌙皓月卡</span>
+            <!-- 新用户免费领卡 -->
+            <div v-if="!authStore.isPremium" class="rounded-2xl border border-dashed px-4 py-3 text-center"
+              style="border-color: var(--premium-gold); background: var(--premium-gold-soft)">
+              <p class="mb-2 text-xs text-[var(--ink-soft)]">新注册用户专享</p>
+              <button @click="handleFreeClaim" :disabled="freeClaiming"
+                class="w-full rounded-xl py-2.5 font-display text-sm font-bold text-white transition-all active:scale-[0.97] disabled:opacity-45"
+                :style="{ background: 'linear-gradient(180deg, var(--premium-gold), var(--premium-gold-strong))' }">
+                {{ freeClaiming ? '领取中…' : '🎁 免费领取一张皓月卡' }}
+              </button>
             </div>
-            <div class="h-2 overflow-hidden rounded-full" style="background: var(--line)">
-              <div class="h-full rounded-full transition-all duration-500"
-                :style="{ width: Math.min(100, (authStore.pointsBalance / 2000) * 100) + '%', background: 'var(--premium-gold)' }"></div>
-            </div>
-            <div class="flex items-center justify-between text-[11px]">
-              <span class="text-[var(--ink-soft)]">今日已赚 {{ authStore.currency?.todayEarned ?? 0 }} / {{ authStore.currency?.dailyCap ?? 100 }}</span>
-              <span class="font-display font-bold" :style="{ color: authStore.pointsBalance >= 2000 ? 'var(--success)' : 'var(--premium-gold)' }">
-                {{ authStore.pointsBalance }} / 2000
-              </span>
+
+            <!-- 限时折扣兑换 -->
+            <div class="rounded-2xl px-4 py-3" style="background: var(--premium-gold-soft)">
+              <div class="mb-1 flex items-center justify-between">
+                <span class="font-display text-sm font-bold text-[var(--ink)]">限时折扣</span>
+                <span class="text-[10px] text-[var(--ink-soft)]">至 2026-07-31</span>
+              </div>
+              <div class="flex items-center justify-center gap-2 rounded-xl py-2 font-display text-base font-bold"
+                style="color: var(--premium-gold)">
+                <span><Sparkles class="inline h-4 w-4" /><s class="mx-1 text-[var(--ink-soft)]">2000</s> 1500 兑换 🌙皓月卡</span>
+              </div>
+              <div class="mt-2 h-2 overflow-hidden rounded-full" style="background: var(--line)">
+                <div class="h-full rounded-full transition-all duration-500"
+                  :style="{ width: Math.min(100, (authStore.pointsBalance / 1500) * 100) + '%', background: 'var(--premium-gold)' }"></div>
+              </div>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span class="text-[var(--ink-soft)]">今日已赚 {{ authStore.currency?.todayEarned ?? 0 }} / {{ authStore.currency?.dailyCap ?? 100 }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="font-display font-bold" :style="{ color: authStore.pointsBalance >= 1500 ? 'var(--success)' : 'var(--premium-gold)' }">
+                    {{ authStore.pointsBalance }} / 1500
+                  </span>
+                  <button @click="handlePointsRedeem"
+                    :disabled="authStore.pointsBalance < 1500 || pointsRedeeming"
+                    class="rounded-lg px-3 py-1 text-[11px] font-bold text-white transition-all active:scale-[0.95] disabled:opacity-40"
+                    style="background: var(--premium-gold)">
+                    {{ pointsRedeeming ? '兑换中' : '兑换' }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

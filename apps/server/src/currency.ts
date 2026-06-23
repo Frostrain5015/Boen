@@ -19,6 +19,8 @@ export const STAR_BONUS_RATE = 2;
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
   month: { key: 'month', name: '皓月卡', days: 30, cost: 2000 },
+  /** 限时折扣月卡（活动至2026-07-31），25% off → 1500 */
+  month_promo: { key: 'month_promo', name: '皓月卡(限时)', days: 30, cost: 1500 },
 } as const;
 
 export type CurrencyProductKey = keyof typeof CURRENCY_PRODUCTS;

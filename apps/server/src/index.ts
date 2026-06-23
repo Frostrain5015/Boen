@@ -58,7 +58,7 @@ import {
   updateMistake,
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
-import { redeemForUser } from './redeem.js';
+import { redeemForUser, grantMembershipDays } from './redeem.js';
 import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
 
 // 从仓库根加载 .env
@@ -1403,6 +1403,31 @@ app.post('/api/currency/redeem-membership', async (c) => {
     balance: result.balance,
     redeemed: { days: result.days, until: result.until },
   });
+});
+
+// 新账户免费领取皓月卡（仅限从未激活过会员的免费用户）
+app.post('/api/currency/claim-free-card', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
+
+  try {
+    const row = db.prepare('SELECT tier, activated_at FROM subscriptions WHERE user_id=?').get(userId) as
+      | { tier: string; activated_at: number | null }
+      | undefined;
+    // 已激活过会员的不可再领
+    if (row?.activated_at != null) {
+      return c.json({ error: 'already_claimed', message: '已领取过免费皓月卡' }, 400);
+    }
+    const { until, tier } = grantMembershipDays(userId, 30);
+    invalidateSubscriptionCache(userId);
+    return c.json({
+      tier, isPremium: true, expiresAt: until,
+      dailyLimit: null, dailyUsed: null, dailyRemaining: null,
+    });
+  } catch {
+    return c.json({ error: 'claim_failed', message: '领取失败' }, 500);
+  }
 });
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
