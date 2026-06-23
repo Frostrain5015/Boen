@@ -188,8 +188,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             {{ cardName }}权益
           </div>
           <ul class="back-benefits" :class="fontSizes[size].desc">
-            <li v-if="!isMonthly"><span class="benefit-dot" /><Star :size="10" class="mr-0.5" style="color: var(--premium-gold)" />V4 Pro 大模型</li>
-            <li v-else><span class="benefit-dot" />V4 Flash 大模型</li>
+            <li><span class="benefit-dot" />DeepSeek V4 {{ isMonthly ? 'Flash' : 'Pro' }} 大模型</li>
             <li><span class="benefit-dot" />全题型考试</li>
             <li><span class="benefit-dot" />错题智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
