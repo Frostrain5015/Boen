@@ -185,33 +185,31 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>
 
-          <!-- 背面内嵌兑换码（无边框，底部细线 + 占位提示） -->
+          <!-- 背面底部：兑换码 + 积分按钮共享一条底线 -->
           <div v-if="redeemable" class="back-bottom" @click.stop>
-            <div class="back-redeem-row">
-              <Ticket class="back-redeem-icon" :size="14" />
-              <input
-                class="back-redeem-input"
-                :value="redeemCode"
-                @input="onRedeemInput"
-                @keydown.enter="emit('redeem')"
-                @click.stop
-                :disabled="redeeming"
-                :placeholder="redeemPlaceholder"
-                maxlength="48"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button
-                class="back-redeem-btn"
-                @click.stop="emit('redeem')"
-                :disabled="redeeming || !redeemCode.trim()"
-                :title="redeemPlaceholder"
-              >
-                <LoaderCircle v-if="redeeming" :size="14" class="back-redeem-spin" />
-                <ArrowRight v-else :size="14" />
-              </button>
-            </div>
-            <!-- 积分兑换入口（仅皓月卡，四角星圆形按钮，同提交按钮风格） -->
+            <Ticket class="back-redeem-icon" :size="14" />
+            <input
+              class="back-redeem-input"
+              :value="redeemCode"
+              @input="onRedeemInput"
+              @keydown.enter="emit('redeem')"
+              @click.stop
+              :disabled="redeeming"
+              :placeholder="redeemPlaceholder"
+              maxlength="48"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button
+              class="back-redeem-btn"
+              @click.stop="emit('redeem')"
+              :disabled="redeeming || !redeemCode.trim()"
+              :title="redeemPlaceholder"
+            >
+              <LoaderCircle v-if="redeeming" :size="14" class="back-redeem-spin" />
+              <ArrowRight v-else :size="14" />
+            </button>
+            <!-- 积分兑换圆形按钮（同提交按钮样式，仅皓月卡） -->
             <button
               v-if="props.pointsBalance !== undefined && isMonthly"
               class="back-points-btn"
@@ -687,29 +685,18 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   background: #b07dd6;
 }
 
-/* ── 背面底部（兑换码 + 积分兑换，flex 右对齐）── */
+/* ── 背面底部（兑换码 + 积分按钮共享一条底线）── */
 .back-bottom {
   margin-top: auto;       /* 贴卡片底部 */
-  padding-top: 9px;
+  padding: 9px 0 4px;
   cursor: default;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.back-redeem-row {
   display: flex;
   align-items: center;
   gap: 7px;
-  flex: 1;
-  min-width: 0;           /* 容许收缩 */
-  padding-bottom: 4px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.18);
   transition: border-color 0.2s ease;
 }
-.back-redeem-row:focus-within {
+.back-bottom:focus-within {
   border-bottom-color: currentColor;
 }
 
