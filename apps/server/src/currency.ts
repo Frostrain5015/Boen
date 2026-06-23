@@ -11,6 +11,10 @@ export const CONVERT_RATE = 0.05;
 export const DAILY_CAP = 100;
 const MIN_GAIN_FOR_FLOOR1 = 5; // rawGain≥此值但 floor 为 0 时保底给 10（×10 后的最小颗粒）
 
+/** LLM 评分/考试得分（0-100）换算为 rawGain 的系数（合并入 Elo rawGain 一起计分）。
+ *  0.3 × 80 分 → 24 rawGain 增量 → 约 10-20% 的 Elo 基础收益加成。 */
+export const SCORE_CONVERT = 0.3;
+
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
   month: { key: 'month', name: '皓月卡', days: 30, cost: 2000 },

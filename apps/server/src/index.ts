@@ -59,7 +59,7 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser } from './redeem.js';
-import { earnPoints, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
+import { earnPoints, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, SCORE_CONVERT } from './currency.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -530,9 +530,10 @@ async function runGraph(
 }
 
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
-/** 把一次结算的熟练度变化换算成星月积分并入账（结构化学习/考试共用）。
- *  rawGain = Σ max(0, after-before)；S = 学科总熟练度；按日上限封顶。
- *  rawGain≤0 或入账 0 且未触顶时返回 undefined（不附带积分字段）。 */
+/** 把一次结算的熟练度变化 + LLM 评分换算成星月积分并入账。
+ *  rawGain = Σ max(0, after-before) + sessionScore × SCORE_CONVERT；
+ *  S = 学科总熟练度；按日上限封顶。
+ *  rawGain≤0 且无评分加成时返回 undefined（不附带积分字段）。 */
 function awardSessionPoints(
   userId: string,
   changes: Array<{ before: number; after: number }>,
@@ -540,9 +541,12 @@ function awardSessionPoints(
   grade: string | undefined,
   reason: 'session' | 'exam',
   refId?: string,
+  sessionScore?: number,
 ): { pointsEarned: number; pointsBalance: number; pointsCapped: boolean } | undefined {
   try {
-    const rawGain = changes.reduce((s, c) => s + Math.max(0, (c.after ?? 0) - (c.before ?? 0)), 0);
+    const eloGain = changes.reduce((s, c) => s + Math.max(0, (c.after ?? 0) - (c.before ?? 0)), 0);
+    const scoreGain = (sessionScore ?? 0) * SCORE_CONVERT;
+    const rawGain = eloGain + scoreGain;
     if (rawGain <= 0) return undefined;
     let S = 0;
     if (subject && grade) {
@@ -585,7 +589,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
     // 仅当 cache 非空才发结算事件（MODE_SCORE 路径已发过时跳过）
     if (updatedKps > 0) {
-      const points = awardSessionPoints(userId, profChanges, subject, grade, 'session', threadId);
+      const points = awardSessionPoints(userId, profChanges, subject, grade, 'session', threadId, Number(args.score ?? 0));
       await send({
         type: 'settlement',
         summary: String(args.summary ?? ''),
@@ -1611,7 +1615,7 @@ app.post('/api/chat', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
           const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, body.threadId);
-          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', body.threadId);
+          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', body.threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
@@ -1700,7 +1704,7 @@ app.post('/api/explore', async (c) => {
             updateProficiency(userId, node.id, sessionScore, 100, 'explore');
           }
 
-          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', threadId);
+          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '').trim(),
