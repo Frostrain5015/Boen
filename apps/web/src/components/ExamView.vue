@@ -336,6 +336,7 @@ function goToGroup(idx: number) {
   if (!g || !g.questions.length) return;
   questionSwitchDirection.value = idx > currentGroupIndex.value ? 'next' : 'prev';
   currentQuestionIndex.value = g.questions[0].index;
+  nextTick(() => centerCurrentDot());
 }
 function prevGroup() { goToGroup(currentGroupIndex.value - 1); }
 function nextGroup() {
@@ -369,9 +370,11 @@ function centerCurrentDot() {
   if (!nav) return;
   const active = nav.querySelector<HTMLElement>('.question-dot-current');
   if (!active) return;
-  // active.offsetLeft = 元素左边缘相对滚动内容的偏移（含 padding-left）
-  // 目标：让 active 的中心对齐容器可视区中心
-  const target = active.offsetLeft + active.offsetWidth / 2 - nav.clientWidth / 2;
+  // 用 getBoundingClientRect 算 active 圆点相对于 nav 容器的偏移，
+  // 不受 offsetParent 链影响。
+  const navRect = nav.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  const target = nav.scrollLeft + (activeRect.left - navRect.left) + activeRect.width / 2 - navRect.width / 2;
   nav.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
 }
 
