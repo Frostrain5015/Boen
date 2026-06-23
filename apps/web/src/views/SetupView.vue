@@ -46,80 +46,147 @@ const redeemHeadline = computed(() => {
   return `续期成功！${cardName}已到账`;
 });
 
-async function handleRedeem() {
-  const code = redeemInput.value.trim();
-  if (!code || redeeming.value) return;
-  redeeming.value = true;
-  // 兑换前先记录旧状态：用于动画起点、升级过渡、文案
-  const wasPremium = authStore.isPremium;
-  const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-  // 首开（广告页）：兑换前先测量两张广告卡的位置，避免重渲染后丢失正确起点
-  const adYearlyRect = wasPremium ? null : (adYearlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
-  const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
-  try {
-    const r = await authStore.redeemCode(code);
-    if (r.ok) {
-      redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-      redeemInput.value = '';
-      const srcRect = wasPremium ? null : (redeemedTier.value === 'yearly' ? adYearlyRect : adMonthlyRect);
-      await startRedeemAnimation({ wasPremium, oldTier, srcRect });
-    } else {
-      toast.error(r.message ?? '兑换失败');
-    }
-  } finally {
-    redeeming.value = false;
-  }
-}
-
 onMounted(() => { authStore.fetchCurrencyStatus(); });
 
-const pointsRedeeming = ref(false);
-const freeClaiming = ref(false);
+// ── 二级确认弹窗 ─────────────────────────────
+const confirmState = ref<{ title: string; message: string; onConfirm: () => Promise<void> } | null>(null);
+const confirmLoading = ref(false);
+
+function showConfirm(title: string, message: string, onConfirm: () => Promise<void>) {
+  confirmState.value = { title, message, onConfirm };
+}
+function closeConfirm() { confirmState.value = null; }
+
+/** Crockford Base32 解码兑换码中的有效期天数（30/365），仅需前 4 字符即可。 */
+function decodeCodeDuration(rawCode: string): number | null {
+  const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const norm = rawCode.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+  if (norm.length < 4) return null;
+  let bits = 0;
+  for (let i = 0; i < 4; i++) {
+    const v = ALPHABET.indexOf(norm[i]);
+    if (v < 0) return null;
+    bits = (bits << 5) | v;
+  }
+  const durationBit = ((bits >> 4) >> 9) & 1;
+  return durationBit === 1 ? 365 : 30;
+}
+
+/** 格式化日期 */
+function fmtDate(ts: number): string {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 计算兑换后的到期时间戳（秒），用于确认弹窗 */
+function calcExpiry(days: number): number {
+  if (authStore.isPremium && authStore.subscription?.expiresAt) {
+    const base = Math.max(authStore.subscription.expiresAt, Math.floor(Date.now() / 1000));
+    return base + days * 86400;
+  }
+  return Math.floor(Date.now() / 1000) + days * 86400;
+}
+
+const pointsLoading = ref(false);
+const freeClaimLoading = ref(false);
 
 /** 用星月积分兑换皓月卡（限时折扣价 1500，复用发卡动画） */
 async function handlePointsRedeem() {
-  if (pointsRedeeming.value || redeeming.value) return;
-  pointsRedeeming.value = true;
-  const wasPremium = authStore.isPremium;
-  const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-  const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
-  try {
-    const r = await authStore.redeemMembershipWithPoints('month_promo');
-    if (r.ok) {
-      redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-      await startRedeemAnimation({ wasPremium, oldTier, srcRect: adMonthlyRect });
-    } else {
-      toast.error(r.message ?? '兑换失败');
-    }
-  } finally {
-    pointsRedeeming.value = false;
-  }
+  if (pointsLoading.value || redeeming.value) return;
+  const tierName = '皓月卡';
+  const until = calcExpiry(30);
+  showConfirm(
+    `确定要激活你的${tierName}吗？`,
+    `有效期至 ${fmtDate(until)}`,
+    async () => {
+      pointsLoading.value = true;
+      try {
+        const wasPremium = authStore.isPremium;
+        const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+        const rect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
+        const r = await authStore.redeemMembershipWithPoints('month_promo');
+        if (r.ok) {
+          redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+          closeConfirm();
+          await startRedeemAnimation({ wasPremium, oldTier, srcRect: rect });
+        } else {
+          toast.error(r.message ?? '兑换失败');
+          closeConfirm();
+        }
+      } finally { pointsLoading.value = false; }
+    },
+  );
 }
 
 /** 新用户免费领取皓月卡（从卡片当前位置起飞动画） */
 async function handleFreeClaim() {
-  if (freeClaiming.value || redeeming.value) return;
-  freeClaiming.value = true;
-  const token = getToken();
-  try {
-    const res = await fetch('/api/currency/claim-free-card', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    });
-    const data = await res.json();
-    if (res.ok) {
-      await authStore.fetchSubscription();
-      redeemedTier.value = 'monthly';
-      const rect = adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null;
-      await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: rect });
-    } else {
-      toast.error(data.message ?? '领取失败');
-    }
-  } catch {
-    toast.error('领取失败，请稍后再试');
-  } finally {
-    freeClaiming.value = false;
+  if (freeClaimLoading.value || redeeming.value) return;
+  const until = calcExpiry(30);
+  showConfirm(
+    '确定要激活你的皓月卡吗？',
+    `有效期至 ${fmtDate(until)}`,
+    async () => {
+      freeClaimLoading.value = true;
+      const token = getToken();
+      try {
+        const res = await fetch('/api/currency/claim-free-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
+        const data = await res.json();
+        if (res.ok) {
+          await authStore.fetchSubscription();
+          redeemedTier.value = 'monthly';
+          closeConfirm();
+          const rect = adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null;
+          await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: rect });
+        } else {
+          toast.error(data.message ?? '领取失败');
+          closeConfirm();
+        }
+      } catch {
+        toast.error('领取失败，请稍后再试');
+        closeConfirm();
+      } finally { freeClaimLoading.value = false; }
+    },
+  );
+}
+
+/** 兑换码：先解码得天数再确认 */
+async function handleRedeem() {
+  const code = redeemInput.value.trim();
+  if (!code || redeeming.value) return;
+  const days = decodeCodeDuration(code);
+  if (!days) {
+    toast.error('兑换码无效');
+    return;
   }
+  const tierName = days >= 365 ? '星耀卡' : '皓月卡';
+  const until = calcExpiry(days);
+  showConfirm(
+    `确定要激活你的${tierName}吗？`,
+    `有效期至 ${fmtDate(until)}`,
+    async () => {
+      redeeming.value = true;
+      const wasPremium = authStore.isPremium;
+      const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+      const adYearlyRect = wasPremium ? null : (adYearlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
+      const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
+      try {
+        const r = await authStore.redeemCode(code);
+        if (r.ok) {
+          redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+          redeemInput.value = '';
+          closeConfirm();
+          const srcRect = wasPremium ? null : (redeemedTier.value === 'yearly' ? adYearlyRect : adMonthlyRect);
+          await startRedeemAnimation({ wasPremium, oldTier, srcRect });
+        } else {
+          toast.error(r.message ?? '兑换失败');
+          closeConfirm();
+        }
+      } finally { redeeming.value = false; }
+    },
+  );
 }
 
 /** 起点 → 放大移到中央 → 镜面闪光（升级时切档）→ 停留 */
@@ -317,7 +384,7 @@ function handleBack() {
               :redeeming="redeeming"
               redeem-placeholder="兑换码续期 / 升级"
               :points-balance="authStore.pointsBalance"
-              :points-redeeming="pointsRedeeming"
+              :points-redeeming="pointsLoading"
               @redeem="handleRedeem"
               @redeem-points="handlePointsRedeem"
             />
@@ -355,7 +422,7 @@ function handleBack() {
               :redeeming="redeeming"
               redeem-placeholder="输入兑换码激活"
               :points-balance="authStore.pointsBalance"
-              :points-redeeming="pointsRedeeming"
+              :points-redeeming="pointsLoading"
               @redeem="handleRedeem"
               @redeem-points="handlePointsRedeem"
               @claim-free="handleFreeClaim"
@@ -395,10 +462,10 @@ function handleBack() {
                     {{ authStore.pointsBalance }} / 1500
                   </span>
                   <button @click="handlePointsRedeem"
-                    :disabled="authStore.pointsBalance < 1500 || pointsRedeeming"
+                    :disabled="authStore.pointsBalance < 1500 || pointsLoading"
                     class="rounded-lg px-3 py-1 text-[11px] font-bold text-white transition-all active:scale-[0.95] disabled:opacity-40"
                     style="background: var(--premium-gold)">
-                    {{ pointsRedeeming ? '兑换中' : '兑换' }}
+                    {{ pointsLoading ? '兑换中' : '兑换' }}
                   </button>
                 </div>
               </div>
@@ -406,6 +473,27 @@ function handleBack() {
           </div>
         </div>
       </div>
+
+      <!-- ═══ 二级确认弹窗 ═══ -->
+      <Teleport to="body">
+        <Transition name="panel-scale">
+          <div v-if="confirmState" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm" @click.self="closeConfirm">
+            <div class="clay clay-glass mx-4 w-full max-w-sm overflow-hidden text-center">
+              <div class="px-6 pt-6 pb-4">
+                <p class="mb-3 font-display text-base font-bold text-[var(--ink)]">{{ confirmState.title }}</p>
+                <p class="text-sm text-[var(--ink-soft)]">{{ confirmState.message }}</p>
+              </div>
+              <div class="flex gap-3 border-t border-[var(--line)] px-6 py-4">
+                <button @click="closeConfirm" class="flex-1 rounded-2xl border border-[var(--line)] bg-white py-2.5 font-display text-sm font-bold text-[var(--ink-soft)] transition-all hover:border-[var(--accent)] active:scale-[0.97]">取消</button>
+                <button @click="confirmLoading ? null : (confirmLoading=true, confirmState.onConfirm().finally(() => confirmLoading=false))"
+                  class="flex-1 rounded-2xl py-2.5 font-display text-sm font-bold text-white transition-all active:scale-[0.97]"
+                  :style="{ background: 'linear-gradient(180deg, var(--premium-gold), var(--premium-gold-strong))' }"
+                >{{ confirmLoading ? '处理中…' : '确定' }}</button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
 
       <!-- ═══ 右侧：设置列表 ═══ -->
       <div class="flex-1 min-w-0 space-y-4">
