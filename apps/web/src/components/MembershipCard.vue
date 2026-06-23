@@ -213,10 +213,10 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             <button
               v-if="props.pointsBalance !== undefined && isMonthly"
               class="back-points-btn"
-              :class="{ 'back-points-btn-ready': props.pointsBalance >= 160, 'back-points-btn-short': props.pointsBalance < 160 }"
+              :class="{ 'back-points-btn-ready': props.pointsBalance >= 2000, 'back-points-btn-short': props.pointsBalance < 2000 }"
               @click.stop="emit('redeem-points')"
-              :disabled="props.pointsBalance < 160 || props.pointsRedeeming"
-              :title="props.pointsBalance >= 160 ? '积分兑换皓月卡' : `还差${160 - props.pointsBalance}分`"
+              :disabled="props.pointsBalance < 2000 || props.pointsRedeeming"
+              :title="props.pointsBalance >= 2000 ? '积分兑换皓月卡' : `还差${2000 - props.pointsBalance}分`"
             >
               <LoaderCircle v-if="props.pointsRedeeming" :size="14" class="back-redeem-spin" />
               <Sparkles v-else :size="14" />
