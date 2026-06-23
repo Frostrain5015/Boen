@@ -338,6 +338,33 @@ function handleBack() {
           <button @click="toast.info('请联系管理员激活星月卡')" class="text-xs underline-offset-2 transition-colors hover:underline"
             style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
         </template>
+
+        <!-- ═══ 限时活动：星月积分兑换皓月卡 ═══ -->
+        <div class="clay clay-glass overflow-hidden" style="border: 1px solid var(--premium-gold)">
+          <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--premium-gold-soft)">
+            <span class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--premium-gold)">限时活动</span>
+            <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分兑换皓月卡</h2>
+            <span class="ml-auto font-display text-sm font-bold" style="color: var(--premium-gold)">{{ authStore.pointsBalance }}</span>
+          </div>
+          <div class="space-y-3 px-4 py-3">
+            <div class="flex items-center justify-center gap-2 rounded-2xl py-2 font-display text-base font-bold"
+              style="background: var(--premium-gold-soft); color: var(--premium-gold)">
+              <Sparkles class="h-4 w-4" />
+              <span>2000 积分 → 皓月卡</span>
+              <Sparkles class="h-4 w-4" />
+            </div>
+            <div class="h-2 overflow-hidden rounded-full" style="background: var(--line)">
+              <div class="h-full rounded-full transition-all duration-500"
+                :style="{ width: Math.min(100, (authStore.pointsBalance / 2000) * 100) + '%', background: 'var(--premium-gold)' }"></div>
+            </div>
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-[var(--ink-soft)]">今日已赚 {{ authStore.currency?.todayEarned ?? 0 }} / {{ authStore.currency?.dailyCap ?? 100 }}</span>
+              <span class="font-display font-bold" :style="{ color: authStore.pointsBalance >= 2000 ? 'var(--success)' : 'var(--premium-gold)' }">
+                {{ authStore.pointsBalance }} / 2000
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ═══ 右侧：设置列表 ═══ -->
