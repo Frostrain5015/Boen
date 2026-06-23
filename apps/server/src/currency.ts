@@ -8,7 +8,7 @@ import { grantMembershipDays } from './redeem.js';
 //   λ            —— 全局换算常数，刻意小以维持珍贵感。
 // 精算依据见 plans/modular-nibbling-swan.md：典型日活 ~4-6 分/天 → 27-40 天换皓月卡(1600)。
 export const CONVERT_RATE = 0.05;
-export const DAILY_CAP = 80;
+export const DAILY_CAP = 100;
 const MIN_GAIN_FOR_FLOOR1 = 5; // rawGain≥此值但 floor 为 0 时保底给 10（×10 后的最小颗粒）
 
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
