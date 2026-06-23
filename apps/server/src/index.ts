@@ -669,10 +669,72 @@ function databaseQuestionPayload(quiz: ToolCall, scope: QuestionScope): import('
   return { ...payload, ...taxonomy };
 }
 
-async function emitQuestionIfAny(quiz: ToolCall | undefined, send: (e: SseEvent) => Promise<void>, scope: QuestionScope) {
-  if (quiz?.id) {
-    await send({ type: 'question', toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) });
+/**
+ * 把出题失败原因作为该出题工具的结果回灌给模型（type:'answer' → 路由回 agent），
+ * 让它据此重新出题。返回重试后新的 pending 题目（若有）。
+ */
+async function resumeQuestionWithError(
+  threadId: string,
+  toolCallId: string,
+  reason: string,
+  send: (e: SseEvent) => Promise<void>,
+): Promise<ToolCall | undefined> {
+  const { question } = await runGraph(new Command<QuestionResume>({
+    resume: {
+      type: 'answer', // 'answer' 会路由回 agent，让模型看到错误结果后重试
+      toolCallId,
+      toolContent: `出题失败：${reason}。请改用一个【当前学科、年级下已发布】的知识点，重新调用出题工具生成一道新题。`,
+    },
+  }), threadId, send);
+  return question;
+}
+
+/**
+ * 安全下发题目：构建题卡失败（如题目未绑定当前学科年级的已发布知识点）时，
+ * **不抛错中断本轮 SSE**，而是把失败原因回灌给模型让它重试出题（最多 maxRetry 次）；
+ * 仍失败则跳空 interrupt + 统一 fail 工具卡片收尾，避免线程卡死、后续输入无响应。
+ * @returns 是否最终成功下发了题卡
+ */
+async function safeDeliverQuestion(
+  quiz: ToolCall | undefined,
+  send: (e: SseEvent) => Promise<void>,
+  scope: QuestionScope,
+  threadId: string,
+  persistConversationId?: string,
+  maxRetry = 2,
+): Promise<boolean> {
+  let current = quiz;
+  for (let attempt = 0; attempt <= maxRetry; attempt++) {
+    if (!current?.id) return false; // 模型未再出题（如改为文字回复）→ 不再处理
+    let payload: import('@boen/shared').QuestionPayload | null = null;
+    let reason = '';
+    try {
+      payload = databaseQuestionPayload(current, scope);
+    } catch (err) {
+      reason = err instanceof Error ? err.message : String(err);
+    }
+    if (payload) {
+      if (persistConversationId) {
+        addMessage(persistConversationId, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: current.id, payload, answered: false }));
+      }
+      await send({ type: 'question', toolCallId: current.id, question: payload });
+      return true;
+    }
+    console.warn(`[question] 题卡构建失败（第 ${attempt + 1} 次）:`, reason);
+    if (attempt < maxRetry) {
+      // 回灌错误让模型重试出题（重试中模型再次调用出题工具会自动再发 quiz_generating）
+      try {
+        current = await resumeQuestionWithError(threadId, current.id, reason, send);
+      } catch (err) {
+        console.warn('[question] 重试出题失败:', err instanceof Error ? err.message : err);
+        break;
+      }
+    }
   }
+  // 重试用尽：清空中断 + 统一 fail 工具卡片，保证 done 正常收尾、线程不卡
+  await drainPendingQuestions(threadId, send);
+  await send({ type: 'todo_fail', action: 'quiz', error: '这道题没能生成，我们继续吧' });
+  return false;
 }
 
 /**
@@ -693,13 +755,29 @@ async function resumePendingQuestionAsSkipped(threadId: string, send: (e: SseEve
   return true;
 }
 
-/** 将 LangGraph interrupt 中的题目调用转换为可持久化的题卡。 */
-function extractQuestionPayload(quiz: ToolCall | undefined, scope: QuestionScope): { toolCallId: string; question: import('@boen/shared').QuestionPayload } | null {
-  if (quiz?.id) {
-    return { toolCallId: quiz.id, question: databaseQuestionPayload(quiz, scope) };
+/**
+ * 在开始新一轮前，循环清空线程里残留的未作答 interrupt（最多 max 次）。
+ * 单次 skip 后 agent 可能再次出题导致新的 interrupt；不清空会与新输入的图执行
+ * 冲突，表现为"再输入无响应"。任何异常都吞掉，绝不阻断新回合。
+ */
+async function drainPendingQuestions(
+  threadId: string,
+  send: (e: SseEvent) => Promise<void>,
+  max = 3,
+): Promise<void> {
+  for (let i = 0; i < max; i++) {
+    let cleared = false;
+    try {
+      cleared = await resumePendingQuestionAsSkipped(threadId, send);
+    } catch (err) {
+      console.warn('[drain] 跳过残留题目失败:', err instanceof Error ? err.message : err);
+      return;
+    }
+    if (!cleared) return;
   }
-  return null;
+  console.warn('[drain] 连续跳过仍有残留 interrupt，已达上限，放弃');
 }
+
 
 /** Strip unverifiable labels from historical conversation payloads on read. */
 function sanitizeConversationQuestionMessage<T extends { role: string; content: string }>(message: T, subject: string): T {
@@ -1577,9 +1655,9 @@ app.post('/api/chat', async (c) => {
             })
           : null;
 
-      // 若上一轮正暂停等待作答，先以原生 interrupt 恢复并标记跳过，
-      // 再开始新的用户回合，保证 ToolMessage 在历史中的顺序合法。
-      await resumePendingQuestionAsSkipped(body.threadId, send);
+      // 若上一轮正暂停等待作答，先以原生 interrupt 恢复并标记跳过（循环清空残留），
+      // 再开始新的用户回合，保证 ToolMessage 在历史中的顺序合法、线程不卡。
+      await drainPendingQuestions(body.threadId, send);
 
       // 突破模式：加载知识画像中的薄弱点数据
       let weaknessData: string | undefined;
@@ -1661,14 +1739,15 @@ app.post('/api/chat', async (c) => {
           // 从前端展示中移除评分标记
           content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
         }
-        // 如果该回复触发了出题，同时保存题目载荷（用于会话重载时还原题目卡片）
-        const qData = extractQuestionPayload(question, { subject: body.subject ?? 'math', grade: body.grade });
-        if (qData) {
-          addMessage(body.conversationId!, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
-        }
       }
 
-      await emitQuestionIfAny(question, send, { subject: body.subject ?? 'math', grade: body.grade });
+      // 出题：构建+持久化+下发一体化，失败自动跳空中断（不卡线程、不断流）
+      await safeDeliverQuestion(
+        question, send,
+        { subject: body.subject ?? 'math', grade: body.grade },
+        body.threadId,
+        owned ? body.conversationId! : undefined,
+      );
       // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
       await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', body.grade);
       await emitReviewCompleteIfAny(last, send);
@@ -1750,11 +1829,11 @@ app.post('/api/explore', async (c) => {
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
       }
-      const qData = extractQuestionPayload(question, { subject: body.subject ?? 'math', grade: body.grade });
-      if (qData) {
-        addMessage(threadId, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: qData.toolCallId, payload: qData.question, answered: false }));
-      }
-      await emitQuestionIfAny(question, send, { subject: body.subject ?? 'math', grade: body.grade });
+      await safeDeliverQuestion(
+        question, send,
+        { subject: body.subject ?? 'math', grade: body.grade },
+        threadId, threadId,
+      );
       await send({ type: 'done' });
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
@@ -2052,13 +2131,12 @@ app.post('/api/answer', async (c) => {
         },
       }), body.threadId, send);
       await handleSessionExit(last, send, userId, body.threadId, subject, grade || undefined);
-      if (body.conversationId) {
-        const nextQuestion = extractQuestionPayload(question, { subject, grade: grade || undefined });
-        if (nextQuestion) {
-          addMessage(body.conversationId, 'system', JSON.stringify({ __boen_type: 'question', toolCallId: nextQuestion.toolCallId, payload: nextQuestion.question, answered: false }));
-        }
-      }
-      await emitQuestionIfAny(question, send, { subject, grade: grade || undefined });
+      await safeDeliverQuestion(
+        question, send,
+        { subject, grade: grade || undefined },
+        body.threadId,
+        body.conversationId || undefined,
+      );
       await emitReviewCompleteIfAny(last, send);
       await send({ type: 'done' });
     } catch (err) {

@@ -171,13 +171,19 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'todo_fail') {
       // 同步把进行中的步骤标记为失败，进度面板与内联工具卡片状态一致
       if (e.action === 'plan' || e.action === 'advance') useUiStore().markTodoFailed();
+      // 出题失败：题目用的是 quiz_generating 占位（非 tool_pending），先清掉占位
+      if (e.action === 'quiz') isGeneratingQuiz.value = false;
+      let replaced = false;
       for (let i = items.value.length - 1; i >= 0; i--) {
         const item = items.value[i];
         if (item?.kind === 'tool_pending' && item.action === e.action) {
           items.value[i] = { kind: 'tool_error', action: e.action, error: e.error };
+          replaced = true;
           break;
         }
       }
+      // 没有对应 pending（如出题失败）→ 直接追加统一 fail 工具卡片
+      if (!replaced) items.value.push({ kind: 'tool_error', action: e.action, error: e.error });
     } else if (e.type === 'usage') {
       const authStore = useAuthStore();
       if (authStore.subscription && !authStore.subscription.isPremium) {

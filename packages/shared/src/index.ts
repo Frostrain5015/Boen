@@ -503,9 +503,9 @@ export type SseEvent =
   | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'conversation_created'; conversationId: string; title: string }
   | { type: 'todo_plan'; steps: TodoStep[]; currentStep: number }
-  | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
-  | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
-  | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; error: string }
+  | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch' | 'quiz'; detail: string }
+  | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch' | 'quiz'; detail: string }
+  | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch' | 'quiz'; error: string }
   | { type: 'subject_changed'; subject: string }
   | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }>; pointsEarned?: number; pointsBalance?: number; pointsCapped?: boolean }
   | { type: 'done' }
