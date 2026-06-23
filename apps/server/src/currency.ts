@@ -6,15 +6,14 @@ import { grantMembershipDays } from './redeem.js';
 //   rawGain      —— 本次会话/考试所有知识点的「正向 Elo 增量」之和（调用方计算）。
 //   S            —— 学科总熟练度 0~100（调用方从 getProfileOutline 取并传入）。
 //   λ            —— 全局换算常数，刻意小以维持珍贵感。
-// 精算依据见 plans/modular-nibbling-swan.md：典型日活 ~5 分/天 → 32 天换皓月卡(160)。
-export const CONVERT_RATE = 0.06;
-export const DAILY_CAP = 8;
-const MIN_GAIN_FOR_FLOOR1 = 5; // rawGain≥此值但 floor 为 0 时保底给 1 分
+// 精算依据见 plans/modular-nibbling-swan.md：典型日活 ~4-6 分/天 → 27-40 天换皓月卡(1600)。
+export const CONVERT_RATE = 0.05;
+export const DAILY_CAP = 80;
+const MIN_GAIN_FOR_FLOOR1 = 5; // rawGain≥此值但 floor 为 0 时保底给 10（×10 后的最小颗粒）
 
-/** 积分可兑换的会员产品（年卡积分不打折：= 12×月卡，保护年卡现金收入） */
-/** 星月积分可兑换产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
+/** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
-  month: { key: 'month', name: '皓月卡', days: 30, cost: 160 },
+  month: { key: 'month', name: '皓月卡', days: 30, cost: 1600 },
 } as const;
 
 export type CurrencyProductKey = keyof typeof CURRENCY_PRODUCTS;
@@ -51,12 +50,13 @@ export function getCurrencyStatus(userId: string): CurrencyStatus {
   };
 }
 
-/** 纯函数：把 rawGain + 学科熟练度换算成「理论应得积分」（未封顶、未取整前的下游 floor）。 */
+/** 纯函数：把 rawGain + 学科熟练度换算成「理论应得积分」（乘 10 细化粒度）。 */
 export function computeSessionPoints(rawGain: number, subjectProf: number): number {
   if (!(rawGain > 0)) return 0;
   const S = Math.max(0, Math.min(100, subjectProf));
-  const raw = Math.floor(rawGain * (1 + S / 100) * CONVERT_RATE);
-  return Math.max(rawGain >= MIN_GAIN_FOR_FLOOR1 ? 1 : 0, raw);
+  // 先按 λ 算分、floor、再 ×10 以获得子单位粒度（例如 0 分不再是最小跳变）。
+  const raw = Math.floor(rawGain * (1 + S / 100) * CONVERT_RATE) * 10;
+  return Math.max(rawGain >= MIN_GAIN_FOR_FLOOR1 ? 10 : 0, raw);
 }
 
 export interface EarnResult {
