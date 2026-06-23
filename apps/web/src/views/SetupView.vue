@@ -70,29 +70,27 @@ async function handleRedeem() {
   }
 }
 
-const pointsRedeeming = ref('');
+const pointsRedeeming = ref(false);
 
 onMounted(() => { authStore.fetchCurrencyStatus(); });
 
-/** 用星月积分兑换会员（复用兑换码同款发卡动画） */
-async function handlePointsRedeem(productKey: 'month' | 'year') {
+/** 用星月积分兑换皓月卡（复用兑换码同款发卡动画） */
+async function handlePointsRedeem() {
   if (pointsRedeeming.value || redeeming.value) return;
-  pointsRedeeming.value = productKey;
+  pointsRedeeming.value = true;
   const wasPremium = authStore.isPremium;
   const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-  const adYearlyRect = wasPremium ? null : (adYearlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
   const adMonthlyRect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
   try {
-    const r = await authStore.redeemMembershipWithPoints(productKey);
+    const r = await authStore.redeemMembershipWithPoints('month');
     if (r.ok) {
       redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
-      const srcRect = wasPremium ? null : (redeemedTier.value === 'yearly' ? adYearlyRect : adMonthlyRect);
-      await startRedeemAnimation({ wasPremium, oldTier, srcRect });
+      await startRedeemAnimation({ wasPremium, oldTier, srcRect: adMonthlyRect });
     } else {
       toast.error(r.message ?? '兑换失败');
     }
   } finally {
-    pointsRedeeming.value = '';
+    pointsRedeeming.value = false;
   }
 }
 
@@ -290,7 +288,10 @@ function handleBack() {
               v-model:redeem-code="redeemInput"
               :redeeming="redeeming"
               redeem-placeholder="兑换码续期 / 升级"
+              :points-balance="authStore.pointsBalance"
+              :points-redeeming="pointsRedeeming"
               @redeem="handleRedeem"
+              @redeem-points="handlePointsRedeem"
             />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
@@ -324,60 +325,19 @@ function handleBack() {
               v-model:redeem-code="redeemInput"
               :redeeming="redeeming"
               redeem-placeholder="输入兑换码激活"
+              :points-balance="authStore.pointsBalance"
+              :points-redeeming="pointsRedeeming"
               @redeem="handleRedeem"
+              @redeem-points="handlePointsRedeem"
             />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
             <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
-            点击卡片翻面，在背面输入兑换码激活
+            点击卡片翻面，可用兑换码或积分激活
           </p>
           <button @click="toast.info('请联系管理员激活星月卡')" class="text-xs underline-offset-2 transition-colors hover:underline"
             style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
         </template>
-
-        <!-- ═══ 星月积分兑换 ═══ -->
-        <div class="clay clay-glass overflow-hidden">
-          <div class="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
-            <Moon class="h-4 w-4" style="color: var(--premium-gold)" />
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分</h2>
-            <span class="ml-auto inline-flex items-center gap-1 font-display text-base font-bold" style="color: var(--premium-gold)">
-              <Sparkles class="h-3.5 w-3.5" />{{ authStore.pointsBalance }}
-            </span>
-          </div>
-          <div class="space-y-3 px-4 py-3">
-            <p class="text-[11px] leading-relaxed text-[var(--ink-soft)]">
-              认真学习与考试可获得星月积分，积少成多兑换会员
-              <span v-if="authStore.currency">· 今日已赚 {{ authStore.currency.todayEarned }}/{{ authStore.currency.dailyCap }}</span>
-            </p>
-            <div
-              v-for="p in (authStore.currency?.products ?? [])"
-              :key="p.key"
-              class="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2.5"
-            >
-              <div class="mb-1.5 flex items-center gap-2">
-                <component :is="p.key === 'year' ? Star : Moon" class="h-3.5 w-3.5" style="color: var(--premium-gold)" />
-                <span class="text-xs font-bold text-[var(--ink)]">{{ p.name }}</span>
-                <span class="text-[10px] text-[var(--ink-soft)]">{{ p.days }}天</span>
-                <span class="ml-auto font-display text-xs font-bold" style="color: var(--premium-gold)">{{ p.cost }} 积分</span>
-              </div>
-              <!-- 进度条 -->
-              <div class="mb-2 h-1.5 overflow-hidden rounded-full" style="background: var(--line)">
-                <div class="h-full rounded-full transition-all"
-                  :style="{ width: Math.min(100, (authStore.pointsBalance / p.cost) * 100) + '%', background: 'var(--premium-gold)' }"></div>
-              </div>
-              <button
-                @click="handlePointsRedeem(p.key as 'month' | 'year')"
-                :disabled="authStore.pointsBalance < p.cost || !!pointsRedeeming"
-                class="w-full rounded-lg py-1.5 font-display text-xs font-bold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45"
-                :style="authStore.pointsBalance >= p.cost
-                  ? 'background: var(--premium-gold); color: #fff'
-                  : 'background: var(--locked-surface); color: var(--locked-ink)'"
-              >
-                {{ pointsRedeeming === p.key ? '兑换中…' : authStore.pointsBalance >= p.cost ? '立即兑换' : `还差 ${p.cost - authStore.pointsBalance} 积分` }}
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- ═══ 右侧：设置列表 ═══ -->

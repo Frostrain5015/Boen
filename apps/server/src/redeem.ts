@@ -162,7 +162,11 @@ export function grantMembershipDays(userId: string, days: number): { until: numb
     INSERT INTO subscriptions (user_id, tier, activated_at, expires_at, updated_at)
     VALUES (?, ?, ?, ?, unixepoch())
     ON CONFLICT(user_id) DO UPDATE SET
-      tier=excluded.tier,
+      /* 仅当新 tier 更高时才升级（yearly > monthly），不因续期月卡降级年卡用户 */
+      tier=CASE
+        WHEN excluded.tier='yearly' OR subscriptions.tier='yearly' THEN 'yearly'
+        ELSE excluded.tier
+      END,
       expires_at=excluded.expires_at,
       activated_at=COALESCE(subscriptions.activated_at, excluded.activated_at),
       updated_at=unixepoch()

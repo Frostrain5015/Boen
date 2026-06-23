@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock } from 'lucide-vue-next';
+import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock, Coins } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -20,6 +20,10 @@ interface Props {
   redeemPlaceholder?: string;
   /** 未解锁态：正面叠加磨砂灰罩 + “未解锁”锁徽（无卡广告态用） */
   locked?: boolean;
+  /** 星月积分余额（传入即在该卡背面右下角显示积分兑换按钮，仅皓月卡） */
+  pointsBalance?: number;
+  /** 积分兑换进行中 */
+  pointsRedeeming?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,11 +37,14 @@ const props = withDefaults(defineProps<Props>(), {
   redeeming: false,
   redeemPlaceholder: '输入兑换码',
   locked: false,
+  pointsBalance: undefined,
+  pointsRedeeming: false,
 });
 
 const emit = defineEmits<{
   (e: 'update:redeemCode', value: string): void;
   (e: 'redeem'): void;
+  (e: 'redeem-points'): void;
 }>();
 
 function onRedeemInput(e: Event) {
@@ -179,7 +186,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
           </ul>
 
           <!-- 背面内嵌兑换码（无边框，底部细线 + 占位提示） -->
-          <div v-if="redeemable" class="back-redeem" @click.stop>
+          <div v-if="redeemable" class="back-bottom" @click.stop>
             <div class="back-redeem-row">
               <Ticket class="back-redeem-icon" :size="14" />
               <input
@@ -204,6 +211,17 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
                 <ArrowRight v-else :size="14" />
               </button>
             </div>
+            <!-- 积分兑换按钮（仅皓月卡，卡片背面右下角） -->
+            <button
+              v-if="props.pointsBalance !== undefined && isMonthly"
+              class="back-points-btn"
+              :class="{ 'back-points-btn-ready': props.pointsBalance >= 160, 'back-points-btn-short': props.pointsBalance < 160 }"
+              @click.stop="emit('redeem-points')"
+              :disabled="props.pointsBalance < 160 || props.pointsRedeeming"
+            >
+              <Coins :size="11" />
+              <span>{{ props.pointsRedeeming ? '兑换中…' : props.pointsBalance >= 160 ? '积分兑换 160分' : `还差${160 - props.pointsBalance}分` }}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -668,17 +686,24 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   background: #b07dd6;
 }
 
-/* ── 背面内嵌兑换码（无边框：仅底部细线作为输入提示）── */
-.back-redeem {
+/* ── 背面底部（兑换码 + 积分兑换，flex 右对齐）── */
+.back-bottom {
   margin-top: auto;       /* 贴卡片底部 */
   padding-top: 9px;
   cursor: default;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .back-redeem-row {
   display: flex;
   align-items: center;
   gap: 7px;
+  flex: 1;
+  min-width: 0;           /* 容许收缩 */
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.18);
   transition: border-color 0.2s ease;
@@ -755,4 +780,44 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 @keyframes back-redeem-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── 积分兑换按钮（卡片背面右下角）── */
+.back-points-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.back-points-btn:active { transform: scale(0.94); }
+
+/* 余额足够 → 金色唤醒 */
+.back-points-btn-ready {
+  background: linear-gradient(180deg, #dab263, #d4a053);
+  color: #fff;
+  box-shadow: 0 4px 10px -5px rgba(212, 160, 83, 0.5);
+}
+.back-points-btn-ready:hover { opacity: 0.88; }
+.back-points-btn-ready:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 余额不足 → 暖灰静默 */
+.back-points-btn-short {
+  background: var(--locked-surface);
+  color: var(--locked-ink);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.card-monthly-back .back-points-btn,
+.card-monthly-back .back-points-btn-icon { color: #6a6560; }
 </style>
