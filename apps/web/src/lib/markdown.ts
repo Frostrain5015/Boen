@@ -244,6 +244,11 @@ export function renderMarkdown(text: string): string {
   const normalized = sanitizeGeneratedHtml(autoClosed)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `\n$$\n${e}\n$$\n`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`)
+    // KaTeX @traptitech/markdown-it-katex 的 $…$ 正则要求内容不以空格结尾，
+    // 否则整条公式降级为文字（例如 $6 + 2 = $ 会原样显示 $ 号）。
+    // 在交给 KaTeX 前去掉单 $ 行内数学的首尾空白。
+    // 「否定后行 (?<!\$)」与「否定前瞻 (?!\$)」联合确保不误伤 $$…$$ 块级公式。
+    .replace(/(?<!\$)\$([^$\n]+)\$(?!\$)/g, (_, inner) => `$${inner.trim()}$`)
     // 画线句支持：'被引用的句子' / '被引用的句子' → <u>被引用的句子</u>（语文阅读常见）
     .replace(/[''']([^''']{4,})[''']/g, (_, s) => `<u>${s}</u>`)
     // 修复模型常见 KaTeX 格式错误
