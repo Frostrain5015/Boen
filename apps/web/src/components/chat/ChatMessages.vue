@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { GraduationCap, PencilLine, Wrench, CheckCircle, XCircle, Sparkles } from 'lucide-vue-next';
+import { GraduationCap, PencilLine, Wrench, CheckCircle, XCircle, Sparkles, AlertTriangle, ClipboardList, Play, BookOpen, RefreshCw } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import Mascot from '@/components/Mascot.vue';
 import QuestionCard from '@/components/QuestionCard.vue';
@@ -72,10 +72,15 @@ onMounted(() => {
                 <div class="quiz-gen-inner">
                   <span class="quiz-gen-icon"
                     :class="m.kind === 'tool_result' ? 'quiz-gen-icon-done' : m.kind === 'tool_error' ? 'quiz-gen-icon-err' : ''">
-                    <template v-if="m.kind === 'tool_error'">⚠️</template>
+                    <template v-if="m.kind === 'tool_error'"><AlertTriangle class="h-4 w-4" /></template>
                     <PencilLine v-else-if="m.kind === 'tool_pending' && m.action === 'quiz'" class="h-4 w-4" />
                     <Wrench v-else-if="m.kind === 'tool_pending'" class="h-4 w-4" />
-                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : m.action === 'switch' ? '🔄' : m.action === 'quiz' ? '✏️' : '🎓' }}</template>
+                    <ClipboardList v-else-if="m.action === 'plan'" class="h-4 w-4" />
+                    <Play v-else-if="m.action === 'advance'" class="h-4 w-4" />
+                    <BookOpen v-else-if="m.action === 'query'" class="h-4 w-4" />
+                    <RefreshCw v-else-if="m.action === 'switch'" class="h-4 w-4" />
+                    <PencilLine v-else-if="m.action === 'quiz'" class="h-4 w-4" />
+                    <GraduationCap v-else class="h-4 w-4" />
                   </span>
                   <span class="quiz-gen-label">
                     <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课' : m.action === 'advance' ? '正在进入下一阶段' : m.action === 'query' ? '正在查询教材库' : m.action === 'switch' ? '正在切换学科' : m.action === 'quiz' ? '博文正在出题' : '课堂即将结束' }}</template>
