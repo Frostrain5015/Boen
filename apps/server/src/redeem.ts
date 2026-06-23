@@ -142,6 +142,34 @@ export function generateCode(
   return { code: encodeCode({ version: VERSION, ...opts, nonce }, secret), nonce };
 }
 
+// ── 会员发放（兑换码 / 星月积分共用）─────────────────────────
+
+/**
+ * 为用户发放/续期会员若干天（叠加续期语义）。
+ * 已是有效会员则在原到期时间上叠加，避免临期兑换损失天数；否则从 now 起算。
+ * 供 redeemForUser（兑换码）与 currency.ts（星月积分兑换）共用。
+ * ⚠️ 仅做 subscriptions upsert，调用方负责放进自己的事务并记录各自的流水。
+ */
+export function grantMembershipDays(userId: string, days: number): { until: number; tier: 'monthly' | 'yearly' } {
+  const now = Math.floor(Date.now() / 1000);
+  const subRow = db.prepare(`SELECT expires_at FROM subscriptions WHERE user_id=?`).get(userId) as
+    | { expires_at: number | null }
+    | undefined;
+  const base = subRow?.expires_at && subRow.expires_at > now ? subRow.expires_at : now;
+  const until = base + days * 86400;
+  const tier: 'monthly' | 'yearly' = days >= 365 ? 'yearly' : 'monthly';
+  db.prepare(`
+    INSERT INTO subscriptions (user_id, tier, activated_at, expires_at, updated_at)
+    VALUES (?, ?, ?, ?, unixepoch())
+    ON CONFLICT(user_id) DO UPDATE SET
+      tier=excluded.tier,
+      expires_at=excluded.expires_at,
+      activated_at=COALESCE(subscriptions.activated_at, excluded.activated_at),
+      updated_at=unixepoch()
+  `).run(userId, tier, now, until);
+  return { until, tier };
+}
+
 // ── 兑换 ─────────────────────────────────────────────────────
 
 /**
@@ -151,8 +179,6 @@ export function generateCode(
 export function redeemForUser(userId: string, rawCode: string, secret: string): RedeemResult {
   const p = decodeCode(rawCode, secret);
   if (!p || p.version !== VERSION) return { ok: false, error: 'invalid_code' };
-
-  const now = Math.floor(Date.now() / 1000);
 
   // 撤销名单：单码 nonce 或整批 batch
   const revoked = db
@@ -171,27 +197,11 @@ export function redeemForUser(userId: string, rawCode: string, secret: string): 
       const used = (db.prepare(`SELECT COUNT(*) AS c FROM code_redemptions WHERE nonce=?`).get(p.nonce) as { c: number }).c;
       if (p.maxUses > 0 && used >= p.maxUses) return { ok: false, error: 'code_used' };
 
-      const subRow = db.prepare(`SELECT expires_at FROM subscriptions WHERE user_id=?`).get(userId) as
-        | { expires_at: number | null }
-        | undefined;
-      // 已是有效星月卡用户则在原到期时间上叠加，避免临期兑换损失天数
-      const base = subRow?.expires_at && subRow.expires_at > now ? subRow.expires_at : now;
-      const until = base + p.durationDays * 86400;
+      const { until } = grantMembershipDays(userId, p.durationDays);
 
       db.prepare(
         `INSERT INTO code_redemptions (nonce, user_id, duration_days, granted_until) VALUES (?, ?, ?, ?)`,
       ).run(p.nonce, userId, p.durationDays, until);
-
-      const tier = p.durationDays >= 365 ? 'yearly' : 'monthly';
-      db.prepare(`
-        INSERT INTO subscriptions (user_id, tier, activated_at, expires_at, updated_at)
-        VALUES (?, ?, ?, ?, unixepoch())
-        ON CONFLICT(user_id) DO UPDATE SET
-          tier=excluded.tier,
-          expires_at=excluded.expires_at,
-          activated_at=COALESCE(subscriptions.activated_at, excluded.activated_at),
-          updated_at=unixepoch()
-      `).run(userId, tier, now, until);
 
       return { ok: true, until, durationDays: p.durationDays };
     })();

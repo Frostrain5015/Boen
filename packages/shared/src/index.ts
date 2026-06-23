@@ -322,6 +322,12 @@ export interface ExamResults {
   proficiencyChanges?: ProficiencyChange[];
   /** 自动归入错题本的信息 */
   mistakesCollected?: { count: number; mistakeIds: string[] };
+  /** 本次结算获得的星月积分（已按日上限封顶） */
+  pointsEarned?: number;
+  /** 入账后的积分余额 */
+  pointsBalance?: number;
+  /** 是否因日上限被截断 */
+  pointsCapped?: boolean;
 }
 
 /** 考试历史列表项（概要） */
@@ -445,6 +451,25 @@ export interface SubscriptionStatus {
   dailyRemaining: number | null;
 }
 
+/** 星月积分（局内货币）可兑换的会员产品 */
+export interface CurrencyProduct {
+  key: string;
+  name: string;
+  days: number;
+  cost: number;
+}
+
+/** 星月积分状态（/api/currency/status 返回） */
+export interface CurrencyStatus {
+  balance: number;
+  totalEarned: number;
+  totalSpent: number;
+  todayEarned: number;
+  dailyCap: number;
+  dailyRemaining: number;
+  products: CurrencyProduct[];
+}
+
 // ─────────────────────────────────────────────────────────────
 // SSE 事件
 // ─────────────────────────────────────────────────────────────
@@ -481,6 +506,6 @@ export type SseEvent =
   | { type: 'todo_done'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; detail: string }
   | { type: 'todo_fail'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch'; error: string }
   | { type: 'subject_changed'; subject: string }
-  | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }> }
+  | { type: 'settlement'; summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }>; pointsEarned?: number; pointsBalance?: number; pointsCapped?: boolean }
   | { type: 'done' }
   | { type: 'error'; message: string };

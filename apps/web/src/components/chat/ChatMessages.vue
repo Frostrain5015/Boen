@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { GraduationCap, PencilLine, Wrench, CheckCircle, XCircle } from 'lucide-vue-next';
+import { GraduationCap, PencilLine, Wrench, CheckCircle, XCircle, Sparkles } from 'lucide-vue-next';
 import { renderMarkdown } from '@/lib/markdown';
 import Mascot from '@/components/Mascot.vue';
 import QuestionCard from '@/components/QuestionCard.vue';
@@ -166,6 +166,16 @@ onMounted(() => {
             <div class="max-h-32 overflow-y-auto rounded-xl bg-[var(--surface)] p-3 text-xs leading-relaxed text-[var(--ink)] md-body"
               v-html="renderMarkdown(chatStore.learningSettlement.summary)">
             </div>
+
+            <!-- 星月积分奖励 -->
+            <div v-if="(chatStore.learningSettlement.pointsEarned ?? 0) > 0"
+              class="flex items-center justify-center gap-2 rounded-2xl border border-[var(--premium-gold)] bg-[var(--premium-gold-soft)] px-4 py-2.5"
+              style="animation: popIn 0.4s ease both">
+              <Sparkles class="h-4 w-4 text-[var(--premium-gold)]" />
+              <span class="font-display text-sm font-bold text-[var(--premium-gold)]">+{{ chatStore.learningSettlement.pointsEarned }} 星月积分</span>
+            </div>
+            <p v-else-if="chatStore.learningSettlement.pointsCapped"
+              class="text-center text-[11px] text-[var(--ink-soft)]">🌙 今日星月积分已满，明天再来</p>
 
             <!-- 详细熟练度变化（结算时批量写入后的各知识点变化） -->
             <div v-if="chatStore.learningSettlement.proficiencyChanges?.length" class="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2.5">

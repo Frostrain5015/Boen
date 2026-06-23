@@ -59,6 +59,7 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser } from './redeem.js';
+import { earnPoints, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -529,7 +530,34 @@ async function runGraph(
 }
 
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
-async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string) {
+/** 把一次结算的熟练度变化换算成星月积分并入账（结构化学习/考试共用）。
+ *  rawGain = Σ max(0, after-before)；S = 学科总熟练度；按日上限封顶。
+ *  rawGain≤0 或入账 0 且未触顶时返回 undefined（不附带积分字段）。 */
+function awardSessionPoints(
+  userId: string,
+  changes: Array<{ before: number; after: number }>,
+  subject: string | undefined,
+  grade: string | undefined,
+  reason: 'session' | 'exam',
+  refId?: string,
+): { pointsEarned: number; pointsBalance: number; pointsCapped: boolean } | undefined {
+  try {
+    const rawGain = changes.reduce((s, c) => s + Math.max(0, (c.after ?? 0) - (c.before ?? 0)), 0);
+    if (rawGain <= 0) return undefined;
+    let S = 0;
+    if (subject && grade) {
+      const outline = getProfileOutline(subject, grade, userId) as { overall?: { weightedScore?: number } };
+      S = Math.max(0, outline.overall?.weightedScore ?? 0);
+    }
+    const res = earnPoints(userId, rawGain, S, reason, refId);
+    if (res.earned <= 0 && !res.capped) return undefined;
+    return { pointsEarned: res.earned, pointsBalance: res.balance, pointsCapped: res.capped };
+  } catch {
+    return undefined;
+  }
+}
+
+async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string, subject?: string, grade?: string) {
   let exitCall: ToolCall | undefined;
 
   // Case 1: last 本身是带 exit_session 的 AI 消息
@@ -557,6 +585,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
     // 仅当 cache 非空才发结算事件（MODE_SCORE 路径已发过时跳过）
     if (updatedKps > 0) {
+      const points = awardSessionPoints(userId, profChanges, subject, grade, 'session', threadId);
       await send({
         type: 'settlement',
         summary: String(args.summary ?? ''),
@@ -565,6 +594,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
         totalSteps: Number(args.totalSteps ?? 0),
         updatedKps,
         proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
+        ...points,
       });
     }
   }
@@ -1320,6 +1350,58 @@ app.post('/api/subscription/redeem', async (c) => {
   });
 });
 
+// ── 星月积分 API ────────────────────────────
+const CURRENCY_PRODUCT_LIST = Object.values(CURRENCY_PRODUCTS).map((p) => ({
+  key: p.key, name: p.name, days: p.days, cost: p.cost,
+}));
+
+app.get('/api/currency/status', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const status = getCurrencyStatus(userId);
+  return c.json({ ...status, products: CURRENCY_PRODUCT_LIST });
+});
+
+app.get('/api/currency/ledger', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ entries: listLedger(userId, 30) });
+});
+
+// 用积分兑换会员（皓月卡/星耀卡）
+app.post('/api/currency/redeem-membership', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
+
+  let productKey = '';
+  try {
+    productKey = String((await c.req.json<{ productKey?: string }>()).productKey ?? '').trim();
+  } catch { /* 忽略 body 解析错误 */ }
+
+  const result = redeemMembershipWithPoints(userId, productKey);
+  if (!result.ok) {
+    const msgMap: Record<string, string> = {
+      invalid_product: '会员产品不存在',
+      insufficient: '星月积分不足',
+    };
+    return c.json({ error: result.error, message: msgMap[result.error] ?? '兑换失败', balance: result.balance, cost: result.cost }, 400);
+  }
+
+  // 即时生效：清掉订阅缓存，返回订阅 + 余额
+  invalidateSubscriptionCache(userId);
+  return c.json({
+    tier: result.tier,
+    isPremium: true,
+    expiresAt: result.until,
+    dailyLimit: null,
+    dailyUsed: null,
+    dailyRemaining: null,
+    balance: result.balance,
+    redeemed: { days: result.days, until: result.until },
+  });
+});
+
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──
 
 /** POST /api/auth/token - 用授权码换 access_token（携带 client_secret + code_verifier）*/
@@ -1529,6 +1611,7 @@ app.post('/api/chat', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
           const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, body.threadId);
+          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', body.threadId);
           await send({
             type: 'settlement',
             summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
@@ -1537,6 +1620,7 @@ app.post('/api/chat', async (c) => {
             totalSteps,
             updatedKps,
             proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
+            ...points,
           });
           // 从前端展示中移除评分标记
           content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
@@ -1550,7 +1634,7 @@ app.post('/api/chat', async (c) => {
 
       await emitQuestionIfAny(question, send, { subject: body.subject ?? 'math', grade: body.grade });
       // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
-      await handleSessionExit(last, send, userId, body.threadId);
+      await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', body.grade);
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
@@ -1616,6 +1700,7 @@ app.post('/api/explore', async (c) => {
             updateProficiency(userId, node.id, sessionScore, 100, 'explore');
           }
 
+          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', threadId);
           await send({
             type: 'settlement',
             summary: content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '').trim(),
@@ -1624,6 +1709,7 @@ app.post('/api/explore', async (c) => {
             totalSteps,
             updatedKps: flushedCount + (node ? 1 : 0),
             proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
+            ...points,
           });
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
@@ -1929,7 +2015,7 @@ app.post('/api/answer', async (c) => {
           toolContent: safeToolContent,
         },
       }), body.threadId, send);
-      await handleSessionExit(last, send, userId, body.threadId);
+      await handleSessionExit(last, send, userId, body.threadId, subject, grade || undefined);
       if (body.conversationId) {
         const nextQuestion = extractQuestionPayload(question, { subject, grade: grade || undefined });
         if (nextQuestion) {

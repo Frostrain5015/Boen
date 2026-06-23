@@ -50,7 +50,7 @@ export const useChatStore = defineStore('chat', () => {
   const input = ref('');
   const busy = ref(false);
   const isGeneratingQuiz = ref(false);
-  const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }> } | null>(null);
+  const learningSettlement = ref<{ summary: string; score: number; stepsCompleted: number; totalSteps: number; updatedKps: number; proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number }>; pointsEarned?: number; pointsCapped?: boolean } | null>(null);
   /** 类课堂是否进行中（用于步骤日志检测，避免跨 store 引用） */
   let _sessionActive = false;
   /** 会话开始时间戳（用于日志 elapsed 计算） */
@@ -189,8 +189,13 @@ export const useChatStore = defineStore('chat', () => {
         };
       }
     } else if (e.type === 'settlement') {
-      learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps, proficiencyChanges: (e as any).proficiencyChanges };
-      console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | ${new Date().toLocaleTimeString()}`);
+      learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps, proficiencyChanges: e.proficiencyChanges, pointsEarned: e.pointsEarned, pointsCapped: e.pointsCapped };
+      console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | +${e.pointsEarned ?? 0}星月积分 | ${new Date().toLocaleTimeString()}`);
+      // 回写星月积分余额
+      if (typeof e.pointsBalance === 'number') {
+        const { useAuthStore } = await import('@/stores/auth');
+        useAuthStore().applyEarnedPoints(e.pointsBalance);
+      }
       _sessionActive = false;
       const { useUiStore } = await import('@/stores/ui');
       useUiStore().endSession();

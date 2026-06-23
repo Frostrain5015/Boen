@@ -23,7 +23,8 @@ import { execFile } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { getWeightDistribution, WEIGHT_TIERS } from './kg-weights.js';
-import { updateProficiency, getWeakPoints, getRecommendedKPs } from './knowledge-profile.js';
+import { updateProficiency, getWeakPoints, getRecommendedKPs, getProfileOutline } from './knowledge-profile.js';
+import { earnPoints } from './currency.js';
 import db from './db.js';
 import { retrieveCurriculum } from './curriculum.js';
 import { retrieveGlobalStyleSkills } from './mistakes.js';
@@ -2122,6 +2123,23 @@ export async function submitExamSession(
     }
   }
   if (proficiencyChanges.length) results.proficiencyChanges = proficiencyChanges;
+
+  // ── 星月积分结算：按正向熟练度增量 × 学科总熟练度倍增入账（日上限封顶）──
+  try {
+    const rawGain = proficiencyChanges.reduce((s, c) => s + Math.max(0, c.after - c.before), 0);
+    if (rawGain > 0) {
+      const outline = getProfileOutline(session.subject, String(session.grade ?? ''), userId) as { overall?: { weightedScore?: number } };
+      const S = Math.max(0, outline.overall?.weightedScore ?? 0);
+      const earn = earnPoints(userId, rawGain, S, 'exam', examId);
+      if (earn.earned > 0 || earn.capped) {
+        results.pointsEarned = earn.earned;
+        results.pointsBalance = earn.balance;
+        results.pointsCapped = earn.capped;
+      }
+    }
+  } catch (err) {
+    console.warn('[currency] 考试积分结算失败（不影响考试提交）:', err instanceof Error ? err.message : err);
+  }
 
   // ── 自动错题收集：将失分严重的题目归入错题本 ──
   try {

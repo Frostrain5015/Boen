@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Grade, SubscriptionStatus } from '@boen/shared';
+import type { Grade, SubscriptionStatus, CurrencyStatus } from '@boen/shared';
 import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { useChatStore } from './chat';
 import { useExamStore } from './exam';
@@ -37,10 +37,12 @@ export const useAuthStore = defineStore('auth', () => {
   // 初始化时还没有 currentUser，只能扫 unscoped key；scoped 的稍后在 checkAuth 中补扫
   const userProfile = ref<UserProfile | null>(loadProfileFallback());
   const subscription = ref<SubscriptionStatus | null>(null);
+  const currency = ref<CurrencyStatus | null>(null);
 
   // ── Computed ──────────────────────────────────────────────
   const isPremium = computed(() => subscription.value?.isPremium ?? false);
   const dailyRemaining = computed(() => subscription.value?.dailyRemaining ?? null);
+  const pointsBalance = computed(() => currency.value?.balance ?? 0);
 
   // ── Actions ───────────────────────────────────────────────
 
@@ -73,6 +75,61 @@ export const useAuthStore = defineStore('auth', () => {
       if (res.ok) {
         subscription.value = data as SubscriptionStatus;
         return { ok: true };
+      }
+      return { ok: false, error: data.error, message: data.message };
+    } catch {
+      return { ok: false, error: 'network', message: '网络错误，请稍后再试' };
+    }
+  }
+
+  /** 拉取星月积分状态（余额/今日已赚/可兑换产品） */
+  async function fetchCurrencyStatus() {
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetch('/api/currency/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        currency.value = (await res.json()) as CurrencyStatus;
+      }
+    } catch {
+      /* 静默失败 */
+    }
+  }
+
+  /** 结算事件回写最新余额（SSE settlement / 考试结果携带） */
+  function applyEarnedPoints(balance: number | undefined) {
+    if (typeof balance === 'number' && currency.value) {
+      currency.value = { ...currency.value, balance };
+    } else if (typeof balance === 'number') {
+      // 尚未拉取过 status：异步补拉一次
+      fetchCurrencyStatus();
+    }
+  }
+
+  /** 用星月积分兑换会员：成功后同时更新订阅与积分余额 */
+  async function redeemMembershipWithPoints(productKey: string): Promise<{ ok: boolean; error?: string; message?: string }> {
+    const token = getToken();
+    if (!token) return { ok: false, error: 'unauthorized', message: '请先登录' };
+    try {
+      const res = await fetch('/api/currency/redeem-membership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productKey }),
+      });
+      const data = (await res.json()) as Partial<SubscriptionStatus> & { balance?: number; error?: string; message?: string };
+      if (res.ok) {
+        subscription.value = data as SubscriptionStatus;
+        if (typeof data.balance === 'number' && currency.value) {
+          currency.value = { ...currency.value, balance: data.balance };
+        } else {
+          fetchCurrencyStatus();
+        }
+        return { ok: true };
+      }
+      if (typeof data.balance === 'number' && currency.value) {
+        currency.value = { ...currency.value, balance: data.balance };
       }
       return { ok: false, error: data.error, message: data.message };
     } catch {
@@ -125,7 +182,7 @@ export const useAuthStore = defineStore('auth', () => {
       userProfile.value = loadProfileFromStorage();
       const chatStore = useChatStore();
       const examStore = useExamStore();
-      await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription()]);
+      await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription(), fetchCurrencyStatus()]);
     }
     authChecked.value = true;
   }
@@ -141,6 +198,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!userProfile.value) router.push('/setup');
     });
     fetchSubscription();
+    fetchCurrencyStatus();
     const chatStore = useChatStore();
     const examStore = useExamStore();
     chatStore.loadConversations();
@@ -177,8 +235,10 @@ export const useAuthStore = defineStore('auth', () => {
     showSetupDialog,
     userProfile,
     subscription,
+    currency,
     isPremium,
     dailyRemaining,
+    pointsBalance,
     checkAuth,
     handleOAuthSuccess,
     handleOAuthError,
@@ -188,5 +248,8 @@ export const useAuthStore = defineStore('auth', () => {
     fetchSubscription,
     redeemCode,
     decrementDailyUsage,
+    fetchCurrencyStatus,
+    applyEarnedPoints,
+    redeemMembershipWithPoints,
   };
 });

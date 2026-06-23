@@ -390,4 +390,43 @@ db.exec(`
   );
 `);
 
+// ── 星月积分（局内货币）───────────────────────────────────────
+// 用户做结构化学习/考试 → 知识点 Elo 熟练度提升 → 按提升量并以学科总熟练度线性倍增
+// 结算积分；积分累积可兑换皓月卡/星耀卡会员。三张表：
+//   1) user_currency        —— 余额（单行/用户）+ 累计赚/花，便于审计与展示。
+//   2) currency_ledger      —— 流水账本（earn/spend/grant/adjust），镜像 code_redemptions 审计模式。
+//   3) currency_daily_earn  —— 每日已赚计数，用于日上限封顶（镜像 daily_chat_usage）。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_currency (
+    user_id      TEXT PRIMARY KEY,
+    balance      INTEGER NOT NULL DEFAULT 0,
+    total_earned INTEGER NOT NULL DEFAULT 0,
+    total_spent  INTEGER NOT NULL DEFAULT 0,
+    updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS currency_ledger (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       TEXT NOT NULL,
+    type          TEXT NOT NULL CHECK(type IN ('earn', 'spend', 'grant', 'adjust')),
+    amount        INTEGER NOT NULL,
+    balance_after INTEGER NOT NULL,
+    reason        TEXT,
+    ref_id        TEXT,
+    created_at    INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_currency_ledger_user ON currency_ledger(user_id, created_at DESC);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS currency_daily_earn (
+    user_id TEXT NOT NULL,
+    date    TEXT NOT NULL,
+    earned  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, date)
+  );
+`);
+
 export default db;

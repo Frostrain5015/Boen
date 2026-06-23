@@ -16,6 +16,7 @@ import {
   User,
   Moon,
   Star,
+  Sparkles,
   LogOut,
 } from 'lucide-vue-next';
 import Mascot from '@/components/Mascot.vue';
@@ -303,6 +304,17 @@ function onSubmenuLeave(el: Element) {
 
       <!-- 用户设置入口 + 退出登录 -->
       <div class="shrink-0 space-y-0.5 border-t border-[var(--line)] px-3 py-2.5">
+        <!-- 星月积分入口 -->
+        <router-link
+          to="/setup"
+          class="mb-0.5 flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors hover:bg-[var(--premium-gold-soft)]"
+        >
+          <Moon class="h-3.5 w-3.5 shrink-0" style="color: var(--premium-gold)" />
+          <span class="text-xs font-semibold text-[var(--ink-soft)]">星月积分</span>
+          <span class="ml-auto inline-flex items-center gap-1 font-display text-sm font-bold" style="color: var(--premium-gold)">
+            <Sparkles class="h-3 w-3" />{{ authStore.pointsBalance }}
+          </span>
+        </router-link>
         <router-link
           to="/setup"
           class="flex items-center gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-[var(--accent-soft)]/60"

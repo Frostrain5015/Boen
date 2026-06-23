@@ -9,10 +9,12 @@ import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
 import { useUiStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 import StarDisplay from '@/components/StarDisplay.vue';
 import BoenSelect from '@/components/BoenSelect.vue';
 
 const toast = useToast();
+const authStore = useAuthStore();
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -73,6 +75,9 @@ interface ExamResultsData {
   analysis?: string;
   proficiencyChanges?: Array<{ kpTitle: string; before: number; after: number; score: number; maxScore: number }>;
   mistakesCollected?: { count: number; mistakeIds: string[] };
+  pointsEarned?: number;
+  pointsBalance?: number;
+  pointsCapped?: boolean;
   recommendation?: {
     recommendedPractice: Array<{ kpId: number; kpTitle: string; reason: string; suggestedMode: string }>;
     difficultyAdjustment: { currentLevel: string; suggestedLevel: string };
@@ -688,7 +693,14 @@ async function submitExam() {
       }
     });
     if (errMsg) throw new Error(errMsg);
-    if (gradedResults) { results.value = gradedResults; examState.value = 'graded'; emit('refresh'); }
+    if (gradedResults) {
+      const gr: ExamResultsData = gradedResults;
+      results.value = gr;
+      examState.value = 'graded';
+      // 回写星月积分余额
+      if (typeof gr.pointsBalance === 'number') authStore.applyEarnedPoints(gr.pointsBalance);
+      emit('refresh');
+    }
     else throw new Error('提交失败：未收到判卷结果');
   } catch (err) {
     toast.error('提交失败: ' + (err instanceof Error ? err.message : String(err)));
@@ -1129,6 +1141,27 @@ onUnmounted(() => {
           </div>
           <span class="grade-badge" :class="results.grade === '优秀' ? 'grade-excellent' : results.grade === '良好' ? 'grade-good' : results.grade === '及格' ? 'grade-pass' : 'grade-fail'">{{ results.grade }}</span>
           <div class="mt-3 text-xs text-[var(--ink-soft)]">{{ results.totalScore }}/{{ results.maxScore }} 分</div>
+        </div>
+
+        <!-- 星月积分奖励 -->
+        <div
+          v-if="(results.pointsEarned ?? 0) > 0"
+          class="clay clay-glass flex items-center gap-3 px-4 py-3"
+          v-motion
+          :initial="{ opacity: 0, y: 10 }"
+          :enter="{ opacity: 1, y: 0, transition: { delay: 80, duration: 400 } }"
+        >
+          <Sparkles class="h-5 w-5 shrink-0 text-[var(--premium-gold)]" />
+          <span class="text-sm font-semibold text-[var(--ink)]">
+            获得 <span class="font-display font-bold text-[var(--premium-gold)]">+{{ results.pointsEarned }}</span> 星月积分
+          </span>
+        </div>
+        <div
+          v-else-if="results.pointsCapped"
+          class="clay clay-glass flex items-center gap-3 px-4 py-3"
+        >
+          <Sparkles class="h-5 w-5 shrink-0 text-[var(--ink-soft)]" />
+          <span class="text-sm text-[var(--ink-soft)]">🌙 今日星月积分已满，明天再来</span>
         </div>
 
         <!-- 自动错题收集通知 -->
