@@ -480,7 +480,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 }
 
 .card-footer-price-yearly {
-  color: var(--premium-gold-strong);
+  color: #7b4da8; /* 星耀卡紫 */
 }
 
 .card-footer-original {
@@ -787,7 +787,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 
 /* 余额足 → 同提交按钮梯度色，略提亮以示可用 */
 .card-monthly-back .back-points-btn-ready {
-  background: linear-gradient(180deg, #dab263, #c99a48);
+  background: linear-gradient(180deg, #9a948c, #7a756e);
 }
 .card-yearly-back .back-points-btn-ready {
   background: linear-gradient(180deg, #9b72bf, #7b4da8);

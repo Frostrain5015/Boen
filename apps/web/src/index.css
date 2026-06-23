@@ -26,11 +26,11 @@
   --accent-glow: rgba(20, 180, 138, 0.4);
   --accent-on: #ffffff;
 
-  /* ── 会员系统专用令牌 ── */
-  --premium-gold: #d4a053;
-  --premium-gold-strong: #b8862d;
-  --premium-gold-soft: #fdf3e0;
-  --premium-gold-glow: rgba(212, 160, 83, 0.35);
+  /* ── 会员系统专用令牌（皓月卡铂金灰） ── */
+  --premium-gold: #8f9aa3;
+  --premium-gold-strong: #6a6560;
+  --premium-gold-soft: #f3f5f6;
+  --premium-gold-glow: rgba(143, 154, 163, 0.35);
 
   /* 锁定态 */
   --locked-ink: #b0a698;
