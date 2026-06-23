@@ -598,6 +598,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 .card-claim-badge {
   position: relative;
   z-index: 7;
+  pointer-events: auto; /* 穿透父级的 pointer-events: none */
   display: inline-flex;
   align-items: center;
   gap: 6px;
