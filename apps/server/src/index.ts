@@ -122,7 +122,7 @@ const REDEEM_CODE_SECRET = process.env.REDEEM_CODE_SECRET ?? '';
 if (!REDEEM_CODE_SECRET) console.warn('[redeem] REDEEM_CODE_SECRET 未配置，兑换码功能将拒绝服务');
 
 // 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
-const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null } }>();
+const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null; activatedAt: number | null } }>();
 async function resolveUserId(c: Context): Promise<string | null> {
   const authz = c.req.header('authorization');
   if (!authz?.startsWith('Bearer ')) return null;
@@ -170,6 +170,7 @@ interface SubscriptionInfo {
   tier: 'free' | 'monthly' | 'yearly';
   isPremium: boolean;
   expiresAt: number | null;
+  activatedAt: number | null;
 }
 
 /** 解析用户 ID 并查询订阅状态（复用 userIdCache，5 分钟 TTL） */
@@ -186,14 +187,15 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
   const userId = await resolveUserId(c);
   if (!userId) return null;
   // 查订阅表
-  const row = db.prepare('SELECT tier, expires_at FROM subscriptions WHERE user_id = ?').get(userId) as
-    | { tier: string; expires_at: number | null }
+  const row = db.prepare('SELECT tier, expires_at, activated_at FROM subscriptions WHERE user_id = ?').get(userId) as
+    | { tier: string; expires_at: number | null; activated_at: number | null }
     | undefined;
   const now = Math.floor(Date.now() / 1000);
   const sub: SubscriptionInfo = {
     tier: (row?.tier === 'monthly' ? 'monthly' : row?.tier === 'yearly' ? 'yearly' : 'free') as 'free' | 'monthly' | 'yearly',
     isPremium: (row?.tier === 'monthly' || row?.tier === 'yearly') && row?.expires_at != null && row.expires_at > now,
     expiresAt: row?.expires_at ?? null,
+    activatedAt: row?.activated_at ?? null,
   };
   // 回写缓存
   const entry = userIdCache.get(token);
@@ -726,13 +728,18 @@ app.use('/api/*', cors());
 app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (model as any)?.modelName ?? 'deepseek-v4-flash' }));
 
 // ── 模型切换 API ────────────────────────────
-/** POST /api/model/switch — 切换模型提供商（需认证） */
+/** POST /api/model/switch — 切换模型提供商（需认证；deepseek-pro 仅限星耀卡年卡用户） */
 app.post('/api/model/switch', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
+  // V4 Pro 仅星耀卡可用
+  if (p === 'deepseek-pro') {
+    const row = db.prepare('SELECT tier FROM subscriptions WHERE user_id=?').get(userId) as { tier: string } | undefined;
+    if (row?.tier !== 'yearly') return c.json({ error: 'premium_required', message: 'DeepSeek V4 Pro 仅限星耀卡用户使用' }, 403);
+  }
   const switched = switchModel(p);
   return c.json({ success: true, provider: switched });
 });
@@ -1309,6 +1316,7 @@ app.get('/api/subscription/status', async (c) => {
     tier: result.sub.tier,
     isPremium: result.sub.isPremium,
     expiresAt: result.sub.expiresAt,
+    activatedAt: result.sub.activatedAt,
     dailyLimit: result.sub.isPremium ? null : FREE_DAILY_LIMIT,
     dailyUsed,
     dailyRemaining: result.sub.isPremium ? null : Math.max(0, FREE_DAILY_LIMIT - (dailyUsed ?? 0)),

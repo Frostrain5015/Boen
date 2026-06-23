@@ -446,6 +446,7 @@ export interface SubscriptionStatus {
   tier: 'free' | 'monthly' | 'yearly';
   isPremium: boolean;
   expiresAt: number | null;
+  activatedAt: number | null;
   dailyLimit: number | null;
   dailyUsed: number | null;
   dailyRemaining: number | null;

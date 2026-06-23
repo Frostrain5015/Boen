@@ -20,6 +20,8 @@ interface Props {
   redeemPlaceholder?: string;
   /** 未解锁态：正面叠加磨砂灰罩 + “未解锁”锁徽（无卡广告态用） */
   locked?: boolean;
+  /** 可免费领取（将锁徽改为”🎁免费领取”，点击触发 claim-free 事件） */
+  claimable?: boolean;
   /** 星月积分余额（传入即在该卡背面右下角显示积分兑换按钮，仅皓月卡） */
   pointsBalance?: number;
   /** 积分兑换进行中 */
@@ -37,6 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
   redeeming: false,
   redeemPlaceholder: '输入兑换码',
   locked: false,
+  claimable: false,
   pointsBalance: undefined,
   pointsRedeeming: false,
 });
@@ -45,6 +48,7 @@ const emit = defineEmits<{
   (e: 'update:redeemCode', value: string): void;
   (e: 'redeem'): void;
   (e: 'redeem-points'): void;
+  (e: 'claim-free'): void;
 }>();
 
 function onRedeemInput(e: Event) {
@@ -161,10 +165,15 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
         <!-- 闪光效果 -->
         <div :key="shimmerKey" class="card-shimmer" />
 
-        <!-- 未解锁遮罩：磨砂灰罩 + 居中锁徽；pointer-events:none 不挡翻面，翻面后随正面隐藏 -->
+        <!-- 未解锁遮罩：磨砂灰罩 + 锁徽；pointer-events:none 不挡翻面 -->
         <div v-if="locked" class="card-lock-overlay" aria-hidden="true">
           <div class="card-lock-veil" />
-          <div class="card-lock-badge">
+          <!-- 可免费领取状态：独立按钮，点击触发 claim-free（不再翻面） -->
+          <button v-if="claimable && isMonthly" class="card-claim-badge" @click.stop="emit('claim-free')">
+            <span>🎁 免费领取</span>
+          </button>
+          <!-- 普通锁徽 -->
+          <div v-else class="card-lock-badge">
             <span class="card-lock-ring"><Lock :size="size === 'sm' ? 12 : 14" /></span>
             <span class="card-lock-text">未解锁</span>
           </div>
@@ -179,7 +188,8 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             {{ cardName }}权益
           </div>
           <ul class="back-benefits" :class="fontSizes[size].desc">
-            <li><span class="benefit-dot" />V4 Pro 大模型</li>
+            <li v-if="!isMonthly"><span class="benefit-dot" /><Star :size="10" class="mr-0.5" style="color: var(--premium-gold)" />V4 Pro 大模型</li>
+            <li v-else><span class="benefit-dot" />V4 Flash 大模型</li>
             <li><span class="benefit-dot" />全题型考试</li>
             <li><span class="benefit-dot" />错题智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
@@ -269,10 +279,10 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   overflow: hidden;
 }
 
-/* 背对用户的一面禁用命中测试：preserve-3d 下带 z-index 的内容会被压平、
-   即使 backface-visibility 隐藏了绘制，仍会拦截点击，导致背面输入框点不到。 */
+/* 背对用户的一面禁用命中测试，并强制隐藏渲染（修复移动端 backface-visibility 失效）。 */
 .card-face.face-off {
   pointer-events: none;
+  visibility: hidden;
 }
 
 /* ── 正面样式 ── */
@@ -584,6 +594,29 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   letter-spacing: 0.1em;
   color: #6f685d;
 }
+/* 可领取按钮：取代锁徽，点击直通领卡 */
+.card-claim-badge {
+  position: relative;
+  z-index: 7;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--premium-gold), var(--premium-gold-strong));
+  box-shadow: 0 8px 18px -10px rgba(86, 64, 40, 0.5);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: lock-breathe 2.6s ease-in-out infinite;
+}
+.card-claim-badge:hover { transform: scale(1.04); }
+.card-claim-badge:active { transform: scale(0.96); }
 @keyframes lock-breathe {
   0%, 100% { transform: translateY(0); box-shadow: 0 8px 18px -10px rgba(86, 64, 40, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
   50% { transform: translateY(-1.5px); box-shadow: 0 12px 22px -10px rgba(86, 64, 40, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.9); }

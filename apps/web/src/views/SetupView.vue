@@ -96,7 +96,7 @@ async function handlePointsRedeem() {
   }
 }
 
-/** 新用户免费领取皓月卡 */
+/** 新用户免费领取皓月卡（从卡片当前位置起飞动画） */
 async function handleFreeClaim() {
   if (freeClaiming.value || redeeming.value) return;
   freeClaiming.value = true;
@@ -110,7 +110,8 @@ async function handleFreeClaim() {
     if (res.ok) {
       await authStore.fetchSubscription();
       redeemedTier.value = 'monthly';
-      await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: null });
+      const rect = adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null;
+      await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: rect });
     } else {
       toast.error(data.message ?? '领取失败');
     }
@@ -348,6 +349,7 @@ function handleBack() {
               size="md"
               :show-price="true"
               locked
+              :claimable="!authStore.isPremium && !authStore.subscription?.activatedAt"
               redeemable
               v-model:redeem-code="redeemInput"
               :redeeming="redeeming"
@@ -356,34 +358,22 @@ function handleBack() {
               :points-redeeming="pointsRedeeming"
               @redeem="handleRedeem"
               @redeem-points="handlePointsRedeem"
+              @claim-free="handleFreeClaim"
             />
           </div>
           <p class="text-xs text-center" style="color: var(--ink-soft)">
             <Sparkles class="inline h-3 w-3 mr-1" style="color: var(--premium-gold)" />
             点击卡片翻面，可用兑换码或积分激活
           </p>
-          <button @click="toast.info('请联系管理员激活星月卡')" class="text-xs underline-offset-2 transition-colors hover:underline"
-            style="color: var(--ink-soft); opacity: 0.7">没有兑换码？联系管理员</button>
         </template>
 
-        <!-- ═══ 限时活动：星月积分兑换皓月卡 ═══ -->
+        <!-- ═══ 限时活动：积分折扣兑换皓月卡 ═══ -->
         <div class="clay clay-glass overflow-hidden" style="border: 1px solid var(--premium-gold)">
           <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--premium-gold-soft)">
             <span class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--premium-gold)">限时活动</span>
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分兑换皓月卡</h2>
           </div>
           <div class="space-y-3 px-4 py-3">
-            <!-- 新用户免费领卡 -->
-            <div v-if="!authStore.isPremium" class="rounded-2xl border border-dashed px-4 py-3 text-center"
-              style="border-color: var(--premium-gold); background: var(--premium-gold-soft)">
-              <p class="mb-2 text-xs text-[var(--ink-soft)]">新注册用户专享</p>
-              <button @click="handleFreeClaim" :disabled="freeClaiming"
-                class="w-full rounded-xl py-2.5 font-display text-sm font-bold text-white transition-all active:scale-[0.97] disabled:opacity-45"
-                :style="{ background: 'linear-gradient(180deg, var(--premium-gold), var(--premium-gold-strong))' }">
-                {{ freeClaiming ? '领取中…' : '🎁 免费领取一张皓月卡' }}
-              </button>
-            </div>
-
             <!-- 限时折扣兑换 -->
             <div class="rounded-2xl px-4 py-3" style="background: var(--premium-gold-soft)">
               <div class="mb-1 flex items-center justify-between">
@@ -517,9 +507,9 @@ function handleBack() {
                 ><span>DeepSeek V4 Flash</span></button>
                 <button @click="setProvider('deepseek-pro')"
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97] min-w-[130px]"
-                  :class="(modelProvider === 'deepseek-pro' ? 'border-[#E8A317] bg-[#fef3d2] text-[#b8730d]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)]') + (!authStore.isPremium ? ' opacity-40 cursor-not-allowed' : ' hover:border-[#E8A317]')"
-                  :disabled="!authStore.isPremium"
-                ><span v-if="!authStore.isPremium"><Lock class="inline h-3 w-3 mr-0.5" /></span>DeepSeek V4 Pro</button>
+                  :class="(modelProvider === 'deepseek-pro' ? 'border-[#E8A317] bg-[#fef3d2] text-[#b8730d]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)]') + (authStore.subscription?.tier !== 'yearly' ? ' opacity-40 cursor-not-allowed' : ' hover:border-[#E8A317]')"
+                  :disabled="authStore.subscription?.tier !== 'yearly'"
+                ><span v-if="authStore.subscription?.tier !== 'yearly'"><Lock class="inline h-3 w-3 mr-0.5" /></span>DeepSeek V4 Pro</button>
               </div>
             </div>
 
