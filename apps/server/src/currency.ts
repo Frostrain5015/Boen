@@ -13,7 +13,7 @@ const MIN_GAIN_FOR_FLOOR1 = 5; // rawGain≥此值但 floor 为 0 时保底给 1
 
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
-  month: { key: 'month', name: '皓月卡', days: 30, cost: 1600 },
+  month: { key: 'month', name: '皓月卡', days: 30, cost: 2000 },
 } as const;
 
 export type CurrencyProductKey = keyof typeof CURRENCY_PRODUCTS;
