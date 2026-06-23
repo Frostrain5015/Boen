@@ -370,12 +370,9 @@ function centerCurrentDot() {
   if (!nav) return;
   const active = nav.querySelector<HTMLElement>('.question-dot-current');
   if (!active) return;
-  // 用 getBoundingClientRect 算 active 圆点相对于 nav 容器的偏移，
-  // 不受 offsetParent 链影响。
-  const navRect = nav.getBoundingClientRect();
-  const activeRect = active.getBoundingClientRect();
-  const target = nav.scrollLeft + (activeRect.left - navRect.left) + activeRect.width / 2 - navRect.width / 2;
-  nav.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  // scrollIntoView 把 active 圆点居中到 nav 可视区中线，
+  // 比手动 scrollTo 可靠（不依赖坐标计算）。
+  active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 function gradeLabel(g: string): string {
