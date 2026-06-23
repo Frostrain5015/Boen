@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle } from 'lucide-vue-next';
+import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -18,6 +18,8 @@ interface Props {
   redeeming?: boolean;
   /** 输入框提示文案 */
   redeemPlaceholder?: string;
+  /** 未解锁态：正面叠加磨砂灰罩 + “未解锁”锁徽（无卡广告态用） */
+  locked?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -30,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   redeemCode: '',
   redeeming: false,
   redeemPlaceholder: '输入兑换码',
+  locked: false,
 });
 
 const emit = defineEmits<{
@@ -150,6 +153,15 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 
         <!-- 闪光效果 -->
         <div :key="shimmerKey" class="card-shimmer" />
+
+        <!-- 未解锁遮罩：磨砂灰罩 + 居中锁徽；pointer-events:none 不挡翻面，翻面后随正面隐藏 -->
+        <div v-if="locked" class="card-lock-overlay" aria-hidden="true">
+          <div class="card-lock-veil" />
+          <div class="card-lock-badge">
+            <span class="card-lock-ring"><Lock :size="size === 'sm' ? 12 : 14" /></span>
+            <span class="card-lock-text">未解锁</span>
+          </div>
+        </div>
       </div>
 
       <!-- 背面 -->
@@ -505,6 +517,62 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 @keyframes shimmer-sweep {
   0% { background-position: 200% center; }
   100% { background-position: -200% center; }
+}
+
+/* ── 未解锁遮罩（无卡广告态）── */
+.card-lock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;            /* 盖在内容/扫光之上 */
+  pointer-events: none;  /* 不拦截点击：仍可点击翻面去兑换 */
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 暖灰磨砂罩：去饱和 + 轻压暗，营造“未激活”观感 */
+.card-lock-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(176, 166, 152, 0.22), rgba(120, 106, 93, 0.36));
+  backdrop-filter: saturate(0.55) brightness(0.98);
+  -webkit-backdrop-filter: saturate(0.55) brightness(0.98);
+}
+/* 居中锁徽：磨砂白胶囊 + 暖棕阴影，呼吸微动 */
+.card-lock-badge {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 8px 18px -10px rgba(86, 64, 40, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: lock-breathe 2.6s ease-in-out infinite;
+}
+.card-lock-ring {
+  display: grid;
+  place-items: center;
+  color: #8a8276;
+}
+.card-lock-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  color: #6f685d;
+}
+@keyframes lock-breathe {
+  0%, 100% { transform: translateY(0); box-shadow: 0 8px 18px -10px rgba(86, 64, 40, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+  50% { transform: translateY(-1.5px); box-shadow: 0 12px 22px -10px rgba(86, 64, 40, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-lock-badge { animation: none; }
 }
 
 /* ── 背面样式 ── */

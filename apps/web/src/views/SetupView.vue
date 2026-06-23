@@ -307,6 +307,7 @@ function handleBack() {
               type="yearly"
               size="md"
               :show-price="true"
+              locked
               redeemable
               v-model:redeem-code="redeemInput"
               :redeeming="redeeming"
@@ -318,6 +319,7 @@ function handleBack() {
               type="monthly"
               size="md"
               :show-price="true"
+              locked
               redeemable
               v-model:redeem-code="redeemInput"
               :redeeming="redeeming"
