@@ -449,7 +449,7 @@ function handleBack() {
               </div>
               <div class="flex items-center justify-center gap-2 rounded-xl py-2 font-display text-base font-bold"
                 style="color: var(--premium-gold)">
-                <span><Sparkles class="inline h-4 w-4" /><s class="mx-1 text-[var(--ink-soft)]">2000</s> 1500 兑换 🌙皓月卡</span>
+                <span><Sparkles class="inline h-4 w-4" /><s class="mx-1">2000</s> 1500 兑换 🌙皓月卡</span>
               </div>
               <div class="mt-2 h-2 overflow-hidden rounded-full" style="background: var(--line)">
                 <div class="h-full rounded-full transition-all duration-500"
