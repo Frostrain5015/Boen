@@ -73,11 +73,12 @@ onMounted(() => {
                   <span class="quiz-gen-icon"
                     :class="m.kind === 'tool_result' ? 'quiz-gen-icon-done' : m.kind === 'tool_error' ? 'quiz-gen-icon-err' : ''">
                     <template v-if="m.kind === 'tool_error'">⚠️</template>
+                    <PencilLine v-else-if="m.kind === 'tool_pending' && m.action === 'quiz'" class="h-4 w-4" />
                     <Wrench v-else-if="m.kind === 'tool_pending'" class="h-4 w-4" />
-                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : m.action === 'switch' ? '🔄' : '🎓' }}</template>
+                    <template v-else>{{ m.action === 'plan' ? '📋' : m.action === 'advance' ? '▶️' : m.action === 'query' ? '📖' : m.action === 'switch' ? '🔄' : m.action === 'quiz' ? '✏️' : '🎓' }}</template>
                   </span>
                   <span class="quiz-gen-label">
-                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课' : m.action === 'advance' ? '正在进入下一阶段' : m.action === 'query' ? '正在查询教材库' : m.action === 'switch' ? '正在切换学科' : '课堂即将结束' }}</template>
+                    <template v-if="m.kind === 'tool_pending'">{{ m.action === 'plan' ? '博文正在备课' : m.action === 'advance' ? '正在进入下一阶段' : m.action === 'query' ? '正在查询教材库' : m.action === 'switch' ? '正在切换学科' : m.action === 'quiz' ? '博文正在出题' : '课堂即将结束' }}</template>
                     <template v-else-if="m.kind === 'tool_result'">{{ formatToolStatus((m as any).detail) }}</template>
                     <template v-else>{{ formatToolStatus((m as any).error) }}</template>
                   </span>
@@ -116,17 +117,8 @@ onMounted(() => {
               <div v-if="m.text" class="stream-wrap" :class="{ 'is-streaming': !m.done }">
                 <div class="md-body text-[15px] leading-relaxed" v-html="renderMarkdown(m.text)"></div>
               </div>
-              <!-- 正在出题提示，仅在最后一条且是 assistant 时 -->
-              <div v-if="i === chatStore.items.length - 1 && chatStore.isGeneratingQuiz" class="quiz-gen clay-sm">
-                <div class="quiz-gen-inner">
-                  <span class="quiz-gen-icon">
-                    <PencilLine class="h-4 w-4" />
-                  </span>
-                  <span class="quiz-gen-label">博文正在出题</span>
-                  <span class="quiz-gen-dots"><span></span><span></span><span></span></span>
-                </div>
-              </div>
-              <TypingDots v-else-if="i === chatStore.items.length - 1 && chatStore.showPendingIndicator" />
+              <!-- 出题中提示已统一为 tool_pending(action:'quiz') 卡片，见上方工具卡片模板 -->
+              <TypingDots v-if="i === chatStore.items.length - 1 && chatStore.showPendingIndicator" />
             </div>
           </div>
         </template>

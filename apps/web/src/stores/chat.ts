@@ -127,8 +127,18 @@ export const useChatStore = defineStore('chat', () => {
       }
     } else if (e.type === 'quiz_generating') {
       isGeneratingQuiz.value = true;
+      // 用统一工具卡片展示「博文正在出题」，不依赖「最后一条须为 assistant」，
+      // 结构化模式/重试时也能稳定显示完整状态（pending→done/fail）。
+      if (!items.value.some((it) => it.kind === 'tool_pending' && it.action === 'quiz')) {
+        const lastA = items.value[items.value.length - 1];
+        if (lastA?.kind === 'assistant' && !lastA.done) lastA.done = true;
+        items.value.push({ kind: 'tool_pending', action: 'quiz' });
+        idx.value = -1;
+      }
     } else if (e.type === 'question') {
       isGeneratingQuiz.value = false;
+      // 出题成功 → 把出题中的 pending 卡片标记完成后移除，再插入题卡
+      items.value = items.value.filter((it) => !(it.kind === 'tool_pending' && it.action === 'quiz'));
       items.value.push({ kind: 'question', toolCallId: e.toolCallId, question: e.question, answered: false });
       idx.value = -1;
       // 题目卡片渲染后滚动到最新（多次尝试以覆盖 Markdown/TikZ 等异步渲染）
@@ -218,8 +228,11 @@ export const useChatStore = defineStore('chat', () => {
     items.value.forEach((it) => {
       if (it.kind === 'assistant') it.done = true;
     });
-    // 清理无工具调用也无正文的空消息
-    items.value = items.value.filter(it => !(it.kind === 'assistant' && !it.text));
+    // 清理无工具调用也无正文的空消息 + 流结束仍未收尾的出题 pending（异常中断兜底）
+    items.value = items.value.filter(it =>
+      !(it.kind === 'assistant' && !it.text) &&
+      !(it.kind === 'tool_pending' && it.action === 'quiz'),
+    );
     processTikzDiagrams();
   }
 
