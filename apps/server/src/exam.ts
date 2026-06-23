@@ -561,7 +561,9 @@ async function renderTikzBlockAsync(texCode: string): Promise<string | null> {
       writeFileSync(texPath, `\\documentclass{standalone}\\usepackage{fontspec}\\usepackage{xeCJK}\\setCJKmainfont{Noto Sans CJK SC}\\usepackage{amsmath}\\usepackage{tikz}\\usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}\\usepackage{pgfplots}\\pgfplotsset{compat=1.18}\\usepackage{xlop}\\begin{document}${texCode}\\end{document}`, 'utf-8');
       await execFileAsync('xelatex', ['-no-shell-escape', '-interaction=nonstopmode', `-output-directory=${tmpDir}`, texPath], { timeout: 30000 });
       if (!existsSync(pdfPath)) return null;
-      await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `-o=${svgPath}`, pdfPath], { timeout: 15000 });
+      // dvisvgm 短选项 -o 不支持 `=` 语法（-o=path 会把文件名当成「=path」写入失败且仍返回 exit 0），
+      // 必须用长选项 --output=path（与 tikz-renderer.ts 的 HTTP 渲染路径保持一致）。
+      await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `--output=${svgPath}`, pdfPath], { timeout: 15000 });
       if (!existsSync(svgPath)) return null;
       return readFileSync(svgPath, 'utf-8') || null;
     } catch {
