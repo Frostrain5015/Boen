@@ -344,14 +344,11 @@ function handleBack() {
           <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--premium-gold-soft)">
             <span class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--premium-gold)">限时活动</span>
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分兑换皓月卡</h2>
-            <span class="ml-auto font-display text-sm font-bold" style="color: var(--premium-gold)">{{ authStore.pointsBalance }}</span>
           </div>
           <div class="space-y-3 px-4 py-3">
             <div class="flex items-center justify-center gap-2 rounded-2xl py-2 font-display text-base font-bold"
               style="background: var(--premium-gold-soft); color: var(--premium-gold)">
-              <Sparkles class="h-4 w-4" />
-              <span>2000 积分 → 皓月卡</span>
-              <Sparkles class="h-4 w-4" />
+              <span>积攒 <Sparkles class="inline h-4 w-4" />2000 兑换一张 🌙皓月卡</span>
             </div>
             <div class="h-2 overflow-hidden rounded-full" style="background: var(--line)">
               <div class="h-full rounded-full transition-all duration-500"
