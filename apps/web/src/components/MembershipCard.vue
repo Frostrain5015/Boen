@@ -274,14 +274,14 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   border-radius: 16px;
   overflow: hidden;
 }
 
-/* 背对用户的一面禁用命中测试，并强制隐藏渲染（修复移动端 backface-visibility 失效）。 */
+/* 背对用户的一面禁用命中测试（backface-visibility 由 .card-face 控制）。 */
 .card-face.face-off {
   pointer-events: none;
-  visibility: hidden;
 }
 
 /* ── 正面样式 ── */
