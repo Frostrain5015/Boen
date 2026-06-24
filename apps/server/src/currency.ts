@@ -19,11 +19,12 @@ export const STAR_BONUS_RATE = 2;
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
   month: { key: 'month', name: '皓月卡', days: 30, cost: 2000 },
-  /** 限时折扣月卡（活动至2026-07-31），25% off → 1500 */
-  month_promo: { key: 'month_promo', name: '皓月卡(限时)', days: 30, cost: 1500 },
 } as const;
 
 export type CurrencyProductKey = keyof typeof CURRENCY_PRODUCTS;
+
+/** 每日登录奖励积分（北京时间每天一次） */
+export const DAILY_LOGIN_REWARD = 50;
 
 export interface CurrencyStatus {
   balance: number;
@@ -32,10 +33,64 @@ export interface CurrencyStatus {
   todayEarned: number;
   dailyCap: number;
   dailyRemaining: number;
+  /** 今日（北京时间）是否已领取登录奖励 */
+  claimedToday: boolean;
+  /** 每日登录奖励积分数 */
+  loginReward: number;
 }
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** 北京时间（UTC+8）的 YYYY-MM-DD，用于每日登录领取判定 */
+function beijingDateStr(): string {
+  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** 查询今日（北京时间）是否已领取登录奖励 */
+export function getDailyLoginClaimed(userId: string): boolean {
+  const row = db.prepare(`SELECT 1 FROM daily_login_claims WHERE user_id=? AND date=?`).get(userId, beijingDateStr());
+  return !!row;
+}
+
+export type ClaimDailyResult =
+  | { ok: true; reward: number; balance: number }
+  | { ok: false; error: 'already_claimed'; balance: number };
+
+/**
+ * 领取每日登录奖励（北京时间每天一次，不占用每日赚分上限）。
+ * 原子事务：查重 → 入账 → 记账 → 记领取。
+ */
+export function claimDailyLogin(userId: string): ClaimDailyResult {
+  const date = beijingDateStr();
+  try {
+    return db.transaction((): ClaimDailyResult => {
+      const exist = db.prepare(`SELECT 1 FROM daily_login_claims WHERE user_id=? AND date=?`).get(userId, date);
+      const curRow = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
+      const balanceBefore = curRow?.balance ?? 0;
+      if (exist) return { ok: false, error: 'already_claimed', balance: balanceBefore };
+
+      const balanceAfter = balanceBefore + DAILY_LOGIN_REWARD;
+      db.prepare(`INSERT INTO daily_login_claims (user_id, date, amount) VALUES (?, ?, ?)`).run(userId, date, DAILY_LOGIN_REWARD);
+      db.prepare(`
+        INSERT INTO user_currency (user_id, balance, total_earned, total_spent, updated_at)
+        VALUES (?, ?, ?, 0, unixepoch())
+        ON CONFLICT(user_id) DO UPDATE SET
+          balance=balance+excluded.balance,
+          total_earned=total_earned+excluded.total_earned,
+          updated_at=unixepoch()
+      `).run(userId, DAILY_LOGIN_REWARD, DAILY_LOGIN_REWARD);
+      db.prepare(`
+        INSERT INTO currency_ledger (user_id, type, amount, balance_after, reason, ref_id)
+        VALUES (?, 'earn', ?, ?, '每日登录奖励', ?)
+      `).run(userId, DAILY_LOGIN_REWARD, balanceAfter, date);
+      return { ok: true, reward: DAILY_LOGIN_REWARD, balance: balanceAfter };
+    })();
+  } catch {
+    const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
+    return { ok: false, error: 'already_claimed', balance: cur?.balance ?? 0 };
+  }
 }
 
 /** 读取用户积分状态（含当日已赚 / 剩余额度），无记录时返回零值。 */
@@ -54,6 +109,8 @@ export function getCurrencyStatus(userId: string): CurrencyStatus {
     todayEarned,
     dailyCap: DAILY_CAP,
     dailyRemaining: Math.max(0, DAILY_CAP - todayEarned),
+    claimedToday: getDailyLoginClaimed(userId),
+    loginReward: DAILY_LOGIN_REWARD,
   };
 }
 

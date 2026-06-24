@@ -96,6 +96,7 @@ export function systemPromptForQa(gradeBand: GradeBand, subject?: string, userNa
     '  ask_short_answer: {"stem":"简答题题干","referenceAnswer":"参考答案","keyPoints":["要点"],"knowledgePointId":123,"explanation":"解析"}',
     '【重要】出题时必须使用「当前学情」中列出的知识点 ID 填写 knowledgePointId。不得输出 knowledgePoint 或 literacies：服务端会只从数据库解析并展示考点、核心素养。',
     '题目涉及几何、函数图像、受力分析、电路、坐标、图表等可视化内容时，鼓励在题干（stem 字段）里用 TikZ 代码块（```tikz）画示意图——直观的图形更利于学生建立空间与结构直觉；公式用 KaTeX（$...$）。',
+    '【TikZ 硬性规范】① \\node 文字里只能用单层行内公式 $...$，严禁嵌套 $$（行间公式在 tikzpicture 内非法）；② \\usetikzlibrary 不要写进代码块（常用库已预加载）；③ 竖式（两位数以上加减乘除）一律用 \\opadd/\\opsub/\\opmul/\\opdiv 直接写在文本里，严禁塞进 TikZ 节点或用 array 手拼。',
     xlopGuide,
     '',
     '【⚠️ 学科切换强制令】你必须根据学生的问题内容实时判断所属学科。一旦确定学生当前问的问题属于其他学科（如数学对话中学生突然问物理），**必须立即调用 switch_subject 工具切换**，不得询问学生"要不要切换""可以吗"等确认。切换后系统会自动加载新学科的知识库供你下一轮使用，你无需额外操作。**不切换 = 用错误学科的知识回答 = 严重错误。**',

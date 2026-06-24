@@ -482,6 +482,10 @@ export interface CurrencyStatus {
   dailyCap: number;
   dailyRemaining: number;
   products: CurrencyProduct[];
+  /** 今日（北京时间）是否已领取登录奖励 */
+  claimedToday: boolean;
+  /** 每日登录奖励积分数 */
+  loginReward: number;
 }
 
 // ─────────────────────────────────────────────────────────────

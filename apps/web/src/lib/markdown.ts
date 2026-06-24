@@ -253,11 +253,12 @@ export function renderMarkdown(text: string): string {
     .replace(/[''']([^''']{4,})[''']/g, (_, s) => `<u>${s}</u>`)
     // 修复模型常见 KaTeX 格式错误
     .replace(/(?<!\$)\$(?!\$)([^$]+?)\$\$/g, (_, inner) => `$$${inner}$$`) // $...$$ → $$...$$（混用定界符，只匹配非$内容避免跨边界）
-    .replace(/\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}\s*\$\$/g, (_, body) => `\n$$\\begin{array}${body}\\end{array}\n$$`) // \begin{array}...\end{array}$$ → 补开头 $$
-    .replace(/(^|[^$])?\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}/g, (_, prefix, body) => {
-      if (prefix?.includes('$')) return _;
-      return `${prefix || ''}\n$$\n\\begin{array}${body}\\end{array}\n$$\n`;
-    });
+    // 竖式 array 补定界：仅处理「未被 $$ 正确包裹」的 array，避免把已包裹的 $$…$$ 重复包裹
+    //（重复包裹会插入空 $$\n$$ 块，导致 KaTeX 渲染整段竖式失败）。
+    // 半包裹（仅有结尾 $$，缺开头）→ 补开头；(?<!\$) 跳过前面已有 $ 的情况
+    .replace(/(?<!\$)(\\begin\s*\{array\}[\s\S]*?\\end\s*\{array\})\s*\$\$/g, (_, arr) => `\n$$\n${arr}\n$$\n`)
+    // 裸 array（前后都没有 $ 定界）→ 补 $$；前置 (?<!\$) + 后随 (?!\s*\$) 双向跳过已包裹的
+    .replace(/(?<!\$)\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}(?!\s*\$)/g, (_, body) => `\n$$\n\\begin{array}${body}\\end{array}\n$$\n`);
   return DOMPurify.sanitize(md.render(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized)))), PURIFY_CONFIG);
 }
 

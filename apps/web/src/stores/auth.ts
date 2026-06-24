@@ -108,6 +108,26 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 领取每日登录奖励（北京时间每天一次，+50 积分）。返回是否成功 + 提示。 */
+  async function claimDailyLogin(): Promise<{ ok: boolean; reward?: number; message?: string }> {
+    const token = getToken();
+    if (!token) return { ok: false, message: '请先登录' };
+    try {
+      const res = await fetch('/api/currency/claim-daily', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = (await res.json()) as { ok?: boolean; reward?: number; balance?: number; message?: string };
+      if (typeof data.balance === 'number' && currency.value) {
+        currency.value = { ...currency.value, balance: data.balance, claimedToday: true };
+      }
+      if (res.ok && data.ok) return { ok: true, reward: data.reward };
+      return { ok: false, message: data.message ?? '领取失败' };
+    } catch {
+      return { ok: false, message: '网络错误，请稍后再试' };
+    }
+  }
+
   /** 用星月积分兑换会员：成功后同时更新订阅与积分余额 */
   async function redeemMembershipWithPoints(productKey: string): Promise<{ ok: boolean; error?: string; message?: string }> {
     const token = getToken();
@@ -251,5 +271,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchCurrencyStatus,
     applyEarnedPoints,
     redeemMembershipWithPoints,
+    claimDailyLogin,
   };
 });

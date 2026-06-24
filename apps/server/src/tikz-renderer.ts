@@ -8,7 +8,7 @@ const MAX_CODE_LENGTH = 6_000;
 const MAX_QUEUE_DEPTH = Number(process.env.TIKZ_MAX_QUEUE_DEPTH ?? 8);
 const MAX_CONCURRENCY = Number(process.env.TIKZ_MAX_CONCURRENCY ?? 2);
 const USER_WINDOW_MS = 60_000;
-const USER_WINDOW_LIMIT = Number(process.env.TIKZ_USER_LIMIT_PER_MINUTE ?? 4);
+const USER_WINDOW_LIMIT = Number(process.env.TIKZ_USER_LIMIT_PER_MINUTE ?? 30);
 
 const renderPool = new Semaphore(MAX_CONCURRENCY);
 const renderRequestsByUser = new Map<string, number[]>();
@@ -54,7 +54,12 @@ export function validateTikzCode(code: unknown): asserts code is string {
   }
 
   const environments = [...code.matchAll(/\\(?:begin|end)\s*\{([^}]+)\}/gi)].map((match) => match[1].toLowerCase());
-  const allowedEnvironments = new Set(['tikzpicture', 'scope', 'pgfonlayer']);
+  const allowedEnvironments = new Set([
+    'tikzpicture', 'scope', 'pgfonlayer',
+    // 节点内常用的安全数学/对齐环境（竖式数组、矩阵、方程组等），无文件/外壳访问风险
+    'array', 'matrix', 'pmatrix', 'bmatrix', 'vmatrix', 'smallmatrix',
+    'cases', 'aligned', 'gathered', 'split',
+  ]);
   if (environments.some((name) => !allowedEnvironments.has(name))) {
     throw new TikzRenderError('unsupported TikZ environment', 400);
   }
@@ -98,6 +103,18 @@ function sanitizeRenderedSvg(svg: string): string {
 }
 
 function documentFor(code: string): string {
+  // 健壮性修复（针对模型常见输出错误）：
+  // 1) \usetikzlibrary 误写在正文 → 提取并入导言区，正文移除（\usetikzlibrary 只能在导言区）
+  // 2) tikzpicture 内出现行间公式 $$ 属非法（节点公式只能用单 $）→ 删除多余的 $$，
+  //    保留外层 $…$，使「竖式 / array / 矩阵」以行内公式正常编译
+  const extraLibs: string[] = [];
+  let body = code.replace(/\\usetikzlibrary\s*\{([^}]*)\}/g, (_, libs: string) => {
+    extraLibs.push(libs.trim());
+    return '';
+  });
+  body = body.replace(/\$\$/g, '');
+  const extraLibLine = extraLibs.length ? `\\usetikzlibrary{${extraLibs.join(',')}}\n` : '';
+
   return String.raw`\documentclass{standalone}
 \usepackage{fontspec}
 \usepackage{xeCJK}
@@ -105,10 +122,10 @@ function documentFor(code: string): string {
 \usepackage{amsmath}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning,calc,angles,quotes,intersections,through,math,matrix,fit,patterns,decorations.pathmorphing,decorations.pathreplacing}
-\usepackage{pgfplots}
+${extraLibLine}\usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \begin{document}
-${code}
+${body}
 \end{document}`;
 }
 

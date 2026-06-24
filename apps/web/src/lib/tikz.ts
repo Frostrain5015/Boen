@@ -5,6 +5,10 @@
  * - 真正的 TikZ 图形优先使用预渲染 SVG（出题阶段编译），否则调用服务端 /api/render-tikz。
  */
 
+// 渲染结果缓存：key=TikZ 源码，value=SVG。流式输出时 v-html 每个 token 都会重建 DOM，
+// 缓存命中可避免对同一图形重复请求服务端（杜绝触发 429 限流 / 队列堆积）。
+const renderCache = new Map<string, string>();
+
 const errBox = (msg: string) =>
   `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">${msg}</div>`;
 const vertBox = (html: string) =>
@@ -157,6 +161,14 @@ export async function processTikzDiagrams(
       }
     }
 
+    // 命中渲染缓存：直接复用，避免重复请求（流式重渲染 / 同图重复时尤为关键）
+    const cachedSvg = renderCache.get(code);
+    if (cachedSvg) {
+      replaceWithSvgImage(wrap, cachedSvg);
+      wrap.dataset.tikzState = 'done';
+      continue;
+    }
+
     // 回退：服务端渲染
     wrap.dataset.tikzState = 'rendering';
     const controller = new AbortController();
@@ -172,6 +184,7 @@ export async function processTikzDiagrams(
       const data = await res.json().catch(() => ({})) as { svg?: string; error?: string };
       if (res.ok && data.svg) {
         // Treat renderer output as an image resource, never executable DOM.
+        renderCache.set(code, data.svg);
         replaceWithSvgImage(wrap, data.svg);
         wrap.dataset.tikzState = 'done';
       } else {

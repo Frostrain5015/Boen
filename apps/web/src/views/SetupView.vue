@@ -89,8 +89,20 @@ function calcExpiry(days: number): number {
 
 const pointsLoading = ref(false);
 const freeClaimLoading = ref(false);
+const dailyClaimLoading = ref(false);
 
-/** 用星月积分兑换皓月卡（限时折扣价 1500，复用发卡动画） */
+/** 领取每日登录奖励（北京时间每天一次，+50 星月积分） */
+async function handleDailyClaim() {
+  if (dailyClaimLoading.value || authStore.currency?.claimedToday) return;
+  dailyClaimLoading.value = true;
+  try {
+    const r = await authStore.claimDailyLogin();
+    if (r.ok) toast.success(`+${r.reward} 星月积分，已到账`);
+    else toast.error(r.message ?? '领取失败');
+  } finally { dailyClaimLoading.value = false; }
+}
+
+/** 用星月积分兑换皓月卡（2000 积分，复用发卡动画） */
 async function handlePointsRedeem() {
   if (pointsLoading.value || redeeming.value) return;
   const tierName = '皓月卡';
@@ -104,7 +116,7 @@ async function handlePointsRedeem() {
         const wasPremium = authStore.isPremium;
         const oldTier: 'monthly' | 'yearly' = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
         const rect = wasPremium ? null : (adMonthlyRef.value?.rootEl?.getBoundingClientRect() ?? null);
-        const r = await authStore.redeemMembershipWithPoints('month_promo');
+        const r = await authStore.redeemMembershipWithPoints('month');
         if (r.ok) {
           redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
           closeConfirm();
@@ -435,40 +447,32 @@ function handleBack() {
           </p>
         </template>
 
-        <!-- ═══ 限时活动：积分折扣兑换皓月卡 ═══ -->
+        <!-- ═══ 限时活动：每日登录领星月积分 ═══ -->
         <div class="clay clay-glass overflow-hidden" style="border: 1px solid var(--premium-gold)">
           <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--premium-gold-soft)">
             <span class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--premium-gold)">限时活动</span>
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">星月积分兑换皓月卡</h2>
+            <h2 class="font-display text-sm font-bold text-[var(--ink)]">每日登录领星月积分</h2>
           </div>
           <div class="space-y-3 px-4 py-3">
-            <!-- 限时折扣兑换 -->
+            <!-- 每日登录领取 -->
             <div class="rounded-2xl px-4 py-3" style="background: var(--premium-gold-soft)">
-              <div class="mb-1 flex items-center justify-between">
-                <span class="font-display text-sm font-bold text-[var(--ink)]">限时折扣</span>
-                <span class="text-[10px] text-[var(--ink-soft)]">至 2026-07-31</span>
-              </div>
-              <div class="flex items-center justify-center gap-2 rounded-xl py-2 font-display text-base font-bold"
-                style="color: var(--premium-gold)">
-                <span><Sparkles class="inline h-4 w-4" /><s class="mx-1">2000</s> 1500 兑换 皓月卡×1</span>
-              </div>
-              <div class="mt-2 h-2 overflow-hidden rounded-full" style="background: var(--line)">
-                <div class="h-full rounded-full transition-all duration-500"
-                  :style="{ width: Math.min(100, (authStore.pointsBalance / 1500) * 100) + '%', background: 'var(--premium-gold)' }"></div>
-              </div>
-              <div class="mt-1 flex items-center justify-between text-[11px]">
-                <span class="text-[var(--ink-soft)]">今日已赚 {{ authStore.currency?.todayEarned ?? 0 }} / {{ authStore.currency?.dailyCap ?? 100 }}</span>
-                <div class="flex items-center gap-2">
-                  <span class="font-display font-bold" :style="{ color: authStore.pointsBalance >= 1500 ? 'var(--success)' : 'var(--premium-gold)' }">
-                    {{ authStore.pointsBalance }} / 1500
-                  </span>
-                  <button @click="handlePointsRedeem"
-                    :disabled="authStore.pointsBalance < 1500 || pointsLoading"
-                    class="rounded-lg px-3 py-1 text-[11px] font-bold text-white transition-all active:scale-[0.95] disabled:opacity-40"
-                    style="background: var(--premium-gold)">
-                    {{ pointsLoading ? '兑换中' : '兑换' }}
-                  </button>
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="font-display text-base font-bold" style="color: var(--premium-gold)">
+                    <Sparkles class="inline h-4 w-4" /> 每天 +{{ authStore.currency?.loginReward ?? 50 }} 星月积分
+                  </p>
+                  <p class="mt-0.5 text-[11px] text-[var(--ink-soft)]">每日登录即可领取（北京时间每天一次）</p>
                 </div>
+                <button @click="handleDailyClaim"
+                  :disabled="authStore.currency?.claimedToday || dailyClaimLoading"
+                  class="shrink-0 rounded-xl px-4 py-2 text-xs font-bold text-white transition-all active:scale-[0.95] disabled:opacity-40"
+                  style="background: var(--premium-gold)">
+                  {{ dailyClaimLoading ? '领取中' : (authStore.currency?.claimedToday ? '今日已领' : '领取') }}
+                </button>
+              </div>
+              <div class="mt-2 flex items-center justify-between text-[11px] text-[var(--ink-soft)]">
+                <span>当前积分 <span class="font-display font-bold" style="color: var(--premium-gold)">{{ authStore.pointsBalance }}</span></span>
+                <span>攒满 2000 可兑换皓月卡 ×1</span>
               </div>
             </div>
           </div>

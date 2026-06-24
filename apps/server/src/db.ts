@@ -429,6 +429,17 @@ db.exec(`
   );
 `);
 
+// 每日登录领取（按北京时间 date 每天一次，date 为北京时间 YYYY-MM-DD）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_login_claims (
+    user_id    TEXT NOT NULL,
+    date       TEXT NOT NULL,
+    amount     INTEGER NOT NULL DEFAULT 50,
+    claimed_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    PRIMARY KEY (user_id, date)
+  );
+`);
+
 // ── 对话记忆摘要 ──────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS conversation_summaries (

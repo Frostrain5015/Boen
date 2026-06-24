@@ -20,6 +20,14 @@ import type { MascotState } from '@/components/Mascot.vue';
 import { useAuthStore } from './auth';
 import { useUiStore } from './ui';
 
+// 流式渲染 TikZ 的防抖：v-html 每个 token 重建 DOM，若逐 token 触发会对同一图形
+// 反复请求服务端（瞬间打满 429 限流）。这里合并为「最后一个 token 后 400ms 触发一次」。
+let _tikzDebounce: ReturnType<typeof setTimeout> | undefined;
+function scheduleTikzRender() {
+  if (_tikzDebounce) clearTimeout(_tikzDebounce);
+  _tikzDebounce = setTimeout(() => { runTikz(document); }, 400);
+}
+
 // ── Types ───────────────────────────────────────────────────
 export type Subject = 'chinese' | 'math' | 'english' | 'science';
 
@@ -121,7 +129,7 @@ export const useChatStore = defineStore('chat', () => {
       }
       if (cur.kind === 'assistant') {
         cur.text += e.value;
-        if (e.value.includes('`')) nextTick(() => runTikz(document));
+        if (e.value.includes('`')) scheduleTikzRender();
         // 类课堂 TODO 步骤日志（占位，实际由 todo_step 事件驱动）
         // 此处保留空分支避免后续误会
       }

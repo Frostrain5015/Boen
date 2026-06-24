@@ -62,7 +62,7 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser, grantMembershipDays } from './redeem.js';
-import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
+import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin } from './currency.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1503,6 +1503,18 @@ app.get('/api/currency/ledger', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   return c.json({ entries: listLedger(userId, 30) });
+});
+
+// 领取每日登录奖励（北京时间每天一次，+50 星月积分）
+app.post('/api/currency/claim-daily', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
+  const r = claimDailyLogin(userId);
+  if (!r.ok) {
+    return c.json({ error: r.error, message: '今日已领取，明天再来', claimedToday: true, balance: r.balance }, 400);
+  }
+  return c.json({ ok: true, reward: r.reward, balance: r.balance, claimedToday: true });
 });
 
 // 用积分兑换会员（皓月卡/星耀卡）
