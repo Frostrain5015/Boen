@@ -24,7 +24,7 @@ import { useUiStore } from './ui';
 export type Subject = 'chinese' | 'math' | 'english' | 'science';
 
 export type ChatItem =
-  | { kind: 'user'; text: string; createdAt: number; modeTag?: string }
+  | { kind: 'user'; text: string; createdAt: number; modeTag?: string; images?: string[] }
   | { kind: 'assistant'; text: string; done: boolean; createdAt: number }
   | { kind: 'question'; toolCallId: string; question: import('@boen/shared').QuestionPayload; answered: boolean; grading?: GradingResult; userAnswer?: import('@boen/shared').AnswerPayload }
   | { kind: 'tool_pending'; action: string }
@@ -238,9 +238,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // ── Actions ───────────────────────────────────────────────
 
-  async function send(text: string) {
+  async function send(text: string, images?: string[]) {
     const t = text.trim();
-    if (!t || busy.value) return;
+    if ((!t || busy.value) && (!images || !images.length)) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast.warning('当前网络不可用，恢复连接后再发送');
       return;
@@ -278,7 +278,7 @@ export const useChatStore = defineStore('chat', () => {
     const modeTag = !uiStore.modeTagSent && modeLabel ? modeLabel : undefined;
     if (modeTag) uiStore.modeTagSent = true;
 
-    items.value.push({ kind: 'user', text: t, createdAt: nowSeconds(), modeTag });
+    items.value.push({ kind: 'user', text: t, createdAt: nowSeconds(), modeTag, images });
     items.value.push(newAssistant());
     const idx = { value: items.value.length - 1 };
     scrollDown(true);
@@ -287,6 +287,7 @@ export const useChatStore = defineStore('chat', () => {
         {
           threadId: currentConversationId.value!,
           message: t,
+          images,
           gradeBand: authStore.userProfile ? gradeToBand(authStore.userProfile.grade) : 'middle',
           grade: authStore.userProfile?.grade,
           userName: authStore.userProfile?.name,
@@ -399,7 +400,19 @@ export const useChatStore = defineStore('chat', () => {
       const restored: ChatItem[] = [];
       for (const m of msgs) {
         if (m.role === 'user') {
-          restored.push({ kind: 'user', text: m.content, createdAt: m.createdAt });
+          // 兼容 JSON 编码的图文消息（{"text":"...","images":[...]}）
+          let userText = m.content;
+          let userImages: string[] | undefined;
+          if (m.content.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(m.content);
+              if (parsed.text !== undefined) {
+                userText = parsed.text;
+                userImages = parsed.images;
+              }
+            } catch { /* 不是 JSON，就按纯文本显示 */ }
+          }
+          restored.push({ kind: 'user', text: userText, createdAt: m.createdAt, images: userImages });
         } else if (m.role === 'system') {
           try {
             const meta = JSON.parse(m.content);

@@ -100,6 +100,17 @@ onMounted(() => {
           <!-- 用户消息 -->
           <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
             <div class="max-w-[85%] text-right">
+              <!-- 图片预览 -->
+              <div v-if="m.images && m.images.length" class="mb-1 flex flex-wrap justify-end gap-1.5">
+                <img
+                  v-for="(img, j) in m.images"
+                  :key="j"
+                  :src="`data:image/jpeg;base64,${img}`"
+                  class="max-h-48 max-w-full rounded-xl border border-[var(--line)] object-contain shadow-sm"
+                  alt="用户上传图片"
+                  loading="lazy"
+                />
+              </div>
               <p class="text-[15px] leading-relaxed text-[var(--ink)]" style="white-space: pre-wrap; word-break: break-word;">
                 <span v-if="m.modeTag" class="font-semibold" :class="
                   m.modeTag.includes('集中练习') ? 'text-[#f2557a]' :

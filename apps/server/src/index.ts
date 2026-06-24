@@ -30,6 +30,9 @@ import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
+import { ensureFtsTable, rebuildFtsIndex } from './fts.js';
+import { setRewriteModel } from './query-rewriter.js';
+import { retrieveRelevantMemories, generateConversationSummaryAsync } from './conversation-memory.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
@@ -101,6 +104,13 @@ let examModel = createModel(currentProvider, EXAM_MODEL_OPTS);
 // LangGraph 对话状态持久化到 SQLite（重启不丢失）
 const checkpointer = new SqliteSaver(db);
 
+// 初始化 FTS5 全文搜索索引（幂等）
+ensureFtsTable();
+// 从已有课程数据重建 FTS 索引（幂等，已有数据则跳过）
+try { rebuildFtsIndex(); } catch { /* FTS 表可能尚不存在，忽略 */ }
+// 注入查询改写模型
+setRewriteModel(model);
+
 let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
 
 /** 切换模型并重建 LangGraph 图 */
@@ -108,6 +118,7 @@ function switchModel(provider: string) {
   currentProvider = provider;
   model = createModel(provider);
   examModel = createModel(provider, EXAM_MODEL_OPTS);
+  setRewriteModel(model);
   graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
   return provider;
 }
@@ -1644,7 +1655,10 @@ app.post('/api/chat', async (c) => {
     try {
       // 如果有归属本人的 conversationId，保存用户消息
       if (owned) {
-        addMessage(body.conversationId!, 'user', body.message);
+        const userContent = body.images?.length
+          ? JSON.stringify({ text: body.message, images: body.images })
+          : body.message;
+        addMessage(body.conversationId!, 'user', userContent);
       }
 
       // 新对话标题：与主回复并发生成（隐藏延迟），在流关闭前回填 title_updated 事件
@@ -1688,6 +1702,9 @@ app.post('/api/chat', async (c) => {
         }
       }
 
+      // 长期对话记忆：检索相关历史摘要（用于全部模式）
+      const memoryContext = await retrieveRelevantMemories(userId ?? '', body.message, body.subject ?? 'math');
+
       // 结构化模式：注入教学 prompt（TODO 由 plan_steps 工具在图中创建）
       let modeSystemMsg: SystemMessage | undefined;
       if (body.mode && !['qa', 'explore'].includes(body.mode) && userId) {
@@ -1696,15 +1713,29 @@ app.post('/api/chat', async (c) => {
         if (modePrompt) modeSystemMsg = new SystemMessage(modePrompt);
       }
 
+      // 构建可能含图片的 HumanMessage
+      const humanMsg: HumanMessage = body.images?.length
+        ? new HumanMessage({
+            content: [
+              { type: 'text', text: body.message },
+              ...body.images.map((img: string) => ({
+                type: 'image_url' as const,
+                image_url: { url: `data:image/jpeg;base64,${img}` },
+              })),
+            ],
+          })
+        : new HumanMessage(body.message);
+
       const { last, question } = await runGraph(
         {
-          messages: [modeSystemMsg, new HumanMessage(body.message)].filter(Boolean),
+          messages: [modeSystemMsg, humanMsg].filter(Boolean),
           gradeBand: body.gradeBand ?? 'middle',
           grade: body.grade,
           subject: body.subject ?? 'math',
           userName: body.userName,
           weaknessData,
           styleExamples,
+          memoryContext,
           practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
         },
@@ -1756,6 +1787,12 @@ app.post('/api/chat', async (c) => {
       // 发送每日用量信息（供前端更新剩余次数）
       if (usageInfo) await send({ type: 'usage', ...usageInfo });
       await send({ type: 'done' });
+
+      // 非阻塞：异步生成对话摘要并存储（不等待）
+      if (owned && body.conversationId && userId) {
+        generateConversationSummaryAsync(userId, body.conversationId, body.subject ?? 'math', model)
+          .catch(err => console.warn('[memory] summary generation failed:', err));
+      }
     } catch (err) {
       await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     }

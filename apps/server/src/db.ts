@@ -429,4 +429,22 @@ db.exec(`
   );
 `);
 
+// ── 对话记忆摘要 ──────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS conversation_summaries (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    subject TEXT NOT NULL DEFAULT 'math',
+    summary TEXT NOT NULL,
+    topics TEXT NOT NULL DEFAULT '',
+    proficiency_level TEXT NOT NULL DEFAULT 'unknown',
+    unresolved_questions TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    embedding BLOB
+  );
+  CREATE INDEX IF NOT EXISTS idx_cs_user_subject ON conversation_summaries(user_id, subject);
+  CREATE INDEX IF NOT EXISTS idx_cs_created ON conversation_summaries(created_at DESC);
+`);
+
 export default db;

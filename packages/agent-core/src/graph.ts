@@ -42,6 +42,7 @@ export const BoenState = Annotation.Root({
   reviewPhase: Annotation<string>(),
   weaknessData: Annotation<string | undefined>(),
   styleExamples: Annotation<string | undefined>(),
+  memoryContext: Annotation<string | undefined>(),
   practiceType: Annotation<string | undefined>(),
   pendingModeSwitch: Annotation<string | undefined>(),
   /** The last human-in-the-loop question resolution, used only for graph routing. */
@@ -371,8 +372,32 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     return { mode: state.mode ?? 'qa', forceQuiz: false };
   };
 
+  // ── 检索必要性判断 ──────────────────────────
+  /** 当用户输入为问候、短确认、纯追随时跳过检索，减少延迟 */
+  function needRetrieval(state: State): boolean {
+    const last = state.messages[state.messages.length - 1];
+    if (!last || !isHumanMessage(last)) return false;
+    const text = String(last.content).trim();
+
+    // 简单问候
+    if (/^(你好|嗨|hi|hello|hey|早|晚上好|谢谢|感谢|ok|好的|嗯|是的|对|明白了?|知道[了]?)/i.test(text)) return false;
+    // 纯追问（没有新知识点）
+    if (/^(为什么|然后[呢]?|继续|还有[吗]?|再讲讲|再说说|所以[呢]?)/i.test(text) && !text.includes('？') && text.length < 10) return false;
+    // 简短确认
+    if (/^(好[的吧么]?|行[吧]?|可以|嗯嗯|ok|是的|对[的啊]?|没错)/i.test(text) && text.length < 5) return false;
+    // 上一次已加载 curriculum 且本次是同话题短追问
+    if (state.curriculum && text.length < 8) return false;
+
+    return true; // 默认需要检索
+  }
+
   // ── 节点：加载课程资料 ──────────────────────
   const loadCurriculum = async (state: State): Promise<Partial<State>> => {
+    // 检索必要性判断：不需要检索时清空旧的 curriculum 并跳过
+    if (!needRetrieval(state)) {
+      return { curriculum: undefined };
+    }
+
     let parts: string[] = [];
     if (deps.retrieveCurriculum) {
       const lastHuman = [...state.messages].reverse().find(isHumanMessage);
@@ -384,6 +409,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     }
     if (state.mode === 'weakness' && state.weaknessData) parts.push(state.weaknessData);
     if ((state.mode === 'weakness' || state.forceQuiz || state.practiceType) && state.styleExamples) parts.push(state.styleExamples);
+    if (state.memoryContext) parts.push(state.memoryContext);
     return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };
 

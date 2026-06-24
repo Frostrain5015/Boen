@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { nextTick, onMounted, computed, ref, type Component } from 'vue';
-import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2 } from 'lucide-vue-next';
+import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2, ImagePlus, X } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import DailyLimitBanner from '@/components/DailyLimitBanner.vue';
 import { useVoiceInput } from '@/composables/useVoiceInput';
+import { useImagePicker } from '@/composables/useImagePicker';
 import Mascot from '@/components/Mascot.vue';
 
 const chatStore = useChatStore();
 const uiStore = useUiStore();
 const authStore = useAuthStore();
 const { speechSupported, voiceListening, voiceButtonLabel, toggleVoiceInput, initVoiceSupport } = useVoiceInput();
+const { pickedImages, pickFromFile, removeImage, clearImages } = useImagePicker();
 
 let _inputEl: HTMLTextAreaElement | null = null;
 function setInputEl(el: unknown) {
@@ -69,8 +71,16 @@ const todoPanelStyle = computed(() => {
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    chatStore.send(chatStore.input);
+    const images = pickedImages.value.map(img => img.data);
+    chatStore.send(chatStore.input, images.length ? images : undefined);
+    if (images.length) clearImages();
   }
+}
+
+function onSendClick() {
+  const images = pickedImages.value.map(img => img.data);
+  chatStore.send(chatStore.input, images.length ? images : undefined);
+  if (images.length) clearImages();
 }
 
 onMounted(() => {
@@ -112,6 +122,15 @@ onMounted(() => {
         </div>
       </Teleport>
       <DailyLimitBanner :show="chatStore.dailyLimitReached" @close="chatStore.dailyLimitReached = false" />
+      <!-- 图片预览 -->
+      <div v-if="pickedImages.length" class="mb-2 flex flex-wrap gap-2 px-1">
+        <div v-for="(img, i) in pickedImages" :key="i" class="group relative h-16 w-16 overflow-hidden rounded-xl border border-[var(--line)] bg-white/60 shadow-sm">
+          <img :src="`data:${img.mimeType};base64,${img.data}`" class="h-full w-full object-cover" alt="预览图片" />
+          <button @click="removeImage(i)" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-[var(--error)]" aria-label="移除图片">
+            <X class="h-3 w-3" />
+          </button>
+        </div>
+      </div>
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
         <Transition name="mascot-pop">
@@ -168,6 +187,16 @@ onMounted(() => {
             class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
           />
           <button
+            @click="pickFromFile"
+            :disabled="chatStore.busy"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border transition-all active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
+            :class="pickedImages.length ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white/75 text-[var(--ink-soft)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+            aria-label="上传图片"
+            title="上传图片"
+          >
+            <ImagePlus class="h-5 w-5" />
+          </button>
+          <button
             @click="toggleVoiceInput"
             :disabled="chatStore.busy || !speechSupported"
             class="grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border transition-all active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-45"
@@ -180,8 +209,8 @@ onMounted(() => {
           </button>
           <span class="sr-only" aria-live="polite">{{ voiceButtonLabel }}</span>
           <button
-            @click="chatStore.send(chatStore.input)"
-            :disabled="chatStore.busy || !chatStore.input.trim()"
+            @click="onSendClick"
+            :disabled="chatStore.busy || (!chatStore.input.trim() && !pickedImages.length)"
             class="btn-accent grid h-11 w-11 shrink-0 place-items-center rounded-[18px]"
             aria-label="发送"
           >

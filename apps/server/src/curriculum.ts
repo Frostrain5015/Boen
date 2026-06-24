@@ -1,5 +1,7 @@
 import db from './db.js';
 import { embedTexts, embedQuery, cosineSim, vectorToBlob, blobToVector } from './embeddings.js';
+import { rewriteQuery } from './query-rewriter.js';
+import { searchFts, indexFtsRow } from './fts.js';
 
 // ── 入库数据格式（seed JSON）──────────────────
 export interface UnitNode {
@@ -110,6 +112,14 @@ export async function ingestTextbook(seed: TextbookSeed): Promise<{ units: numbe
     kpRowsToEmbed.forEach((k, i) => insEmb.run('kp', k.id, subject, grade, k.content, vectorToBlob(kpVecs[i])));
   }
 
+  // 同步 FTS5 全文搜索索引
+  for (const u of unitRows) {
+    indexFtsRow('unit', u.id, subject, grade, u.content);
+  }
+  for (const k of kpRowsToEmbed) {
+    indexFtsRow('kp', k.id, subject, grade, k.content);
+  }
+
   return { units: unitRows.length, kps: kpRowsToEmbed.length };
 }
 
@@ -157,46 +167,96 @@ export async function retrieveRelated(
     .map((r) => r.content);
 }
 
+/**
+ * 混合检索：向量语义 + BM25 全文搜索，RRF 融合排序。
+ * 提供比纯向量检索更鲁棒的召回结果。
+ */
+async function hybridRetrieve(
+  grade: string,
+  subject: string,
+  query: string,
+  k = 5,
+): Promise<string[]> {
+  // 并行执行向量检索和 FTS5 检索，各取更多候选
+  const [vectorResults, ftsResults] = await Promise.all([
+    retrieveRelated(grade, subject, query, k * 3),
+    searchFts(subject, grade, query, k * 3),
+  ]);
+
+  // RRF 融合：对每个结果在各列表中的排名取倒数
+  const scores = new Map<string, number>();
+
+  vectorResults.forEach((content, i) => {
+    scores.set(content, (scores.get(content) ?? 0) + 1 / (60 + i));
+  });
+  ftsResults.forEach((r, i) => {
+    scores.set(r.content, (scores.get(r.content) ?? 0) + 1 / (60 + i));
+  });
+
+  return Array.from(scores.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, k)
+    .map(([content]) => content);
+}
+
 function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (m) => `\\${m}`);
 }
 
-/** LangGraph 工具：查询当前年级/学科下的相关知识点与教材章节。 */
+/** LangGraph 工具：查询当前年级/学科下的相关知识点与教材章节（支持多模式检索）。 */
 export async function lookupKnowledgePoint(args: {
   grade?: string;
   subject?: string;
   query: string;
+  mode?: 'auto' | 'semantic' | 'keyword' | 'hybrid';
   limit?: number;
 }): Promise<string> {
   const { grade, subject } = args;
   const query = args.query.trim();
   const limit = Math.min(Math.max(args.limit ?? 5, 1), 10);
+  const mode = args.mode ?? 'auto';
   if (!grade || !subject || !/^[1-9]$/.test(grade)) return '当前年级或学科不在课程知识库范围内。';
   if (!query) return '查询词为空，无法检索课程知识点。';
 
-  const like = `%${escapeLike(query)}%`;
-  const matches = db.prepare(
-    `SELECT title, description, code
-     FROM knowledge_points
-     WHERE subject=?
-       AND (grade=? OR grade IS NULL)
-       AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR code LIKE ? ESCAPE '\\')
-     ORDER BY title
-     LIMIT ?`,
-  ).all(subject, grade, like, like, like, limit) as { title: string; description: string | null; code: string | null }[];
-
-  const related = await retrieveRelated(grade, subject, query, limit);
   const parts: string[] = [];
-  if (matches.length) {
-    parts.push(
-      '标题/描述匹配的知识点：\n' +
-        matches
-          .map((m) => `- ${m.code ? `[${m.code}] ` : ''}${m.title}${m.description ? `：${m.description}` : ''}`)
-          .join('\n'),
-    );
+
+  // mode: keyword / auto(含精确匹配倾向) → 执行 FTS5 关键词搜索 + LIKE 查找
+  if (mode === 'keyword' || mode === 'hybrid' || mode === 'auto') {
+    const like = `%${escapeLike(query)}%`;
+    const matches = db.prepare(
+      `SELECT title, description, code
+       FROM knowledge_points
+       WHERE subject=?
+         AND (grade=? OR grade IS NULL)
+         AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR code LIKE ? ESCAPE '\\')
+       ORDER BY title
+       LIMIT ?`,
+    ).all(subject, grade, like, like, like, limit) as { title: string; description: string | null; code: string | null }[];
+
+    if (matches.length) {
+      parts.push(
+        '标题/描述匹配的知识点：\n' +
+          matches
+            .map((m) => `- ${m.code ? `[${m.code}] ` : ''}${m.title}${m.description ? `：${m.description}` : ''}`)
+            .join('\n'),
+      );
+    }
+
+    // keyword 模式下如果已经有关键词命中，直接返回
+    if (mode === 'keyword' && matches.length > 0) {
+      return parts.join('\n\n');
+    }
   }
-  if (related.length) {
-    parts.push('向量召回的相关章节/知识点：\n' + related.map((r) => `- ${r}`).join('\n'));
+
+  // mode: semantic / hybrid / auto → 执行向量语义检索
+  if (mode === 'semantic' || mode === 'hybrid' || (mode === 'auto' && parts.length === 0)) {
+    const related = mode === 'hybrid'
+      ? await hybridRetrieve(grade, subject, query, limit)
+      : await retrieveRelated(grade, subject, query, limit);
+
+    if (related.length) {
+      parts.push('向量召回的相关章节/知识点：\n' + related.map((r) => `- ${r}`).join('\n'));
+    }
   }
 
   if (parts.length === 0) return `没有在${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}课程知识库中找到「${query}」。`;
@@ -214,8 +274,16 @@ export async function retrieveCurriculum(args: { grade?: string; subject?: strin
   if (!outline) return '';
   const parts = [`【当前学情】学生正在学「${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}」，本学期教材编排如下：`, outline];
   if (query) {
-    const related = await retrieveRelated(grade, subject, query, 5);
-    if (related.length) parts.push('\n与学生当前问题最相关的章节/知识点：\n' + related.map((c) => `- ${c}`).join('\n'));
+    // 查询改写：将口语化提问改写为更适合检索的形式
+    const rewritten = await rewriteQuery(query, subject, grade);
+    const searchQuery = rewritten !== query ? rewritten : query;
+
+    // 混合检索：向量语义 + BM25 全文搜索
+    const related = await hybridRetrieve(grade, subject, searchQuery, 5);
+    if (related.length) {
+      const label = rewritten !== query ? `（检索优化："${query}" → "${rewritten}"）` : '';
+      parts.push(`\n与学生当前问题最相关的章节/知识点：${label}\n` + related.map((c) => `- ${c}`).join('\n'));
+    }
   }
   parts.push('\n讲解时贴合该教材的编排与进度，不超纲；可据此判断学生处于哪个章节、需要哪些前置知识。');
   parts.push('\n【学习周期提示】一个单元完整的闭环是：预习 → 同步练习 → 错题追练 → 单元复习 → 考前巩固。根据学生的提问和行为判断当前阶段，主动引导到下一步。');

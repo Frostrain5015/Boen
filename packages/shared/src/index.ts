@@ -24,15 +24,28 @@ export function gradeLabel(grade: Grade): string {
 /** 智能体工作模式 */
 export type BoenMode = 'qa' | 'review' | 'preview' | 'weakness' | 'practice' | 'ai-learning' | 'exam' | 'explore';
 
+/** Base64 编码的 JPEG/PNG 图片数据（不含 data: URI 前缀），可选 */
+export interface Attachment {
+  type: 'image';
+  /** Base64 编码的图片数据（不含 data: URI 前缀） */
+  data: string;
+  /** MIME 类型，如 'image/jpeg' */
+  mimeType: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** 附件列表（用于用户消息中的图片等） */
+  attachments?: Attachment[];
 }
 
 /** POST /api/chat 请求体 */
 export interface ChatRequest {
   threadId: string;
   message: string;
+  /** Base64 编码的 JPEG/PNG 图片数据（不含 data: URI 前缀），可选 */
+  images?: string[];
   gradeBand: GradeBand;
   grade?: Grade;
   userName?: string;
