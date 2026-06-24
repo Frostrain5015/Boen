@@ -49,11 +49,11 @@ const redeemHeadline = computed(() => {
 onMounted(() => { authStore.fetchCurrencyStatus(); });
 
 // ── 二级确认弹窗 ─────────────────────────────
-const confirmState = ref<{ title: string; message: string; onConfirm: () => Promise<void> } | null>(null);
+const confirmState = ref<{ title: string; message: string; notice?: string; onConfirm: () => Promise<void> } | null>(null);
 const confirmLoading = ref(false);
 
-function showConfirm(title: string, message: string, onConfirm: () => Promise<void>) {
-  confirmState.value = { title, message, onConfirm };
+function showConfirm(title: string, message: string, onConfirm: () => Promise<void>, notice?: string) {
+  confirmState.value = { title, message, notice, onConfirm };
 }
 function closeConfirm() { confirmState.value = null; }
 
@@ -149,6 +149,7 @@ async function handleFreeClaim() {
         closeConfirm();
       } finally { freeClaimLoading.value = false; }
     },
+    '仅限一次，激活后不可退换',
   );
 }
 
@@ -481,7 +482,8 @@ function handleBack() {
             <div class="clay clay-glass mx-4 w-full max-w-sm overflow-hidden text-center">
               <div class="px-6 pt-6 pb-4">
                 <p class="mb-3 font-display text-base font-bold text-[var(--ink)]">{{ confirmState.title }}</p>
-                <p class="text-sm text-[var(--ink-soft)]">{{ confirmState.message }}</p>
+                <p class="mb-1 text-sm text-[var(--ink-soft)]">{{ confirmState.message }}</p>
+                <p v-if="confirmState.notice" class="text-[11px] leading-tight" style="color: var(--error)">{{ confirmState.notice }}</p>
               </div>
               <div class="flex gap-3 border-t border-[var(--line)] px-6 py-4">
                 <button @click="closeConfirm" class="flex-1 rounded-2xl border border-[var(--line)] bg-white py-2.5 font-display text-sm font-bold text-[var(--ink-soft)] transition-all hover:border-[var(--accent)] active:scale-[0.97]">取消</button>
@@ -732,8 +734,8 @@ function handleBack() {
 }
 
 /* ── 二级确认弹窗淡入淡出 ── */
-:global(.confirm-fade-enter-active) { transition: opacity 0.22s ease, transform 0.22s ease; }
-:global(.confirm-fade-leave-active) { transition: opacity 0.15s ease, transform 0.15s ease; }
-:global(.confirm-fade-enter-from) { opacity: 0; transform: scale(0.94); }
-:global(.confirm-fade-leave-to) { opacity: 0; transform: scale(0.96); }
+:global(.confirm-fade-enter-active) { transition: opacity 0.22s ease; }
+:global(.confirm-fade-leave-active) { transition: opacity 0.15s ease; }
+:global(.confirm-fade-enter-from) { opacity: 0; }
+:global(.confirm-fade-leave-to) { opacity: 0; }
 </style>
