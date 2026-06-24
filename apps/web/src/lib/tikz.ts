@@ -11,8 +11,10 @@ const renderCache = new Map<string, string>();
 
 const errBox = (msg: string) =>
   `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">${msg}</div>`;
+// 外层 <span> + display:inline-flex 确保 markdown-it 始终作为行内 HTML 透传
+//（<div> 是块级元素，嵌入行内时 md.render 可能剥离或变形）。
 const vertBox = (html: string) =>
-  `<div class="xlop-vert" style="display:inline-flex;flex-direction:column;align-items:center;font-family:'Nunito','HarmonyOS Sans SC',sans-serif;font-weight:600;line-height:1.3;padding:4px 8px;margin:0 4px;vertical-align:middle;white-space:nowrap">${html}</div>`;
+  `<span class="xlop-vert" style="display:inline-flex;flex-direction:column;align-items:center;font-family:'Nunito','HarmonyOS Sans SC',sans-serif;font-weight:600;line-height:1.3;padding:4px 8px;margin:0 4px;vertical-align:middle;white-space:nowrap">${html}</span>`;
 
 function replaceWithSvgImage(wrap: HTMLElement, svg: string) {
   const objectUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
@@ -67,17 +69,17 @@ function renderAddSub(aStr: string, bStr: string, op: string): string {
   // 进位借位提示行
   let carryHint = '';
   if (op === '+') {
-    if (carry > 0) carryHint = `<div style="font-size:0.7em;color:#e74c3c;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}${carry}</div>`;
+    if (carry > 0) carryHint = `<span style="display:block;font-size:0.7em;color:#e74c3c;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}${carry}</span>`;
   } else {
-    if (carry < 0) carryHint = `<div style="font-size:0.7em;color:#2b5fa8;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}<span style="font-size:0.85em">↰</span></div>`;
+    if (carry < 0) carryHint = `<span style="display:block;font-size:0.7em;color:#2b5fa8;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}<span style="font-size:0.85em">↰</span></span>`;
   }
 
   return vertBox(`
     ${carryHint}
-    <div style="letter-spacing:0.15em">${a.padStart(resLen, ' ')}</div>
-    <div style="letter-spacing:0.15em">${op}${b.padStart(resLen - 1, ' ')}</div>
-    <div style="border-top:2px solid #2c2722;width:100%;margin:0 0 2px 0;height:0"></div>
-    <div style="letter-spacing:0.15em">${resultDisplay}</div>
+    <span style="display:block;letter-spacing:0.15em">${a.padStart(resLen, ' ')}</span>
+    <span style="display:block;letter-spacing:0.15em">${op}${b.padStart(resLen - 1, ' ')}</span>
+    <span style="display:block;border-top:2px solid #2c2722;width:100%;margin:0 0 2px 0;height:0"></span>
+    <span style="display:block;letter-spacing:0.15em">${resultDisplay}</span>
   `);
 }
 
@@ -92,15 +94,15 @@ function renderMul(aStr: string, bStr: string): string {
     partials.push(partial.trim());
   }
   const maxW = Math.max(a.length, b.length + 1, product.length, ...partials.map(p => p.length));
-  const lines = [`<div style="letter-spacing:0.15em">${a.padStart(maxW, ' ')}</div>`];
-  lines.push(`<div style="letter-spacing:0.15em">×${b.padStart(maxW - 1, ' ')}</div>`);
+  const lines = [`<span style="display:block;letter-spacing:0.15em">${a.padStart(maxW, ' ')}</span>`];
+  lines.push(`<span style="display:block;letter-spacing:0.15em">×${b.padStart(maxW - 1, ' ')}</span>`);
   if (partials.length > 1) {
     for (const p of partials) {
-      lines.push(`<div style="letter-spacing:0.15em;color:#666">${p.padStart(maxW, ' ')}</div>`);
+      lines.push(`<span style="display:block;letter-spacing:0.15em;color:#666">${p.padStart(maxW, ' ')}</span>`);
     }
   }
-  lines.push(`<div style="border-top:2px solid #2c2722;width:100%;margin:0 0 2px 0;height:0"></div>`);
-  lines.push(`<div style="letter-spacing:0.15em">${product.padStart(maxW, ' ')}</div>`);
+  lines.push(`<span style="display:block;border-top:2px solid #2c2722;width:100%;margin:0 0 2px 0;height:0"></span>`);
+  lines.push(`<span style="display:block;letter-spacing:0.15em">${product.padStart(maxW, ' ')}</span>`);
   return vertBox(lines.join(''));
 }
 
@@ -110,7 +112,7 @@ function renderDiv(dividendStr: string, divisorStr: string): string {
   const V = parseInt(divisorStr, 10);
   // 容错：非法输入退回简单展示
   if (!/^\d+$/.test(D) || !Number.isFinite(V) || V <= 0) {
-    return vertBox(`<div style="letter-spacing:0.15em">${escapeHtml(divisorStr)} ) ${escapeHtml(dividendStr)}</div>`);
+    return vertBox(`<span style="display:block;letter-spacing:0.15em">${escapeHtml(divisorStr)} ) ${escapeHtml(dividendStr)}</span>`);
   }
   const n = D.length;
   const CW = 0.66;                 // 每列宽度(em)
@@ -142,13 +144,13 @@ function renderDiv(dividendStr: string, divisorStr: string): string {
   const row = (prefix: string, build: (c: number) => string) => {
     let cells = '';
     for (let c = 0; c < n; c++) cells += build(c);
-    return `<div style="display:flex">${prefix}${cells}</div>`;
+    return `<span style="display:inline-flex">${prefix}${cells}</span>`;
   };
 
   // 商行（每列已对齐到被除数）
   const quotientRow = row(slot, (c) => cell(quotient[c] || ''));
   // 除号顶横线（覆盖被除数各列）
-  const barRow = `<div style="display:flex">${slot}<span style="display:inline-block;border-top:2px solid #2c2722;width:calc(${cw} * ${n});height:0"></span></div>`;
+  const barRow = `<span style="display:inline-flex">${slot}<span style="display:inline-block;border-top:2px solid #2c2722;width:calc(${cw} * ${n});height:0"></span></span>`;
   // 被除数行：「除数 )」前缀 + 各位
   const prefixDivisor = `<span style="display:inline-block;width:${pw};text-align:right;padding-right:0.22em">${escapeHtml(String(V))} )</span>`;
   const dividendRow = row(prefixDivisor, (c) => cell(D[c]));
@@ -163,7 +165,7 @@ function renderDiv(dividendStr: string, divisorStr: string): string {
     });
   }
 
-  return vertBox(`<div style="font-variant-numeric:tabular-nums;line-height:1.4">${quotientRow}${barRow}${dividendRow}${stepHtml}</div>`);
+  return vertBox(`<span style="display:block;font-variant-numeric:tabular-nums;line-height:1.4">${quotientRow}${barRow}${dividendRow}${stepHtml}</span>`);
 }
 
 /** HTML 转义辅助 */
