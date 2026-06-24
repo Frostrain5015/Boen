@@ -40,7 +40,7 @@ function onClickOutside(e: MouseEvent) {
 
             <h3>1. 总则</h3>
             <p>
-              欢迎使用「博文 Boen」（以下简称"本服务"）。本服务由寒霜科技（Frostrain Tech）提供，
+              欢迎使用「博文 Boen」（以下简称"本服务"）。本服务由寒霜科技（Frost Tech）提供，
               是一款面向中小学生及大学生的 AI 学习辅助工具。在开始使用前，请您仔细阅读本服务条款。
               通过登录并使用本服务，即表示您已阅读、理解并同意受本条款的约束。
             </p>
@@ -150,8 +150,8 @@ function onClickOutside(e: MouseEvent) {
             <h3>11. 联系方式</h3>
             <p>
               如您对本条款有任何疑问或建议，可通过以下方式联系我们：<br />
-              邮箱：<a href="mailto:support@frostrain.tech" class="text-[var(--accent-strong)] underline">support@frostrain.tech</a><br />
-              服务提供方：寒霜科技（Frostrain Tech）
+              邮箱：<a href="mailto:phy55015@hotmail.com" class="text-[var(--accent-strong)] underline">phy55015@hotmail.com</a><br />
+              服务提供方：寒霜科技（Frost Tech）
             </p>
           </div>
 
