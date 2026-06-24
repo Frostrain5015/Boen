@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import Mascot from '@/components/Mascot.vue';
+import TermsOfService from '@/components/TermsOfService.vue';
 import { loginWithFrostId } from '@/services/auth';
 
 const isLoading = ref(false);
+const agreedToTerms = ref(false);
+const showTos = ref(false);
 
 async function handleLogin() {
+  if (!agreedToTerms.value) return;
   isLoading.value = true;
   try {
     await loginWithFrostId();
@@ -44,7 +48,7 @@ async function handleLogin() {
       <!-- 登录按钮 -->
       <button
         @click="handleLogin"
-        :disabled="isLoading"
+        :disabled="isLoading || !agreedToTerms"
         class="btn-accent group flex w-full items-center justify-center gap-2 rounded-[18px] px-6 py-3.5 text-base font-semibold transition-all duration-300 disabled:opacity-60"
       >
         <span v-if="isLoading" class="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
@@ -65,10 +69,18 @@ async function handleLogin() {
         <span>{{ isLoading ? '正在跳转…' : '使用 Frost ID 登录' }}</span>
       </button>
 
-      <!-- 提示 -->
-      <p class="text-center text-xs text-[var(--ink-soft)]/60">
-        登录即表示你同意我们的服务条款
-      </p>
+      <!-- 同意条款 -->
+      <label class="flex cursor-pointer items-start gap-2 text-left">
+        <input
+          type="checkbox"
+          v-model="agreedToTerms"
+          class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--accent)]"
+        />
+        <span class="text-xs leading-relaxed text-[var(--ink-soft)]/80">
+          我已阅读并同意
+          <button type="button" @click.stop="showTos = true" class="text-[var(--accent-strong)] underline hover:opacity-80">服务条款</button>
+        </span>
+      </label>
     </div>
 
     <!-- 底部装饰 -->
@@ -76,4 +88,6 @@ async function handleLogin() {
       <p class="text-xs text-[var(--ink-soft)]/40">Powered by Frost ID · 寒霜科技</p>
     </div>
   </div>
+
+  <TermsOfService :show="showTos" @close="showTos = false" />
 </template>
