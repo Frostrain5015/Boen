@@ -1,12 +1,12 @@
 # 博文 Boen · 学习辅助智能体
 
-面向 **小学 / 中学 / 本科** 三个年龄段的通用学习助手，基于 **LangGraph.js（全 TypeScript 栈）**。
+面向 **小学 / 中学 / 本科** 三个年龄段的通用 AI 学习助手，基于 **LangGraph.js（全 TypeScript 栈）**。
 
-支持日常问答、结构化预习/复习/练习、学科自适应切换、AI 出题批改、考试生成与评测。
+支持日常问答、结构化预习/复习/练习、AI 出题批改、考试生成与评测、多模态输入（图片）。
 
 > 线上体验：[boen.frostrain.tech](https://boen.frostrain.tech)
 
-当前版本：**v0.3.3**
+当前版本：**v0.5.0**
 
 ---
 
@@ -16,6 +16,7 @@
 - 任意学科自由提问，模型按年龄段调整语气与深度
 - 苏格拉底式引导，优先帮用户自己推导而非直接给答案
 - 流式输出 + LaTeX 公式 / TikZ 示意图实时渲染
+- **多模态输入**：支持上传图片，DeepSeek V4 原生理解图像内容（数学题截图、试卷照片等）
 
 ### 结构化教学模式
 
@@ -35,9 +36,19 @@ plan_steps → advance_step → exit_session
 
 ### 出题与测评
 - 四种题型：选择题（含多选）、填空、判断、简答
-- 模型以 tool_call 结构化出题 → 前端渲染交互卡片
+- 模型以 `tool_call` 结构化出题 → 前端渲染交互卡片
 - 服务端判分（填空逐空给分，简答交 LLM 定性评分）
 - 标准答案只留服务端，不下发前端
+
+### 智能检索（高级 RAG）
+- **查询改写**：LLM 将口语化提问改写为更适合检索的形式
+- **混合检索**：向量语义（bge-small-zh） + BM25 全文搜索（FTS5）RRF 融合排序
+- **自适应模式**：`lookup_knowledge_point` 工具支持 `auto/semantic/keyword/hybrid` 四种检索模式
+- **条件化检索**：问候/追随便跳过知识库查询，减少延迟
+
+### 长期对话记忆
+- 会话结束后 LLM 自动生成结构化摘要（知识点、学生水平、未解决问题）
+- 摘要向量化后跨会话检索，实现越用越懂你的个性化教学
 
 ### 学科自适应切换
 - 手动切换（右上角标签栏）+ 模型自动切换（`switch_subject` 工具）
@@ -73,7 +84,9 @@ plan_steps → advance_step → exit_session
 | 后端 | Hono + `@hono/node-server`，SSE 流式 |
 | 前端 | Vue 3 + Vite + Tailwind v4 + markdown-it + KaTeX |
 | 图形渲染 | PGF/TiKZ → xelatex → dvisvgm 服务端编译 |
-| 知识库 | SQLite（`better-sqlite3`）+ 自定义课程知识图谱；语数英 G1-G9、科学 G1-G9（教材版本与核验状态见课程目录） |
+| 向量嵌入 | bge-small-zh-v1.5（本地 ONNX，`@huggingface/transformers`） |
+| 全文搜索 | SQLite FTS5（BM25） |
+| 知识库 | SQLite（`better-sqlite3`）+ 自定义课程知识图谱；语数英 G1-G9、科学 G1-G9 |
 | 公式编辑 | MathLive（所见即所得） |
 | 包管理 | npm workspaces（monorepo） |
 
@@ -83,9 +96,9 @@ plan_steps → advance_step → exit_session
 boen/
 ├── packages/
 │   ├── shared/          # 前后端共享类型（SseEvent / GradeBand / ChatRequest …）
-│   └── agent-core/      # 模型工厂 + LangGraph 主图 + 工具定义 + 课程工具（含 src/quiz 出题批分模块）
+│   └── agent-core/      # 模型工厂 + LangGraph 主图 + 工具定义 + 出题批分模块
 ├── apps/
-│   ├── server/          # Hono SSE 后端（聊天/考试/画像/探索 API）
+│   ├── server/          # Hono SSE 后端（聊天/考试/画像/探索/记忆 API）
 │   └── web/             # Vue 3 前端
 └── script/              # 数据分析、课程数据导入脚本
 ```
@@ -93,16 +106,17 @@ boen/
 ## LangGraph 图结构
 
 ```
-__start__ → router → loadCurriculum → agent
-agent → ToolNode(有 tool_calls) → updateTodo → agent
+router → checkNeedRetrieval → loadCurriculum (条件) → agent
+agent → ToolNode(有 tool_calls) → agent
+agent → awaitQuestion(出题) → agent(答题后)
 agent → __end__(无 tool_calls)
 ```
 
 - **router**: 用户意图检测 → 设置 `mode`（qa / review / preview / weakness / practice / explore）
-- **loadCurriculum**: 按学科+年级加载课程知识库
+- **checkNeedRetrieval**: 问候/短确认/纯追随便跳过知识库检索（方向二）
+- **loadCurriculum**: 按学科+年级加载课程知识库 + 长期记忆 + 薄弱点数据
 - **agent**: 构建 system prompt + 绑定工具 → 调用 LLM
 - **tools**: `ToolNode` 自动执行所有工具调用
-- **updateTodo**: 拦截 `plan_steps`/`advance_step` 维护 TODO 状态机
 
 ## 工具清单
 
@@ -117,7 +131,7 @@ agent → __end__(无 tool_calls)
 | `ask_true_false` | 出判断题 |
 | `ask_short_answer` | 出简答题 |
 | `complete_review` | 复习完成提交评分 |
-| `lookup_knowledge_point` | 查询课程知识图谱 |
+| `lookup_knowledge_point` | 查询课程知识图谱（支持 `auto/semantic/keyword/hybrid` 模式） |
 | `switch_to_*` | 学习周期感知主动建议切换模式 |
 
 ## 配置
@@ -151,7 +165,7 @@ npm run dev:web                # 启动前端 → http://localhost:5173
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/chat` | POST | 流式对话（SSE） |
+| `/api/chat` | POST | 流式对话（SSE，支持图片） |
 | `/api/answer` | POST | 提交题目作答 |
 | `/api/explore` | POST | 启动探索课 |
 | `/api/exam/generate` | POST | 生成考试 |
@@ -160,7 +174,6 @@ npm run dev:web                # 启动前端 → http://localhost:5173
 | `/api/profile/outline` | GET | 课程大纲 |
 | `/api/render-tikz` | POST | TikZ → SVG 渲染 |
 | `/api/model/status` | GET | 当前模型状态 |
-| `/api/ai/*` | - | AI 相关（观澜模式） |
 
 详细接口定义见 `packages/shared/src/index.ts` 中的 `SseEvent` 类型。
 
@@ -194,3 +207,5 @@ pm2 restart boen-server
 ## License
 
 MIT
+
+© 2026 寒霜科技（Frost Tech）

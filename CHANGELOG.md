@@ -1,6 +1,73 @@
 # 更新日志
 
-## v0.3.5（当前）
+## v0.5.0（当前）
+
+### 重大功能
+
+#### 多模态输入（图片 → 聊天）
+- 前端图片选择 → Canvas 压缩 → base64 → multi-content HumanMessage
+- DeepSeek V4 Flash 原生支持图片理解，学生可拍照上传数学题/试卷截图
+- 图片预览缩略图 + 移除按钮，图片与文字同一条消息发送
+- 消息持久化兼容：JSON 编码图文消息，历史对话可恢复显示
+
+#### 高级 RAG（查询改写 + 混合检索）
+- **查询改写**：LLM 自动将口语化提问改写为更适合检索的形式（如"这一步为什么这么算？" → "分数除法计算方法的原理"）
+- **FTS5 全文搜索**：SQLite FTS5 + BM25 关键词精确匹配，与向量语义检索互补
+- **RRF 融合排序**：向量结果 + BM25 结果按倒数排名融合，取双方优势
+- **自适应模式**：`lookup_knowledge_point` 工具支持 `auto/semantic/keyword/hybrid` 四种模式
+
+#### 条件化检索
+- `needRetrieval` 规则引擎：问候、短确认、纯追随便跳过知识库查询
+- 减少不必要的 LLM 调用延迟 + API 消耗
+
+#### 长期对话记忆
+- 会话结束时 LLM 自动生成结构化摘要（知识点、学生水平、未解决问题）
+- 摘要经 bge-small-zh 向量化后存储，跨会话检索
+- `loadCurriculum` 节点自动注入相关历史记忆，实现个性化连贯教学
+- 每个用户保留最近 50 条摘要，自动清理过期数据
+
+#### 服务条款合规
+- 登录页添加勾选复选框「我已阅读并同意服务条款」，未勾选时登录按钮置灰
+- 完整的《服务条款》二级弹窗，覆盖《个人信息保护法》《网络安全法》《未成年人保护法》等中国法律法规要求
+
+### 错误修复（P0）
+- **用量在 SSE 流开始前扣除**：`checkAndIncrementUsage` 拆分为 `checkUsage`（只读）+ `incrementUsage`（流成功后执行），失败请求不消耗免费额度
+- **`[object Object]` 崩溃**：multi-content `HumanMessage` 的 `content` 为数组时 `String(content)` 产生 `[object Object]`，新增 `getMessageText()` 正确提取文本
+- **对话创建失败 → threadId=null**：`apiCreateConversation` 失败时 `busy=false; return`，不再发送消息
+- **catch 块中 send() 再次异常**：6 处 `send({type:'error'})` 全部加 `try {} catch {}` 保护，防止 unhandled rejection
+- **令牌撤销绕过**：`userIdCache` 新增反向索引 `userIdTokens` 用于 O(1) 失效，撤销后立即删除缓存
+- **4 处 Map 内存泄漏**：`userIdCache`（上限 5000）/ `PROFICIENCY_CACHE`（上限 5000）/ `redeemAttempts`（上限 10000）/ tikz 限流（上限 10000）全部加清理逻辑
+
+### 工程
+- 全部 workspace 升级至 v0.5.0
+- 服务启动时自动从已有课程数据重建 FTS5 索引（幂等）
+- 公司信息统一：寒霜科技（Frost Tech），联系邮箱 phy55015@hotmail.com
+
+---
+
+## v0.4.0
+
+### 五大架构升级
+
+#### 多模态输入
+- 前端图片选择 → Canvas 压缩 → base64 → multi-content HumanMessage，DeepSeek V4 原生支持
+
+#### 高级 RAG
+- LLM 查询改写 + FTS5 BM25 全文搜索 + RRF 融合排序
+- 新建 `query-rewriter.ts`、`fts.ts` 模块
+
+#### 条件化检索
+- `loadCurriculum` 节点前加 `needRetrieval()` 规则判断
+
+#### 长期对话记忆
+- 新建 `conversation-memory.ts`：会话结束 LLM 摘要 → 向量化 → 跨会话检索注入
+
+#### 自适应检索
+- `lookup_knowledge_point` 支持 `mode: auto/semantic/keyword/hybrid` 参数
+
+---
+
+## v0.3.5
 
 ### 熟练度系统重写
 - Elo 参数全面校准：`ELO_RATING_INIT=0`、`ELO_K_BASE=8`、`ELO_SCALING=15`
