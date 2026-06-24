@@ -74,6 +74,16 @@ export interface BoenGraphDeps {
   lookupKnowledgePoint?: (args: { grade?: string; subject?: string; query: string; limit?: number }) => Promise<string>;
 }
 
+/** 从消息中提取纯文本（兼容 multi-content 数组，如 [{type:'text',text:'...'}, {type:'image_url',...}]） */
+function getMessageText(msg: { content: string | Array<{ type: string; text?: string }> }): string {
+  if (typeof msg.content === 'string') return msg.content;
+  if (Array.isArray(msg.content)) {
+    const textBlock = msg.content.find((c) => c.type === 'text');
+    return textBlock?.text ?? '';
+  }
+  return '';
+}
+
 function detectQuizIntent(text: string): { force: boolean; tool: string } {
   const wantsQuiz = /考我|考考|出一?[道题]|来一?[道题]|测验|测试|测一测|练习|出题|quiz/i.test(text);
   let tool = 'ask_multiple_choice';
@@ -346,7 +356,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   const router = (state: State): Partial<State> => {
     const last = state.messages[state.messages.length - 1];
     if (last && isHumanMessage(last)) {
-      const text = String(last.content);
+      const text = getMessageText(last);
       const { force, tool: qTool } = detectQuizIntent(text);
 
       if (state.pendingModeSwitch && detectConfirmIntent(text)) {
@@ -377,7 +387,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
   function needRetrieval(state: State): boolean {
     const last = state.messages[state.messages.length - 1];
     if (!last || !isHumanMessage(last)) return false;
-    const text = String(last.content).trim();
+    const text = getMessageText(last).trim();
 
     // 简单问候
     if (/^(你好|嗨|hi|hello|hey|早|晚上好|谢谢|感谢|ok|好的|嗯|是的|对|明白了?|知道[了]?)/i.test(text)) return false;
@@ -401,7 +411,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     let parts: string[] = [];
     if (deps.retrieveCurriculum) {
       const lastHuman = [...state.messages].reverse().find(isHumanMessage);
-      const query = lastHuman ? String(lastHuman.content) : '';
+      const query = lastHuman ? getMessageText(lastHuman) : '';
       try {
         const curriculum = await deps.retrieveCurriculum({ grade: state.grade, subject: state.subject, query });
         if (curriculum) parts.push(curriculum);

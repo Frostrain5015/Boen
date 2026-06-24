@@ -91,7 +91,16 @@ onMounted(() => {
 <template>
   <footer class="px-4 pb-4 pt-16">
     <div class="mx-auto w-full max-w-2xl">
-      <!-- 学习模式按钮（大学仅通用模式，不显示）。课堂中淡出按钮、改显当前模式高亮状态 -->
+      <!-- 图片预览（在模式按钮上方） -->
+      <div v-if="pickedImages.length" class="mb-2 flex flex-wrap gap-2 px-1">
+        <div v-for="(img, i) in pickedImages" :key="i" class="group relative h-16 w-16 overflow-hidden rounded-xl border border-[var(--line)] bg-white/60 shadow-sm">
+          <img :src="`data:${img.mimeType};base64,${img.data}`" class="h-full w-full object-cover" alt="预览图片" />
+          <button @click="removeImage(i)" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-[var(--error)]" aria-label="移除图片">
+            <X class="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+      <!-- 学习模式按钮 -->
       <div v-if="!uiStore.isCollege" class="relative mb-2 flex min-h-[34px] items-center gap-1.5 px-1" data-tour="modes">
         <Transition name="mode-swap">
           <!-- 课堂中：当前模式高亮状态文本（不可点击） -->
@@ -122,15 +131,6 @@ onMounted(() => {
         </div>
       </Teleport>
       <DailyLimitBanner :show="chatStore.dailyLimitReached" @close="chatStore.dailyLimitReached = false" />
-      <!-- 图片预览 -->
-      <div v-if="pickedImages.length" class="mb-2 flex flex-wrap gap-2 px-1">
-        <div v-for="(img, i) in pickedImages" :key="i" class="group relative h-16 w-16 overflow-hidden rounded-xl border border-[var(--line)] bg-white/60 shadow-sm">
-          <img :src="`data:${img.mimeType};base64,${img.data}`" class="h-full w-full object-cover" alt="预览图片" />
-          <button @click="removeImage(i)" class="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--line)] bg-white text-[var(--ink-soft)] opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-[var(--error)]" aria-label="移除图片">
-            <X class="h-3 w-3" />
-          </button>
-        </div>
-      </div>
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
         <Transition name="mascot-pop">
