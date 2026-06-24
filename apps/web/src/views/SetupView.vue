@@ -451,17 +451,17 @@ function handleBack() {
         <div class="clay clay-glass overflow-hidden" style="border: 1px solid var(--premium-gold)">
           <div class="flex items-center gap-2 px-4 py-2.5" style="background: var(--premium-gold-soft)">
             <span class="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--premium-gold)">限时活动</span>
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">每日登录领星月积分</h2>
+            <h2 class="font-display text-sm font-bold text-[var(--ink)]">每日签到</h2>
           </div>
           <div class="space-y-3 px-4 py-3">
-            <!-- 每日登录领取 -->
+            <!-- 每日签到领取 -->
             <div class="rounded-2xl px-4 py-3" style="background: var(--premium-gold-soft)">
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="font-display text-base font-bold" style="color: var(--premium-gold)">
-                    <Sparkles class="inline h-4 w-4" /> 每天 +{{ authStore.currency?.loginReward ?? 50 }} 星月积分
+                  <p class="font-display text-sm font-bold" style="color: var(--premium-gold)">
+                    <Sparkles class="inline h-4 w-4" /> 每日登录即可领取 {{ authStore.currency?.loginReward ?? 50 }} 星月积分
                   </p>
-                  <p class="mt-0.5 text-[11px] text-[var(--ink-soft)]">每日登录即可领取（北京时间每天一次）</p>
+                  <p class="mt-0.5 text-[11px] text-[var(--ink-soft)]">2000 积分可兑换皓月卡 ×1</p>
                 </div>
                 <button @click="handleDailyClaim"
                   :disabled="authStore.currency?.claimedToday || dailyClaimLoading"
@@ -469,10 +469,6 @@ function handleBack() {
                   style="background: var(--premium-gold)">
                   {{ dailyClaimLoading ? '领取中' : (authStore.currency?.claimedToday ? '今日已领' : '领取') }}
                 </button>
-              </div>
-              <div class="mt-2 flex items-center justify-between text-[11px] text-[var(--ink-soft)]">
-                <span>当前积分 <span class="font-display font-bold" style="color: var(--premium-gold)">{{ authStore.pointsBalance }}</span></span>
-                <span>攒满 2000 可兑换皓月卡 ×1</span>
               </div>
             </div>
           </div>

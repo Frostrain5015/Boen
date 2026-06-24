@@ -93,11 +93,66 @@ function renderMul(aStr: string, bStr: string): string {
   return vertBox(lines.join(''));
 }
 
-function renderDiv(dividend: string, divisor: string): string {
-  return vertBox(`
-    <div style="font-size:0.85rem;color:#666">${divisor} ⟌ ${dividend}</div>
-    <div style="font-size:0.8rem;color:#18a558;margin-top:2px">≈ ${(parseInt(dividend) / parseInt(divisor)).toFixed(1)}</div>
-  `);
+/** 标准长除法竖式：商对齐在上、左侧除数与除号、逐步乘减与余数。 */
+function renderDiv(dividendStr: string, divisorStr: string): string {
+  const D = String(parseInt(dividendStr, 10));
+  const V = parseInt(divisorStr, 10);
+  // 容错：非法输入退回简单展示
+  if (!/^\d+$/.test(D) || !Number.isFinite(V) || V <= 0) {
+    return vertBox(`<div style="letter-spacing:0.15em">${escapeHtml(divisorStr)} ) ${escapeHtml(dividendStr)}</div>`);
+  }
+  const n = D.length;
+  const CW = 0.66;                 // 每列宽度(em)
+  const cw = `${CW}em`;
+  const pw = `${String(V).length * CW + 0.95}em`;  // 左侧「除数 )」前缀宽度
+
+  // 长除法分步：从高位起逐位试商
+  const quotient: string[] = Array(n).fill('');
+  const steps: Array<{ value: string; end: number; kind: 'prod' | 'rem' }> = [];
+  let cur = 0, started = false;
+  for (let i = 0; i < n; i++) {
+    cur = cur * 10 + Number(D[i]);
+    const qd = Math.floor(cur / V);
+    if (qd > 0 || started) {
+      quotient[i] = String(qd);
+      started = true;
+      const product = qd * V;
+      steps.push({ value: String(product), end: i, kind: 'prod' });
+      cur -= product;
+      steps.push({ value: String(cur), end: i, kind: 'rem' });
+    } else if (i === n - 1) {
+      quotient[i] = '0';             // 整体不够除 → 商 0
+    }
+  }
+
+  const cell = (ch: string, color?: string, underline?: boolean) =>
+    `<span style="display:inline-block;width:${cw};text-align:center;${color ? 'color:' + color + ';' : ''}${underline ? 'border-bottom:2px solid #2c2722;' : ''}">${ch}</span>`;
+  const slot = `<span style="display:inline-block;width:${pw}"></span>`;
+  const row = (prefix: string, build: (c: number) => string) => {
+    let cells = '';
+    for (let c = 0; c < n; c++) cells += build(c);
+    return `<div style="display:flex">${prefix}${cells}</div>`;
+  };
+
+  // 商行（每列已对齐到被除数）
+  const quotientRow = row(slot, (c) => cell(quotient[c] || ''));
+  // 除号顶横线（覆盖被除数各列）
+  const barRow = `<div style="display:flex">${slot}<span style="display:inline-block;border-top:2px solid #2c2722;width:calc(${cw} * ${n});height:0"></span></div>`;
+  // 被除数行：「除数 )」前缀 + 各位
+  const prefixDivisor = `<span style="display:inline-block;width:${pw};text-align:right;padding-right:0.22em">${escapeHtml(String(V))} )</span>`;
+  const dividendRow = row(prefixDivisor, (c) => cell(D[c]));
+  // 步骤行：乘积(带下划线) → 余数
+  let stepHtml = '';
+  for (const s of steps) {
+    const start = s.end - s.value.length + 1;
+    const color = s.kind === 'prod' ? '#666' : '#18a558';
+    stepHtml += row(slot, (c) => {
+      const inRange = c >= start && c <= s.end;
+      return cell(inRange ? s.value[c - start] : '', inRange ? color : undefined, s.kind === 'prod' && inRange);
+    });
+  }
+
+  return vertBox(`<div style="font-variant-numeric:tabular-nums;line-height:1.4">${quotientRow}${barRow}${dividendRow}${stepHtml}</div>`);
 }
 
 /** HTML 转义辅助 */

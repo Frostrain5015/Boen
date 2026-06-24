@@ -44,17 +44,12 @@ function xlopToKatex(code: string): string | null {
   if (sub) return buildArray(sub[1].trim(), sub[2].trim(), '-');
   const mul = code.match(/\\opmul\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (mul) return buildMul(mul[1].trim(), mul[2].trim());
-  // 除法 → 竖式（长除格式）
+  // 除法 → 标准长除竖式：交给 tikz-wrap 占位，由 processTikzDiagrams → renderDiv 渲染
+  // （KaTeX 的 array 画不出标准长除，故除法单独走 HTML 渲染器）。
   const div = code.match(/\\opdiv\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (div) {
-    const d = parseInt(div[1]), v = parseInt(div[2]);
-    if (v === 0) return `$${d} \\div ${v}$$`;
-    const quotient = Math.floor(d / v);
-    const remainder = d % v;
-    const result = remainder === 0
-      ? `$$\n\\begin{array}{r}\n  ${quotient}\\\\\n\\hline\n${v})${d}\n\\end{array}\n$$`
-      : `$$\n\\begin{array}{r}\n  ${quotient}\\ \\text{余}\\ ${remainder}\\\\\n\\hline\n${v})${d}\n\\end{array}\n$$`;
-    return result;
+    const inner = `\\opdiv{${div[1].trim()}}{${div[2].trim()}}`;
+    return `<div class="tikz-wrap" data-tikz="${encodeURIComponent(inner)}"><div class="tikz-gen"><span class="tikz-gen-label">竖式渲染中…</span></div></div>`;
   }
   return null;
 }

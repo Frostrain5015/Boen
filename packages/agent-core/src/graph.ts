@@ -377,6 +377,12 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
       if (['review', 'preview', 'weakness', 'explore'].includes(state.mode ?? '')) {
         return { mode: state.mode, reviewPhase: 'teaching', forceQuiz: force, quizTool: qTool };
       }
+      // 专项练习是结构化教学：始终保留备课/推进/出题全套工具，让模型先调用 plan_steps
+      // 写入课堂 TODO 再出题。不能 forceQuiz —— tool_choice 会锁死只能调出题工具，
+      // 导致 plan_steps/advance_step 不可用（含"练习"二字的消息会误触发 forceQuiz）。
+      if (state.mode === 'practice' || state.practiceType) {
+        return { mode: 'practice', reviewPhase: 'teaching', forceQuiz: false, quizTool: undefined };
+      }
       return { mode: state.mode ?? 'qa', forceQuiz: force, quizTool: qTool };
     }
     return { mode: state.mode ?? 'qa', forceQuiz: false };
