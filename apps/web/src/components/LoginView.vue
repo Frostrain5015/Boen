@@ -42,7 +42,7 @@ async function handleLogin() {
       <!-- 标题 -->
       <div class="text-center">
         <h1 class="brand-text text-3xl font-bold">博文 Boen</h1>
-        <p class="mt-2 text-sm text-[var(--ink-soft)]">你的 AI 学习小伙伴</p>
+        <p class="mt-2 text-sm text-[var(--ink-soft)]">AI 原生时代的教育智能体</p>
       </div>
 
       <!-- 登录按钮 -->
