@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import katex from '@traptitech/markdown-it-katex';
 import DOMPurify from 'dompurify';
+import { renderXlop } from '@/lib/tikz';
 
 // DOMPurify 配置：保留 KaTeX/MathML 渲染所需的标签和属性
 const PURIFY_CONFIG: Parameters<typeof DOMPurify.sanitize>[1] = {
@@ -34,83 +35,11 @@ function sanitizeGeneratedHtml(text: string): string {
     .trim();
 }
 
-// ── 前端竖式渲染：\opadd / \opsub / \opmul / \opdiv → KaTeX array ─────
+// ── 前端竖式渲染：\opadd / \opsub / \opmul / \opdiv → HTML 竖式（同步渲染） ──
 
-/** 把 xlop 命令转成 KaTeX-compatible \begin{array} 字符串 */
+/** 把 xlop 命令转成 HTML 竖式（同步渲染，不依赖异步 tikz-wrap pass，不依赖 KaTeX）。 */
 function xlopToKatex(code: string): string | null {
-  const add = code.match(/\\opadd\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (add) return buildArray(add[1].trim(), add[2].trim(), '+');
-  const sub = code.match(/\\opsub\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (sub) return buildArray(sub[1].trim(), sub[2].trim(), '-');
-  const mul = code.match(/\\opmul\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mul) return buildMul(mul[1].trim(), mul[2].trim());
-  // 除法 → 标准长除竖式：交给 tikz-wrap 占位，由 processTikzDiagrams → renderDiv 渲染
-  // （KaTeX 的 array 画不出标准长除，故除法单独走 HTML 渲染器）。
-  const div = code.match(/\\opdiv\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (div) {
-    const inner = `\\opdiv{${div[1].trim()}}{${div[2].trim()}}`;
-    return `<div class="tikz-wrap" data-tikz="${encodeURIComponent(inner)}"><div class="tikz-gen"><span class="tikz-gen-label">竖式渲染中…</span></div></div>`;
-  }
-  return null;
-}
-
-function computeCarries(a: string, b: string): { carries: string[]; result: string } {
-  const maxLen = Math.max(a.length, b.length);
-  const digits: string[] = [];
-  const carries: string[] = [];
-  let carry = 0;
-  for (let i = maxLen - 1; i >= 0; i--) {
-    const da = parseInt(a[a.length - maxLen + i] || '0');
-    const db = parseInt(b[b.length - maxLen + i] || '0');
-    const sum = da + db + carry;
-    carries.unshift(carry > 0 ? `\\scriptstyle{${carry}}` : '');
-    digits.unshift(String(sum % 10));
-    carry = Math.floor(sum / 10);
-  }
-  if (carry > 0) carries.unshift(`\\scriptstyle{${carry}}`);
-  return { carries, result: digits.join('') };
-}
-
-function buildArray(a: string, b: string, op: string): string {
-  const aNum = parseInt(a), bNum = parseInt(b);
-  const result = op === '+' ? String(aNum + bNum) : String(aNum - bNum);
-  const resLen = result.length;
-  const rows: string[] = [];
-
-  // 进位行
-  if (op === '+') {
-    const { carries } = computeCarries(a, b);
-    const carryPadded = carries.map((c, i) => {
-      const pad = resLen - carries.length + i;
-      return c ? ' '.repeat(Math.max(0, pad)) + c : '';
-    }).join('').trimEnd();
-    if (carryPadded) rows.push(carryPadded.replace(/ /g, '\\;'));
-  }
-
-  rows.push(a.padStart(resLen, '~'));
-  rows.push(op + '\\;' + b.padStart(resLen - 1, '~'));
-  rows.push('\\hline\\;' + result.padStart(resLen, '~'));
-  const body = rows.map(r => r.replace(/~/g, '\\phantom{0}')).join('\\\\\n');
-  return `$$\n\\begin{array}{r}\n${body}\n\\end{array}\n$$`;
-}
-
-function buildMul(a: string, b: string): string {
-  const aNum = parseInt(a), bNum = parseInt(b);
-  const product = String(aNum * bNum);
-  const resLen = product.length;
-  const rows: string[] = [a.padStart(resLen, '~')];
-  rows.push('\\times\\;' + b.padStart(resLen - 1, '~'));
-  if (b.length > 1) {
-    for (let i = b.length - 1; i >= 0; i--) {
-      const digit = parseInt(b[i]);
-      const partial = String(aNum * digit);
-      const pad = resLen - partial.length - (b.length - 1 - i);
-      rows.push(partial.padStart(pad + partial.length, '~'));
-    }
-  }
-  rows.push('\\hline\\;' + product.padStart(resLen, '~'));
-  const body = rows.map(r => r.replace(/~/g, '\\phantom{0}')).join('\\\\\n');
-  return `$$\n\\begin{array}{r}\n${body}\n\\end{array}\n$$`;
+  return renderXlop(code);
 }
 
 // ── 行间公式归一化 ─────────────────────────
@@ -254,7 +183,13 @@ export function renderMarkdown(text: string): string {
     .replace(/(?<!\$)(\\begin\s*\{array\}[\s\S]*?\\end\s*\{array\})\s*\$\$/g, (_, arr) => `\n$$\n${arr}\n$$\n`)
     // 裸 array（前后都没有 $ 定界）→ 补 $$；前置 (?<!\$) + 后随 (?!\s*\$) 双向跳过已包裹的
     .replace(/(?<!\$)\\begin\s*\{array\}([\s\S]*?)\\end\s*\{array\}(?!\s*\$)/g, (_, body) => `\n$$\n\\begin{array}${body}\\end{array}\n$$\n`);
-  return DOMPurify.sanitize(md.render(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized)))), PURIFY_CONFIG);
+  const html = md.render(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized))));
+  // KaTeX 报错降级：把 katex-error 红色源码替换为友好的兜底提示，绝不裸吐 LaTeX 源码。
+  const fallback = DOMPurify.sanitize(html.replace(
+    /<span[^>]*class="katex-error"[^>]*>[\s\S]*?<\/span>/g,
+    () => `<span class="katex-fallback" style="color:var(--error);font-size:0.85rem;cursor:help" title="公式渲染失败，已安全降级">⚠ 公式暂不可渲染</span>`,
+  ), PURIFY_CONFIG);
+  return fallback;
 }
 
 /**
@@ -269,7 +204,11 @@ export function renderMarkdownInline(text: string): string {
   const normalized = sanitizeGeneratedHtml(autoClosed)
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => `$${e}$`)
     .replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => `$${e}$`);
-  return DOMPurify.sanitize(md.renderInline(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized)))), PURIFY_CONFIG);
+  const html = md.renderInline(liberateCircledFromMath(normalizeXlop(normalizeBlanks(normalized))));
+  return DOMPurify.sanitize(html.replace(
+    /<span[^>]*class="katex-error"[^>]*>[\s\S]*?<\/span>/g,
+    () => `<span class="katex-fallback" style="color:var(--error);font-size:0.85rem;cursor:help" title="公式渲染失败，已安全降级">⚠</span>`,
+  ), PURIFY_CONFIG);
 }
 
 // ── TikZ 代码块：服务端已下线，降级为占位 ──────────────

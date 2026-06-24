@@ -25,8 +25,8 @@ function replaceWithSvgImage(wrap: HTMLElement, svg: string) {
   wrap.replaceChildren(image);
 }
 
-/** 前端竖式渲染：解析 \opadd / \opsub / \opmul / \opdiv 并生成 HTML 表格 */
-function renderXlop(code: string): string | null {
+/** 前端竖式渲染：解析 \opadd / \opsub / \opmul / \opdiv 并生成 HTML 表格。导出供 markdown 同步调用。 */
+export function renderXlop(code: string): string | null {
   const mAdd = code.match(/\\opadd\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
   if (mAdd) return renderAddSub(mAdd[1], mAdd[2], '+');
   const mSub = code.match(/\\opsub\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
@@ -41,32 +41,43 @@ function renderXlop(code: string): string | null {
 function renderAddSub(aStr: string, bStr: string, op: string): string {
   const a = aStr.trim(), b = bStr.trim();
   const maxLen = Math.max(a.length, b.length);
-  const aPadded = a.padStart(maxLen, ' ');
-  const bPadded = b.padStart(maxLen, ' ');
-  const result: string[] = [];
-  let carry = 0, carryRow = '';
+  // 逐位计算（加法进位 / 减法借位）
+  const digits: number[] = [];
+  let carry = 0; // 加法为正(进位)，减法为负(借位)
   for (let i = maxLen - 1; i >= 0; i--) {
-    const da = i >= aPadded.length ? 0 : (aPadded[i] === ' ' ? 0 : parseInt(aPadded[i]));
-    const db = i >= bPadded.length ? 0 : (bPadded[i] === ' ' ? 0 : parseInt(bPadded[i]));
-    const sum = da + db + carry;
-    const digit = sum % 10;
-    carry = Math.floor(sum / 10);
-    result.unshift(String(digit));
-    if (carry) carryRow = '¹' + result.slice(0).join('').slice(0, -1).replace(/\d/g, ' ') + '¹ ';
-    else carryRow = '';
+    const da = Number(a[a.length - maxLen + i] || '0');
+    const db = Number(b[b.length - maxLen + i] || '0');
+    if (op === '+') {
+      const s = da + db + carry;
+      digits.unshift(s % 10);
+      carry = Math.floor(s / 10);
+    } else {
+      let s = da - db + carry;
+      if (s < 0) { s += 10; carry = -1; }
+      else { carry = 0; }
+      digits.unshift(s);
+    }
   }
-  if (carry) result.unshift(String(carry));
+  if (carry > 0) digits.unshift(carry);
+  const resultStr = digits.map(d => Math.abs(d)).join('').replace(/^0+(?=\d)/, '');
+  if (resultStr === '') { digits[0] = 0; digits.length = 1; } // 0-0=0
+  const resLen = digits.length;
+  const resultDisplay = digits.map(d => d >= 0 ? String(d) : `<span style="color:var(--error)">${String(-d)}</span>`).join('');
 
-  const resultStr = result.join('');
-  const resLen = resultStr.length;
-  const line = '─'.repeat(resLen);
+  // 进位借位提示行
+  let carryHint = '';
+  if (op === '+') {
+    if (carry > 0) carryHint = `<div style="font-size:0.7em;color:#e74c3c;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}${carry}</div>`;
+  } else {
+    if (carry < 0) carryHint = `<div style="font-size:0.7em;color:#2b5fa8;letter-spacing:0.15em;height:1.1em">${' '.repeat(resLen - 1)}<span style="font-size:0.85em">↰</span></div>`;
+  }
 
   return vertBox(`
-    ${carry ? `<div style="font-size:0.7em;color:#e74c3c;letter-spacing:0.1em;height:1.1em">${' '.repeat(resLen - 1)}${carry}</div>` : ''}
-    <div style="letter-spacing:0.15em">${aStr.padStart(resLen, ' ')}</div>
-    <div style="letter-spacing:0.15em">${op}${bStr.padStart(resLen - 1, ' ')}</div>
+    ${carryHint}
+    <div style="letter-spacing:0.15em">${a.padStart(resLen, ' ')}</div>
+    <div style="letter-spacing:0.15em">${op}${b.padStart(resLen - 1, ' ')}</div>
     <div style="border-top:2px solid #2c2722;width:100%;margin:0 0 2px 0;height:0"></div>
-    <div style="letter-spacing:0.15em">${resultStr}</div>
+    <div style="letter-spacing:0.15em">${resultDisplay}</div>
   `);
 }
 
