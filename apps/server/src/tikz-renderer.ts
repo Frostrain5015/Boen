@@ -12,6 +12,7 @@ const USER_WINDOW_LIMIT = Number(process.env.TIKZ_USER_LIMIT_PER_MINUTE ?? 4);
 
 const renderPool = new Semaphore(MAX_CONCURRENCY);
 const renderRequestsByUser = new Map<string, number[]>();
+const MAX_TIKZ_USERS = 10000;
 let queuedOrRunning = 0;
 
 export class TikzRenderError extends Error {
@@ -61,6 +62,14 @@ export function validateTikzCode(code: unknown): asserts code is string {
 
 export function consumeTikzRateLimit(userId: string): void {
   const now = Date.now();
+  // 缓存上限保护：超出时清理不活跃用户
+  if (renderRequestsByUser.size >= MAX_TIKZ_USERS && !renderRequestsByUser.has(userId)) {
+    const entries = [...renderRequestsByUser.entries()];
+    for (const [k, v] of entries) {
+      const recent = v.filter((t) => t > now - USER_WINDOW_MS);
+      if (recent.length === 0) renderRequestsByUser.delete(k);
+    }
+  }
   const recent = (renderRequestsByUser.get(userId) ?? []).filter((timestamp) => timestamp > now - USER_WINDOW_MS);
   if (recent.length >= USER_WINDOW_LIMIT) {
     renderRequestsByUser.set(userId, recent);

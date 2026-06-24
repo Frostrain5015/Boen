@@ -150,6 +150,8 @@ export const useChatStore = defineStore('chat', () => {
     } else if (e.type === 'title_updated') {
       const conv = conversations.value.find((c) => c.id === e.conversationId);
       if (conv) conv.title = e.title;
+    } else if (e.type === 'review_complete') {
+      items.value.push({ kind: 'tool_result', action: 'review', detail: `复习完成：${e.summary}（${e.correctAnswers}/${e.totalQuestions} 正确，得分 ${e.score}）` });
     } else if (e.type === 'grading') {
       const q = items.value.find((it) => it.kind === 'question' && it.toolCallId === e.toolCallId);
       if (q && q.kind === 'question') q.grading = e.result;
@@ -263,7 +265,11 @@ export const useChatStore = defineStore('chat', () => {
         const { conversation } = await apiCreateConversation('\u65b0\u5bf9\u8bdd', uiStore.subject);
         conversations.value.unshift(conversation);
         currentConversationId.value = conversation.id;
-      } catch { toast.error('\u521b\u5efa\u5bf9\u8bdd\u5931\u8d25'); }
+      } catch {
+        toast.error('\u521b\u5efa\u5bf9\u8bdd\u5931\u8d25');
+        busy.value = false;
+        return; // \u4e0d\u7ee7\u7eed\u53d1\u9001\uff0c\u9632\u6b62 threadId=null \u5d29\u6e83
+      }
     }
 
     input.value = '';

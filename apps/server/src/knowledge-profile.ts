@@ -179,6 +179,17 @@ export interface CachedUpdate {
 }
 
 const PROFICIENCY_CACHE = new Map<string, Map<number, CachedUpdate>>();
+const MAX_PROFICIENCY_CACHE = 5000;
+
+/** 清理 PROFICIENCY_CACHE 超出上限的条目（删除最旧的 10%） */
+function trimProficiencyCache(): void {
+  if (PROFICIENCY_CACHE.size < MAX_PROFICIENCY_CACHE) return;
+  const entries = [...PROFICIENCY_CACHE.entries()];
+  // 按插入顺序删除，Map 保留插入顺序
+  for (let i = 0; i < Math.floor(MAX_PROFICIENCY_CACHE * 0.1); i++) {
+    PROFICIENCY_CACHE.delete(entries[i][0]);
+  }
+}
 
 function cacheKey(userId: string, threadId: string): string {
   return `${userId}:${threadId}`;
@@ -191,7 +202,10 @@ function cacheKey(userId: string, threadId: string): string {
  */
 export function cacheProficiencyUpdate(userId: string, threadId: string, kgNodeId: number, score: number, maxScore: number, mode: string): void {
   const key = cacheKey(userId, threadId);
-  if (!PROFICIENCY_CACHE.has(key)) PROFICIENCY_CACHE.set(key, new Map());
+  if (!PROFICIENCY_CACHE.has(key)) {
+    trimProficiencyCache();
+    PROFICIENCY_CACHE.set(key, new Map());
+  }
   const userCache = PROFICIENCY_CACHE.get(key)!;
   const existing = userCache.get(kgNodeId);
   if (existing) {

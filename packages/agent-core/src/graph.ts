@@ -75,10 +75,10 @@ export interface BoenGraphDeps {
 }
 
 /** 从消息中提取纯文本（兼容 multi-content 数组，如 [{type:'text',text:'...'}, {type:'image_url',...}]） */
-function getMessageText(msg: { content: string | Array<{ type: string; text?: string }> }): string {
+function getMessageText(msg: { content: unknown }): string {
   if (typeof msg.content === 'string') return msg.content;
   if (Array.isArray(msg.content)) {
-    const textBlock = msg.content.find((c) => c.type === 'text');
+    const textBlock = msg.content.find((c: any) => c?.type === 'text');
     return textBlock?.text ?? '';
   }
   return '';
