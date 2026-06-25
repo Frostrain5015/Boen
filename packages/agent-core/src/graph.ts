@@ -42,7 +42,6 @@ export const BoenState = Annotation.Root({
   reviewPhase: Annotation<string>(),
   weaknessData: Annotation<string | undefined>(),
   styleExamples: Annotation<string | undefined>(),
-  memoryContext: Annotation<string | undefined>(),
   practiceType: Annotation<string | undefined>(),
   pendingModeSwitch: Annotation<string | undefined>(),
   /** The last human-in-the-loop question resolution, used only for graph routing. */
@@ -425,7 +424,6 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     }
     if (state.mode === 'weakness' && state.weaknessData) parts.push(state.weaknessData);
     if ((state.mode === 'weakness' || state.forceQuiz || state.practiceType) && state.styleExamples) parts.push(state.styleExamples);
-    if (state.memoryContext) parts.push(state.memoryContext);
     return { curriculum: parts.length > 0 ? parts.join('\n\n') : undefined };
   };
 

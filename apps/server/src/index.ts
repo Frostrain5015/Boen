@@ -32,7 +32,7 @@ import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { ensureFtsTable, rebuildFtsIndex } from './fts.js';
 import { setRewriteModel } from './query-rewriter.js';
-import { retrieveRelevantMemories, generateConversationSummaryAsync } from './conversation-memory.js';
+import { generateConversationSummaryAsync } from './conversation-memory.js';
 import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
 import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
@@ -1753,9 +1753,6 @@ app.post('/api/chat', async (c) => {
         }
       }
 
-      // 长期对话记忆：检索相关历史摘要（用于全部模式）
-      const memoryContext = await retrieveRelevantMemories(userId ?? '', body.message, body.subject ?? 'math');
-
       // 结构化模式：注入教学 prompt（TODO 由 plan_steps 工具在图中创建）
       let modeSystemMsg: SystemMessage | undefined;
       if (body.mode && !['qa', 'explore'].includes(body.mode) && userId) {
@@ -1786,7 +1783,6 @@ app.post('/api/chat', async (c) => {
           userName: body.userName,
           weaknessData,
           styleExamples,
-          memoryContext,
           practiceType: body.practiceType,
           ...(body.mode ? { mode: body.mode } : {}),
         },
