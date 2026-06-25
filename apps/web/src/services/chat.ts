@@ -105,12 +105,14 @@ export const streamAnswer = (req: AnswerRequest, onEvent: (e: SseEvent) => void)
 export const streamExamGenerate = (
   config: { subject: string; grade: string; durationMinutes: number; notes?: string; totalScore?: number },
   onEvent: (e: SseEvent) => void,
-) => streamSse('/api/exam/generate', config, onEvent);
+  signal?: AbortSignal,
+) => streamSse('/api/exam/generate', config, onEvent, signal);
 
 export const streamExamSubmit = (
   req: { examId: string; answers: Array<{ questionIndex: number; answer: AnswerPayload }> },
   onEvent: (e: SseEvent) => void,
-) => streamSse('/api/exam/submit/stream', req, onEvent);
+  signal?: AbortSignal,
+) => streamSse('/api/exam/submit/stream', req, onEvent, signal);
 
 // ── 对话管理 API ────────────────────────────
 

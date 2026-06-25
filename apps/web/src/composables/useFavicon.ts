@@ -1,6 +1,12 @@
+/**
+ * 动态 Favicon 管理
+ *
+ * 监听当前学科切换事件，自动更新浏览器标签页图标为对应学科的吉祥物色 SVG。
+ */
 import { watch } from 'vue';
 import { useUiStore } from '@/stores/ui';
 
+/** 学科 → 强调色映射表 */
 const ACCENT_MAP: Record<string, string> = {
   chinese: '#ff7a4d',
   math: '#14b48a',
@@ -8,6 +14,7 @@ const ACCENT_MAP: Record<string, string> = {
   science: '#3498db',
 };
 
+/** 生成吉祥物风格的 Favicon SVG */
 function makeFaviconSvg(accent: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
     <circle cx="50" cy="55" r="33" fill="${accent}"/>
@@ -22,6 +29,7 @@ function makeFaviconSvg(accent: string): string {
   </svg>`;
 }
 
+/** 更新页面 <link rel="icon"> 标签 */
 function updateFavicon(subj: string) {
   const color = ACCENT_MAP[subj] ?? '#14b48a';
   const svg = makeFaviconSvg(color);
@@ -35,6 +43,7 @@ function updateFavicon(subj: string) {
   link.href = `data:image/svg+xml,${encoded}`;
 }
 
+/** 注册学科监听，学科变化时自动更新 Favicon */
 export function useFavicon() {
   const uiStore = useUiStore();
   watch(() => uiStore.subject, updateFavicon, { immediate: true });
