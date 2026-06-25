@@ -126,6 +126,8 @@ const scoreRevealed = ref(false);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
 /** SSE 请求取消控制器，组件卸载时中止所有未完成的流式请求 */
 const examAbortController = ref<AbortController | null>(null);
+/** 出卷阶段服务端已创建的 examId（在 exam_ready 事件中立即捕获，断线恢复用） */
+const examCreatedId = ref<string | null>(null);
 const dotNavRef = ref<HTMLElement | null>(null);
 
 const EXAM_TRACE_PREFIX = '[Boen Exam]';
@@ -633,6 +635,7 @@ async function generateExamPaper() {
   // 上一轮请求未完成时先中止，再创建新的
   examAbortController.value?.abort();
   examAbortController.value = new AbortController();
+  examCreatedId.value = null;
   try {
     const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes) };
     examTrace('generate:start', examRequest);
@@ -643,6 +646,8 @@ async function generateExamPaper() {
         examTrace(`generate:progress:${e.step}`, { message: e.message, progress: e.progress });
       } else if (e.type === 'exam_ready') {
         ready = { examId: e.examId, title: e.title, totalQuestions: e.totalQuestions, totalScore: e.totalScore, durationMinutes: e.durationMinutes };
+        // 立即捕获 examId，即使后续 SSE 中断也能保存快照
+        examCreatedId.value = e.examId;
         examTrace('generate:ready', ready);
       } else if (e.type === 'error') {
         errMsg = e.message;
@@ -674,7 +679,12 @@ async function generateExamPaper() {
     emit('refresh'); // 新试卷已入库，刷新侧栏考试列表
   } catch (err) {
     console.error(`${EXAM_TRACE_PREFIX} generate:failed`, err);
-    toast.error('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
+    // AbortError = 用户主动离开页面，不弹出错误提示
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      examTrace('generate:aborted');
+    } else {
+      toast.error('生成试卷失败: ' + (err instanceof Error ? err.message : String(err)));
+    }
     examState.value = 'config';
   }
 }
@@ -960,15 +970,15 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  // 断线保存：先保存快照再 abort，确保 examId 不丢失
+  if (examState.value === 'ready' || examState.value === 'taking') {
+    if (session.value?.examId) examStore.saveSession(session.value.examId, examState.value);
+  } else if (examState.value === 'generating') {
+    // 出卷中的 examId 通过 examCreatedId 捕获（session 尚未赋值）
+    if (examCreatedId.value) examStore.saveSession(examCreatedId.value, 'generating');
+  }
   examAbortController.value?.abort();
   if (timerInterval.value) clearInterval(timerInterval.value);
-  // 断线保存：考试已生成但未完成 → 保存快照供下次恢复
-  if (session.value?.examId && (examState.value === 'ready' || examState.value === 'taking')) {
-    examStore.saveSession(session.value.examId, examState.value);
-  }
-  if (examState.value === 'generating' && session.value?.examId) {
-    examStore.saveSession(session.value.examId, 'generating');
-  }
   for (const id of tikzTimers) window.clearTimeout(id);
   tikzTimers.clear();
   if (dotNavResizeTimer) clearTimeout(dotNavResizeTimer);
