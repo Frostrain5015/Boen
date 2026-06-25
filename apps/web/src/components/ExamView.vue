@@ -4,7 +4,7 @@ import Mascot from '@/components/Mascot.vue';
 import { CheckCircle2, XCircle, Sparkles, Clock, AlertTriangle, BarChart3, GraduationCap, BrainCircuit, ChevronDown, ChevronUp, Send, ArrowLeft, ChevronRight, Target, TrendingUp } from 'lucide-vue-next';
 import type { QuestionType, AnswerPayload } from '@boen/shared';
 import { getToken } from '@/services/auth';
-import { streamExamGenerate, streamExamSubmit } from '@/services/chat';
+import { streamExamGenerate, streamExamSubmit, createEmptyExam } from '@/services/chat';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
@@ -637,7 +637,11 @@ async function generateExamPaper() {
   examAbortController.value = new AbortController();
   examCreatedId.value = null;
   try {
-    const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes) };
+    // 先预创建空白考试记录，确保用户切换页面后能找回
+    const { examId } = await createEmptyExam(config.value);
+    examCreatedId.value = examId;
+    examTrace('generate:created-empty', { examId });
+    const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes), examId };
     examTrace('generate:start', examRequest);
     await streamExamGenerate(examRequest, (e) => {
       examTrace(`sse:${e.type}`, e);

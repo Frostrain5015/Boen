@@ -1988,6 +1988,38 @@ export function createExamSession(userId: string, config: ExamConfig, data: Gene
   };
 }
 
+/** 更新由 POST /api/exam 预创建的空白考试记录（出卷完成后填充完整数据） */
+export function updateExamSession(examId: string, userId: string, config: ExamConfig, data: GeneratedExam): ExamSession | null {
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`UPDATE exam_sessions SET subject=?, grade=?, title=?, questions=?, total_score=?, duration_minutes=?, status='pending', updated_at=?, blueprint=?, quality_report=? WHERE id=? AND user_id=?`).run(
+    config.subject,
+    config.grade,
+    data.title,
+    JSON.stringify(data.questions),
+    data.totalScore,
+    data.durationMinutes,
+    now,
+    JSON.stringify(data.blueprint),
+    JSON.stringify(data.qualityReport),
+    examId,
+    userId,
+  );
+  return {
+    id: examId,
+    userId,
+    subject: config.subject,
+    grade: config.grade,
+    title: data.title,
+    questions: data.questions,
+    totalScore: data.totalScore,
+    durationMinutes: data.durationMinutes,
+    status: 'pending',
+    createdAt: now,
+    blueprint: data.blueprint,
+    qualityReport: data.qualityReport,
+  };
+}
+
 export function getExamSession(examId: string, userId: string): ExamSession | null {
   const row = db.prepare(`SELECT * FROM exam_sessions WHERE id=? AND user_id=?`).get(examId, userId) as any;
   if (!row) return null;

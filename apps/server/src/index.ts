@@ -1230,7 +1230,7 @@ app.post('/api/mistakes/:id/practice', async (c) => {
   return c.json({ prompt: formatMistakePracticePrompt(detail.mistake) });
 });
 
-import { generateExam, createExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode, generateDetailedReview } from './exam.js';
+import { generateExam, createExamSession, updateExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode, generateDetailedReview } from './exam.js';
 import { postExamRecommendation } from './exam-recommendation.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
@@ -1239,8 +1239,10 @@ app.post('/api/exam/generate', async (c) => {
   const gate = requirePremium(c, authResult);
   if (gate) return gate;
   const userId = authResult!.userId;
-  const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number; notes?: string; totalScore?: number };
+  const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number; notes?: string; totalScore?: number; examId?: string };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
+  // 如果前端传入了 examId（来自 POST /api/exam 的预创建记录），直接用这个 ID
+  const preCreatedId = body.examId;
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
     try {
@@ -1251,7 +1253,10 @@ app.post('/api/exam/generate', async (c) => {
         (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
         userId,
       );
-      const session = createExamSession(userId, { subject: body.subject, grade: body.grade }, exam);
+      // 使用预创建的 examId 更新记录，否则新建
+      const session = preCreatedId
+        ? updateExamSession(preCreatedId, userId, { subject: body.subject, grade: body.grade }, exam)!
+        : createExamSession(userId, { subject: body.subject, grade: body.grade }, exam);
       await send({
         type: 'exam_ready',
         examId: session.id,
@@ -1334,6 +1339,22 @@ app.post('/api/exam/submit/stream', async (c) => {
       try { await send({ type: 'error', message: msg }); } catch {}
     }
   });
+});
+
+/** POST /api/exam — 创建空考试记录（立即返回 examId，用于断线恢复 */
+app.post('/api/exam', async (c) => {
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
+  const body = await c.req.json() as { subject: string; grade: string; durationMinutes?: number; notes?: string };
+  if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
+  const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at) VALUES (?, ?, ?, ?, '', '[]', 0, ?, 'generating', ?)`).run(
+    id, userId, body.subject, body.grade, body.durationMinutes ?? 45, now,
+  );
+  return c.json({ examId: id });
 });
 
 /** GET /api/exams — 当前用户的考试历史列表（概要） */

@@ -103,10 +103,19 @@ export const streamAnswer = (req: AnswerRequest, onEvent: (e: SseEvent) => void)
 
 /** 生成试卷（流式：实时推送 规划→出题→审核 进度） */
 export const streamExamGenerate = (
-  config: { subject: string; grade: string; durationMinutes: number; notes?: string; totalScore?: number },
+  config: { subject: string; grade: string; durationMinutes: number; notes?: string; totalScore?: number; examId?: string },
   onEvent: (e: SseEvent) => void,
   signal?: AbortSignal,
 ) => streamSse('/api/exam/generate', config, onEvent, signal);
+
+/** 预创建空白考试记录（立即返回 examId，用于断线恢复） */
+export async function createEmptyExam(config: { subject: string; grade: string; durationMinutes?: number; notes?: string }): Promise<{ examId: string }> {
+  return apiFetch('/api/exam', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+}
 
 export const streamExamSubmit = (
   req: { examId: string; answers: Array<{ questionIndex: number; answer: AnswerPayload }> },
