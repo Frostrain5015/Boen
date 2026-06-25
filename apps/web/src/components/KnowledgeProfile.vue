@@ -144,7 +144,7 @@ async function fetchOutline() {
     const data = await res.json();
     outline.value = data;
     setTimeout(() => { animatingNumbers.value = true; }, 100);
-  } catch (e) { console.warn('[profile] load outline failed:', e); }
+  } catch (e) { console.error('[profile] load outline failed:', e); }
   loading.value = false;
 }
 

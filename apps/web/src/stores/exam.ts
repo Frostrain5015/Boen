@@ -32,7 +32,7 @@ export const useExamStore = defineStore('exam', () => {
       const { exams: list } = await listExams();
       exams.value = list;
     } catch (e) {
-      console.warn('[boen] loadExams failed:', e);
+      console.error('[boen] loadExams failed:', e);
     }
   }
 

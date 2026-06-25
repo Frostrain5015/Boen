@@ -168,7 +168,7 @@ function scheduleTikzProcessing() {
   tikzScheduled = true;
   const run = () => {
     processTikzDiagrams(document, tikzSvgsMap.value).catch((err) => {
-      console.warn(`${EXAM_TRACE_PREFIX} tikz:process-failed`, err);
+      console.error(`${EXAM_TRACE_PREFIX} tikz:process-failed`, err);
     });
   };
   nextTick(() => {

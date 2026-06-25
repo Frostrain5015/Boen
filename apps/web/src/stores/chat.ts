@@ -363,7 +363,7 @@ export const useChatStore = defineStore('chat', () => {
       const { conversations: convs } = await getConversations();
       conversations.value = convs;
     } catch (e) {
-      console.warn('[boen] loadConversations failed:', e);
+      console.error('[boen] loadConversations failed:', e);
     }
   }
 
@@ -453,7 +453,7 @@ export const useChatStore = defineStore('chat', () => {
       processTikzDiagrams();
     } catch (e) {
       items.value = [];
-      console.warn('[boen] selectConversation failed:', e);
+      console.error('[boen] selectConversation failed:', e);
       toast.error('\u52a0\u8f7d\u5bf9\u8bdd\u5931\u8d25');
     }
   }

@@ -439,7 +439,7 @@ watch(selectedMistake, async (mistake) => {
     selectedAssetObjectUrl.value = objectUrl;
   } catch (e) {
     selectedAssetObjectUrl.value = '';
-    console.warn('[mistakes] fetch asset failed:', e);
+    console.error('[mistakes] fetch asset failed:', e);
   }
   scheduleTikzProcessing();
   // 断线恢复：如果错题尚未完成分析，自动触发重分析
