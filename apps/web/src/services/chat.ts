@@ -20,6 +20,13 @@ export class StreamInterruptedError extends Error {
   }
 }
 
+// ── 401 未授权回调 ─────────────────────────────
+// 由 authStore 在初始化时注册，避免 Pinia ↔ 服务层的循环依赖
+let _onUnauthorized: (() => void) | null = null;
+export function setOnUnauthorized(cb: () => void) {
+  _onUnauthorized = cb;
+}
+
 /** 通用 SSE 流读取：POST body，逐事件回调 */
 async function streamSse(
   url: string,
@@ -41,6 +48,11 @@ async function streamSse(
 
   // 非 2xx 响应（如 429 限额、401 未认证）：解析 JSON 错误体并抛出
   if (!res.ok) {
+    // 401 → token 过期，触发自动登出
+    if (res.status === 401) {
+      _onUnauthorized?.();
+      throw new Error('认证已过期，请重新登录');
+    }
     try {
       const errBody = await res.json() as Record<string, unknown>;
       const err = new Error(errBody.message as string || `请求失败 (${res.status})`);
@@ -128,6 +140,11 @@ async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
+  // 401 → token 过期，触发自动登出
+  if (res.status === 401) {
+    _onUnauthorized?.();
+    throw new Error('认证已过期，请重新登录');
+  }
   if (!res.ok) {
     const err = await res.text();
     throw new Error(err);
@@ -150,6 +167,11 @@ async function streamAuthorizedSse(
     },
   });
   if (!res.ok) {
+    // 401 → token 过期，触发自动登出
+    if (res.status === 401) {
+      _onUnauthorized?.();
+      throw new Error('认证已过期，请重新登录');
+    }
     const errText = await res.text();
     console.error('[SSE] HTTP 错误', res.status, errText);
     throw new Error(errText);
