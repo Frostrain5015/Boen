@@ -22,7 +22,7 @@ import {
 import Mascot from '@/components/Mascot.vue';
 import { useChatStore } from '@/stores/chat';
 import { useExamStore, subjectMeta, examGradeLabel } from '@/stores/exam';
-import { useUiStore, SUBJECT_LABELS } from '@/stores/ui';
+import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
@@ -62,7 +62,13 @@ const userModelLabel = computed(() => {
 });
 
 function subjectLabel(val: string) {
-  return SUBJECT_LABELS.find((s) => s.value === val) ?? { value: val, label: val, emoji: '📁' };
+  const found = [
+    { value: 'chinese', label: '语文', emoji: '📖' },
+    { value: 'math', label: '数学', emoji: '🔢' },
+    { value: 'english', label: '英语', emoji: '🔤' },
+    { value: 'science', label: '科学', emoji: '🔬' },
+  ].find((s) => s.value === val);
+  return found ?? { label: val, emoji: '📁' };
 }
 
 function formatDate(timestamp: number) {

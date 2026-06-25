@@ -1,18 +1,9 @@
-/**
- * 聊天滚动管理
- *
- * 提供滚动容器引用、自动滚动到底部、溢出检测等功能。
- * 内部使用 ResizeObserver 监听容器尺寸变化，自动更新溢出状态。
- */
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 
 export function useScrollManagement() {
-  /** 滚动容器的 DOM 引用 */
   const scroller = ref<HTMLElement | null>(null);
-  /** 内容是否超出容器高度（用于显示/隐藏顶部淡出遮罩） */
   const hasScrollOverflow = ref(false);
 
-  /** 检查滚动容器是否溢出 */
   function checkScrollOverflow() {
     nextTick(() => {
       const el = scroller.value;
@@ -21,7 +12,6 @@ export function useScrollManagement() {
     });
   }
 
-  /** 滚动到底部（可选强制滚动） */
   function scrollDown(force = false) {
     const doScroll = () => {
       const el = scroller.value;

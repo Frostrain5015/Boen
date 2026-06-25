@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-vue-next';
 import { useToast, type ToastType } from '@/composables/useToast';
 
-const { toasts, dismiss, error } = useToast();
+const { toasts, dismiss } = useToast();
 
 const iconMap: Record<ToastType, any> = {
   success: CheckCircle,
@@ -18,22 +17,10 @@ const colorMap: Record<ToastType, string> = {
   info: 'var(--accent)',
   warning: '#f59e42',
 };
-
-// 监听全局错误事件（来自 main.ts 中的 app.config.errorHandler）
-function onGlobalError(e: Event) {
-  const detail = (e as CustomEvent).detail;
-  if (detail) error(detail);
-}
-onMounted(() => {
-  window.addEventListener('boen:global-error', onGlobalError);
-});
-onUnmounted(() => {
-  window.removeEventListener('boen:global-error', onGlobalError);
-});
 </script>
 
 <template>
-  <div class="toast-stack" data-toast-container aria-live="polite" aria-atomic="false">
+  <div class="toast-stack" aria-live="polite" aria-atomic="false">
     <TransitionGroup name="toast-slide">
       <div
         v-for="t in toasts"

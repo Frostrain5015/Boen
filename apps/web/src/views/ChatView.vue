@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * 对话主视图
- *
- * 包含顶栏（AppHeader）、消息列表（ChatMessages）、输入区域（InputArea）。
- * 挂载时尝试启动新手引导（仅首次登录展示一次）。
- * 类课堂模式运行时，通过 Teleport 在 body 顶部渲染发光跑马灯条。
- */
 import { onMounted, nextTick } from 'vue';
 import { useChatStore } from '@/stores/chat';
 import { useUiStore } from '@/stores/ui';
