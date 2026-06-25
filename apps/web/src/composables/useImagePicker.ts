@@ -1,3 +1,14 @@
+/**
+ * 图片选择与压缩 composable
+ *
+ * 提供文件选择、Canvas 压缩（最长边 1200px，JPEG 0.72 质量）、预览管理功能。
+ * 支持多图片选择，失败图片计数通过 lastPickFailedCount 暴露给调用方。
+ *
+ * 调用方式：
+ *   const cf = useImagePicker();
+ *   cf.pickFromFile(); // 打开文件选择器
+ *   const failed = cf.lastPickFailedCount.value; // 失败图片数量
+ */
 import { ref } from 'vue';
 
 export interface PickedImage {
@@ -40,7 +51,7 @@ function compressImage(file: File): Promise<PickedImage> {
       const data = canvas.toDataURL(mimeType, JPEG_QUALITY).replace(/^data:image\/\w+;base64,/, '');
       resolve({ data, mimeType, name: file.name });
     };
-    img.onerror = () => reject(new Error('图片加载失败'));
+    img.onerror = () => reject(new Error(`图片加载失败: ${file.name}`));
     img.src = URL.createObjectURL(file);
   });
 }
@@ -51,6 +62,8 @@ function compressImage(file: File): Promise<PickedImage> {
  */
 export function useImagePicker() {
   const pickedImages = ref<PickedImage[]>([]);
+  /** 最近一次选择的失败图片数量 */
+  const lastPickFailedCount = ref(0);
 
   /** 打开文件选择器并处理选定图片 */
   function pickFromFile(): void {
@@ -63,11 +76,16 @@ export function useImagePicker() {
       const results = await Promise.allSettled(
         Array.from(input.files).map(f => compressImage(f)),
       );
+      let failed = 0;
       for (const r of results) {
         if (r.status === 'fulfilled') {
           pickedImages.value.push(r.value);
+        } else {
+          failed++;
+          console.error('[ImagePicker] 图片加载失败:', r.reason);
         }
       }
+      lastPickFailedCount.value = failed;
     };
     input.click();
   }
@@ -84,6 +102,7 @@ export function useImagePicker() {
 
   return {
     pickedImages,
+    lastPickFailedCount,
     pickFromFile,
     removeImage,
     clearImages,

@@ -125,7 +125,9 @@ watch(questionType, () => resetStructuredFields());
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
 
 function revokeSelectedAssetUrl() {
-  if (selectedAssetObjectUrl.value) URL.revokeObjectURL(selectedAssetObjectUrl.value);
+  if (selectedAssetObjectUrl.value) {
+    try { URL.revokeObjectURL(selectedAssetObjectUrl.value); } catch { /* 安全忽略 */ }
+  }
   selectedAssetObjectUrl.value = '';
 }
 
@@ -234,7 +236,9 @@ async function analyzeCreated(id: string) {
 
 function clearImage() {
   imageFile.value = null;
-  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value);
+  if (imagePreview.value) {
+    try { URL.revokeObjectURL(imagePreview.value); } catch { /* 安全忽略 */ }
+  }
   imagePreview.value = '';
 }
 
@@ -429,7 +433,7 @@ watch(selectedMistake, async (mistake) => {
   try {
     const objectUrl = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
     if (requestId !== selectedAssetRequest || selectedMistake.value?.id !== mistake.id) {
-      URL.revokeObjectURL(objectUrl);
+      try { URL.revokeObjectURL(objectUrl); } catch { /* 安全忽略 */ }
       return;
     }
     selectedAssetObjectUrl.value = objectUrl;
@@ -595,7 +599,7 @@ onBeforeUnmount(() => {
                         <p class="mt-1.5 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
                         <p class="mt-0.5 text-[11px] text-[var(--ink-soft)] opacity-60">最大 15MB</p>
                       </template>
-                      <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" class="sr-only" @change="onFileChange" />
                     </label>
                     <div class="mt-2 flex items-center justify-between">
                       <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
