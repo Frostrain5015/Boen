@@ -442,6 +442,11 @@ watch(selectedMistake, async (mistake) => {
     console.warn('[mistakes] fetch asset failed:', e);
   }
   scheduleTikzProcessing();
+  // 断线恢复：如果错题尚未完成分析，自动触发重分析
+  if (mistake.status !== 'analyzed' && !busy.value && rightView.value === 'detail') {
+    console.log('[MistakeBook] 检测到未完成分析的错题，正在恢复分析…');
+    reanalyze(mistake);
+  }
 }, { immediate: true });
 
 watch(rightView, (v) => {

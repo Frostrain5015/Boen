@@ -12,8 +12,12 @@ const uiStore = useUiStore();
 const onboarding = useOnboardingStore();
 
 // 首次登录完成设置后进入对话页：尝试开启新手引导（仅一次）
+// 同时检查断线状态，恢复未完成的对话流
 onMounted(() => {
-  nextTick(() => onboarding.maybeStart('chat'));
+  nextTick(() => {
+    chatStore.recoverFromInterruption();
+    onboarding.maybeStart('chat');
+  });
 });
 </script>
 

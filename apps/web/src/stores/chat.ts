@@ -458,6 +458,33 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /**
+   * 断线恢复：组件重新挂载时，检查是否有未完成（断线）的流式响应，
+   * 通过重新加载对话来恢复完整状态。
+   */
+  async function recoverFromInterruption() {
+    if (!currentConversationId.value) return;
+    const last = items.value[items.value.length - 1];
+    // busy=true 但 SSE 连接已断开 → 卡死状态；assistant 未 done → 消息不完整
+    const needsRecovery = busy.value || (last?.kind === 'assistant' && !last.done);
+    if (!needsRecovery) return;
+
+    console.log('[Boen 对话] 检测到断线，正在恢复对话状态…');
+    busy.value = false;
+    isGeneratingQuiz.value = false;
+    if (_sessionActive) {
+      useUiStore().endSession();
+      _sessionActive = false;
+    }
+    const convId = currentConversationId.value;
+    try {
+      await selectConversation(convId);
+      toast.info('对话状态已恢复');
+    } catch {
+      toast.warning('对话状态恢复失败，请尝试新建对话');
+    }
+  }
+
   return {
     // state
     items,
@@ -481,6 +508,7 @@ export const useChatStore = defineStore('chat', () => {
     handleNewConversation,
     handleDeleteConversation,
     selectConversation,
+    recoverFromInterruption,
     handleEvent,
     finalizeAssistants,
     scrollDown,
