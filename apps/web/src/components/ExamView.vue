@@ -10,11 +10,13 @@ import { processTikzDiagrams } from '@/lib/tikz';
 import { useToast } from '@/composables/useToast';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
+import { useExamStore } from '@/stores/exam';
 import StarDisplay from '@/components/StarDisplay.vue';
 import BoenSelect from '@/components/BoenSelect.vue';
 
 const toast = useToast();
 const authStore = useAuthStore();
+const examStore = useExamStore();
 
 interface ExamConfigData {
   subject: 'chinese' | 'math' | 'english' | 'science';
@@ -659,6 +661,9 @@ async function generateExamPaper() {
     examTrace('questions:load:start', { examId: r.examId });
     await loadQuestions(r.examId);
     examState.value = 'ready';
+    // 出卷完成，保存会话快照供断线恢复
+    examStore.clearSavedSession();
+    examStore.saveSession(r.examId, 'ready');
     examTrace('generate:complete', {
       examId: r.examId,
       totalQuestions: session.value?.questions.length ?? 0,
@@ -746,11 +751,15 @@ function startExam() {
   questionSwitchDirection.value = 'next';
   examState.value = 'taking';
   startTimer(session.value.durationMinutes);
+  // 进入答题阶段，更新会话快照状态
+  if (session.value.examId) examStore.saveSession(session.value.examId, 'taking');
 }
 
 function revealResults() {
   scoreRevealed.value = false;
   examState.value = 'results';
+  // 考试完成，清除断线恢复快照
+  examStore.clearSavedSession();
   // 下一帧启动动画
   requestAnimationFrame(() => { requestAnimationFrame(() => { scoreRevealed.value = true; }); });
 }
@@ -901,13 +910,65 @@ function onWindowResize() {
   }, 150);
 }
 
+/**
+ * 断线恢复：从服务端重新加载已生成的试卷，还原到"准备开始"状态。
+ * 计时器和已填写的答案不保留。
+ */
+async function restoreExamSession(examId: string, savedState: 'generating' | 'ready' | 'taking') {
+  try {
+    const res = await fetch(`/api/exam/${examId}`, { headers: authHeaders() });
+    const data = await res.json();
+    if (!data.exam?.questions?.length) {
+      examTrace('restore:exam-not-found', { examId });
+      return;
+    }
+    const exam = data.exam;
+    // 还原试卷基本信息
+    session.value = {
+      examId: exam.examId,
+      title: exam.title ?? '',
+      totalQuestions: exam.questions.length,
+      totalScore: exam.totalScore ?? 0,
+      durationMinutes: exam.durationMinutes ?? 0,
+      questions: exam.questions,
+      qualityReport: exam.qualityReport,
+    };
+    // 还原配置（学科/年级/时长）
+    if (exam.subject) config.value.subject = exam.subject;
+    if (exam.grade) config.value.grade = exam.grade;
+    if (exam.durationMinutes) config.value.durationMinutes = exam.durationMinutes;
+    config.value.notes = exam.notes ?? '';
+    // 还原到"准备开始"（答题界面），计时器和答案重置
+    examState.value = 'ready';
+    answers.value = new Map();
+    timer.value = 0;
+    examTrace('restore:success', { examId, savedState });
+    toast.info('检测到未完成的考试，已恢复试卷');
+  } catch (e) {
+    console.error('[Exam] 恢复考试失败:', e);
+    toast.warning('考试恢复失败，请重新出卷');
+  }
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown);
   window.addEventListener('resize', onWindowResize);
+  // 断线恢复：检查是否有未完成的考试快照
+  if (examStore.savedExamId && examStore.savedExamState) {
+    restoreExamSession(examStore.savedExamId, examStore.savedExamState);
+    examStore.clearSavedSession();
+  }
 });
 onUnmounted(() => {
   examAbortController.value?.abort();
   if (timerInterval.value) clearInterval(timerInterval.value);
+  // 断线保存：考试已生成但未完成 → 保存快照供下次恢复
+  if (session.value?.examId && (examState.value === 'ready' || examState.value === 'taking')) {
+    examStore.saveSession(session.value.examId, examState.value);
+  }
+  if (examState.value === 'generating' && session.value?.examId) {
+    examStore.saveSession(session.value.examId, 'generating');
+  }
   for (const id of tikzTimers) window.clearTimeout(id);
   tikzTimers.clear();
   if (dotNavResizeTimer) clearTimeout(dotNavResizeTimer);

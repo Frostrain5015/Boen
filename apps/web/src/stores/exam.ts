@@ -19,6 +19,12 @@ export const useExamStore = defineStore('exam', () => {
   const pendingExamNotes = ref<string | null>(null);
   const pendingExamConfig = ref<{ subject: Subject; grade: string; durationMinutes: number; notes: string } | null>(null);
 
+  // ── 断线恢复：考试会话快照 ───────────────────────────────
+  /** 已生成但未完成的考试 ID（组件卸载时持久化，用于断线恢复） */
+  const savedExamId = ref<string | null>(null);
+  /** 中断时的考试阶段（generating=出卷中, ready=待作答, taking=作答中） */
+  const savedExamState = ref<'generating' | 'ready' | 'taking' | null>(null);
+
   // ── Actions ───────────────────────────────────────────────
 
   async function loadExams() {
@@ -34,6 +40,7 @@ export const useExamStore = defineStore('exam', () => {
     selectedExamId.value = null;
     pendingExamNotes.value = null;
     pendingExamConfig.value = null;
+    clearSavedSession();
     examViewKey.value++;
   }
 
@@ -48,6 +55,18 @@ export const useExamStore = defineStore('exam', () => {
     uiStore.subject = detail.subject;
     selectedExamId.value = null;
     examViewKey.value++;
+  }
+
+  /** 保存考试会话快照（组件卸载时调用，用于断线恢复） */
+  function saveSession(examId: string, state: 'generating' | 'ready' | 'taking') {
+    savedExamId.value = examId;
+    savedExamState.value = state;
+  }
+
+  /** 清除考试会话快照（考试正常完成或新建时调用） */
+  function clearSavedSession() {
+    savedExamId.value = null;
+    savedExamState.value = null;
   }
 
   async function handleDeleteExam(examId: string, event: Event) {
@@ -72,10 +91,14 @@ export const useExamStore = defineStore('exam', () => {
     examViewKey,
     pendingExamNotes,
     pendingExamConfig,
+    savedExamId,
+    savedExamState,
     loadExams,
     startNewExam,
     openExamReview,
     handleExam,
+    saveSession,
+    clearSavedSession,
     handleDeleteExam,
   };
 });
