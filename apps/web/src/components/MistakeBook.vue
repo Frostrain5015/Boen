@@ -35,6 +35,7 @@ import Mascot from '@/components/Mascot.vue';
 import BoenSelect from '@/components/BoenSelect.vue';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
+import { SUBJECT_LABELS } from '@/stores/ui';
 
 type Subject = 'chinese' | 'math' | 'english' | 'science';
 type IntakeMode = 'image' | 'text';
@@ -49,12 +50,6 @@ const emit = defineEmits<{
   (e: 'practice', detail: { prompt: string; subject: Subject; grade: string }): void;
 }>();
 
-const SUBJECTS = [
-  { value: 'chinese' as const, label: '语文' },
-  { value: 'math' as const, label: '数学' },
-  { value: 'english' as const, label: '英语' },
-  { value: 'science' as const, label: '科学' },
-];
 const STEP_META: Record<AnalyzeMistakeStep, { label: string; icon: typeof ScanText }> = {
   ocr: { label: '识别题面', icon: ScanText },
   analyze: { label: '分析错因', icon: WandSparkles },
@@ -125,7 +120,9 @@ watch(questionType, () => resetStructuredFields());
 const mappedScoreDelta = computed(() => selectedMistake.value?.mappings?.filter((m) => m.afterScore !== undefined) ?? []);
 
 function revokeSelectedAssetUrl() {
-  if (selectedAssetObjectUrl.value) URL.revokeObjectURL(selectedAssetObjectUrl.value);
+  if (selectedAssetObjectUrl.value) {
+    try { URL.revokeObjectURL(selectedAssetObjectUrl.value); } catch { /* 安全忽略 */ }
+  }
   selectedAssetObjectUrl.value = '';
 }
 
@@ -234,7 +231,9 @@ async function analyzeCreated(id: string) {
 
 function clearImage() {
   imageFile.value = null;
-  if (imagePreview.value) URL.revokeObjectURL(imagePreview.value);
+  if (imagePreview.value) {
+    try { URL.revokeObjectURL(imagePreview.value); } catch { /* 安全忽略 */ }
+  }
   imagePreview.value = '';
 }
 
@@ -365,7 +364,7 @@ async function startPractice(mistake: MistakeItem) {
 }
 
 const subjectGrouped = computed(() =>
-  SUBJECTS.map(s => ({
+  SUBJECT_LABELS.map(s => ({
     ...s,
     count: mistakes.value.filter(m => m.subject === s.value).length,
   })),
@@ -429,7 +428,7 @@ watch(selectedMistake, async (mistake) => {
   try {
     const objectUrl = await fetchMistakeAssetObjectUrl(mistake.id, asset.id);
     if (requestId !== selectedAssetRequest || selectedMistake.value?.id !== mistake.id) {
-      URL.revokeObjectURL(objectUrl);
+      try { URL.revokeObjectURL(objectUrl); } catch { /* 安全忽略 */ }
       return;
     }
     selectedAssetObjectUrl.value = objectUrl;
@@ -520,7 +519,7 @@ onBeforeUnmount(() => {
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm font-bold">{{ m.title || '未命名错题' }}</span>
                   <span class="mt-0.5 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
-                    <span>{{ SUBJECTS.find(s => s.value === m.subject)?.label }}</span>
+                    <span>{{ SUBJECT_LABELS.find(s => s.value === m.subject)?.label }}</span>
                     <span>{{ formatTime(m.updatedAt) }}</span>
                     <span class="rounded-full px-1.5 py-0.5" :class="m.status === 'analyzed' ? 'bg-[#e7f7ee] text-[#18a558]' : 'bg-[#fef3e2] text-[#f59e42]'">{{ m.status === 'analyzed' ? '已归档' : '待确认' }}</span>
                   </span>
@@ -595,7 +594,7 @@ onBeforeUnmount(() => {
                         <p class="mt-1.5 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
                         <p class="mt-0.5 text-[11px] text-[var(--ink-soft)] opacity-60">最大 15MB</p>
                       </template>
-                      <input type="file" accept="image/png,image/jpeg,image/webp" class="sr-only" @change="onFileChange" />
+                      <input type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" class="sr-only" @change="onFileChange" />
                     </label>
                     <div class="mt-2 flex items-center justify-between">
                       <p v-if="imageError" class="text-xs font-semibold" style="color: var(--error)">{{ imageError }}</p>
@@ -751,7 +750,7 @@ onBeforeUnmount(() => {
                       <template v-if="batchMistakes.length > 1">
                         <span class="mr-2 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] text-[var(--accent-strong)]">{{ currentBatchIndex + 1 }} / {{ batchMistakes.length }}</span>
                       </template>
-                      {{ SUBJECTS.find(s => s.value === selectedMistake?.subject)?.label }} · {{ gradeLabel(selectedMistake.grade) }} · {{ formatTime(selectedMistake.createdAt) }}
+                      {{ SUBJECT_LABELS.find(s => s.value === selectedMistake?.subject)?.label }} · {{ gradeLabel(selectedMistake.grade) }} · {{ formatTime(selectedMistake.createdAt) }}
                     </p>
                   </div>
                   <div class="flex shrink-0 items-center gap-1">

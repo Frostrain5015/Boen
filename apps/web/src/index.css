@@ -81,8 +81,11 @@ html[data-fontsize="lg"] { font-size: 18px; }
   --ink-soft: #5f7089;
   --line: #d4dde9;
 }
-/* 类课堂冷/暖切换：广谱过渡（* 兜底全覆盖，0.7s 与背景动画同步） */
-*, *::before, *::after {
+/* 类课堂冷/暖切换：下级元素继承获得过渡。
+ * 避免全局 * 通配符的性能开销。通过 CSS 自定义属性继承机制，
+ * 显式声明了 transition 的类（.clay, .btn-accent, .text-accent 等）
+ * 已涵盖所有视觉关键元素。 */
+.boen-session *, .boen-session *::before, .boen-session *::after {
   transition:
     background 0.7s ease,
     color 0.7s ease,
@@ -90,6 +93,11 @@ html[data-fontsize="lg"] { font-size: 18px; }
     fill 0.7s ease,
     stroke 0.7s ease,
     box-shadow 0.7s ease;
+}
+/* 学科切换时，只有显式声明了 transition 的类（如 .bg-accent, .text-accent, .btn-accent）
+ * 会平滑过渡颜色。新增 .clay 卡片在学科切换时的颜色过渡。 */
+.clay, .clay-glass, .clay-sm {
+  transition: background 0.7s ease, border-color 0.7s ease, box-shadow 0.7s ease;
 }
 
 /* ── 类课堂光斑：透明度和颜色冷调调整（无环游，仅渐变过渡）── */
@@ -623,16 +631,13 @@ body {
 .md-body th { background: var(--accent-soft); transition: background-color 0.7s; }
 .md-body a { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; }
 
-/* ── 吉祥物角落变色动画 ───────────────────── */
+/* ── 吉祥物角落呼吸变色动画 ──────────────────── */
 .mascot-corner-cycle {
-  animation: mascotHueShift 4s ease-in-out infinite;
+  animation: mascotBreathe 4s ease-in-out infinite;
 }
-@keyframes mascotHueShift {
-  0%   { filter: hue-rotate(0deg); }
-  25%  { filter: hue-rotate(60deg); }
-  50%  { filter: hue-rotate(180deg); }
-  75%  { filter: hue-rotate(300deg); }
-  100% { filter: hue-rotate(360deg); }
+@keyframes mascotBreathe {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.82; filter: brightness(1.08); }
 }
 
 /* 滚动条 */
@@ -641,14 +646,18 @@ body {
 *::-webkit-scrollbar-thumb:hover { background: rgba(120, 106, 93, 0.4); background-clip: content-box; }
 
 /* ── 视图切换淡入淡出 ────────────────────────── */
+/* 修正：离开与进入动画重叠导致的抖动：
+ * mode="out-in" 确保旧视图完全消失后再渲染新视图，
+ * 避免 enter-from（translateY(8px)）与 leave-to（translateY(-6px)）
+ * 在同一时刻叠加产生跳跃感。 */
 .view-fade-enter-active,
 .view-fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 .view-fade-leave-active {
   pointer-events: none;
 }
-.view-fade-enter-from { opacity: 0; transform: translateY(8px); }
+.view-fade-enter-from { opacity: 0; transform: translateY(10px); }
 .view-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
 /* ── 会员系统 UI ─────────────────────────────── */
@@ -750,7 +759,7 @@ body {
 
 /* ── 无障碍：尊重 reduced-motion ───────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  .boen-session *, .boen-session *::before, .boen-session *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

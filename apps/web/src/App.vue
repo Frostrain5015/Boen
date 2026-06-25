@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * 博文 Boen 根组件
+ *
+ * 条件渲染结构（按优先级）：
+ * 1. OAuth 回调 → 渲染 OAuthCallback 处理授权码
+ * 2. 未认证 → 渲染 LoginView（authChecked 为 false 时也拦截，防止闪现未登录界面）
+ * 3. 已认证 → 主应用布局：背景层 + 侧边栏 + 路由视图 + 吉祥物 + 新手引导
+ *
+ * 全局常驻组件：ToastProvider（通知）、ConfirmDialog（确认弹窗）、NetworkStatusBanner（断网提示）
+ */
 import { onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import OAuthCallback from '@/components/OAuthCallback.vue';
@@ -24,7 +34,7 @@ watch(() => router.currentRoute.value.name, (name) => {
   }
 });
 
-// Initialize favicon watcher
+// 初始化 Favicon 学科色跟随
 useFavicon();
 
 onMounted(() => {
@@ -72,7 +82,7 @@ onMounted(() => {
       <!-- 主内容区 -->
       <div class="relative min-h-0 min-w-0 flex-1 overflow-hidden" :data-subject="uiStore.subject">
         <router-view v-slot="{ Component }">
-          <Transition name="view-fade">
+          <Transition name="view-fade" mode="out-in">
             <component :is="Component" class="absolute inset-0 flex flex-col" />
           </Transition>
         </router-view>

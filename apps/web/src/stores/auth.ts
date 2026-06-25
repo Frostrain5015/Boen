@@ -2,9 +2,16 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Grade, SubscriptionStatus, CurrencyStatus } from '@boen/shared';
 import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
+import { setOnUnauthorized } from '@/services/chat';
 import { useChatStore } from './chat';
 import { useExamStore } from './exam';
 import router from '@/router';
+
+// 注册 401 自动登出回调：当 API 请求返回 401 时，自动清除登录状态并跳转到登录页
+setOnUnauthorized(() => {
+  const store = useAuthStore();
+  store.doLogout();
+});
 
 // ── User Profile types & helpers ────────────────────────────
 const PROFILE_KEY = 'boen_user_profile';
@@ -56,8 +63,8 @@ export const useAuthStore = defineStore('auth', () => {
       if (res.ok) {
         subscription.value = (await res.json()) as SubscriptionStatus;
       }
-    } catch {
-      /* 静默失败，不影响基础功能 */
+    } catch (e) {
+      console.error('[boen] fetchSubscription failed:', e);
     }
   }
 
@@ -93,8 +100,8 @@ export const useAuthStore = defineStore('auth', () => {
       if (res.ok) {
         currency.value = (await res.json()) as CurrencyStatus;
       }
-    } catch {
-      /* 静默失败 */
+    } catch (e) {
+      console.error('[boen] fetchCurrencyStatus failed:', e);
     }
   }
 

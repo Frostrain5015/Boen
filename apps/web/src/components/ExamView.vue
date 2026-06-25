@@ -123,6 +123,8 @@ const gradingSteps: Array<{ step: GradingStep; label: string }> = [
 const scoreRevealed = ref(false);
 const questionSwitchDirection = ref<'next' | 'prev'>('next');
 const dotNavRef = ref<HTMLElement | null>(null);
+/** SSE 请求取消控制器，组件卸载时中止所有未完成的流式请求 */
+const examAbortController = ref<AbortController | null>(null);
 
 const EXAM_TRACE_PREFIX = '[Boen Exam]';
 function examTrace(event: string, payload?: unknown) {
@@ -626,6 +628,9 @@ async function generateExamPaper() {
   genProgress.value = { step: 'blueprint', message: '正在准备…', progress: 0 };
   let ready: ExamReadyData | undefined;
   let errMsg = '';
+  // 创建新的 AbortController，旧请求会被上一轮创建时取代
+  examAbortController.value?.abort();
+  examAbortController.value = new AbortController();
   try {
     const examRequest = { ...config.value, totalScore: totalScoreForDuration(config.value.durationMinutes) };
     examTrace('generate:start', examRequest);
@@ -641,7 +646,7 @@ async function generateExamPaper() {
         errMsg = e.message;
         console.error(`${EXAM_TRACE_PREFIX} generate:error`, e.message);
       }
-    });
+    }, examAbortController.value!.signal);
     examTrace('generate:stream-complete');
     if (errMsg) throw new Error(errMsg);
     const r = ready as ExamReadyData | undefined;
@@ -675,6 +680,9 @@ async function submitExam() {
   examState.value = 'grading';
   // 只提交已作答的题（留空的题跳过，由后端按未作答计 0 分）
   const answerArray: { questionIndex: number; answer: AnswerPayload }[] = [];
+  // 创建新的 AbortController，旧请求会被上一轮创建时取代
+  examAbortController.value?.abort();
+  examAbortController.value = new AbortController();
   for (const q of session.value.questions) {
     const payload = toAnswerPayload(q.type, answers.value.get(q.index));
     if (payload) answerArray.push({ questionIndex: q.index, answer: payload });
@@ -691,7 +699,7 @@ async function submitExam() {
       } else if (e.type === 'error') {
         errMsg = e.message;
       }
-    });
+    }, examAbortController.value!.signal);
     if (errMsg) throw new Error(errMsg);
     if (gradedResults) {
       const gr: ExamResultsData = gradedResults;
@@ -898,6 +906,7 @@ onMounted(() => {
   window.addEventListener('resize', onWindowResize);
 });
 onUnmounted(() => {
+  examAbortController.value?.abort();
   if (timerInterval.value) clearInterval(timerInterval.value);
   for (const id of tikzTimers) window.clearTimeout(id);
   tikzTimers.clear();

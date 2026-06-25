@@ -7,6 +7,7 @@ import { getExamReview } from '@/services/chat';
 import { renderMarkdown } from '@/lib/markdown';
 import { processTikzDiagrams } from '@/lib/tikz';
 import StarDisplay from '@/components/StarDisplay.vue';
+import { SUBJECT_LABELS } from '@/stores/ui';
 
 const props = defineProps<{ examId: string | null }>();
 const emit = defineEmits<{ (e: 'back'): void }>();
@@ -16,15 +17,9 @@ const detail = ref<ExamReviewDetail | null>(null);
 const expanded = ref<Set<number>>(new Set());
 const error = ref('');
 
-const SUBJECT_LABELS: Record<string, { label: string; emoji: string }> = {
-  chinese: { label: '语文', emoji: '📖' },
-  math: { label: '数学', emoji: '🔢' },
-  english: { label: '英语', emoji: '🔤' },
-  science: { label: '科学', emoji: '🔬' },
-};
 const TYPE_LABELS: Record<string, string> = { multiple_choice: '选择题', fill_blank: '填空题', true_false: '判断题', short_answer: '简答题' };
 
-function subjectInfo(s: string) { return SUBJECT_LABELS[s] ?? { label: s, emoji: '📁' }; }
+function subjectInfo(subject: string) { return SUBJECT_LABELS.find((s) => s.value === subject) ?? { value: subject, label: subject, emoji: '📁' }; }
 function gradeLabel(g: string): string {
   const n = Number(g);
   if (!n) return g;
