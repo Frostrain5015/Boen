@@ -19,8 +19,8 @@ const MAX_SUMMARIES_PER_USER = 50;
 const MEMORY_WINDOW_DAYS = 30;
 /** 最大注入摘要条数 */
 const MAX_INJECT_MEMORIES = 3;
-/** 摘要相关度阈值（低于此值跳过注入） */
-const SIMILARITY_THRESHOLD = 0.45;
+/** 摘要相关度阈值（低于此值跳过注入）。bge-small-zh 区分度有限，基线 ~0.63，需 ≥0.70 才有实质语义相关。 */
+const SIMILARITY_THRESHOLD = 0.70;
 
 // ── Prompt ─────────────────────────────────────
 const SUMMARY_SYSTEM = `你是一个教育助手的对话摘要器。分析以下一段师生对话，生成结构化的摘要。
@@ -222,5 +222,5 @@ export async function retrieveRelevantMemories(
   未解决问题：${r.unresolvedQuestions || '无'}`
   );
 
-  return `\n## 🕐 历史关联\n学生之前讨论过以下内容：\n${lines.join('\n---\n')}\n\n请利用这些历史信息调整教学节奏，避免重复已掌握的内容，并关注上次未解决的问题。`;
+  return `\n## 🕐 历史关联\n学生之前讨论过以下内容：\n${lines.join('\n---\n')}\n\n请利用这些历史信息调整教学节奏，避免重复已掌握的内容，并关注上次未解决的问题。\n【⚠ 绝对禁止】不要在回复开头提及、复述或总结上述历史对话内容。直接回答学生当前的问题，历史信息仅用于内部调整教学策略。`;
 }
