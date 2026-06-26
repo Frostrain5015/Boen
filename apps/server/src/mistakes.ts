@@ -1349,7 +1349,7 @@ export async function analyzeMistake(
   let analyses: AnalysisJson[];
 
   if (!recognizedText && row.source_type === 'image') {
-    await onProgress?.({ step: 'ocr', message: '多模态识别题目（含手写与批改）', progress: 8 });
+    await onProgress?.({ step: 'ocr', message: '阿里云OCR正在识别', progress: 8 });
     const assetPath = getOriginalAssetPath(mistakeId);
     if (!assetPath) throw new Error('找不到原始图片');
     const vlm = await recognizeAndAnalyzeWithVlm(assetPath, row.subject, row.grade, candidates0);
@@ -1384,6 +1384,8 @@ export async function analyzeMistake(
   const candidates = getCandidateNodes(effectiveSubject, row.grade, 80);
 
   // ── 3. 逐题应用分析结果 ──
+  // 做对（学生答案与正确答案相近或相同）的题：照常入库 + 沉淀向量化出题风格素材，
+  // 仅在「错题本列表」层面不予收录（由 is_correct 过滤，见 applyAnalysisToMistake / listMistakes）。
   for (let i = 0; i < analyses.length; i++) {
     const analysis = analyses[i];
     let targetId: string;
@@ -1394,7 +1396,7 @@ export async function analyzeMistake(
       targetId = mistakeId;
       targetRow = { ...row, subject: effectiveSubject };
     } else {
-      // 后续题创建新记录（无资产，共享 OCR 文本）
+      // 后续题创建新记录（无资产，共享识别文本）
       targetId = makeMistakeId();
       const now = nowSec();
       db.prepare(`
@@ -1417,7 +1419,7 @@ export async function analyzeMistake(
 
   // ── 4. 批量整合风格技能：每流程激进合并成 ≤3 个有效技能，沉淀进全局库 ──
   try {
-    await onProgress?.({ step: 'style', message: '整合并沉淀出题风格技能', progress: 99 });
+    await onProgress?.({ step: 'style', message: '整理出题风格', progress: 99 });
     const summaries = analyses
       .filter((a) => (a.promptText || a.title))
       .map((a) => [

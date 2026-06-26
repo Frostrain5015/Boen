@@ -91,6 +91,52 @@ const progress = ref(0);
 const progressMessage = ref('');
 const activeStep = ref<AnalyzeMistakeStep | null>(null);
 const completedSteps = ref<Set<AnalyzeMistakeStep>>(new Set());
+
+// ── 进度平滑 & 计时 ──
+// 新链路里「阿里云OCR正在识别」单步可达 60~90s，服务端 progress 会长时间停在 8%。
+// 用前端计时 + 缓动让进度条持续前进，并在长步骤上显示「已运行 / 预计」时间。
+const displayProgress = ref(0);
+const stepStartMs = ref(Date.now());
+const nowMs = ref(Date.now());
+let progressTimer: ReturnType<typeof setInterval> | null = null;
+// 长步骤预计耗时（秒）：用于展示与缓动目标。仅图片识别 / 末尾风格整理会明显耗时。
+const STEP_ETA_SEC: Partial<Record<AnalyzeMistakeStep, number>> = { ocr: 60, style: 18 };
+
+const elapsedSec = computed(() => Math.max(0, Math.floor((nowMs.value - stepStartMs.value) / 1000)));
+const isTimedStep = computed(() =>
+  (activeStep.value === 'ocr' && mode.value === 'image') ||
+  (activeStep.value === 'style' && progress.value >= 99));
+const displayMessage = computed(() => {
+  const base = progressMessage.value || '准备分析错题';
+  if (!isTimedStep.value) return base;
+  const eta = STEP_ETA_SEC[activeStep.value as AnalyzeMistakeStep];
+  return eta ? `${base} · 已 ${elapsedSec.value}s / 预计 ~${eta}s` : `${base} · 已 ${elapsedSec.value}s`;
+});
+const displayPercent = computed(() => Math.min(100, Math.round(displayProgress.value)));
+
+// 缓动目标：长步骤里允许进度条向「下一里程碑之前」缓慢爬升，避免长时间不动。
+function creepTarget(): number {
+  if (activeStep.value === 'ocr' && mode.value === 'image') return 28;     // 8 → 28
+  if (activeStep.value === 'style' && progress.value >= 99) return 99.6;   // 99 → 99.6
+  return progress.value;
+}
+function startProgressTimer() {
+  stepStartMs.value = Date.now();
+  nowMs.value = Date.now();
+  if (progressTimer) clearInterval(progressTimer);
+  progressTimer = setInterval(() => {
+    nowMs.value = Date.now();
+    const target = creepTarget();
+    if (displayProgress.value < target) {
+      // 指数缓动：越接近目标越慢，营造「持续推进但不冲到头」的观感。
+      displayProgress.value = Math.min(target, displayProgress.value + Math.max(0.12, (target - displayProgress.value) * 0.06));
+    }
+  }, 400);
+}
+function stopProgressTimer() {
+  if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+}
+onBeforeUnmount(stopProgressTimer);
 const selectedAssetObjectUrl = ref('');
 let selectedAssetRequest = 0;
 const batchMistakes = ref<MistakeItem[]>([]);
@@ -175,14 +221,19 @@ function resetProgress() {
   progressMessage.value = '';
   activeStep.value = null;
   completedSteps.value = new Set();
+  displayProgress.value = 0;
+  stepStartMs.value = Date.now();
+  nowMs.value = Date.now();
 }
 
 function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
   if (event.type === 'mistake_progress') {
     console.log('[错题分析] 进度:', event.step, event.message, event.progress);
+    if (event.message !== progressMessage.value) stepStartMs.value = Date.now();
     activeStep.value = event.step;
     progress.value = event.progress;
     progressMessage.value = event.message;
+    if (event.progress > displayProgress.value) displayProgress.value = event.progress;
     const next = new Set(completedSteps.value);
     for (const step of STEPS) {
       if (STEPS.indexOf(step) < STEPS.indexOf(event.step)) next.add(step);
@@ -190,25 +241,23 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     completedSteps.value = next;
   } else if (event.type === 'mistake_ready') {
     console.log('[错题分析] 完成, promptText.length:', event.mistake.promptText?.length ?? 0);
-    batchMistakes.value.push(event.mistake);
-    currentBatchIndex.value = batchMistakes.value.length - 1;
-    selectedMistake.value = event.mistake;
-    // 答案匹配度≥阈值：判定为大概率做对，从前端错题列表过滤
+    // 做对的题（学生答案与正确答案相近或相同）不予收录进错题本；
+    // 后端仍入库并向量化其题型风格，作为智能体出题学习素材。
     if (event.mistake.isCorrect) {
       const score = Math.round((event.mistake.answerMatchScore ?? 0) * 100);
-      correctNotice.value = `该题学生答案与正确答案匹配度 ${score}%，判定为大概率做对，已自动移出错题列表。题型风格特征仍已沉淀，将融入后续出题。`;
-      // 从列表移除（重分析场景下可能已存在）
+      correctNotice.value = `该题学生答案与正确答案匹配度 ${score}%，判定为做对，未收录进错题本；其题型风格已沉淀，将融入后续智能出题。`;
+      // 从列表移除（重分析场景下可能已存在），也不进入逐题复看
       mistakes.value = mistakes.value.filter((m) => m.id !== event.mistake.id);
     } else {
       correctNotice.value = '';
+      batchMistakes.value.push(event.mistake);
+      currentBatchIndex.value = batchMistakes.value.length - 1;
+      selectedMistake.value = event.mistake;
       // 更新列表
       const index = mistakes.value.findIndex((m) => m.id === event.mistake.id);
       if (index >= 0) mistakes.value[index] = event.mistake;
       else mistakes.value.unshift(event.mistake);
     }
-    progress.value = 100;
-    activeStep.value = 'complete';
-    completedSteps.value = new Set(STEPS);
   } else if (event.type === 'error') {
     error.value = event.message;
   }
@@ -230,7 +279,17 @@ function nextQuestion() {
 
 async function analyzeCreated(id: string) {
   resetProgress();
-  await streamMistakeAnalyze(id, handleAnalyzeEvent);
+  startProgressTimer();
+  try {
+    await streamMistakeAnalyze(id, handleAnalyzeEvent);
+    // 流结束才算真正完成，避免多题场景下中途跳到 100% 再回落
+    progress.value = 100;
+    displayProgress.value = 100;
+    activeStep.value = 'complete';
+    completedSteps.value = new Set(STEPS);
+  } finally {
+    stopProgressTimer();
+  }
   await refreshMistakes();
 }
 
@@ -545,11 +604,11 @@ onBeforeUnmount(() => {
         <div v-if="busy || progress > 0" class="border-b border-[var(--line)] px-5 py-4">
           <div class="mb-3 flex items-center gap-2">
             <ScanText class="h-4 w-4 text-[var(--accent)]" />
-            <span class="font-display text-sm font-bold text-[var(--ink)]">{{ progressMessage || '准备分析错题' }}</span>
-            <span class="ml-auto text-xs font-bold text-[var(--accent-strong)]">{{ progress }}%</span>
+            <span class="font-display text-sm font-bold text-[var(--ink)]">{{ displayMessage }}</span>
+            <span class="ml-auto text-xs font-bold text-[var(--accent-strong)]">{{ displayPercent }}%</span>
           </div>
           <div class="h-2 overflow-hidden rounded-full bg-[var(--paper)]">
-            <div class="h-full rounded-full bg-accent transition-all duration-300" :style="{ width: `${progress}%` }"></div>
+            <div class="h-full rounded-full bg-accent transition-all duration-300" :style="{ width: `${displayProgress}%` }"></div>
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2 md:grid-cols-6">
             <div v-for="step in STEPS" :key="step" class="flex items-center gap-1.5 rounded-2xl px-2 py-2 text-xs font-bold transition-all" :class="completedSteps.has(step) || activeStep === step ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'bg-white/60 text-[var(--ink-soft)]'">
