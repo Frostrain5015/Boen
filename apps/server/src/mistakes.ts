@@ -2,17 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { Readable } from 'node:stream';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import * as OcrPkg from '@alicloud/ocr-api20210707';
-const OcrRuntime = OcrPkg as any;
-const OcrClient = (OcrRuntime.default?.default ?? OcrRuntime.default ?? OcrRuntime) as new (config: any) => {
-  recognizeEduPaperOcr(req: any): Promise<any>;
-  recognizeEduPaperStructed(req: any): Promise<any>;
-};
-const { RecognizeEduPaperOcrRequest, RecognizeEduPaperStructedRequest } = OcrRuntime;
-import * as OpenApi from '@alicloud/openapi-client';
 import type {
   Difficulty,
   MistakeAsset,
@@ -31,9 +22,15 @@ import { blobToVector, cosineSim, embedQuery, embedTexts, vectorToBlob } from '.
 import { getProficiencyLevel } from './knowledge-profile.js';
 
 import { ASSET_ROOT } from './paths.js';
-const MAX_IMAGE_MB = Number(process.env.ALIYUN_OCR_MAX_IMAGE_MB ?? '8');
+const MAX_IMAGE_MB = Number(process.env.MISTAKE_IMAGE_MAX_MB ?? process.env.ALIYUN_OCR_MAX_IMAGE_MB ?? '8');
 const MAX_IMAGE_BYTES = Math.max(1, MAX_IMAGE_MB) * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+// 阿里云百炼（DashScope）多模态识别 —— 错题图片走单次 VLM 调用，直接产出结构化题目分析，
+// 取代旧版"教育试卷 OCR 资源包 + 再调一次 LLM 抽题"的两步链路。
+const BAILIAN_BASE_URL = (process.env.BAILIAN_BASE_URL ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/+$/, '');
+const BAILIAN_VL_MODEL = process.env.BAILIAN_VL_MODEL ?? 'qwen3-vl-plus';
+const BAILIAN_VL_TIMEOUT_MS = Number(process.env.BAILIAN_VL_TIMEOUT_MS ?? '180000');
 
 type UploadedAsset = {
   bytes: Buffer;
@@ -75,12 +72,6 @@ type AnalysisJson = {
   distractorPattern?: string;
   presentationFeatures?: Record<string, unknown>;
   styleText?: string;
-};
-
-type OcrResult = {
-  provider: string;
-  raw: unknown;
-  text: string;
 };
 
 function nowSec() {
@@ -299,150 +290,122 @@ function safeParseJson(raw: string): any {
   throw new Error('LLM 返回的分析 JSON 无法解析');
 }
 
-function collectTextValues(value: unknown, acc: string[] = [], depth = 0): string[] {
-  if (depth > 8 || value == null) return acc;
-  if (typeof value === 'string') {
-    const text = value.trim();
-    if (text.length >= 2 && text.length <= 4000) acc.push(text);
-    return acc;
-  }
-  if (Array.isArray(value)) {
-    for (const item of value) collectTextValues(item, acc, depth + 1);
-    return acc;
-  }
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    for (const key of ['content', 'text', 'word', 'words', 'question', 'answer', 'stem', 'value', 'data']) {
-      if (key in obj) collectTextValues(obj[key], acc, depth + 1);
-    }
-    for (const [key, child] of Object.entries(obj)) {
-      if (['content', 'text', 'word', 'words', 'question', 'answer', 'stem', 'value', 'data'].includes(key)) continue;
-      collectTextValues(child, acc, depth + 1);
-    }
-  }
-  return acc;
+/** 依据文件魔数判断图片 MIME，无法识别时回退 jpeg。 */
+function detectImageMime(buf: Buffer): string {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
+  return 'image/jpeg';
 }
 
-function normalizeOcrText(rawData: string | undefined): { raw: unknown; text: string } {
-  if (!rawData) return { raw: {}, text: '' };
-  const raw = safeJson<unknown>(rawData, rawData);
-  const payload = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? raw as Record<string, unknown>
-    : {};
+type VlmRecognition = {
+  provider: string;
+  raw: unknown;
+  recognizedText: string;
+  analyses: AnalysisJson[];
+};
 
-  // RecognizeEduPaperOcr returns reading-order text in `content`. Recursively
-  // collecting every response string duplicates words and metadata, which
-  // causes unreliable downstream question splitting.
-  const content = typeof payload.content === 'string' ? payload.content.trim() : '';
-  if (content) return { raw, text: content };
+/**
+ * 单次多模态调用：错题图片 → 结构化题目分析。
+ *
+ * VLM 直接完成「识别题面 + 转写学生手写 + 依红笔批改判对错 + 错因/知识点映射」，
+ * 取代旧版「教育试卷 OCR 出文本 → 再调一次 LLM 抽题」的两步链路。让模型看到原图
+ * 才能利用红笔 √/× 等视觉批改信号，这是纯文本 OCR 丢失、下游文本模型无法复原的。
+ */
+async function recognizeAndAnalyzeWithVlm(
+  filePath: string,
+  subject: string,
+  grade: string,
+  candidates: CandidateNode[],
+): Promise<VlmRecognition> {
+  const apiKey = process.env.BAILIAN_API_KEY;
+  if (!apiKey) throw new Error('多模态识别未配置：请设置 BAILIAN_API_KEY');
 
-  const words = Array.isArray(payload.prism_wordsInfo)
-    ? payload.prism_wordsInfo
-      .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === 'object'))
-      .map((item) => ({
-        text: typeof item.word === 'string' ? item.word.trim() : '',
-        y: Number(item.y ?? (item.pos as any)?.[0]?.y ?? 0),
-        x: Number(item.x ?? (item.pos as any)?.[0]?.x ?? 0),
-      }))
-      .filter((item) => item.text)
-      .sort((a, b) => a.y - b.y || a.x - b.x)
-    : [];
-  if (words.length) return { raw, text: words.map((item) => item.text).join('\n') };
-
-  const texts = collectTextValues(raw)
-    .map((s) => s.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-  return { raw, text: [...new Set(texts)].slice(0, 80).join('\n') };
-}
-
-function legacySubjectForAliyun(subject: string, grade: string) {
-  const n = Number(grade);
-  const isPrimary = Number.isFinite(n) && n >= 1 && n <= 6;
-  const isMiddle = Number.isFinite(n) && n >= 7 && n <= 9;
-  if (subject === 'math') return isPrimary ? 'PrimarySchool_Math' : isMiddle ? 'JHighSchool_Math' : 'Math';
-  if (subject === 'chinese') return isPrimary ? 'PrimarySchool_Chinese' : 'Chinese';
-  if (subject === 'english') return isPrimary ? 'PrimarySchool_English' : isMiddle ? 'JHighSchool_English' : 'English';
-  return 'default';
-}
-
-/** 阿里云 ACK 签名辅助：计算 HMAC-SHA1 */
-function subjectForAliyun(subject: string, grade: string) {
-  const n = Number(grade);
-  const isPrimary = Number.isFinite(n) && n >= 1 && n <= 6;
-  const isMiddle = Number.isFinite(n) && n >= 7 && n <= 9;
-  if (subject === 'math') return isPrimary ? 'PrimarySchool_Math' : isMiddle ? 'JHighSchool_Math' : 'Math';
-  if (subject === 'chinese') return isPrimary ? 'PrimarySchool_Chinese' : 'Chinese';
-  if (subject === 'english') return isPrimary ? 'PrimarySchool_English' : isMiddle ? 'JHighSchool_English' : 'English';
-  return 'default';
-}
-
-/** 用 Buffer 替代 ReadStream 传给 SDK（避免 @alicloud/openapi-core v1.0.7 的 stream 兼容问题） */
-function readableFromBuffer(buf: Buffer): Readable {
-  return Readable.from(buf);
-}
-
-let aliyunClient: InstanceType<typeof OcrClient> | null = null;
-function getAliyunOcrClient() {
-  const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
-  const accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
-  if (!accessKeyId || !accessKeySecret) {
-    throw new Error('阿里云 OCR 未配置：请设置 ALIYUN_ACCESS_KEY_ID 和 ALIYUN_ACCESS_KEY_SECRET');
-  }
-  if (!aliyunClient) {
-    const config = new OpenApi.Config({
-      accessKeyId,
-      accessKeySecret,
-      endpoint: process.env.ALIYUN_OCR_ENDPOINT ?? 'ocr-api.cn-hangzhou.aliyuncs.com',
-    });
-    aliyunClient = new OcrClient(config as any);
-  }
-  return aliyunClient;
-}
-
-export async function recognizeWithAliyunEduOcr(filePath: string, subject: string, grade: string): Promise<OcrResult> {
-  const client = getAliyunOcrClient();
   const imageBuf = readFileSync(filePath);
-  const request = new RecognizeEduPaperOcrRequest({
-    subject: subjectForAliyun(subject, grade),
-    imageType: process.env.ALIYUN_OCR_IMAGE_TYPE ?? 'photo',
-    outputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false',
-    // 用 Buffer 创建的 Readable 替代 createReadStream，避免 SDK 的 stream 兼容问题
-    body: readableFromBuffer(imageBuf) as any,
-  });
-  console.log(`[OCR] SDK 请求, 图片 ${imageBuf.length} bytes, subject=${request.subject}`);
-  const response = await client.recognizeEduPaperOcr(request);
-  const body = response.body;
-  console.log(`[OCR] SDK 响应 code=${body?.code}, msg=${String(body?.message ?? '').slice(0, 200)}`);
-  if (response.statusCode !== 200 || (body?.code && body.code !== '200')) {
-    throw new Error(`阿里云 OCR 识别失败：${body.message ?? body.code}`);
+  if (imageBuf.length > MAX_IMAGE_BYTES) {
+    throw new Error(`图片体积 ${(imageBuf.length / 1024 / 1024).toFixed(1)}MB 超过上限 ${MAX_IMAGE_MB}MB`);
   }
-  const normalized = normalizeOcrText(body?.data);
-  if (!normalized.text.trim()) {
-    throw new Error('阿里云 OCR 未返回可用题目文本');
+  const mime = detectImageMime(imageBuf);
+  const dataUrl = `data:${mime};base64,${imageBuf.toString('base64')}`;
+
+  // 紧凑候选知识点：只给 id+标题供模型回填 kgNodeId，避免外泄无关字段、压低 prompt token。
+  const candidateText = candidates.slice(0, 60)
+    .map((n) => `[${n.id}] ${n.title}${n.unitTitle ? `（${n.unitTitle}）` : ''}`)
+    .join('\n') || '（无候选）';
+
+  const system = '你是教育错题分析系统。只输出可被 JSON.parse 解析的 JSON 对象，禁止 Markdown 代码块、禁止任何解释性文字。';
+  const userText = [
+    '这是一张学生的作业/试卷照片。请逐题识别并分析，输出 {"questions": [...]}，questions 内每个元素对应一道题。',
+    '',
+    '硬性要求：',
+    '1. 忠实转写题干与学生手写作答（含写错的内容）；绝不替学生解题或纠正其答案，studentAnswer 必须是学生「实际写下」的内容。',
+    '2. 优先依据图中老师的红笔批改（√/×、圈划、订正）判断对错——这是最可靠的依据；无批改时再据题意判断。',
+    '3. correctAnswer 给标准答案；isCorrect 为布尔，判断学生是否真的答对。学生留空则 isCorrect=false 且 errorType="unanswered"；答对则 isCorrect=true 且 errorType="none"。',
+    '4. 应用题学生常写整段过程（如「740-492=248(个) 答：…」），只要最终结果正确即视为答对，不要因表述与标准答案文字不同而误判。',
+    '5. knowledgeNodes 只能从下方候选列表里选 kgNodeId，不要编造新 ID；无法确定就返回空数组。',
+    '',
+    '每题字段（无法判断填 null）：subject(chinese|math|english|science), title(10字内), promptText(完整题面), studentAnswer, correctAnswer, explanation(解法,100字内), errorType(概念混淆|计算失误|审题遗漏|步骤跳步|表达不完整|none|unanswered), errorReason(具体错因,不能只写粗心), isCorrect(bool), confidence(0~1), questionType(选择题|填空题|判断题|计算题|应用题|解答题|阅读题|其他), difficulty(easy|medium|hard), scenarioType(具体真实情境,如购物找零/行程问题), reasoningPattern(核心推理结构), distractorPattern(常见误区), styleText(50字内风格摘要,只描述结构与风格、不复述具体数字), knowledgeNodes(数组,元素 {kgNodeId,title,role(primary|related|prerequisite),confidence,evidence})。',
+    '',
+    `学科: ${subject}；年级: ${grade}`,
+    '候选知识点:',
+    candidateText,
+  ].join('\n');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BAILIAN_VL_TIMEOUT_MS);
+  let resp: Awaited<ReturnType<typeof fetch>>;
+  try {
+    console.log(`[VLM] 多模态识别请求 model=${BAILIAN_VL_MODEL}, 图片 ${imageBuf.length} bytes (${mime})`);
+    resp = await fetch(`${BAILIAN_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: BAILIAN_VL_MODEL,
+        max_tokens: 4000,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: [
+            { type: 'image_url', image_url: { url: dataUrl } },
+            { type: 'text', text: userText },
+          ] },
+        ],
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`多模态识别超时（>${Math.round(BAILIAN_VL_TIMEOUT_MS / 1000)}s），请重试`);
+    }
+    throw new Error(`多模态识别请求失败：${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    clearTimeout(timer);
   }
 
-  // Structed returns layout/cut coordinates rather than text. Keep it as
-  // optional traceability metadata, never as the source of LLM input.
-  let structure: unknown = undefined;
-  if ((process.env.ALIYUN_OCR_USE_STRUCTURE ?? 'true') !== 'false') {
-    try {
-      const structureResponse = await client.recognizeEduPaperStructed(new RecognizeEduPaperStructedRequest({
-        subject: subjectForAliyun(subject, grade),
-        needRotate: (process.env.ALIYUN_OCR_NEED_ROTATE ?? 'true') !== 'false',
-        outputOricoord: (process.env.ALIYUN_OCR_OUTPUT_ORICOORD ?? 'true') !== 'false',
-        body: readableFromBuffer(imageBuf) as any,
-      }));
-      if (structureResponse.statusCode === 200 && (!structureResponse.body?.code || structureResponse.body.code === '200')) {
-        structure = safeJson<unknown>(structureResponse.body?.data ?? '', structureResponse.body?.data ?? null);
-      }
-    } catch (err) {
-      console.warn('[OCR] 结构化切题元数据不可用，将继续使用整页识别结果:', err instanceof Error ? err.message : String(err));
-    }
+  const bodyText = await resp.text();
+  if (!resp.ok) {
+    throw new Error(`多模态识别失败 HTTP ${resp.status}：${bodyText.slice(0, 200)}`);
   }
+  const body = safeJson<any>(bodyText, {});
+  const content = body?.choices?.[0]?.message?.content;
+  const contentText = typeof content === 'string' ? content : String(JSON.stringify(content ?? ''));
+  console.log(`[VLM] 响应 usage=${JSON.stringify(body?.usage ?? {})}, 文本 ${contentText.length} 字`);
+
+  const parsed = safeParseJson(contentText);
+  const analyses = (Array.isArray(parsed)
+    ? parsed
+    : parsed?.questions ?? parsed?.items ?? (parsed ? [parsed] : [])) as AnalysisJson[];
+  // 供前端展示 / DB 留痕的整页文本，由各题题面 + 学生作答拼回（无需再单独 OCR）。
+  const recognizedText = analyses
+    .map((a, i) => `${i + 1}. ${(a.promptText || a.title || '').trim()}${a.studentAnswer ? `\n学生作答：${a.studentAnswer}` : ''}`)
+    .join('\n\n')
+    .trim();
+
   return {
-    provider: 'aliyun:RecognizeEduPaperOcr+RecognizeEduPaperStructed',
-    raw: { requestId: body?.requestId, code: body?.code, data: normalized.raw, structure },
-    text: normalized.text,
+    provider: `bailian:${BAILIAN_VL_MODEL}`,
+    raw: { model: BAILIAN_VL_MODEL, requestId: body?.id, usage: body?.usage, content: contentText },
+    recognizedText,
+    analyses,
   };
 }
 
@@ -541,23 +504,22 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   candidates: CandidateNode[];
 }): Promise<AnalysisJson[]> {
   const analysisText = redactOcrPersonalInfo(params.recognizedText);
-  // Embedding retrieval initializes an ONNX runtime in-process. Keep the OCR
-  // transaction independent from that optional enrichment so a local embedding
-  // failure cannot terminate the model request or block mistake intake.
-  const related: string[] = [];
-  const compactCandidates = '';
+  // 紧凑候选知识点：给出 id+标题供模型回填 kgNodeId。此前该列表被漏传（恒为 'none'），
+  // 导致 knowledgeNodes 形同虚设、下游只能退化到词面兜底匹配——这里补回。
+  const compactCandidates = params.candidates.slice(0, 60)
+    .map((n) => `[${n.id}] ${n.title}${n.unitTitle ? `（${n.unitTitle}）` : ''}`)
+    .join('\n');
   const concisePrompt = [
     'Extract every question from this school-paper OCR text. Return a JSON object with a "questions" field containing the array.',
     'Each item must include subject, title, promptText, studentAnswer, correctAnswer, explanation, errorType, errorReason, isCorrect, confidence, questionType, difficulty, scenarioType, reasoningPattern, distractorPattern, styleText, and knowledgeNodes.',
     'isCorrect is a boolean judging whether the student actually answered correctly. Word/application problems: the student often writes full working such as "740-492=248(个) 答：北区有248个洞窟。" while the reference answer is terse like "248个" — judge by whether the final result is right, never by text overlap. When correct, set isCorrect=true and errorType="none". Set isCorrect=false only for genuine errors; if the student left the answer blank, set isCorrect=false and errorType="unanswered".',
     'questionType MUST be one of the Chinese enum: 选择题/填空题/判断题/计算题/应用题/解答题/阅读题/其他 (never English).',
     'scenarioType = the concrete real-world context in Chinese (e.g. 购物找零/行程问题/图形周长/分类计数); reasoningPattern = the core reasoning structure (e.g. 逆运算求未知数/分步累加); distractorPattern = the common pitfall/wrong-answer pattern (e.g. 加减混淆/进退位出错); styleText = a generalized style summary within 50 Chinese characters describing structure and style ONLY — never copy specific numbers or original wording. These fields are required for every item.',
-    'knowledgeNodes is an array of { kgNodeId, title, role, confidence, evidence }. Only use IDs from the candidate list. Keep explanations under 100 Chinese characters.',
+    'knowledgeNodes is an array of { kgNodeId, title, role, confidence, evidence }. Only use kgNodeId from the candidate list below; never invent IDs. Return an empty array if none fit. Keep explanations under 100 Chinese characters.',
     `Subject: ${params.subject}; grade: ${params.grade}`,
-    `Candidates: ${compactCandidates || 'none'}`,
+    `Candidate knowledge nodes:\n${compactCandidates || 'none'}`,
     `OCR text:\n${analysisText}`,
     params.studentAnswer ? `Student answer:\n${params.studentAnswer}` : '',
-    related.length ? `Curriculum context:\n${related.join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
   console.log(`[mistakes] LLM analysis input: ${concisePrompt.length} characters, ${params.candidates.length} candidate nodes`);
   const conciseResponse = await model.invoke([
@@ -569,66 +531,6 @@ async function analyzeWithLlm(model: BaseChatModel, params: {
   // 兼容裸数组（旧版 DS）和 {"questions": [...]}（Kimi JSON Mode）
   const arr = Array.isArray(conciseParsed) ? conciseParsed : (conciseParsed && typeof conciseParsed === 'object' ? (conciseParsed as any).questions ?? (conciseParsed as any).items ?? [conciseParsed] : []);
   return arr as AnalysisJson[];
-
-  const candidateText = params.candidates
-    .slice(0, 24)
-    .map((n) => `- [${n.id}] ${n.title}${n.unitTitle ? `（${n.unitTitle}）` : ''}`)
-    .join('\n');
-  const prompt = [
-    '你是一个教育错题分析系统。请基于真实作业/考试 OCR 文本，抽取其中所有可识别的题目。',
-    'OCR 文本可能包含一页上的多道题目，请逐一识别并分别分析。',
-    '输出一个 JSON 数组，每个元素对应一道题的完整分析。如果只有一道题，则输出一个元素的数组。',
-    '只允许从候选知识点列表选择 kgNodeId，不要编造新 ID。若无法确定，knowledgeNodes 返回空数组。',
-    '',
-    `学科: ${params.subject}`,
-    `年级: ${params.grade}`,
-    '',
-    'OCR/录入文本:',
-    analysisText || '（空）',
-    params.studentAnswer ? `\n学生补充答案:\n${params.studentAnswer}` : '',
-    related.length ? `\n课程检索上下文:\n${related.map((r) => `- ${r}`).join('\n')}` : '',
-    '',
-    '候选知识点:',
-    candidateText || '（无候选）',
-    '',
-    `用户当前学科: ${params.subject}（AI 可根据内容修正）`,
-    '',
-    '请严格输出 JSON 数组，不要 Markdown，不要解释。每个元素的字段如下:',
-    JSON.stringify({
-      subject: 'chinese | math | english | science — 根据内容判断学科，从候选知识点所在学科推断',
-      title: '10字以内标题',
-      promptText: '整理后的完整题面',
-      studentAnswer: '学生原答案或可见错误作答',
-      correctAnswer: '正确答案',
-      explanation: '简洁解法',
-      errorType: '概念混淆/计算失误/审题遗漏/步骤跳步/表达不完整/其他',
-      errorReason: '具体错因，不能只写粗心',
-      confidence: 0.82,
-      knowledgeNodes: [
-        { kgNodeId: 123, title: '候选知识点标题', role: 'primary', confidence: 0.86, evidence: '题面证据' },
-      ],
-      questionType: '选择题/填空题/解答题/应用题/阅读题/其他',
-      difficulty: 'easy|medium|hard',
-      scenarioType: '生活情境/计算训练/图形推理/文本阅读/实验探究/其他',
-      reasoningPattern: '本题核心推理结构',
-      distractorPattern: '常见误导点或干扰项模式',
-      presentationFeatures: { hasDiagram: false, hasFormula: true, isMultiStep: true },
-      styleText: '用于未来出题的风格摘要，只描述结构和风格，不复述原题具体数字',
-    }),
-  ].filter(Boolean).join('\n');
-
-  console.log(`[mistakes] LLM analysis input: ${prompt.length} characters, ${params.candidates.length} candidate nodes`);
-  const response = await model.invoke([
-    new SystemMessage('你只输出可解析 JSON。'),
-    new HumanMessage(prompt),
-  ]);
-  const content = typeof response.content === 'string' ? response.content : String(JSON.stringify(response.content ?? null));
-  const parsed = safeParseJson(String(content || '[]'));
-  // 兼容：如果 LLM 返回单个对象而非数组，包装成数组
-  if (parsed && !Array.isArray(parsed)) {
-    return [parsed as AnalysisJson];
-  }
-  return (parsed as AnalysisJson[]) || [];
 }
 
 function loadMistakeRows(mistakeId: string, userId: string) {
@@ -1437,36 +1339,43 @@ export async function analyzeMistake(
   if (!row) throw new Error('错题不存在');
   if (row.status === 'archived') throw new Error('错题已归档');
 
-  // ── 1. OCR ──
-  await onProgress?.({ step: 'ocr', message: row.source_type === 'text' ? '读取文本录入' : '调用 OCR 识别', progress: 8 });
+  // ── 1. 识别 + 分析 ──
+  // 图片错题：单次多模态调用一步完成「识别题面 + 转写手写 + 依红笔批改判对错 + 知识点映射」。
+  // 纯文本录入（或已编辑过题面的重分析）：走文本模型分析，无需视觉。
   let recognizedText = String(row.prompt_text ?? '').trim();
   let ocrProvider: string | null = row.ocr_provider ?? null;
   let ocrRaw: unknown = row.ocr_raw ? safeJson(row.ocr_raw, {}) : null;
-  if (!recognizedText.trim() && row.source_type === 'image') {
+  const candidates0 = getCandidateNodes(row.subject, row.grade, 80);
+  let analyses: AnalysisJson[];
+
+  if (!recognizedText && row.source_type === 'image') {
+    await onProgress?.({ step: 'ocr', message: '多模态识别题目（含手写与批改）', progress: 8 });
     const assetPath = getOriginalAssetPath(mistakeId);
     if (!assetPath) throw new Error('找不到原始图片');
-    const ocr = await recognizeWithAliyunEduOcr(assetPath, row.subject, row.grade);
-    recognizedText = ocr.text || recognizedText;
-    ocrProvider = ocr.provider;
-    ocrRaw = ocr.raw;
+    const vlm = await recognizeAndAnalyzeWithVlm(assetPath, row.subject, row.grade, candidates0);
+    recognizedText = vlm.recognizedText;
+    ocrProvider = vlm.provider;
+    ocrRaw = vlm.raw;
+    analyses = vlm.analyses;
+    await onProgress?.({ step: 'analyze', message: `已识别 ${analyses.length} 道题目`, progress: 30 });
     // 写回 DB 供前端展示
     if (recognizedText.trim()) {
-      db.prepare(`UPDATE mistake_items SET prompt_text=?, ocr_provider=?, updated_at=? WHERE id=?`).run(recognizedText, ocrProvider, Math.floor(Date.now() / 1000), mistakeId);
+      db.prepare(`UPDATE mistake_items SET prompt_text=?, ocr_provider=?, updated_at=? WHERE id=?`).run(recognizedText, ocrProvider, nowSec(), mistakeId);
     }
+  } else {
+    await onProgress?.({ step: 'ocr', message: '读取文本录入', progress: 8 });
+    if (!recognizedText) throw new Error('未识别到有效题目文本，请补充题面后重试');
+    await onProgress?.({ step: 'analyze', message: 'LLM 识别全部题目', progress: 30 });
+    analyses = await analyzeWithLlm(model, {
+      subject: row.subject,
+      grade: row.grade,
+      recognizedText,
+      studentAnswer: row.student_answer ?? undefined,
+      candidates: candidates0,
+    });
   }
-  if (!recognizedText.trim()) throw new Error('OCR 未识别到有效题目文本，请补充题面后重试');
 
-  // ── 2. LLM 分析（返回所有题目） ──
-  await onProgress?.({ step: 'analyze', message: 'LLM 识别全部题目', progress: 30 });
-  const analyses = await analyzeWithLlm(model, {
-    subject: row.subject,
-    grade: row.grade,
-    recognizedText,
-    studentAnswer: row.student_answer ?? undefined,
-    candidates: getCandidateNodes(row.subject, row.grade, 80),
-  });
-
-  if (!analyses.length) throw new Error('LLM 未能从文本中识别出有效题目');
+  if (!analyses.length) throw new Error('未能从图片/文本中识别出有效题目');
 
   // 用 LLM 检测到的学科重新获取候选知识点
   const effectiveSubject = analyses[0].subject && ['chinese','math','english','science'].includes(analyses[0].subject)

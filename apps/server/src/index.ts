@@ -1163,6 +1163,9 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
   const mistakeId = c.req.param('id');
   return streamSSE(c, async (stream) => {
     const send = (e: AnalyzeMistakeEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    // SSE keepalive：图片错题的多模态识别为单次调用，密集整页可达 60~90s 无业务事件，
+    // 每 20s 发一个 SSE 注释帧（: 开头，前端 data: 解析会跳过）防止 nginx proxy 断流。
+    const ping = setInterval(() => { stream.write(': keepalive\n\n').catch(() => {}); }, 20_000);
     try {
       await analyzeMistake(mistakeId, userId, model,
         (p) => send({ type: 'mistake_progress', step: p.step, message: p.message, progress: p.progress }),
@@ -1171,6 +1174,8 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
       await send({ type: 'done' });
     } catch (err) {
       try { await send({ type: 'error', message: err instanceof Error ? err.message : String(err) }); } catch {}
+    } finally {
+      clearInterval(ping);
     }
   });
 });
