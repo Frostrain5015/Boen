@@ -19,3 +19,6 @@ AGENTS.md
 kp-export.json
 generate-english-mappings.cjs
 apps/server/curriculum/kg-mappings/*-weights.json
+
+# 本地凭据（百炼 apiKey 源文件，已安装进 .env）
+apiKey.csv
