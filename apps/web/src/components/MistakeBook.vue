@@ -241,19 +241,25 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
     completedSteps.value = next;
   } else if (event.type === 'mistake_ready') {
     console.log('[错题分析] 完成, promptText.length:', event.mistake.promptText?.length ?? 0);
-    // 做对的题（学生答案与正确答案相近或相同）不予收录进错题本；
-    // 后端仍入库并向量化其题型风格，作为智能体出题学习素材。
+    // 所有题目（含做对的）都进入本次会话的逐题复看与详情，便于查看识别与判定结果。
+    batchMistakes.value.push(event.mistake);
+    currentBatchIndex.value = batchMistakes.value.length - 1;
+    selectedMistake.value = event.mistake;
     if (event.mistake.isCorrect) {
+      // 做对的题（学生答案与正确答案相近或相同）仅临时展示，不收录进「持久化错题本列表」，
+      // 刷新或离开后即消失；后端仍入库并向量化其题型风格，作为智能体出题学习素材。
+      // 匹配度是字符串相似度，对应用题等「答案对但写法不同」天然偏低（是 AI 语义判对的），
+      // 展示低百分比会与「判定为做对」自相矛盾，故仅在相似度确实达标时才展示数字。
       const score = Math.round((event.mistake.answerMatchScore ?? 0) * 100);
-      correctNotice.value = `该题学生答案与正确答案匹配度 ${score}%，判定为做对，未收录进错题本；其题型风格已沉淀，将融入后续智能出题。`;
-      // 从列表移除（重分析场景下可能已存在），也不进入逐题复看
+      const basis = score >= 80
+        ? `学生答案与正确答案高度一致（匹配度 ${score}%）`
+        : 'AI 判定该题作答正确（最终结果与标准答案一致）';
+      correctNotice.value = `${basis}，本题不收录进错题本（仅临时展示，刷新后消失）；其题型风格已沉淀，将融入后续智能出题。`;
+      // 从持久化列表移除（重分析场景下可能已存在）
       mistakes.value = mistakes.value.filter((m) => m.id !== event.mistake.id);
     } else {
       correctNotice.value = '';
-      batchMistakes.value.push(event.mistake);
-      currentBatchIndex.value = batchMistakes.value.length - 1;
-      selectedMistake.value = event.mistake;
-      // 更新列表
+      // 更新持久化列表
       const index = mistakes.value.findIndex((m) => m.id === event.mistake.id);
       if (index >= 0) mistakes.value[index] = event.mistake;
       else mistakes.value.unshift(event.mistake);

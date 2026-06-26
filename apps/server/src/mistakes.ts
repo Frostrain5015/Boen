@@ -1288,7 +1288,12 @@ async function applyAnalysisToMistake(
   // ── 熟练度 ──
   // 做对的题不扣减熟练度，避免错误降低已掌握知识点的画像
   if (isCorrect) {
-    await onProgress?.({ step: 'profile', message: `答案匹配度 ${Math.round(matchScore * 100)}%，判定为大概率做对，跳过画像扣减`, progress: pct(0.65) });
+    // 匹配度是字符串相似度，对应用题等「答案对但写法不同」天然偏低，故仅在它确实达标时才展示数字；
+    // 否则说明是 LLM 语义判对（见 resolveIsCorrect），展示低百分比会误导。
+    const correctBasis = matchScore >= ANSWER_MATCH_THRESHOLD
+      ? `答案与标准答案高度一致（匹配度 ${Math.round(matchScore * 100)}%）`
+      : 'AI 判定作答正确';
+    await onProgress?.({ step: 'profile', message: `${correctBasis}，跳过画像扣减`, progress: pct(0.65) });
   } else {
     await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `写入知识画像（第 ${questionIndex + 1}/${totalQuestions} 题）` : '未找到可信知识点，等待人工修正', progress: pct(0.65) });
     let appliedAt: number | undefined;
