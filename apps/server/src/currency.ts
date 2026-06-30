@@ -87,7 +87,8 @@ export function claimDailyLogin(userId: string): ClaimDailyResult {
       `).run(userId, DAILY_LOGIN_REWARD, balanceAfter, date);
       return { ok: true, reward: DAILY_LOGIN_REWARD, balance: balanceAfter };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] claimDailyLogin 事务失败:', e instanceof Error ? e.message : e);
     const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
     return { ok: false, error: 'already_claimed', balance: cur?.balance ?? 0 };
   }
@@ -197,7 +198,8 @@ export function earnPoints(
 
       return { earned, capped: amount > earned, balance: balanceAfter };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] earnPoints 事务失败:', e instanceof Error ? e.message : e);
     // 入账失败不应阻断主结算流程
     const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
     return { earned: 0, capped: false, balance: cur?.balance ?? 0 };
@@ -234,15 +236,17 @@ export function redeemMembershipWithPoints(userId: string, productKey: string): 
         UPDATE user_currency SET balance=?, total_spent=total_spent+?, updated_at=unixepoch() WHERE user_id=?
       `).run(balanceAfter, product.cost, userId);
 
+      // ledger 金额统一记录正数，方向由 type（'earn'/'spend'）区分
       db.prepare(`
         INSERT INTO currency_ledger (user_id, type, amount, balance_after, reason, ref_id)
         VALUES (?, 'spend', ?, ?, ?, ?)
-      `).run(userId, -product.cost, balanceAfter, `redeem_${product.key}`, product.key);
+      `).run(userId, product.cost, balanceAfter, `redeem_${product.key}`, product.key);
 
       const { until, tier } = grantMembershipDays(userId, product.days);
       return { ok: true, balance: balanceAfter, until, days: product.days, tier };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] redeemMembershipWithPoints 事务失败:', e instanceof Error ? e.message : e);
     const cur = getCurrencyStatus(userId);
     return { ok: false, error: 'insufficient', balance: cur.balance };
   }

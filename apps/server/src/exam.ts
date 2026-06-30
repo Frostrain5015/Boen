@@ -544,7 +544,7 @@ const tikzRenderPool = new Semaphore(3);
 
 function execFileAsync(cmd: string, args: string[], options: { timeout: number; cwd?: string }): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { ...options, encoding: 'utf-8' }, (err, stdout) => {
+    execFile(cmd, args, { ...options, windowsHide: true, encoding: 'utf-8' }, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout ?? '');
     });
@@ -566,10 +566,11 @@ async function renderTikzBlockAsync(texCode: string): Promise<string | null> {
       await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `--output=${svgPath}`, pdfPath], { timeout: 15000 });
       if (!existsSync(svgPath)) return null;
       return readFileSync(svgPath, 'utf-8') || null;
-    } catch {
+    } catch (e) {
+      console.warn('[exam] TiKZ 渲染失败:', e instanceof Error ? e.message.slice(0, 200) : e);
       return null;
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理 */ }
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch (e2) { console.warn('[exam] 清理临时目录失败:', e2); }
     }
   });
 }
@@ -586,7 +587,10 @@ export async function generateExam(
   config: ExamConfig,
   onProgress?: ExamProgressFn,
   userId?: string,
+  signal?: AbortSignal,
 ): Promise<GeneratedExam> {
+  // 如果 signal 已中断则立即退出
+  if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
   try {
     const weightDist = getWeightDistribution(config.subject, config.grade);
     const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
@@ -611,6 +615,9 @@ export async function generateExam(
     const blueprint = canonicalizeExamBlueprint(rawBlueprint, enrichedConfig);
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 18 });
+
+    // 客户端断开连接 → 尽早退出，避免无效消耗 AI token
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
 
     // ─── 阶段二：题目编写组（按 section × questionType 并发，限 6 路） ────
     const writeTasks = flattenBlueprint(blueprint);
@@ -646,6 +653,9 @@ export async function generateExam(
 
     await onProgress?.({ step: 'write', message: 'write', progress: 66 });
 
+    // 客户端断开 → 停止进入审核阶段
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
+
     // ─── 阶段三：审核委员会（5 维度并发） ──────
     await onProgress?.({ step: 'review', message: 'review', progress: 70 });
     let { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
@@ -658,6 +668,7 @@ export async function generateExam(
     const maxRegenerationRounds = 3;
     const regenHistory: number[] = [regenCount]; // 追踪每轮未通过数，用于趋势检测
     for (let round = 1; regenCount > 0 && round <= maxRegenerationRounds; round++) {
+      if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
       await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(96, 78 + round * 5) });
       const crossGroupContext = buildCrossGroupContext(questions);
       const regenResult = await regenerateQuestions(
@@ -799,6 +810,9 @@ export async function generateExam(
     }
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
 
+    // 客户端断开 → 跳过 TikZ 渲染等耗时后处理
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
+
     // ─── TikZ 预渲染：异步渲染，全局最多 3 路并发 ────
     {
       const tikzQS = questions.filter(q => tikzSourceTexts(q).some(hasTikzBlocks));
@@ -903,7 +917,7 @@ async function stepWriteQuestionsV2(
     try {
       const questions = await invokeGenerateQuestions(model, prompt, task.questionType, task.count);
       if (questions.length > 0) return toValidatedExamQuestions(questions, task, config);
-    } catch { /* 继续到兜底 */ }
+    } catch (e) { console.warn('[exam] invokeGenerateQuestions 失败，继续兜底:', e instanceof Error ? e.message.slice(0, 200) : e); }
   }
 
     // 最终兜底：标记 __needs_review__，审核阶段强制重出
@@ -1039,7 +1053,8 @@ async function writeSingleQuestion(model: BaseChatModel, prompt: string, questio
       // published nodes here and validate the selected ID again below.
       sectionKnowledgePoints: getPublishedKnowledgePointIds(config.subject, config.grade).map((id) => ({ id, title: '', weight: 1 })),
     } as WriteTask, 0, config);
-  } catch {
+  } catch (e) {
+    console.warn('[exam] generateWriteTask 失败:', e instanceof Error ? e.message.slice(0, 200) : e);
     return null;
   }
 }
@@ -2083,7 +2098,8 @@ function readGradingCheckpoint(examId: string): ExamQuestionResult[] | null {
   try {
     const parsed = JSON.parse(row.grading_checkpoint);
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-  } catch {
+  } catch (e) {
+    console.warn('[exam] 解析 grading_checkpoint 失败:', e instanceof Error ? e.message.slice(0, 200) : e);
     return null;
   }
 }

@@ -62,7 +62,8 @@ export async function rewriteQuery(
     // 防止模型返回空或与原文完全无关的内容
     if (!rewritten || rewritten.length > originalQuery.length * 3) return originalQuery;
     return rewritten;
-  } catch {
+  } catch (e) {
+    console.warn('[query-rewriter] 改写失败，fallback 到原文:', e instanceof Error ? e.message : e);
     return originalQuery; // fallback 安全
   }
 }

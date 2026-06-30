@@ -133,17 +133,79 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_kp_prof_user ON user_kp_proficiency(user_id);
 `);
 
-// Elo 列迁移
-const profColumnsMigration = db.prepare(`PRAGMA table_info(user_kp_proficiency)`).all() as Array<{ name: string }>;
-const hasProfCol = (name: string) => profColumnsMigration.some((col) => col.name === name);
-if (!hasProfCol('rating')) {
-  db.exec(`ALTER TABLE user_kp_proficiency ADD COLUMN rating REAL DEFAULT 50`);
+// ── 版本化迁移 ──────────────────────────────
+// 统一替代 PRAGMA table_info 逐列检查方案，避免每次启动全表扫描
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY,
+    applied_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+`);
+const currentVersion = (db.prepare(`SELECT MAX(version) FROM schema_version`).pluck() ?? 0) as number;
+
+/** 安全添加列：仅在目标列不存在时执行 ALTER TABLE ADD COLUMN */
+function addColumnIfNotExists(table: string, column: string, def: string): void {
+  const exists = db.prepare(`SELECT 1 FROM pragma_table_info(?) WHERE name=?`).get(table, column);
+  if (!exists) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+  }
 }
-if (!hasProfCol('rating_sigma')) {
-  db.exec(`ALTER TABLE user_kp_proficiency ADD COLUMN rating_sigma REAL DEFAULT 20`);
+
+const MIGRATIONS: Array<{ version: number; run: () => void; description: string }> = [
+  {
+    version: 1,
+    description: 'user_kp_proficiency 添加 Elo 列',
+    run: () => {
+      addColumnIfNotExists('user_kp_proficiency', 'rating', 'REAL DEFAULT 50');
+      addColumnIfNotExists('user_kp_proficiency', 'rating_sigma', 'REAL DEFAULT 20');
+      // 将已有的 weighted_score 回填到 rating（幂等，通过 WHERE 条件保证只执行一次）
+      db.exec(`UPDATE user_kp_proficiency SET rating = weighted_score WHERE rating = 50 AND weighted_score != 50`);
+    },
+  },
+  {
+    version: 2,
+    description: 'exam_sessions 添加 blueprint/quality_report/grading_checkpoint',
+    run: () => {
+      addColumnIfNotExists('exam_sessions', 'blueprint', 'TEXT');
+      addColumnIfNotExists('exam_sessions', 'quality_report', 'TEXT');
+      addColumnIfNotExists('exam_sessions', 'grading_checkpoint', 'TEXT');
+    },
+  },
+  {
+    version: 3,
+    description: 'mistake_items 添加 answer_match_score/is_correct + 索引',
+    run: () => {
+      addColumnIfNotExists('mistake_items', 'answer_match_score', 'REAL NOT NULL DEFAULT 0');
+      addColumnIfNotExists('mistake_items', 'is_correct', 'INTEGER NOT NULL DEFAULT 0');
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_mistakes_correct ON mistake_items(user_id, is_correct)`);
+    },
+  },
+  {
+    version: 4,
+    description: 'mistake_proficiency_events 添加 Elo 列',
+    run: () => {
+      addColumnIfNotExists('mistake_proficiency_events', 'before_rating', 'REAL');
+      addColumnIfNotExists('mistake_proficiency_events', 'after_rating', 'REAL');
+      addColumnIfNotExists('mistake_proficiency_events', 'before_sigma', 'REAL');
+      addColumnIfNotExists('mistake_proficiency_events', 'after_sigma', 'REAL');
+    },
+  },
+];
+
+for (const m of MIGRATIONS) {
+  if (m.version > currentVersion) {
+    try {
+      db.transaction(() => {
+        m.run();
+        db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, unixepoch())').run(m.version);
+      })();
+      console.log(`[db] 迁移 v${m.version} 完成: ${m.description}`);
+    } catch (e) {
+      console.warn(`[db] 迁移 v${m.version} 失败 (${m.description}):`, e instanceof Error ? e.message : e);
+      // 迁移失败不阻止启动 — 表可能已经存在需要的列
+    }
+  }
 }
-// 将已有的 weighted_score 回填到 rating
-db.exec(`UPDATE user_kp_proficiency SET rating = weighted_score WHERE rating = 50 AND weighted_score != 50`);
 
 // ── 复习课程记录 ────────────────────────────
 db.exec(`
@@ -182,18 +244,6 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_exam_user ON exam_sessions(user_id);
 `);
-
-const examSessionColumns = db.prepare(`PRAGMA table_info(exam_sessions)`).all() as Array<{ name: string }>;
-const hasExamSessionColumn = (name: string) => examSessionColumns.some((col) => col.name === name);
-if (!hasExamSessionColumn('blueprint')) {
-  db.exec(`ALTER TABLE exam_sessions ADD COLUMN blueprint TEXT`);
-}
-if (!hasExamSessionColumn('quality_report')) {
-  db.exec(`ALTER TABLE exam_sessions ADD COLUMN quality_report TEXT`);
-}
-if (!hasExamSessionColumn('grading_checkpoint')) {
-  db.exec(`ALTER TABLE exam_sessions ADD COLUMN grading_checkpoint TEXT`);
-}
 
 // ── Mistake notebook ─────────────────────────────────────────
 db.exec(`
@@ -318,14 +368,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_mistake_prof_item ON mistake_proficiency_events(mistake_id);
 `);
 
-// mistake_proficiency_events Elo 列迁移
-const mpeColsMigration = db.prepare(`PRAGMA table_info(mistake_proficiency_events)`).all() as Array<{ name: string }>;
-const hasMpeCol = (name: string) => mpeColsMigration.some((col) => col.name === name);
-if (!hasMpeCol('before_rating')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN before_rating REAL`);
-if (!hasMpeCol('after_rating')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN after_rating REAL`);
-if (!hasMpeCol('before_sigma')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN before_sigma REAL`);
-if (!hasMpeCol('after_sigma')) db.exec(`ALTER TABLE mistake_proficiency_events ADD COLUMN after_sigma REAL`);
-
 // ── 订阅系统 ─────────────────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS subscriptions (
@@ -347,20 +389,6 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_chat_usage(user_id, date);
 `);
-
-// ── Mistake notebook 迁移：答案匹配度与正确性标记 ──
-// 做对的题（匹配度≥0.8）前端不再作为错题展示，但题型风格仍沉淀
-{
-  const cols = db.prepare(`PRAGMA table_info(mistake_items)`).all() as Array<{ name: string }>;
-  const has = (name: string) => cols.some((c) => c.name === name);
-  if (!has('answer_match_score')) {
-    db.exec(`ALTER TABLE mistake_items ADD COLUMN answer_match_score REAL NOT NULL DEFAULT 0`);
-  }
-  if (!has('is_correct')) {
-    db.exec(`ALTER TABLE mistake_items ADD COLUMN is_correct INTEGER NOT NULL DEFAULT 0`);
-  }
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_mistakes_correct ON mistake_items(user_id, is_correct)`);
-}
 
 // ── 兑换码：消费流水 + 撤销 denylist ─────────────────────────
 // 兑换码采用「自描述签名码」：可复用?/面值天数/有效期/批次等条款编码进码内并由 HMAC 签名，

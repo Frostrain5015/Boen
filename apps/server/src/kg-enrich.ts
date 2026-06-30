@@ -27,7 +27,8 @@ export function loadMappingsFromJson(subject: string, grade: string) {
       literacies: Record<string, string[]>;
       blooms: Record<string, string>;
     };
-  } catch {
+  } catch (e) {
+    console.warn('[kg-enrich] 解析失败:', e instanceof Error ? e.message : e);
     return null;
   }
 }

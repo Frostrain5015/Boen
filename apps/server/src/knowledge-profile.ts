@@ -229,8 +229,11 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
   const key = cacheKey(userId, threadId);
   const userCache = PROFICIENCY_CACHE.get(key);
   if (!userCache || userCache.size === 0) return { count: 0, changes: [] };
-  const changes: Array<{ kpTitle: string; before: number; after: number }> = [];
-  const now = Math.floor(Date.now() / 1000);
+
+  // 在事务内批量执行读写，防止并发 flush 交叉导致 Elo 旧值覆盖
+  return db.transaction((): { count: number; changes: Array<{ kpTitle: string; before: number; after: number }> } => {
+    const changes: Array<{ kpTitle: string; before: number; after: number }> = [];
+    const now = Math.floor(Date.now() / 1000);
   for (const [kgNodeId, update] of userCache) {
     // 读旧值（含答题计数）
     const oldRow = db.prepare('SELECT weighted_score, correct_count, total_count FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?').get(userId, kgNodeId) as { weighted_score: number; correct_count: number; total_count: number } | undefined;
@@ -292,6 +295,7 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
   }
   PROFICIENCY_CACHE.delete(key);
   return { count: changes.length, changes };
+  })();  // end transaction
 }
 
 /**
@@ -300,6 +304,24 @@ export function flushProficiencyCache(userId: string, threadId: string): { count
 export function discardProficiencyCache(userId: string, threadId: string): void {
   const key = cacheKey(userId, threadId);
   PROFICIENCY_CACHE.delete(key);
+}
+
+/**
+ * 清空并刷新所有缓存的熟练度更新（用于进程优雅关闭时落盘）。
+ * 返回累计刷新的知识点条目数。
+ */
+export function flushAllProficiencyCaches(): number {
+  let total = 0;
+  // 先收集所有 key，避免 flush 中 delete 导致迭代器失效
+  const keys = [...PROFICIENCY_CACHE.keys()];
+  for (const key of keys) {
+    const parts = key.split(':');
+    if (parts.length === 2) {
+      const result = flushProficiencyCache(parts[0], parts[1]);
+      total += result.count;
+    }
+  }
+  return total;
 }
 
 /**
@@ -370,6 +392,7 @@ export function setCachedProficiencyExpected(
 // ── CRUD ─────────────────────────────────────
 
 export function updateProficiency(userId: string, kgNodeId: number, score: number, maxScore: number, mode?: string, difficulty: number = ELO_DEFAULT_DIFFICULTY): KpProficiency {
+  return db.transaction((): KpProficiency => {
   const existing = db.prepare(`SELECT * FROM user_kp_proficiency WHERE user_id=? AND kg_node_id=?`).get(userId, kgNodeId) as any;
   const correct = existing ? existing.correct_count + score : score;
   const total = existing ? existing.total_count + maxScore : maxScore;
@@ -450,6 +473,7 @@ export function updateProficiency(userId: string, kgNodeId: number, score: numbe
     rating: newRating,
     ratingSigma: newSigma,
   };
+  })();  // end transaction
 }
 
 export function getProficiency(userId: string, kgNodeId: number): KpProficiency | null {
@@ -680,7 +704,7 @@ export function seedProficiencyFromHistory(userId: string): { updated: number } 
           }
         }
       }
-    } catch { /* skip malformed */ }
+    } catch (e) { console.warn('[knowledge-profile] 跳过格式异常数据:', e instanceof Error ? e.message : e); }
   }
 
   return { updated: count };

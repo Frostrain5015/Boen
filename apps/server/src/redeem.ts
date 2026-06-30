@@ -209,7 +209,8 @@ export function redeemForUser(userId: string, rawCode: string, secret: string): 
 
       return { ok: true, until, durationDays: p.durationDays };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[redeem] 兑换事务失败:', e instanceof Error ? e.message : e);
     // PK 冲突等并发兜底
     return { ok: false, error: 'already_redeemed' };
   }

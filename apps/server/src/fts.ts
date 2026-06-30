@@ -129,7 +129,8 @@ export function searchFts(
       refId: r.ref_id,
       score: -r.bm25_score,
     }));
-  } catch {
+  } catch (e) {
+    console.warn('[fts] MATCH 语法错误，退化返回空:', e instanceof Error ? e.message : e);
     // MATCH 语法错误（如查询包含 FTS5 特殊字符）时安全退化
     return [];
   }

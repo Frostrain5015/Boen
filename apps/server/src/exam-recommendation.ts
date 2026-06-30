@@ -181,7 +181,8 @@ function computeDifficultyAdjustment(
       if (typeof parsed.percentage === 'number') {
         percentages.push(parsed.percentage);
       }
-    } catch {
+    } catch (e) {
+      console.warn('[exam-recommendation] 解析考试结果 JSON 失败:', e instanceof Error ? e.message : e);
       // Skip malformed results
     }
   }
