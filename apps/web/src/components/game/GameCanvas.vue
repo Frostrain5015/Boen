@@ -16,6 +16,11 @@ const lives = ref(3);
 const isRunning = ref(false);
 const questionVisible = ref(false);
 
+function restart() {
+  if (scene) scene.restart();
+  isRunning.value = true;
+}
+
 onMounted(() => {
   if (!canvasContainer.value) return;
 
@@ -93,13 +98,16 @@ onUnmounted(() => {
         <div
           v-if="!isRunning && score > 0"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          @click.self="/* noop */"
+          @click.self="() => {}"
         >
           <div class="clay mx-4 w-full max-w-xs bg-white/95 p-6 text-center">
             <div class="mb-1 text-4xl">🎮</div>
             <h2 class="mb-1 text-xl font-bold text-[var(--ink)]" style="font-family: var(--font-display)">游戏结束</h2>
             <p class="mb-4 text-3xl font-bold" :style="{ color: 'var(--accent-strong)' }" style="font-family: var(--font-display)">{{ score }} 分</p>
-            <button class="btn-accent w-full rounded-[18px] px-6 py-3 text-base font-semibold text-white">
+            <button
+              class="btn-accent w-full rounded-[18px] px-6 py-3 text-base font-semibold text-white"
+              @click="restart"
+            >
               🔄 再来一次
             </button>
           </div>
