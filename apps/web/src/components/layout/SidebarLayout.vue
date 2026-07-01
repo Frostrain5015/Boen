@@ -11,6 +11,7 @@ import {
   FileText,
   NotebookPen,
   BrainCircuit,
+  Gamepad2,
   Lock,
   Settings,
   User,
@@ -32,7 +33,7 @@ const examStore = useExamStore();
 const uiStore = useUiStore();
 const authStore = useAuthStore();
 
-type SidebarView = 'chat' | 'exam' | 'examReview' | 'profile' | 'mistakes' | 'setup';
+type SidebarView = 'chat' | 'exam' | 'examReview' | 'profile' | 'mistakes' | 'setup' | 'games';
 
 const currentView = computed<SidebarView>(() => {
   const name = route.name as string;
@@ -41,6 +42,7 @@ const currentView = computed<SidebarView>(() => {
   if (name === 'profile') return 'profile';
   if (name === 'mistakes') return 'mistakes';
   if (name === 'setup') return 'setup';
+  if (name === 'games') return 'games';
   return 'chat';
 });
 
@@ -81,7 +83,7 @@ function formatDate(timestamp: number) {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
 }
 
-function selectSection(section: 'chat' | 'exam' | 'profile' | 'mistakes') {
+function selectSection(section: 'chat' | 'exam' | 'profile' | 'mistakes' | 'games') {
   if (section === 'profile') {
     uiStore.expandedSection = null;
     router.push('/profile');
@@ -90,6 +92,11 @@ function selectSection(section: 'chat' | 'exam' | 'profile' | 'mistakes') {
   if (section === 'mistakes') {
     uiStore.expandedSection = null;
     router.push('/mistakes');
+    return;
+  }
+  if (section === 'games') {
+    uiStore.expandedSection = null;
+    router.push('/games');
     return;
   }
   uiStore.expandedSection = section;
@@ -299,6 +306,16 @@ function onSubmenuLeave(el: Element) {
           <BrainCircuit class="h-4 w-4 shrink-0" />
           <span class="flex-1">档案</span>
           <Lock v-if="!authStore.isPremium" class="h-3 w-3 shrink-0" style="color: var(--locked-ink)" />
+        </button>
+
+        <!-- ═══ 游戏 ═══ -->
+        <button
+          @click="selectSection('games')"
+          class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left font-display text-sm font-bold transition-all"
+          :class="currentView === 'games' ? 'bg-[#f0e6ff] text-[#9333ea]' : 'text-[var(--ink)] hover:bg-[var(--line)]/50'"
+        >
+          <Gamepad2 class="h-4 w-4 shrink-0" />
+          <span class="flex-1">游戏</span>
         </button>
       </div>
 

@@ -55,7 +55,11 @@ export const ChatSchema = z.object({
   mode: z.string().optional(),
   threadId: z.string().optional(),
   practiceType: z.string().optional(),
-  images: z.array(z.string()).optional(),
+  attachments: z.array(z.object({
+    type: z.literal('image'),
+    data: z.string(),
+    mimeType: z.string(),
+  })).optional(),
   userName: z.string().optional(),
 }).strict();
 

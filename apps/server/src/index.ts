@@ -1783,8 +1783,8 @@ app.post('/api/chat', async (c) => {
     try {
       // 如果有归属本人的 conversationId，保存用户消息
       if (owned) {
-        const userContent = body.images?.length
-          ? JSON.stringify({ text: body.message, images: body.images })
+        const userContent = body.attachments?.length
+          ? JSON.stringify({ text: body.message, attachments: body.attachments })
           : body.message;
         addMessage(body.conversationId!, 'user', userContent);
       }
@@ -1839,13 +1839,13 @@ app.post('/api/chat', async (c) => {
       }
 
       // 构建可能含图片的 HumanMessage
-      const humanMsg: HumanMessage = body.images?.length
+      const humanMsg: HumanMessage = body.attachments?.length
         ? new HumanMessage({
             content: [
               { type: 'text', text: body.message },
-              ...body.images.map((img: string) => ({
+              ...body.attachments.map((a) => ({
                 type: 'image_url' as const,
-                image_url: { url: `data:image/jpeg;base64,${img}` },
+                image_url: { url: `data:${a.mimeType};base64,${a.data}` },
               })),
             ],
           })
@@ -2319,6 +2319,21 @@ app.post('/api/answer', async (c) => {
       try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[answer-sse] SSE send 最终失败:', e2); }
     }
   });
+});
+
+// ── 教育游戏 ─────────────────────────────────────────
+import { generateGameQuestion } from './game.js';
+
+/** GET /api/game/question — 获取一道游戏用选择题 */
+app.get('/api/game/question', async (c) => {
+  try {
+    // 游戏暂不要求登录（方便快速体验），后续可加
+    const question = await generateGameQuestion(examModel);
+    return c.json({ question });
+  } catch (err) {
+    console.error('[game] 出题失败:', sanitizeError(err));
+    return c.json({ error: '出题失败' }, 500);
+  }
 });
 
 const port = Number(process.env.PORT ?? 8787);
