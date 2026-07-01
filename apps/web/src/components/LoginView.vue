@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
 import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
+import { useAuthStore } from '@/stores/auth';
+
+const router = useRouter();
+const authStore = useAuthStore();
 
 const isLoading = ref(false);
 const agreedToTerms = ref(false);
@@ -20,7 +25,17 @@ async function handleLogin() {
 
 function handleTestLogin() {
   if (!agreedToTerms.value) return;
-  loginAsTestUser({ name: '本地测试用户', grade: '8' });
+  const { user, profile } = loginAsTestUser({ name: '本地测试用户', grade: '8' });
+  // 直接设置 auth store 状态，跳过 API 调用链条
+  authStore.$patch({
+    authenticated: true,
+    authChecked: true,
+    currentUser: user,
+    userProfile: profile,
+    subscription: { isPremium: true, plan: 'local-dev', dailyRemaining: 99, dailyUsed: 0 },
+    currency: { balance: 9999, totalEarned: 9999, totalSpent: 0, dailyEarned: 0, dailyCap: 100, claimedToday: true },
+  });
+  router.push('/');
 }
 </script>
 

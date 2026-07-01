@@ -2326,8 +2326,9 @@ import { generateGameQuestion } from './game.js';
 /** GET /api/game/question — 获取一道游戏用选择题 */
 app.get('/api/game/question', async (c) => {
   try {
+    const subject = c.req.query('subject') || 'math';
     // 游戏暂不要求登录（方便快速体验），后续可加
-    const question = await generateGameQuestion(examModel);
+    const question = await generateGameQuestion(examModel, subject);
     return c.json({ question });
   } catch (err) {
     console.error('[game] 出题失败:', sanitizeError(err));

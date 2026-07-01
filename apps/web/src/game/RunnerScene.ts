@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-/** 题目数据接口 */
+/* ── 类型 ── */
 export interface GameQuestion {
   id: string;
   stem: string;
@@ -8,478 +8,371 @@ export interface GameQuestion {
   correctKey: string;
 }
 
-/** 场景事件 */
 export interface GameEvents {
-  onScoreChange?: (score: number) => void;
-  onLivesChange?: (lives: number) => void;
-  onGameOver?: (finalScore: number) => void;
-  onQuestionChange?: (question: GameQuestion | null) => void;
+  onScoreChange?: (s: number) => void;
+  onLivesChange?: (l: number) => void;
+  onGameOver?: (s: number) => void;
+  onQuestionChange?: (q: GameQuestion | null) => void;
 }
 
-const LANE_COUNT = 4;
-const PLAYER_SPEED = 60;
-const MAX_SPEED = 230;
-const SPEED_INCREMENT = 5;
-const INITIAL_LIVES = 3;
-const BONUS_PER_QUESTION = 10;
-const GAME_WIDTH = 480;
-const GAME_HEIGHT = 720;
+export type Subject = 'math' | 'chinese' | 'english' | 'science';
 
-/** 拦截门颜色（按正确/错误区分视觉效果） */
-const BARRIER_COLORS = [0xe74c3c, 0x3498db, 0x2ecc71, 0xf39c12];
+/* ── 常量 ── */
+const LANES = 4;
+const INIT_LIVES = 3;
+const BONUS = 10;
+const W = 480, H = 720;
+const P_SPEED = 100, MAX_SPEED = 220, SPEED_STEP = 8;
+const OBS_INTERVAL = 3000;
+
+/** 学科色彩映射（匹配项目 CSS 变量） */
+const SUBJECT_COLORS: Record<Subject, { accent: number; accentSoft: number; glow: number; label: string }> = {
+  math:    { accent: 0x14b48a, accentSoft: 0xd9f4ec, glow: 0x14b48a, label: '数学' },
+  chinese: { accent: 0xff7a4d, accentSoft: 0xffe5d7, glow: 0xff7a4d, label: '语文' },
+  english: { accent: 0x6c5ce7, accentSoft: 0xe8e4ff, glow: 0x6c5ce7, label: '英语' },
+  science: { accent: 0x3498db, accentSoft: 0xd4e6f1, glow: 0x3498db, label: '科学' },
+};
 
 export class RunnerScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Rectangle;
+  /* 游戏状态 */
+  private player!: Phaser.GameObjects.Container;
   private currentLane = 1;
   private lanes: number[] = [];
   private ground!: Phaser.GameObjects.TileSprite;
   private barriers: Phaser.GameObjects.Container[] = [];
-  private scoreText!: Phaser.GameObjects.Text;
-  private lives = INITIAL_LIVES;
   private score = 0;
-  private gameSpeed = 100;
-  private questionActive = false;
-  private currentQuestion: GameQuestion | null = null;
+  private lives = INIT_LIVES;
+  private speed = P_SPEED;
+  private isOver = false;
   private events: GameEvents = {};
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private keyA!: Phaser.Input.Keyboard.Key;
-  private keyD!: Phaser.Input.Keyboard.Key;
-  private questionPanel!: Phaser.GameObjects.Container;
-  private lifeIcons: Phaser.GameObjects.Text[] = [];
-  private gameOverGroup!: Phaser.GameObjects.Container;
-  private isGameOver = false;
+  private subject: Subject = 'math';
+  private subjectColor!: typeof SUBJECT_COLORS.math;
+
+  /* 题目系统 */
   private questionQueue: GameQuestion[] = [];
+  private currentQuestion: GameQuestion | null = null;
   private isFetching = false;
-  private backgroundCircles: Phaser.GameObjects.Arc[] = [];
-  private obstacleTimer = 0;
-  private obstacleInterval = 3000;
+  private questionPanel!: Phaser.GameObjects.Container;
+  private questionActive = false;
 
-  constructor() {
-    super({ key: 'RunnerScene' });
-  }
+  /* HUD */
+  private scoreText!: Phaser.GameObjects.Text;
+  private lifeHearts: Phaser.GameObjects.Text[] = [];
+  private gameOverGroup!: Phaser.GameObjects.Container;
 
-  /** 设置事件回调 */
-  setEvents(events: GameEvents): void {
-    this.events = events;
-  }
+  /* 计时器 */
+  private obsTimer = 0;
 
-  /** 推送一道新题 */
-  pushQuestion(q: GameQuestion): void {
-    this.questionQueue.push(q);
-  }
+  constructor() { super({ key: 'RunnerScene' }); }
+
+  setEvents(e: GameEvents): void { this.events = e; }
+  setSubject(s: Subject): void { this.subject = s; }
+  pushQuestion(q: GameQuestion): void { this.questionQueue.push(q); }
 
   create(): void {
+    this.subjectColor = SUBJECT_COLORS[this.subject] || SUBJECT_COLORS.math;
     const { width, height } = this.scale;
+    this.cameras.main.setBackgroundColor('#1e1b2e');
 
-    // ── 装饰背景（渐变感：滚动圆点） ──────
-    this.cameras.main.setBackgroundColor('#0f172a');
-
-    // 地板条纹装饰（TileSprite）
-    this.ground = this.add.tileSprite(width / 2, height, width, height * 0.6, '__GROUND__');
-    // 创建虚拟地面纹理
+    /* ── 跑道背景 ── */
     const gfx = this.add.graphics();
-    gfx.fillStyle(0x1e293b, 1);
-    gfx.fillRect(0, 0, width, height * 0.6);
+    const laneW = width / LANES;
+    // 深色底
+    gfx.fillStyle(0x2d2a3e, 1);
+    gfx.fillRect(0, 0, width, height);
     // 跑道分割线
-    const laneWidth = width / LANE_COUNT;
-    gfx.lineStyle(2, 0x334155, 0.4);
-    for (let i = 1; i < LANE_COUNT; i++) {
-      gfx.lineBetween(i * laneWidth, 0, i * laneWidth, height * 0.6);
-    }
+    gfx.lineStyle(1, 0x3d3a52, 0.5);
+    for (let i = 1; i < LANES; i++) gfx.lineBetween(i * laneW, 0, i * laneW, height);
     // 中间虚线
-    gfx.lineStyle(1, 0x475569, 0.3);
-    for (let y = 0; y < height * 0.6; y += 40) {
-      gfx.lineBetween(0, y, width, y);
-    }
-    gfx.generateTexture('ground_tile', width, height * 0.6);
+    gfx.lineStyle(1, 0x4a4760, 0.25);
+    for (let y = 0; y < height; y += 40) gfx.lineBetween(0, y, width, y);
+    gfx.generateTexture('bg_tile', width, height);
     gfx.destroy();
-    this.ground.setTexture('ground_tile');
-    this.ground.setOrigin(0.5, 1);
-    this.ground.setPosition(width / 2, height);
-    this.ground.setDisplaySize(width, height);
+    this.ground = this.add.tileSprite(width / 2, height / 2, width, height, 'bg_tile');
 
-    // ── 计算 4 条跑道中心 x ──────
-    for (let i = 0; i < LANE_COUNT; i++) {
-      this.lanes.push(laneWidth * i + laneWidth / 2);
-    }
+    /* ── 4 跑道中心 ── */
+    for (let i = 0; i < LANES; i++) this.lanes.push(laneW * i + laneW / 2);
 
-    // ── 玩家（发光小球） ──────
-    this.player = this.add.rectangle(this.lanes[this.currentLane], height - 100, 36, 36, 0x6366f1, 1);
-    this.player.setStrokeStyle(3, 0x818cf8);
-    // 发光效果（多个同心圆叠加）
-    const glow = this.add.circle(this.player.x, this.player.y, 24, 0x6366f1, 0.2);
-    this.tweens.add({
-      targets: glow,
-      alpha: 0.05,
-      scale: 1.5,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-    });
+    /* ── 玩家（黏土小球） ── */
+    const c = this.subjectColor.accent;
+    this.player = this.add.container(this.lanes[this.currentLane], height - 100);
+    const body = this.add.circle(0, 0, 20, c);
+    body.setStrokeStyle(3, 0xffffff);
+    this.player.add(body);
+    // 发光光晕
+    const glow = this.add.circle(0, 0, 30, c, 0.15);
+    this.player.add(glow);
+    this.tweens.add({ targets: glow, scale: 1.6, alpha: 0.05, duration: 900, yoyo: true, repeat: -1 });
 
-    // ── 顶部 HUD ──────
-    this.scoreText = this.add.text(16, 16, '🏆 0', {
-      fontSize: '22px',
-      fontFamily: 'Fredoka, sans-serif',
-      color: '#f1f5f9',
-    });
+    /* ── HUD ── */
+    this.scoreText = this.add.text(14, 14, '0', { fontSize: '26px', fontFamily: 'Fredoka, sans-serif', color: '#e2e8f0' }).setDepth(10);
+    this.updateHearts();
+    this.createQuestionPanel();
+    this.createGameOverScreen();
 
-    // 生命值图标
-    this.updateLifeIcons();
+    /* ── 键盘 ── */
+    const kb = this.input.keyboard!;
+    kb.createCursorKeys();
+    kb.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    kb.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    kb.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+    kb.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
 
-    // ── 题目面板（顶部） ──────
-    this.questionPanel = this.add.container(width / 2, 60);
-    this.questionPanel.setAlpha(0);
-    const panelBg = this.add.rectangle(0, 0, width - 32, 80, 0x1e293b, 0.9);
-    panelBg.setStrokeStyle(1, 0x6366f1);
-    this.questionPanel.add(panelBg);
-    const qText = this.add.text(0, -4, '', {
-      fontSize: '15px',
-      fontFamily: 'Nunito, sans-serif',
-      color: '#e2e8f0',
-      wordWrap: { width: width - 56 },
-      align: 'center',
-    });
-    qText.setOrigin(0.5);
-    this.questionPanel.add(qText);
-    (this.questionPanel as any).__text = qText;
-
-    // ── 键盘 ──────
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keyA = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-
-    // ── 游戏结束界面（预创建但隐藏） ──────
-    this.gameOverGroup = this.add.container(width / 2, height / 2);
-    this.gameOverGroup.setAlpha(0);
-    const goBg = this.add.rectangle(0, 0, width * 0.8, 240, 0x0f172a, 0.95);
-    goBg.setStrokeStyle(2, 0x6366f1);
-    this.gameOverGroup.add(goBg);
-    const goTitle = this.add.text(0, -80, '游戏结束', {
-      fontSize: '36px',
-      fontFamily: 'Fredoka, sans-serif',
-      color: '#f1f5f9',
-    });
-    goTitle.setOrigin(0.5);
-    this.gameOverGroup.add(goTitle);
-    const goScore = this.add.text(0, -20, '', {
-      fontSize: '24px',
-      fontFamily: 'Nunito, sans-serif',
-      color: '#818cf8',
-    });
-    goScore.setOrigin(0.5);
-    (this.gameOverGroup as any).__scoreText = goScore;
-    this.gameOverGroup.add(goScore);
-    const restartBtn = this.add.text(0, 50, '🔄 再来一次', {
-      fontSize: '20px',
-      fontFamily: 'Fredoka, sans-serif',
-      color: '#22d3ee',
-    });
-    restartBtn.setOrigin(0.5);
-    restartBtn.setInteractive({ useHandCursor: true });
-    restartBtn.on('pointerdown', () => this.restartGame());
-    this.gameOverGroup.add(restartBtn);
-    this.gameOverGroup.setDepth(100);
-    this.gameOverGroup.setScrollFactor(0);
-
-    // ── 获取第一道题 ──────
-    this.fetchNextQuestion();
+    /* ── 获取首题 ── */
+    this.fetchNextQuestions();
   }
 
-  update(_time: number, delta: number): void {
-    if (this.isGameOver) return;
-
+  update(_t: number, delta: number): void {
+    if (this.isOver) return;
     const dt = delta / 1000;
 
-    // ── 地面滚动 ──────
-    this.ground.tilePositionY -= this.gameSpeed * dt * 0.3;
+    // 地面滚动
+    this.ground.tilePositionY -= this.speed * dt * 0.2;
 
-    // ── 玩家移动 (A/D 或 ←/→) ──────
-    if (Phaser.Input.Keyboard.JustDown(this.keyA) || Phaser.Input.Keyboard.JustDown(this.cursors.left)) {
-      this.currentLane = Math.max(0, this.currentLane - 1);
-      this.tweens.add({
-        targets: this.player,
-        x: this.lanes[this.currentLane],
-        duration: 120,
-        ease: 'Power2',
-      });
-    } else if (Phaser.Input.Keyboard.JustDown(this.keyD) || Phaser.Input.Keyboard.JustDown(this.cursors.right)) {
-      this.currentLane = Math.min(LANE_COUNT - 1, this.currentLane + 1);
-      this.tweens.add({
-        targets: this.player,
-        x: this.lanes[this.currentLane],
-        duration: 120,
-        ease: 'Power2',
-      });
+    // 左右移动（A/D 或 ←/→）
+    const kb = this.input.keyboard!;
+    if (Phaser.Input.Keyboard.JustDown(kb.addKey(Phaser.Input.Keyboard.KeyCodes.A)) as any ||
+        Phaser.Input.Keyboard.JustDown(kb.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT)) as any) {
+      this.moveTo(Math.max(0, this.currentLane - 1));
+    } else if (Phaser.Input.Keyboard.JustDown(kb.addKey(Phaser.Input.Keyboard.KeyCodes.D)) as any ||
+               Phaser.Input.Keyboard.JustDown(kb.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT)) as any) {
+      this.moveTo(Math.min(LANES - 1, this.currentLane + 1));
     }
 
-    // ── 拦截门移动 + 碰撞检测 ──────
-    this.obstacleTimer += delta;
-    if (this.obstacleTimer >= this.obstacleInterval) {
-      this.obstacleTimer = 0;
-      if (this.questionQueue.length > 0 || !this.isFetching) {
-        this.spawnBarriers();
-      }
+    // 生成拦截门
+    this.obsTimer += delta;
+    if (this.obsTimer >= OBS_INTERVAL && (this.questionQueue.length > 0 || !this.isFetching)) {
+      this.obsTimer = 0;
+      this.spawnBarriers();
     }
 
+    // 拦截门移动 + 碰撞
     for (let i = this.barriers.length - 1; i >= 0; i--) {
-      const container = this.barriers[i];
-      container.y += this.gameSpeed * dt;
+      const b = this.barriers[i];
+      b.y += this.speed * dt;
 
-      // 碰撞检测
-      if (!(container as any).__passed && container.y >= this.player.y - 50 && container.y <= this.player.y + 50) {
-        const barrierLane = (container as any).__lane;
-        if (barrierLane === this.currentLane) {
-          // 玩家撞上了当前跑道的门
-          const isCorrect = (container as any).__correct;
-          this.handleBarrierCollision(container, isCorrect);
+      if (!(b as any).__triggered && b.y >= this.player.y - 45 && b.y <= this.player.y + 45) {
+        const lane = (b as any).__lane;
+        if (lane === this.currentLane) {
+          this.onHit((b as any).__correct);
+          (b as any).__triggered = true;
         }
       }
 
-      // 超出屏幕移除
-      if (container.y > this.scale.height + 100) {
-        container.destroy();
-        this.barriers.splice(i, 1);
-      }
+      if (b.y > height + 120) { b.destroy(); this.barriers.splice(i, 1); }
     }
   }
 
-  /** 生成一组拦截门（4个跑道各一个） */
+  /* ── 移动跑道 ── */
+  private moveTo(lane: number): void {
+    this.currentLane = lane;
+    this.tweens.add({ targets: this.player, x: this.lanes[lane], duration: 100, ease: 'Power2' });
+  }
+
+  /* ── 拦截门 ── */
   private spawnBarriers(): void {
-    if (!this.currentQuestion && this.questionQueue.length === 0) return;
-
-    const question = this.questionQueue.shift() || this.currentQuestion;
-    if (!question) return;
-    this.currentQuestion = question;
+    const q = this.questionQueue.shift() || this.currentQuestion;
+    if (!q) return;
+    this.currentQuestion = q;
     this.questionActive = true;
+    this.events.onQuestionChange?.(q);
+    this.showQuestionPanel(q);
 
-    // 通知 Vue 更新题目显示
-    this.events.onQuestionChange?.(question);
+    const laneW = this.scale.width / LANES;
+    const correctLane = Phaser.Math.Between(0, LANES - 1);
 
-    // 更新顶部题目面板
-    this.updateQuestionPanel(question);
-
-    const { width, height } = this.scale;
-    const laneWidth = width / LANE_COUNT;
-
-    // 随机分配正确选项到某条跑道
-    const correctLane = Phaser.Math.Between(0, LANE_COUNT - 1);
-
-    for (let lane = 0; lane < LANE_COUNT; lane++) {
-      const option = question.options[lane];
+    for (let lane = 0; lane < LANES; lane++) {
+      const option = q.options[lane];
       if (!option) continue;
-
       const isCorrect = lane === correctLane;
-      const barrier = this.createBarrier(
-        this.lanes[lane],
-        -120,
-        option.text,
-        isCorrect,
-        lane,
-      );
-      this.barriers.push(barrier);
+      this.barriers.push(this.createBarrier(this.lanes[lane], -100, option.text, isCorrect, lane));
     }
   }
 
-  /** 创建一个拦截门 */
-  private createBarrier(x: number, y: number, label: string, isCorrect: boolean, lane: number): Phaser.GameObjects.Container {
-    const container = this.add.container(x, y);
+  private createBarrier(x: number, y: number, label: string, correct: boolean, lane: number): Phaser.GameObjects.Container {
+    const c = this.add.container(x, y);
+    const doorW = this.scale.width / LANES - 18;
+    const doorH = 58;
 
-    // 门框
-    const doorWidth = this.scale.width / LANE_COUNT - 20;
-    const doorHeight = 60;
+    // 所有门初始外观一致：深色半透明底 + 白色圆角框
+    const bg = this.add.rectangle(0, 0, doorW, doorH, 0x1e293b, 0.85);
+    bg.setStrokeStyle(2, 0x475569);
+    bg.setCornerRadius(12);
+    c.add(bg);
 
-    const bg = this.add.rectangle(0, 0, doorWidth, doorHeight, isCorrect ? 0x065f46 : 0x7f1d1d, 0.85);
-    bg.setStrokeStyle(2, isCorrect ? 0x10b981 : 0xef4444);
-    container.add(bg);
+    // 选项图标
+    const iconSize = 22;
+    const icon = this.add.circle(-doorW / 2 + 18, 0, iconSize / 2, 0x334155, 1);
+    icon.setStrokeStyle(1, 0x64748b);
+    c.add(icon);
+    const iconLabel = this.add.text(-doorW / 2 + 18, 0, String.fromCharCode(65 + lane), { fontSize: '10px', fontFamily: 'Fredoka, sans-serif', color: '#94a3b8' }).setOrigin(0.5);
+    c.add(iconLabel);
 
-    // 选项文字
-    const text = this.add.text(0, 0, label, {
-      fontSize: '15px',
-      fontFamily: 'Nunito, sans-serif',
-      color: '#f1f5f9',
-      wordWrap: { width: doorWidth - 16 },
-      align: 'center',
-    });
-    text.setOrigin(0.5);
-    container.add(text);
+    // 答案文字
+    const txt = this.add.text(6, 0, label, { fontSize: '12px', fontFamily: 'Nunito, sans-serif', color: '#e2e8f0', wordWrap: { width: doorW - 44 }, align: 'left' }).setOrigin(0, 0.5);
+    c.add(txt);
+
+    // 入场淡入
+    c.setAlpha(0);
+    this.tweens.add({ targets: c, alpha: 1, duration: 250 });
 
     // 标记
-    (container as any).__correct = isCorrect;
-    (container as any).__lane = lane;
-    (container as any).__passed = false;
-
-    // 入口动画
-    container.setAlpha(0);
-    this.tweens.add({
-      targets: container,
-      alpha: 1,
-      duration: 200,
-      ease: 'Power2',
-    });
-
-    return container;
+    (c as any).__correct = correct;
+    (c as any).__lane = lane;
+    (c as any).__triggered = false;
+    (c as any).__bg = bg;
+    (c as any).__icon = icon;
+    (c as any).__iconLabel = iconLabel;
+    (c as any).__txt = txt;
+    return c;
   }
 
-  /** 碰撞处理 */
-  private handleBarrierCollision(container: Phaser.GameObjects.Container, isCorrect: boolean): void {
-    (container as any).__passed = true;
+  /* ── 碰撞反馈 ── */
+  private onHit(correct: boolean): void {
+    const success = this.subjectColor.accent;
+    const error = 0xf2557a; // --error from project
 
-    if (isCorrect) {
-      // ✅ 正确：加分 + 加速
-      this.score += BONUS_PER_QUESTION;
-      this.gameSpeed = Math.min(MAX_SPEED, this.gameSpeed + SPEED_INCREMENT);
-      this.obstacleInterval = Math.max(1200, this.obstacleInterval - 50);
+    if (correct) {
+      // ✅ 正确：目标变绿 → 缩小淡出
+      this.score += BONUS;
+      this.speed = Math.min(MAX_SPEED, this.speed + SPEED_STEP);
       this.events.onScoreChange?.(this.score);
-      this.scoreText.setText(`🏆 ${this.score}`);
+      this.scoreText.setText(`${this.score}`);
 
-      // 正确闪光
-      this.cameras.main.flash(200, 99, 102, 241, false, (_cam: any, progress: number) => {
-        if (progress === 1) this.cameras.main.resetFX();
-      });
-
-      // 销毁该组拦截门
+      // 所有屏障变色 + 缩小淡出
       for (const b of this.barriers) {
-        this.tweens.add({
-          targets: b,
-          alpha: 0,
-          scale: 0.5,
-          duration: 200,
-          onComplete: () => b.destroy(),
-        });
+        const bg = (b as any).__bg as Phaser.GameObjects.Rectangle;
+        bg.setFillStyle(success, 0.9);
+        bg.setStrokeStyle(2, 0x34d399);
+        // 其他门也变成灰色表示已过时
+        if (!(b as any).__correct) {
+          bg.setFillStyle(0x334155, 0.7);
+          bg.setStrokeStyle(1, 0x475569);
+        }
+        this.tweens.add({ targets: b, alpha: 0, scaleY: 0.3, y: b.y - 60, duration: 350, delay: 60, onComplete: () => b.destroy() });
       }
       this.barriers = [];
       this.questionActive = false;
       this.currentQuestion = null;
       this.questionPanel.setAlpha(0);
       this.events.onQuestionChange?.(null);
-
-      // 取下一题
-      if (this.questionQueue.length === 0) {
-        this.fetchNextQuestion();
-      }
+      if (this.questionQueue.length < 3) this.fetchNextQuestions();
     } else {
-      // ❌ 错误：扣一条命
+      // ❌ 错误：门变红 + 玩家闪烁
+      const bg = (this.barriers.find(b => (b as any).__lane === this.currentLane) as any)?.__bg;
+      if (bg) { bg.setFillStyle(error, 0.9); bg.setStrokeStyle(2, 0xfb7185); }
+
+      // 玩家闪烁
+      this.tweens.add({
+        targets: this.player,
+        alpha: 0.15,
+        duration: 100,
+        yoyo: true,
+        repeat: 5,
+        onComplete: () => { this.player.setAlpha(1); },
+      });
+      // 屏幕红闪
+      this.cameras.main.flash(400, 242, 85, 101, false);
+
       this.lives--;
-      this.updateLifeIcons();
+      this.updateHearts();
       this.events.onLivesChange?.(this.lives);
+      this.speed = Math.max(P_SPEED, this.speed - SPEED_STEP * 2);
 
-      // 错误红闪
-      this.cameras.main.flash(300, 239, 68, 68, false, (_cam: any, progress: number) => {
-        if (progress === 1) this.cameras.main.resetFX();
-      });
-
-      if (this.lives <= 0) {
-        this.gameOver();
-      } else {
-        // 减速惩罚
-        this.gameSpeed = Math.max(PLAYER_SPEED, this.gameSpeed - 30);
-      }
+      if (this.lives <= 0) this.gameOver();
     }
   }
 
-  /** 更新生命图标 */
-  private updateLifeIcons(): void {
-    // 清除旧图标
-    for (const icon of this.lifeIcons) icon.destroy();
-    this.lifeIcons = [];
-
-    for (let i = 0; i < this.lives; i++) {
-      const heart = this.add.text(this.scale.width - 32 - i * 32, 16, '❤️', {
-        fontSize: '20px',
-      });
-      this.lifeIcons.push(heart);
-    }
+  /* ── 题目面板 ── */
+  private createQuestionPanel(): void {
+    const w = this.scale.width - 32;
+    this.questionPanel = this.add.container(this.scale.width / 2, 52).setDepth(10).setAlpha(0);
+    const bg = this.add.rectangle(0, 0, w, 62, 0x1e293b, 0.92);
+    bg.setStrokeStyle(1, this.subjectColor.accent);
+    bg.setCornerRadius(14);
+    this.questionPanel.add(bg);
+    const txt = this.add.text(0, 0, '', { fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#e2e8f0', wordWrap: { width: w - 24 }, align: 'center' }).setOrigin(0.5);
+    this.questionPanel.add(txt);
+    (this.questionPanel as any).__txt = txt;
   }
 
-  /** 更新题目面板 */
-  private updateQuestionPanel(question: GameQuestion): void {
-    const text = (this.questionPanel as any).__text as Phaser.GameObjects.Text;
-    text.setText(question.stem);
+  private showQuestionPanel(q: GameQuestion): void {
+    const txt = (this.questionPanel as any).__txt as Phaser.GameObjects.Text;
+    txt.setText(q.stem);
     this.questionPanel.setAlpha(1);
   }
 
-  /** 从后端获取题目 */
-  private async fetchNextQuestion(): Promise<void> {
-    if (this.isFetching) return;
-    this.isFetching = true;
-
-    // 预缓存 5 道题
-    const needed = 5 - this.questionQueue.length;
-    if (needed <= 0) {
-      this.isFetching = false;
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/game/question');
-      if (!res.ok) throw new Error('Failed to fetch question');
-      const data = await res.json();
-
-      if (data.question) {
-        this.pushQuestion(data.question);
-      }
-
-      // 如果还不够，继续获取
-      if (this.questionQueue.length < 5) {
-        this.fetchNextQuestion();
-      } else {
-        this.isFetching = false;
-      }
-    } catch (err) {
-      console.warn('[game] 获取题目失败:', err);
-      this.isFetching = false;
+  /* ── HUD ── */
+  private updateHearts(): void {
+    this.lifeHearts.forEach(h => h.destroy());
+    this.lifeHearts = [];
+    for (let i = 0; i < this.lives; i++) {
+      const h = this.add.text(this.scale.width - 32 - i * 30, 14, '❤️', { fontSize: '18px' }).setDepth(10);
+      this.lifeHearts.push(h);
     }
   }
 
-  /** 游戏结束 */
+  /* ── 结算 ── */
+  private createGameOverScreen(): void {
+    const c = this.subjectColor;
+    this.gameOverGroup = this.add.container(this.scale.width / 2, this.scale.height / 2).setDepth(100).setAlpha(0).setScrollFactor(0);
+    const bg = this.add.rectangle(0, 0, this.scale.width * 0.8, 240, 0x1e1b2e, 0.95);
+    bg.setStrokeStyle(2, c.accent);
+    bg.setCornerRadius(20);
+    this.gameOverGroup.add(bg);
+    const title = this.add.text(0, -80, '游戏结束', { fontSize: '34px', fontFamily: 'Fredoka, sans-serif', color: '#f1f5f9' }).setOrigin(0.5);
+    this.gameOverGroup.add(title);
+    const sc = this.add.text(0, -20, '', { fontSize: '22px', fontFamily: 'Nunito, sans-serif', color: `#${c.accent.toString(16).padStart(6, '0')}` }).setOrigin(0.5);
+    (this.gameOverGroup as any).__sc = sc;
+    this.gameOverGroup.add(sc);
+    const btn = this.add.text(0, 50, '🔄 再来一次', { fontSize: '20px', fontFamily: 'Fredoka, sans-serif', color: '#22d3ee' }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    btn.on('pointerdown', () => this.restart());
+    this.gameOverGroup.add(btn);
+  }
+
   private gameOver(): void {
-    this.isGameOver = true;
+    this.isOver = true;
     this.barriers.forEach(b => b.destroy());
     this.barriers = [];
     this.player.setAlpha(0);
-
-    // 显示结算界面
-    const scoreText = (this.gameOverGroup as any).__scoreText as Phaser.GameObjects.Text;
-    scoreText.setText(`最终得分：${this.score}`);
-    this.tweens.add({
-      targets: this.gameOverGroup,
-      alpha: 1,
-      duration: 400,
-    });
-
+    const sc = (this.gameOverGroup as any).__sc as Phaser.GameObjects.Text;
+    sc.setText(`${this.score} 分`);
+    this.tweens.add({ targets: this.gameOverGroup, alpha: 1, duration: 400 });
     this.events.onGameOver?.(this.score);
   }
 
-  /** 重新开始 */
-  private restartGame(): void {
-    this.isGameOver = false;
-    this.score = 0;
-    this.lives = INITIAL_LIVES;
-    this.gameSpeed = 100;
-    this.currentLane = 1;
-    this.obstacleTimer = 0;
-    this.obstacleInterval = 3000;
-    this.questionActive = false;
-    this.currentQuestion = null;
-    this.questionQueue = [];
-    this.isFetching = false;
-
-    this.barriers.forEach(b => b.destroy());
-    this.barriers = [];
-
-    this.player.setAlpha(1);
-    this.player.x = this.lanes[this.currentLane];
-    this.player.y = this.scale.height - 100;
-
-    this.scoreText.setText('🏆 0');
-    this.updateLifeIcons();
+  /* ── 重新开始 ── */
+  restart(): void {
+    this.isOver = false;
+    this.score = 0; this.lives = INIT_LIVES; this.speed = P_SPEED;
+    this.currentLane = 1; this.obsTimer = 0;
+    this.questionActive = false; this.currentQuestion = null;
+    this.questionQueue = []; this.isFetching = false;
+    this.barriers.forEach(b => b.destroy()); this.barriers = [];
+    this.player.setAlpha(1); this.player.x = this.lanes[this.currentLane]; this.player.y = 620;
+    this.scoreText.setText('0');
+    this.updateHearts();
     this.questionPanel.setAlpha(0);
     this.gameOverGroup.setAlpha(0);
-    this.events.onQuestionChange?.(null);
-
     this.cameras.main.resetFX();
+    this.fetchNextQuestions();
+  }
 
-    this.fetchNextQuestion();
+  /* ── 取题 ── */
+  private async fetchNextQuestions(): Promise<void> {
+    if (this.isFetching) return;
+    this.isFetching = true;
+    const needed = 5 - this.questionQueue.length;
+    if (needed <= 0) { this.isFetching = false; return; }
+    try {
+      for (let i = 0; i < needed; i++) {
+        const res = await fetch(`/api/game/question?subject=${this.subject}`);
+        if (!res.ok) break;
+        const data = await res.json();
+        if (data.question) this.questionQueue.push(data.question);
+        else break;
+      }
+    } catch (err) { console.warn('[game] 获取题目失败:', err); }
+    this.isFetching = false;
   }
 }

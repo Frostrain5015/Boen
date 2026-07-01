@@ -226,13 +226,25 @@ export async function logout() {
   window.location.reload();
 }
 
-/** 本地开发测试登录：绕过 OAuth，仅用于本地调试游戏等模块 */
+/** 本地开发测试登录：绕过 OAuth，直接设置认证状态，不触发页面重载 */
 export function loginAsTestUser(profile: { name?: string; grade?: string } = {}) {
   const fakeToken = `local-dev-token-${Date.now()}`;
   saveToken(fakeToken);
-  localStorage.setItem('boen_user_profile', JSON.stringify({
+  const profileData = {
     name: profile.name ?? '本地测试用户',
     grade: profile.grade ?? '8',
-  }));
-  window.location.reload();
+  };
+  localStorage.setItem('boen_user_profile', JSON.stringify(profileData));
+  // 不 reload，由调用方（LoginView）直接推入路由
+  return {
+    token: fakeToken,
+    user: {
+      sub: 'local-dev-sub',
+      preferred_username: profileData.name,
+      username: 'local-dev-user',
+      email: 'dev@boen.local',
+      email_verified: true,
+    } as FrostUser,
+    profile: profileData,
+  };
 }
