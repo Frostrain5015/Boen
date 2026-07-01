@@ -178,6 +178,17 @@ export async function getCurrentUser(): Promise<FrostUser | null> {
   const token = getToken();
   if (!token) return null;
 
+  // 本地开发测试 token：直接返回虚拟用户，不请求后端
+  if (token.startsWith('local-dev-token-')) {
+    return {
+      sub: 'local-dev-sub',
+      preferred_username: '本地测试用户',
+      username: 'local-dev-user',
+      email: 'dev@boen.local',
+      email_verified: true,
+    };
+  }
+
   try {
     const response = await fetch('/api/auth/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
@@ -212,5 +223,16 @@ export async function logout() {
     }
   }
   clearToken();
+  window.location.reload();
+}
+
+/** 本地开发测试登录：绕过 OAuth，仅用于本地调试游戏等模块 */
+export function loginAsTestUser(profile: { name?: string; grade?: string } = {}) {
+  const fakeToken = `local-dev-token-${Date.now()}`;
+  saveToken(fakeToken);
+  localStorage.setItem('boen_user_profile', JSON.stringify({
+    name: profile.name ?? '本地测试用户',
+    grade: profile.grade ?? '8',
+  }));
   window.location.reload();
 }

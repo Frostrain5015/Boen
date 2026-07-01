@@ -860,7 +860,7 @@ function buildCrossGroupContext(allQuestions: ExamQuestion[]): string {
  * 按 section × questionType 出题，用 DeepSeek JSON Output + 本地 schema 强制结构化输出。
  * 失败 → 重试 2 次 → 降级题量 → 标记 __needs_review__ 强制进入重出池。
  */
-async function stepWriteQuestionsV2(
+export async function stepWriteQuestionsV2(
   model: BaseChatModel,
   config: ExamConfig,
   task: WriteTask,

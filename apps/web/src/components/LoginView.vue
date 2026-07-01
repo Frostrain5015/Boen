@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
-import { loginWithFrostId } from '@/services/auth';
+import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
 
 const isLoading = ref(false);
 const agreedToTerms = ref(false);
@@ -16,6 +16,11 @@ async function handleLogin() {
   } catch {
     isLoading.value = false;
   }
+}
+
+function handleTestLogin() {
+  if (!agreedToTerms.value) return;
+  loginAsTestUser({ name: '本地测试用户', grade: '8' });
 }
 </script>
 
@@ -67,6 +72,14 @@ async function handleLogin() {
           <line x1="15" y1="12" x2="3" y2="12" />
         </svg>
         <span>{{ isLoading ? '正在跳转…' : '使用 Frost ID 登录' }}</span>
+      </button>
+
+      <button
+        @click="handleTestLogin"
+        :disabled="!agreedToTerms"
+        class="flex w-full items-center justify-center gap-2 rounded-[18px] border border-slate-600 bg-slate-800/60 px-6 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-slate-800 disabled:opacity-60"
+      >
+        🧪 本地测试登录（免 OAuth）
       </button>
 
       <!-- 同意条款 -->

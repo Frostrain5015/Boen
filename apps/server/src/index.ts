@@ -711,7 +711,6 @@ async function autoGenerateTitle(conversationId: string, userMessage: string, on
       await onTitle(title);
     }
   } catch (e) { console.warn('[title] auto-generation failed:', e instanceof Error ? e.message : e); }
-  }
 }
 
 /** 若最后一条消息触发了出题工具，推送 question 事件（每次只呈现第一道） */

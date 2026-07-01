@@ -99,7 +99,6 @@ export class RunnerScene extends Phaser.Scene {
     this.ground.setDisplaySize(width, height);
 
     // ── 计算 4 条跑道中心 x ──────
-    const laneWidth = width / LANE_COUNT;
     for (let i = 0; i < LANE_COUNT; i++) {
       this.lanes.push(laneWidth * i + laneWidth / 2);
     }
