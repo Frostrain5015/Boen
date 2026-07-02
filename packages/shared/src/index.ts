@@ -99,7 +99,7 @@ export interface GradingResult {
   /** 填空题逐空详细匹配信息（含层级，供 Level 3 LLM 语义判定） */
   perBlankDetails?: Array<{
     matched: boolean;
-    level: 1 | 2 | 'miss';
+    level: 1 | 2 | 'miss' | 'llm';
     userNorm: string;
     acceptedNorms: string[];
   }>;

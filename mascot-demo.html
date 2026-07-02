@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>博文吉祥物 · Q版手脚 + 原始色</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Nunito', 'Segoe UI', sans-serif;
+  background: #1a1a2e; color: #e0e0e0; min-height: 100vh;
+  padding: 28px 20px 50px;
+}
+
+/* ── 预设学科色 ── */
+:root {
+  --color-default: #f09070;
+  --color-math: #70b0f0;
+  --color-chinese: #e07070;
+  --color-english: #70c090;
+  --color-science: #a070d0;
+  --color-history: #d0a050;
+}
+
+h1 { text-align: center; font-size: 1.8rem; margin-bottom: 4px; color: #f5d060; }
+.subtitle { text-align: center; font-size: 0.84rem; color: #888; margin-bottom: 28px; line-height: 1.5; }
+
+/* ── Hero 区域 ── */
+.hero {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  margin-bottom: 32px; padding: 28px 20px 24px;
+  background: #16213e; border: 1px solid #2a2a4a; border-radius: 20px;
+  max-width: 580px; margin-left: auto; margin-right: auto;
+}
+
+/* 吉祥物 + 对话框布局 */
+.mascot-dialog-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── 对话框（用户对话气泡） ── */
+.dialog-box {
+  position: relative;
+  background: linear-gradient(135deg, #2e4a6e, #1e3550);
+  border: 1.5px solid #3a5a8a;
+  border-radius: 18px;
+  padding: 14px 20px;
+  margin-top: -2px;
+  max-width: 280px;
+  text-align: center;
+  color: #e0ecff;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  opacity: 0;
+  transform: translateY(10px) scale(0.92);
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 5;
+}
+.dialog-box::before {
+  content: '';
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid #1e3550;
+}
+.dialog-box::after {
+  content: '';
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 10px solid #3a5a8a;
+}
+.show-dialog .dialog-box {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.dialog-box .name {
+  font-weight: 800; font-size: 0.84rem; color: #f5d060; margin-bottom: 4px;
+}
+.dialog-box .dots {
+  display: flex; gap: 5px; justify-content: center; margin-top: 6px;
+}
+.dialog-box .dots span {
+  width: 7px; height: 7px; border-radius: 50%; background: #7ea8d8;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+.dialog-box .dots span:nth-child(2) { animation-delay: 0.2s; }
+.dialog-box .dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* 四肢已漂浮在对话框之上（通过 SVGO overflow:visible 实现） */
+.limb-hint {
+  font-size: 0.7rem; color: #666; margin-top: -2px;
+  text-align: center; line-height: 1.4;
+}
+
+.hero-btns { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.hero-btns button {
+  background: #2a2a4a; border: 1px solid #444; color: #ccc; padding: 5px 14px;
+  border-radius: 20px; cursor: pointer; font-size: 0.78rem; transition: all 0.2s;
+}
+.hero-btns button:hover { border-color: #daa520; color: #f5d060; }
+.hero-btns button.active { background: #daa520; color: #1a1a2e; border-color: #daa520; font-weight: 700; }
+.hero-btns button.toggle-on {
+  background: #4ecdc4; color: #1a1a2e; border-color: #4ecdc4; font-weight: 700;
+}
+
+/* 学科色选择器 */
+.color-swatch {
+  display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 6px;
+}
+.color-swatch span {
+  width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: all 0.2s;
+}
+.color-swatch span.active-col { border-color: #fff; box-shadow: 0 0 8px currentColor; }
+
+/* ── 卡片网格 ── */
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px; max-width: 1120px; margin: 0 auto;
+}
+.card {
+  background: #16213e; border: 1px solid #2a2a4a; border-radius: 16px;
+  padding: 16px 10px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: border-color 0.3s; cursor: pointer;
+}
+.card:hover { border-color: #daa520; }
+.card .label { font-weight: 700; font-size: 0.86rem; color: #ccc; }
+.card .desc { font-size: 0.7rem; color: #777; text-align: center; line-height: 1.4; }
+.card .limb-badge {
+  margin-top: 2px; font-size: 0.64rem;
+  background: #4ecdc4; color: #1a1a2e; padding: 2px 8px; border-radius: 10px;
+  display: none;
+}
+.card.show-limbs .limb-badge { display: inline-block; }
+
+/* ══════ Mascot CSS (与 Vue 组件一致) ══════ */
+.mascot { display: inline-grid; place-items: center; }
+.svg-root { overflow: visible; }
+
+.jelly-body, .mouth, .pupil, .eye-inner, .glasses, .tassel, .limb, .foot-l, .foot-r { transform-box: fill-box; }
+
+.jelly-body { transform-origin: 50px 56px; animation: jellyWobble 5s ease-in-out infinite; }
+.gfloat { transform-box: view-box; transform-origin: 50px 56px; }
+.floaty .gfloat { animation: gfloat 4s ease-in-out infinite; }
+.eye-inner { transform-origin: center; animation: blink 5.5s ease-in-out infinite; }
+.pupil { transition: transform 0.15s ease-out; }
+
+.inline-mascot {
+  display: inline-grid; place-items: center; width: 130px; height: 156px;
+  color: var(--color, var(--color-default));
+}
+
+/* 四肢 */
+.limb-l { transform-origin: 22px 63px; }
+.limb-r { transform-origin: 78px 63px; }
+.foot-l { transform-origin: 33px 99px; }
+.foot-r { transform-origin: 67px 99px; }
+
+.limbs-group { opacity: 0; visibility: hidden; }
+.has-limbs .limbs-group { opacity: 1; visibility: visible; }
+
+.has-limbs .limb-l {
+  animation: limbSpringL 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             limbFloatL 3s ease-in-out 0.5s infinite;
+}
+.has-limbs .limb-r {
+  animation: limbSpringR 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             limbFloatR 3s ease-in-out 0.5s infinite;
+}
+.has-limbs .foot-l {
+  animation: footPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             footFloat 3.2s ease-in-out 0.45s infinite;
+}
+.has-limbs .foot-r {
+  animation: footPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards 0.08s,
+             footFloat 3.2s ease-in-out 0.53s infinite;
+}
+
+
+/* ── 所有表情四肢一致，仅 gentle float ── */
+.eye-happy, .eye-surprise, .eye-sleepy { display: none; }
+.eye-hl.eye-surprise { display: none; }
+.mouth-think, .mouth-grin, .mouth-quiz, .mouth-open, .mouth-sleepy { display: none; }
+.fx { opacity: 0; pointer-events: none; }
+
+.s-thinking .mouth-smile { display: none; } .s-thinking .mouth-think { display: block; }
+.s-happy .eye-normal { display: none; } .s-happy .eye-happy { display: block; }
+.s-happy .eye-bg { display: none; }
+.s-happy .eye-hl { display: none; }
+.s-happy .mouth-smile { display: none; } .s-happy .mouth-grin { display: block; }
+.s-surprise .eye-normal { display: none; } .s-surprise .eye-surprise { display: block; }
+.s-surprise .eye-hl.eye-normal { display: none; } .s-surprise .eye-hl.eye-surprise { display: block; }
+.s-surprise .mouth-smile { display: none; } .s-surprise .mouth-open { display: block; }
+.s-quiz .mouth-smile { display: none; } .s-quiz .mouth-quiz { display: block; }
+.s-sleepy .eye-normal { display: none; } .s-sleepy .eye-sleepy { display: block; }
+.s-sleepy .eye-hl { display: none; }
+.s-sleepy .mouth-smile { display: none; } .s-sleepy .mouth-sleepy { display: block; }
+
+.tassel { transform-origin: 50px 22px; animation: tasselSway 3s ease-in-out infinite; }
+
+/* 状态根动画 */
+.s-idle     { animation: breathe 3.4s ease-in-out infinite; }
+.s-thinking { animation: tiltThink 2.6s ease-in-out infinite; }
+.s-quiz     { animation: presentBob 2s ease-in-out infinite; }
+.s-happy    { animation: cheerHop 0.62s cubic-bezier(0.34, 1.56, 0.64, 1) infinite; }
+.s-surprise { animation: startle 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.s-sleepy   { animation: sink 4.2s ease-in-out infinite; }
+
+.s-thinking .fx-think { opacity: 1; }
+.s-thinking .td { animation: thoughtPuff 1.8s ease-in-out infinite; }
+.s-thinking .td:nth-child(2) { animation-delay: 0.25s; }
+.s-thinking .td:nth-child(3) { animation-delay: 0.5s; }
+.s-thinking .eye-inner { animation: blink 2.4s ease-in-out infinite; }
+.s-quiz .fx-quiz { opacity: 1; animation: fxBob 1.4s ease-in-out infinite; }
+.s-happy .fx-happy { opacity: 1; }
+.s-happy .spark { animation: twinkle 0.9s ease-in-out infinite; }
+.s-happy .spark:nth-child(2) { animation-delay: 0.35s; }
+.s-surprise .fx-surprise { opacity: 1; animation: fxPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.s-sleepy .eye-inner { animation: blink 7s ease-in-out infinite; }
+
+/* ══════ Keyframes ══════ */
+@keyframes jellyWobble {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  14% { transform: scaleX(1.025) scaleY(0.975); }
+  28% { transform: scaleX(0.98) scaleY(1.028); }
+  42% { transform: scaleX(1.012) scaleY(0.99); }
+  56% { transform: scaleX(1) scaleY(1); }
+  68% { transform: scaleX(1.008) scaleY(0.994); }
+  84% { transform: scaleX(1) scaleY(1); }
+}
+@keyframes limbSpringL {
+  0%   { transform: scale(0.6); opacity: 0; }
+  70%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes limbSpringR {
+  0%   { transform: scale(0.6); opacity: 0; }
+  70%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes footPop {
+  0%   { transform: scale(0) translateY(4px); opacity: 0; }
+  70%  { transform: scale(1.12) translateY(-1px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes limbFloatL { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+@keyframes limbFloatR { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+@keyframes footFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-1.5px)} }
+@keyframes blink {
+  0%, 86%, 100% { transform: scaleY(1); }
+  92%, 97% { transform: scaleY(0.08); }
+}
+@keyframes gfloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+@keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.032)} }
+@keyframes tiltThink { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(2deg)} }
+@keyframes presentBob { 0%,100%{transform:translateY(0)rotate(2deg)} 50%{transform:translateY(-3px)rotate(-1deg)} }
+@keyframes cheerHop { 0%,100%{transform:translateY(0)scale(1)} 40%{transform:translateY(-9px)scale(1.05)} 65%{transform:translateY(-1px)scale(.98)} }
+@keyframes startle { 0%{transform:scale(.92)translateY(0)} 45%{transform:scale(1.08)translateY(-4px)} 100%{transform:scale(1)translateY(0)} }
+@keyframes sink { 0%,100%{transform:translateY(0)} 50%{transform:translateY(3px)} }
+@keyframes thoughtPuff { 0%,100%{opacity:.25;transform:scale(.7)} 50%{opacity:1;transform:scale(1)} }
+@keyframes twinkle { 0%,100%{opacity:.2;transform:scale(.6)rotate(0deg)} 50%{opacity:1;transform:scale(1)rotate(45deg)} }
+@keyframes fxBob { 0%,100%{transform:translateY(0)rotate(-6deg)} 50%{transform:translateY(-3px)rotate(6deg)} }
+@keyframes fxPop { 0%{transform:scale(0)translateY(4px)} 60%{transform:scale(1.25)translateY(-2px)} 100%{transform:scale(1)translateY(0)} }
+@keyframes tasselSway { 0%,100%{transform:rotate(0deg)} 33%{transform:rotate(4deg)} 66%{transform:rotate(-3deg)} }
+.spark, .td { transform-origin: center; }
+</style>
+</head>
+<body>
+
+<h1>🍮 博文吉祥物 · 紧凑四肢 + 小眼 + 果冻质感</h1>
+<p class="subtitle">currentColor 着色 · 紧贴身体椭圆圆柱四肢 · 小型眼白渐变瞳孔 · 四肢不随表情变化 · 果冻抖动</p>
+
+<div class="hero" id="hero-container">
+  <div class="label">🖱️ 鼠标追踪瞳孔 | 👇 操作按钮</div>
+
+  <!-- 吉祥物 + 对话框布局 -->
+  <div class="mascot-dialog-wrap">
+    <!-- 吉祥物（SVG 内含四肢，overflow:visible 会穿出 viewBox漂浮在对话框上） -->
+    <div id="hero-mascot" class="mascot floaty s-idle"
+         style="width:160px;height:192px;color:var(--color-default)">
+      <svg class="svg-root" viewBox="0 0 100 120" width="160" height="192" id="hero-svg">
+        <defs>
+          <radialGradient id="hShine" cx="35%" cy="30%" r="72%"><stop offset="0%" stop-color="#fff" stop-opacity=".55"/><stop offset="55%" stop-color="#fff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="hShadow" cx="50%" cy="88%" r="50%" fx="50%" fy="78%"><stop offset="0%" stop-color="#000" stop-opacity="0"/><stop offset="65%" stop-color="#000" stop-opacity=".04"/><stop offset="100%" stop-color="#000" stop-opacity=".2"/></radialGradient>
+          <radialGradient id="hEGrad" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#fffdf9"/><stop offset="55%" stop-color="#f8f3e8"/><stop offset="100%" stop-color="#e6dcd0"/></radialGradient>
+          <radialGradient id="hLShine" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#fff" stop-opacity=".45"/><stop offset="60%" stop-color="#fff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="hPG" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#3a3530"/><stop offset="100%" stop-color="#0f0e0c"/></radialGradient>
+          <radialGradient id="hMG" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="#6b5e55"/><stop offset="100%" stop-color="#2c2722"/></radialGradient>
+          <linearGradient id="hCap" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d372f"/><stop offset="100%" stop-color="#1c1815"/></linearGradient>
+          <clipPath id="hlc"><circle cx="36" cy="47" r="12.5"/></clipPath>
+          <clipPath id="hrc"><circle cx="64" cy="47" r="12.5"/></clipPath>
+        </defs>
+        <g class="gfloat">
+          <!-- 四肢（椭圆圆柱Q版，紧贴身体） -->
+          <g class="limbs-group" id="hero-limbs">
+            <g class="limb limb-l">
+              <path d="M22 63 Q14 68 13 78" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/>
+              <path d="M22 63 Q14 68 13 78" fill="none" stroke="url(#hLShine)" stroke-width="11" stroke-linecap="round"/>
+              <ellipse cx="12" cy="82" rx="7" ry="8" fill="currentColor"/><ellipse cx="12" cy="82" rx="7" ry="8" fill="url(#hLShine)"/>
+            </g>
+            <g class="limb limb-r">
+              <path d="M78 63 Q86 68 87 78" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/>
+              <path d="M78 63 Q86 68 87 78" fill="none" stroke="url(#hLShine)" stroke-width="11" stroke-linecap="round"/>
+              <ellipse cx="88" cy="82" rx="7" ry="8" fill="currentColor"/><ellipse cx="88" cy="82" rx="7" ry="8" fill="url(#hLShine)"/>
+            </g>
+            <g class="foot-l">
+              <ellipse cx="33" cy="99" rx="10" ry="6.5" fill="currentColor"/><ellipse cx="33" cy="99" rx="10" ry="6.5" fill="url(#hLShine)"/>
+            </g>
+            <g class="foot-r">
+              <ellipse cx="67" cy="99" rx="10" ry="6.5" fill="currentColor"/><ellipse cx="67" cy="99" rx="10" ry="6.5" fill="url(#hLShine)"/>
+            </g>
+          </g>
+          <!-- 身体（currentColor + 阴影 + 高光 = 果冻） -->
+          <g class="jelly-body">
+            <circle cx="50" cy="56" r="34" fill="currentColor"/>
+            <circle cx="50" cy="56" r="34" fill="url(#hShadow)"/>
+            <circle cx="50" cy="56" r="34" fill="url(#hShine)"/>
+          </g>
+          <!-- 腮红 -->
+          <ellipse cx="30" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+          <ellipse cx="70" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+          <!-- 眼镜 -->
+          <g class="glasses">
+            <circle cx="36" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+            <circle cx="64" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+            <path d="M48.5 47 Q50 44.5 51.5 47" fill="none" stroke="#2c2722" stroke-width="2" stroke-linecap="round"/>
+            <line x1="23.5" y1="47" x2="17" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+            <line x1="76.5" y1="47" x2="83" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+            <g clip-path="url(#hlc)">
+              <g class="eye-inner" id="hero-eye-l">
+                <ellipse cx="36" cy="47" rx="6.5" ry="7.5" fill="url(#hEGrad)" class="eye-bg"/>
+                <circle class="pupil eye-normal" cx="37" cy="47.5" r="4.8" fill="url(#hPG)" id="hpl"/>
+                <path class="eye-happy" d="M29 46 Q36 38 43 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="36" cy="47" r="8" fill="url(#hEGrad)" class="eye-surprise"/>
+                <circle class="pupil eye-surprise" cx="37" cy="46.5" r="5.5" fill="url(#hPG)"/>
+                <circle cx="36" cy="47" r="7.5" fill="url(#hEGrad)" opacity=".35" class="eye-sleepy"/>
+                <circle class="pupil eye-sleepy" cx="37" cy="48" r="3.5" fill="url(#hPG)"/>
+                <path class="eye-sleepy" d="M29 44 Q36 49 43 44" fill="currentColor" opacity=".55"/>
+                <circle cx="39" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal"/>
+                <circle cx="34.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal"/>
+                <circle cx="39" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise"/>
+                <circle cx="33.5" cy="49.5" r=".55" fill="#fff" opacity=".35" class="eye-hl eye-surprise"/>
+              </g>
+              <path d="M26 38 Q35 37 41 37" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+            </g>
+            <g clip-path="url(#hrc)">
+              <g class="eye-inner" id="hero-eye-r">
+                <ellipse cx="64" cy="47" rx="6.5" ry="7.5" fill="url(#hEGrad)" class="eye-bg"/>
+                <circle class="pupil eye-normal" cx="65" cy="47.5" r="4.8" fill="url(#hPG)" id="hpr"/>
+                <path class="eye-happy" d="M57 46 Q64 38 71 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="64" cy="47" r="8" fill="url(#hEGrad)" class="eye-surprise"/>
+                <circle class="pupil eye-surprise" cx="65" cy="46.5" r="5.5" fill="url(#hPG)"/>
+                <circle cx="64" cy="47" r="7.5" fill="url(#hEGrad)" opacity=".35" class="eye-sleepy"/>
+                <circle class="pupil eye-sleepy" cx="65" cy="48" r="3.5" fill="url(#hPG)"/>
+                <path class="eye-sleepy" d="M57 44 Q64 49 71 44" fill="currentColor" opacity=".55"/>
+                <circle cx="67" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal"/>
+                <circle cx="62.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal"/>
+                <circle cx="67" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise"/>
+                <circle cx="61.5" cy="49.5" r=".55" fill="#fff" opacity=".35" class="eye-hl eye-surprise"/>
+              </g>
+              <path d="M54 37 Q64 38 70 38" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+            </g>
+          </g>
+          <!-- 嘴巴 -->
+          <path class="mouth mouth-smile" d="M42 66 Q50 72 58 66" stroke="url(#hMG)" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+          <path class="mouth mouth-think" d="M40 66 Q47 70 53 68 Q57 69 60 65" stroke="url(#hMG)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path class="mouth mouth-grin" d="M38 65 Q50 80 62 65" fill="url(#hMG)"/>
+          <path class="mouth mouth-grin" d="M38 65 Q50 80 62 65" fill="none" stroke="#2c2722" stroke-width="1.5"/>
+          <ellipse class="mouth mouth-quiz" cx="50" cy="68" rx="5.5" ry="6" fill="url(#hMG)"/>
+          <ellipse class="mouth mouth-open" cx="50" cy="68" rx="9.5" ry="11" fill="url(#hMG)"/>
+          <ellipse class="mouth mouth-sleepy" cx="50" cy="69" rx="4" ry="4.5" fill="url(#hMG)" opacity=".7"/>
+          <!-- 学士帽 -->
+          <g class="cap">
+            <rect x="40" y="20" width="20" height="9" rx="2" fill="url(#hCap)"/>
+            <polygon points="50,12 76,22 50,32 24,22" fill="#37322c"/>
+            <polygon points="50,14 70,22 50,30 30,22" fill="#2c2722"/>
+            <g class="tassel">
+              <path d="M50 22 L70 22 L70 32" stroke="#2c2722" stroke-width="1.6" fill="none"/>
+              <circle cx="70" cy="33" r="2.6" fill="currentColor"/>
+              <g stroke="currentColor" stroke-width=".6" fill="none">
+                <line x1="70.2" y1="35" x2="70.2" y2="42"/>
+                <line x1="68.8" y1="35.2" x2="67.5" y2="42.5"/>
+                <line x1="71.5" y1="35.2" x2="72.8" y2="42.5"/>
+              </g>
+            </g>
+          </g>
+          <!-- 特效 -->
+          <g class="fx fx-think"><circle class="td" cx="84" cy="28" r="2.5" fill="#888"/><circle class="td" cx="92" cy="20" r="3.2" fill="#999"/><circle class="td" cx="99" cy="10" r="4" fill="#aaa"/></g>
+          <text class="fx fx-quiz" x="88" y="20" text-anchor="middle" fill="#daa520" font-size="22" font-weight="800">?</text>
+          <text class="fx fx-surprise" x="88" y="20" text-anchor="middle" fill="#e8a090" font-size="24" font-weight="900">!</text>
+          <g class="fx fx-happy">
+            <path class="spark" d="M14 16 L15.5 20 L19.5 21.5 L15.5 23 L14 27 L12.5 23 L8.5 21.5 L12.5 20 Z" fill="#f5d060"/>
+            <path class="spark" d="M88 22 L89 25 L92 26 L89 27 L88 30 L87 27 L84 26 L87 25 Z" fill="#f5d060"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+
+    <!-- 用户对话框 -->
+    <div class="dialog-box" id="hero-dialog">
+      <div class="name">博文</div>
+      <div>你好！我来帮你解答问题～</div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <div class="limb-hint">💬 对话时四肢伸出，漂浮在对话框之上</div>
+
+  <!-- 学科色选择器 -->
+  <div class="color-swatch" id="color-picker">
+    <span data-col="var(--color-default)" style="background:var(--color-default)" class="active-col" title="默认蜜桃色"></span>
+    <span data-col="var(--color-math)" style="background:var(--color-math)" title="数学蓝"></span>
+    <span data-col="var(--color-chinese)" style="background:var(--color-chinese)" title="语文红"></span>
+    <span data-col="var(--color-english)" style="background:var(--color-english)" title="英语绿"></span>
+    <span data-col="var(--color-science)" style="background:var(--color-science)" title="科学紫"></span>
+    <span data-col="var(--color-history)" style="background:var(--color-history)" title="历史金"></span>
+  </div>
+
+  <div class="hero-btns" id="hero-btns">
+    <button data-state="idle" class="active">idle</button>
+    <button data-state="thinking">thinking</button>
+    <button data-state="quiz">quiz</button>
+    <button data-state="happy">happy</button>
+    <button data-state="surprise">surprise</button>
+    <button data-state="sleepy">sleepy</button>
+    <button data-action="dialog" style="margin-left:8px">💬 切换对话</button>
+  </div>
+  <div class="hero-btns" style="margin-top:4px">
+    <button data-action="all-dialog">🖐️ 全部显示四肢</button>
+    <button data-action="all-idle">✋ 全部隐藏四肢</button>
+  </div>
+</div>
+
+<div class="grid" id="cards"></div>
+
+<p style="text-align:center;margin-top:32px;color:#666;font-size:.76rem">
+  currentColor 学科色 · 紧凑四肢紧贴身体 · 小型渐变眼 · 四肢不随表情变化 · 果冻抖动
+</p>
+
+<script>
+const heroMascot = document.getElementById('hero-mascot');
+const heroContainer = document.getElementById('hero-container');
+let currentState = 'idle';
+let dialogMode = false;
+
+const stateClasses = ['s-idle','s-thinking','s-quiz','s-happy','s-surprise','s-sleepy'];
+
+function setState(s) {
+  currentState = s;
+  stateClasses.forEach(c => heroMascot.classList.remove(c));
+  heroMascot.classList.add('s-' + s);
+  document.querySelectorAll('#hero-btns button[data-state]').forEach(b => {
+    b.classList.toggle('active', b.dataset.state === s && !b.dataset.action);
+  });
+}
+
+// Mouse tracking
+document.addEventListener('mousemove', function(e) {
+  if (!heroMascot) return;
+  const r = heroMascot.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  let mx = Math.max(-1, Math.min(1, (e.clientX - cx) / (r.width * 1.2)));
+  let my = Math.max(-1, Math.min(1, (e.clientY - cy) / (r.height * 1.4)));
+
+  let ox = 0, oy = 0;
+  if (currentState === 'thinking') { ox = -1.8; oy = -2.2; }
+  else if (currentState === 'quiz') { oy = 2.0; }
+  const m = currentState === 'sleepy' ? 0.5 : 1;
+  ox += mx * 2.2 * m;
+  oy += my * 1.8 * m;
+
+  const t = `translate(${ox}px, ${oy}px)`;
+  document.querySelectorAll('#hero-svg .pupil.eye-normal, #hero-svg .pupil.eye-surprise, #hero-svg .pupil.eye-sleepy').forEach(p => {
+    p.setAttribute('transform', t);
+  });
+});
+
+// Color picker
+document.getElementById('color-picker').addEventListener('click', function(e) {
+  const span = e.target.closest('span');
+  if (!span) return;
+  document.querySelectorAll('#color-picker span').forEach(s => s.classList.remove('active-col'));
+  span.classList.add('active-col');
+  heroMascot.style.color = span.dataset.col;
+  // Update all cards too
+  document.querySelectorAll('.inline-mascot').forEach(c => {
+    c.style.color = span.dataset.col;
+  });
+});
+
+// Buttons
+document.getElementById('hero-btns').addEventListener('click', function(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+
+  const action = btn.dataset.action;
+  if (action === 'dialog') {
+    dialogMode = !dialogMode;
+    if (dialogMode) {
+      heroMascot.classList.add('has-limbs');
+      heroContainer.classList.add('show-dialog');
+    } else {
+      heroMascot.classList.remove('has-limbs');
+      heroContainer.classList.remove('show-dialog');
+    }
+    btn.classList.toggle('toggle-on', dialogMode);
+    return;
+  }
+  if (action === 'all-dialog') {
+    document.querySelectorAll('.card').forEach(c => c.classList.add('show-limbs'));
+    return;
+  }
+  if (action === 'all-idle') {
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('show-limbs'));
+    return;
+  }
+  const st = btn.dataset.state;
+  if (st) setState(st);
+});
+
+// ── Cards ──
+const states = [
+  { id:'idle', label:'😌 idle 待机', desc:'大圆眼 · 微笑 · 5.5s眨眼 · 果冻抖动' },
+  { id:'thinking', label:'🤔 thinking 思考', desc:'瞳孔上瞟 · 歪嘴 · 2.4s快眨眼' },
+  { id:'quiz', label:'📝 quiz 出题', desc:'瞳孔下看 · O嘴 · 问号特效' },
+  { id:'happy', label:'🎉 happy 开心', desc:'弯月笑眼 · 咧嘴 · 星星特效' },
+  { id:'surprise', label:'😲 surprise 惊讶', desc:'瞪大眼 · 大O嘴 · 感叹号' },
+  { id:'sleepy', label:'😴 sleepy 困倦', desc:'半闭眼睑 · 小嘴 · 7s慢眨眼' },
+];
+
+function mkId(pre, i) { return pre + i; }
+
+function makeCardSvg(idx) {
+  const sc = states[idx].id;
+  const bi = mkId('bi', idx);
+  const pi = mkId('pi', idx);
+  const mi = mkId('mi', idx);
+  const ci = mkId('ci', idx);
+  const lci = mkId('lci', idx);
+  const rci = mkId('rci', idx);
+  const ei = mkId('ei', idx);
+
+  const bd = (sc === 'thinking') ? '2.4s' : (sc === 'sleepy') ? '7s' : '5.5s';
+
+  // 四肢动画 —— 所有表情一致
+  const ll = 'animation:limbSpringL .5s cubic-bezier(.34,1.56,.64,1) forwards,limbFloatL 3s ease-in-out .5s infinite';
+  const lr = 'animation:limbSpringR .5s cubic-bezier(.34,1.56,.64,1) forwards,limbFloatR 3s ease-in-out .5s infinite';
+  const fl = 'animation:footPop .45s cubic-bezier(.34,1.56,.64,1) forwards,footFloat 3.2s ease-in-out .45s infinite';
+  const fr = 'animation:footPop .45s cubic-bezier(.34,1.56,.64,1) forwards .08s,footFloat 3.2s ease-in-out .53s infinite';
+
+  const limbsHtml = `<g class="limbs-group" style="opacity:1;visibility:visible">
+    <g class="limb limb-l" style="${ll}">
+      <path d="M22 63 Q14 68 13 78" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/><path d="M22 63 Q14 68 13 78" fill="none" stroke="url(#${bi})" stroke-width="11" stroke-linecap="round"/>
+      <ellipse cx="12" cy="82" rx="7" ry="8" fill="currentColor"/><ellipse cx="12" cy="82" rx="7" ry="8" fill="url(#${bi})"/>
+    </g>
+    <g class="limb limb-r" style="${lr}">
+      <path d="M78 63 Q86 68 87 78" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="round"/><path d="M78 63 Q86 68 87 78" fill="none" stroke="url(#${bi})" stroke-width="11" stroke-linecap="round"/>
+      <ellipse cx="88" cy="82" rx="7" ry="8" fill="currentColor"/><ellipse cx="88" cy="82" rx="7" ry="8" fill="url(#${bi})"/>
+    </g>
+    <g class="foot-l" style="${fl}">
+      <ellipse cx="33" cy="99" rx="10" ry="6.5" fill="currentColor"/><ellipse cx="33" cy="99" rx="10" ry="6.5" fill="url(#${bi})"/>
+    </g>
+    <g class="foot-r" style="${fr}">
+      <ellipse cx="67" cy="99" rx="10" ry="6.5" fill="currentColor"/><ellipse cx="67" cy="99" rx="10" ry="6.5" fill="url(#${bi})"/>
+    </g>
+  </g>`;
+
+  const D = 'display:block', N = 'display:none';
+  const sn = ['idle','thinking','quiz'].includes(sc) ? D : N;
+  const sh = sc === 'happy' ? D : N;
+  const ss = sc === 'surprise' ? D : N;
+  const sl = sc === 'sleepy' ? D : N;
+  const hl = ['happy','sleepy'].includes(sc) ? N : D;
+  const hls = sc === 'surprise' ? D : N;
+  const showSmile = sc === 'idle' ? D : N;
+  const stk = sc === 'thinking' ? D : N;
+  const sgr = sc === 'happy' ? D : N;
+  const sqz = sc === 'quiz' ? D : N;
+  const sop = sc === 'surprise' ? D : N;
+  const ssl = sc === 'sleepy' ? D : N;
+
+  const tfx = sc === 'thinking' ? `<g class="fx" style="opacity:1"><circle class="td" cx="84" cy="28" r="2.5" fill="#888"/><circle class="td" cx="92" cy="20" r="3.2" fill="#999"/><circle class="td" cx="99" cy="10" r="4" fill="#aaa"/></g>` : '';
+  const qfx = sc === 'quiz' ? `<text class="fx" style="opacity:1;animation:fxBob 1.4s ease-in-out infinite" x="88" y="20" text-anchor="middle" fill="#daa520" font-size="22" font-weight="800">?</text>` : '';
+  const hfx = sc === 'happy' ? `<g class="fx" style="opacity:1"><path class="spark" d="M14 16 L15.5 20 L19.5 21.5 L15.5 23 L14 27 L12.5 23 L8.5 21.5 L12.5 20 Z" fill="#f5d060"/><path class="spark" d="M88 22 L89 25 L92 26 L89 27 L88 30 L87 27 L84 26 L87 25 Z" fill="#f5d060"/></g>` : '';
+  const sfx = sc === 'surprise' ? `<text class="fx" style="opacity:1;animation:fxPop .5s cubic-bezier(0.34,1.56,0.64,1)" x="88" y="20" text-anchor="middle" fill="#e8a090" font-size="24" font-weight="900">!</text>` : '';
+
+  const ran = {idle:'animation:breathe 3.4s ease-in-out infinite',thinking:'animation:tiltThink 2.6s ease-in-out infinite',quiz:'animation:presentBob 2s ease-in-out infinite',happy:'animation:cheerHop .62s cubic-bezier(.34,1.56,.64,1) infinite',surprise:'animation:startle .5s cubic-bezier(.34,1.56,.64,1)',sleepy:'animation:sink 4.2s ease-in-out infinite'}[sc]||'';
+
+  return `<defs>
+    <radialGradient id="${bi}" cx="35%" cy="30%" r="70%"><stop offset="0%" stop-color="#fff" stop-opacity=".45"/><stop offset="60%" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="${ei}" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#fffdf9"/><stop offset="55%" stop-color="#f8f3e8"/><stop offset="100%" stop-color="#e6dcd0"/></radialGradient>
+    <radialGradient id="${pi}" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#3a3530"/><stop offset="100%" stop-color="#0f0e0c"/></radialGradient>
+    <radialGradient id="${mi}" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="#6b5e55"/><stop offset="100%" stop-color="#2c2722"/></radialGradient>
+    <linearGradient id="${ci}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d372f"/><stop offset="100%" stop-color="#1c1815"/></linearGradient>
+    <clipPath id="${lci}"><circle cx="36" cy="47" r="12.5"/></clipPath>
+    <clipPath id="${rci}"><circle cx="64" cy="47" r="12.5"/></clipPath>
+  </defs>
+  <g class="gfloat has-limbs" style="${ran}">
+    ${limbsHtml}
+    <g class="jelly-body"><circle cx="50" cy="56" r="34" fill="currentColor"/></g>
+    <ellipse cx="30" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+    <ellipse cx="70" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+    <g class="glasses">
+      <circle cx="36" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+      <circle cx="64" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+      <path d="M48.5 47 Q50 44.5 51.5 47" fill="none" stroke="#2c2722" stroke-width="2" stroke-linecap="round"/>
+      <line x1="23.5" y1="47" x2="17" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="76.5" y1="47" x2="83" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+      <g clip-path="url(#${lci})">
+        <g class="eye-inner" style="animation:blink ${bd} ease-in-out infinite">
+          <ellipse cx="36" cy="47" rx="6.5" ry="7.5" fill="url(#${ei})" class="eye-bg" style="${hbg}"/>
+          <circle class="pupil eye-normal" cx="37" cy="47.5" r="4.8" fill="url(#${pi})" style="${sn}"/>
+          <path class="eye-happy" d="M29 46 Q36 38 43 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round" style="${sh}"/>
+          <circle cx="36" cy="47" r="8" fill="url(#${ei})" class="eye-surprise" style="${ss}"/>
+          <circle class="pupil eye-surprise" cx="37" cy="46.5" r="5.5" fill="url(#${pi})" style="${ss}"/>
+          <circle cx="36" cy="47" r="7.5" fill="url(#${ei})" opacity=".35" class="eye-sleepy" style="${sl}"/>
+          <circle class="pupil eye-sleepy" cx="37" cy="48" r="3.5" fill="url(#${pi})" style="${sl}"/>
+          <path class="eye-sleepy" d="M29 44 Q36 49 43 44" fill="currentColor" opacity=".55" style="${sl}"/>
+          <circle cx="39" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="34.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="39" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise" style="${hls}"/>
+        </g>
+        <path d="M26 38 Q35 37 41 37" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+      </g>
+      <g clip-path="url(#${rci})">
+        <g class="eye-inner" style="animation:blink ${bd} ease-in-out infinite">
+          <ellipse cx="64" cy="47" rx="6.5" ry="7.5" fill="url(#${ei})" class="eye-bg" style="${hbg}"/>
+          <circle class="pupil eye-normal" cx="65" cy="47.5" r="4.8" fill="url(#${pi})" style="${sn}"/>
+          <path class="eye-happy" d="M57 46 Q64 38 71 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round" style="${sh}"/>
+          <circle cx="64" cy="47" r="8" fill="url(#${ei})" class="eye-surprise" style="${ss}"/>
+          <circle class="pupil eye-surprise" cx="65" cy="46.5" r="5.5" fill="url(#${pi})" style="${ss}"/>
+          <circle cx="64" cy="47" r="7.5" fill="url(#${ei})" opacity=".35" class="eye-sleepy" style="${sl}"/>
+          <circle class="pupil eye-sleepy" cx="65" cy="48" r="3.5" fill="url(#${pi})" style="${sl}"/>
+          <path class="eye-sleepy" d="M57 44 Q64 49 71 44" fill="currentColor" opacity=".55" style="${sl}"/>
+          <circle cx="67" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="62.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="67" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise" style="${hls}"/>
+        </g>
+        <path d="M54 37 Q64 38 70 38" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+      </g>
+    </g>
+    <path class="mouth mouth-smile" d="M42 66 Q50 72 58 66" stroke="url(#${mi})" stroke-width="2.6" stroke-linecap="round" fill="none" style="${showSmile}"/>
+    <path class="mouth mouth-think" d="M40 66 Q47 70 53 68 Q57 69 60 65" stroke="url(#${mi})" stroke-width="2.2" stroke-linecap="round" fill="none" style="${stk}"/>
+    <path class="mouth mouth-grin" d="M38 65 Q50 80 62 65" fill="url(#${mi})" style="${sgr}"/>
+    <ellipse class="mouth mouth-quiz" cx="50" cy="68" rx="5.5" ry="6" fill="url(#${mi})" style="${sqz}"/>
+    <ellipse class="mouth mouth-open" cx="50" cy="68" rx="9.5" ry="11" fill="url(#${mi})" style="${sop}"/>
+    <ellipse class="mouth mouth-sleepy" cx="50" cy="69" rx="4" ry="4.5" fill="url(#${mi})" opacity=".7" style="${ssl}"/>
+    <g class="cap">
+      <rect x="40" y="20" width="20" height="9" rx="2" fill="url(#${ci})"/>
+      <polygon points="50,12 76,22 50,32 24,22" fill="#37322c"/>
+      <polygon points="50,14 70,22 50,30 30,22" fill="#2c2722"/>
+      <g class="tassel">
+        <path d="M50 22 L70 22 L70 32" stroke="#2c2722" stroke-width="1.6" fill="none"/>
+        <circle cx="70" cy="33" r="2.6" fill="currentColor"/>
+        <g stroke="currentColor" stroke-width=".6" fill="none">
+          <line x1="70.2" y1="35" x2="70.2" y2="42"/>
+          <line x1="68.8" y1="35.2" x2="67.5" y2="42.5"/>
+          <line x1="71.5" y1="35.2" x2="72.8" y2="42.5"/>
+        </g>
+      </g>
+    </g>
+    ${tfx}${qfx}${hfx}${sfx}
+  </g>`; // makeCardSvg
+}
+
+const cardsEl = document.getElementById('cards');
+states.forEach((s, i) => {
+  const card = document.createElement('div');
+  card.className = 'card show-limbs';
+  card.innerHTML = `
+    <div class="label">${s.label}</div>
+    <div class="desc">${s.desc}</div>
+    <div class="inline-mascot" style="color:var(--color-default)">
+      <svg class="svg-root" viewBox="0 0 100 120" width="130" height="156">${makeCardSvg(i)}</svg>
+    </div>
+    <div class="limb-badge">🖐️ 四肢模式</div>
+  `;
+  card.addEventListener('click', function() {
+    const isShowing = card.classList.contains('show-limbs');
+    card.classList.toggle('show-limbs');
+    // Re-render with/without limbs
+    const svg = card.querySelector('svg');
+    if (isShowing) {
+      // Was showing, now hide - rebuild without limbs
+      svg.innerHTML = makeCardSvgNoLimbs(i);
+    } else {
+      svg.innerHTML = makeCardSvg(i);
+    }
+  });
+  cardsEl.appendChild(card);
+});
+
+// Same function but without limbs for the toggle
+function makeCardSvgNoLimbs(idx) {
+  const sc = states[idx].id;
+  const pi = mkId('pni', idx);
+  const mi = mkId('mni', idx);
+  const ci = mkId('cni', idx);
+  const lci = mkId('lcni', idx);
+  const rci = mkId('rcni', idx);
+  const ei = mkId('eni', idx);
+  const bd = (sc === 'thinking') ? '2.4s' : (sc === 'sleepy') ? '7s' : '5.5s';
+
+  const D = 'display:block', N = 'display:none';
+  const sn = ['idle','thinking','quiz'].includes(sc) ? D : N;
+  const sh = sc === 'happy' ? D : N;
+  const hbg = sc === 'happy' ? N : D;
+  const ss = sc === 'surprise' ? D : N;
+  const sl = sc === 'sleepy' ? D : N;
+  const hl = ['happy','sleepy'].includes(sc) ? N : D;
+  const hls = sc === 'surprise' ? D : N;
+  const showSmile = sc === 'idle' ? D : N;
+  const stk = sc === 'thinking' ? D : N;
+  const sgr = sc === 'happy' ? D : N;
+  const sqz = sc === 'quiz' ? D : N;
+  const sop = sc === 'surprise' ? D : N;
+  const ssl = sc === 'sleepy' ? D : N;
+
+  const tfx = sc === 'thinking' ? `<g class="fx" style="opacity:1"><circle class="td" cx="84" cy="28" r="2.5" fill="#888"/><circle class="td" cx="92" cy="20" r="3.2" fill="#999"/><circle class="td" cx="99" cy="10" r="4" fill="#aaa"/></g>` : '';
+  const qfx = sc === 'quiz' ? `<text class="fx" style="opacity:1;animation:fxBob 1.4s ease-in-out infinite" x="88" y="20" text-anchor="middle" fill="#daa520" font-size="22" font-weight="800">?</text>` : '';
+  const hfx = sc === 'happy' ? `<g class="fx" style="opacity:1"><path class="spark" d="M14 16 L15.5 20 L19.5 21.5 L15.5 23 L14 27 L12.5 23 L8.5 21.5 L12.5 20 Z" fill="#f5d060"/><path class="spark" d="M88 22 L89 25 L92 26 L89 27 L88 30 L87 27 L84 26 L87 25 Z" fill="#f5d060"/></g>` : '';
+  const sfx = sc === 'surprise' ? `<text class="fx" style="opacity:1;animation:fxPop .5s cubic-bezier(0.34,1.56,0.64,1)" x="88" y="20" text-anchor="middle" fill="#e8a090" font-size="24" font-weight="900">!</text>` : '';
+  const ran = {idle:'animation:breathe 3.4s ease-in-out infinite',thinking:'animation:tiltThink 2.6s ease-in-out infinite',quiz:'animation:presentBob 2s ease-in-out infinite',happy:'animation:cheerHop .62s cubic-bezier(.34,1.56,.64,1) infinite',surprise:'animation:startle .5s cubic-bezier(.34,1.56,.64,1)',sleepy:'animation:sink 4.2s ease-in-out infinite'}[sc]||'';
+
+  return `<defs>
+    <radialGradient id="${ei}" cx="50%" cy="35%" r="55%"><stop offset="0%" stop-color="#fffdf9"/><stop offset="55%" stop-color="#f8f3e8"/><stop offset="100%" stop-color="#e6dcd0"/></radialGradient>
+    <radialGradient id="${pi}" cx="40%" cy="35%" r="60%"><stop offset="0%" stop-color="#3a3530"/><stop offset="100%" stop-color="#0f0e0c"/></radialGradient>
+    <radialGradient id="${mi}" cx="50%" cy="30%" r="60%"><stop offset="0%" stop-color="#6b5e55"/><stop offset="100%" stop-color="#2c2722"/></radialGradient>
+    <linearGradient id="${ci}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3d372f"/><stop offset="100%" stop-color="#1c1815"/></linearGradient>
+    <clipPath id="${lci}"><circle cx="36" cy="47" r="12.5"/></clipPath>
+    <clipPath id="${rci}"><circle cx="64" cy="47" r="12.5"/></clipPath>
+  </defs>
+  <g class="gfloat" style="${ran}">
+    <g class="jelly-body"><circle cx="50" cy="56" r="34" fill="currentColor"/></g>
+    <ellipse cx="30" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+    <ellipse cx="70" cy="64" rx="6.5" ry="4.5" fill="#fff" opacity=".4"/>
+    <g class="glasses">
+      <circle cx="36" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+      <circle cx="64" cy="47" r="12.5" fill="none" stroke="#2c2722" stroke-width="2.2"/>
+      <path d="M48.5 47 Q50 44.5 51.5 47" fill="none" stroke="#2c2722" stroke-width="2" stroke-linecap="round"/>
+      <line x1="23.5" y1="47" x2="17" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+      <line x1="76.5" y1="47" x2="83" y2="44" stroke="#2c2722" stroke-width="1.8" stroke-linecap="round"/>
+      <g clip-path="url(#${lci})">
+        <g class="eye-inner" style="animation:blink ${bd} ease-in-out infinite">
+          <ellipse cx="36" cy="47" rx="6.5" ry="7.5" fill="url(#${ei})" class="eye-bg" style="${hbg}"/>
+          <circle class="pupil eye-normal" cx="37" cy="47.5" r="4.8" fill="url(#${pi})" style="${sn}"/>
+          <path class="eye-happy" d="M29 46 Q36 38 43 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round" style="${sh}"/>
+          <circle cx="36" cy="47" r="8" fill="url(#${ei})" class="eye-surprise" style="${ss}"/>
+          <circle class="pupil eye-surprise" cx="37" cy="46.5" r="5.5" fill="url(#${pi})" style="${ss}"/>
+          <circle cx="36" cy="47" r="7.5" fill="url(#${ei})" opacity=".35" class="eye-sleepy" style="${sl}"/>
+          <circle class="pupil eye-sleepy" cx="37" cy="48" r="3.5" fill="url(#${pi})" style="${sl}"/>
+          <path class="eye-sleepy" d="M29 44 Q36 49 43 44" fill="currentColor" opacity=".55" style="${sl}"/>
+          <circle cx="39" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="34.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="39" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise" style="${hls}"/>
+        </g>
+        <path d="M26 38 Q35 37 41 37" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+      </g>
+      <g clip-path="url(#${rci})">
+        <g class="eye-inner" style="animation:blink ${bd} ease-in-out infinite">
+          <ellipse cx="64" cy="47" rx="6.5" ry="7.5" fill="url(#${ei})" class="eye-bg" style="${hbg}"/>
+          <circle class="pupil eye-normal" cx="65" cy="47.5" r="4.8" fill="url(#${pi})" style="${sn}"/>
+          <path class="eye-happy" d="M57 46 Q64 38 71 46" fill="none" stroke="#2c2722" stroke-width="3" stroke-linecap="round" style="${sh}"/>
+          <circle cx="64" cy="47" r="8" fill="url(#${ei})" class="eye-surprise" style="${ss}"/>
+          <circle class="pupil eye-surprise" cx="65" cy="46.5" r="5.5" fill="url(#${pi})" style="${ss}"/>
+          <circle cx="64" cy="47" r="7.5" fill="url(#${ei})" opacity=".35" class="eye-sleepy" style="${sl}"/>
+          <circle class="pupil eye-sleepy" cx="65" cy="48" r="3.5" fill="url(#${pi})" style="${sl}"/>
+          <path class="eye-sleepy" d="M57 44 Q64 49 71 44" fill="currentColor" opacity=".55" style="${sl}"/>
+          <circle cx="67" cy="44" r="1.4" fill="#fff" opacity=".95" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="62.5" cy="50.5" r=".65" fill="#fff" opacity=".45" class="eye-hl eye-normal" style="${hl}"/>
+          <circle cx="67" cy="43" r="1.3" fill="#fff" opacity=".9" class="eye-hl eye-surprise" style="${hls}"/>
+        </g>
+        <path d="M54 37 Q64 38 70 38" fill="none" stroke="#fff" stroke-width="1.5" opacity=".3" stroke-linecap="round"/>
+      </g>
+    </g>
+    <path class="mouth mouth-smile" d="M42 66 Q50 72 58 66" stroke="url(#${mi})" stroke-width="2.6" stroke-linecap="round" fill="none" style="${showSmile}"/>
+    <path class="mouth mouth-think" d="M40 66 Q47 70 53 68 Q57 69 60 65" stroke="url(#${mi})" stroke-width="2.2" stroke-linecap="round" fill="none" style="${stk}"/>
+    <path class="mouth mouth-grin" d="M38 65 Q50 80 62 65" fill="url(#${mi})" style="${sgr}"/>
+    <ellipse class="mouth mouth-quiz" cx="50" cy="68" rx="5.5" ry="6" fill="url(#${mi})" style="${sqz}"/>
+    <ellipse class="mouth mouth-open" cx="50" cy="68" rx="9.5" ry="11" fill="url(#${mi})" style="${sop}"/>
+    <ellipse class="mouth mouth-sleepy" cx="50" cy="69" rx="4" ry="4.5" fill="url(#${mi})" opacity=".7" style="${ssl}"/>
+    <g class="cap">
+      <rect x="40" y="20" width="20" height="9" rx="2" fill="url(#${ci})"/>
+      <polygon points="50,12 76,22 50,32 24,22" fill="#37322c"/>
+      <polygon points="50,14 70,22 50,30 30,22" fill="#2c2722"/>
+      <g class="tassel">
+        <path d="M50 22 L70 22 L70 32" stroke="#2c2722" stroke-width="1.6" fill="none"/>
+        <circle cx="70" cy="33" r="2.6" fill="currentColor"/>
+        <g stroke="currentColor" stroke-width=".6" fill="none">
+          <line x1="70.2" y1="35" x2="70.2" y2="42"/>
+          <line x1="68.8" y1="35.2" x2="67.5" y2="42.5"/>
+          <line x1="71.5" y1="35.2" x2="72.8" y2="42.5"/>
+        </g>
+      </g>
+    </g>
+    ${tfx}${qfx}${hfx}${sfx}
+  </g>`;
+}
+</script>
+</body>
+</html>

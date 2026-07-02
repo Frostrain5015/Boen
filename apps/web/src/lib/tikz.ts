@@ -7,7 +7,19 @@
 
 // 渲染结果缓存：key=TikZ 源码，value=SVG。流式输出时 v-html 每个 token 都会重建 DOM，
 // 缓存命中可避免对同一图形重复请求服务端（杜绝触发 429 限流 / 队列堆积）。
+const MAX_RENDER_CACHE = 500;
 const renderCache = new Map<string, string>();
+let renderCacheInsertOrder: string[] = [];
+
+/** 将 SVG 写入缓存，超出上限时淘汰最旧的条目 */
+function cacheSet(key: string, value: string) {
+  if (renderCache.size >= MAX_RENDER_CACHE && !renderCache.has(key)) {
+    const oldest = renderCacheInsertOrder.shift();
+    if (oldest) renderCache.delete(oldest);
+  }
+  if (!renderCache.has(key)) renderCacheInsertOrder.push(key);
+  renderCache.set(key, value);
+}
 
 const errBox = (msg: string) =>
   `<div style="color:var(--error);font-size:0.85rem;padding:0.5rem">${msg}</div>`;
@@ -27,16 +39,21 @@ function replaceWithSvgImage(wrap: HTMLElement, svg: string) {
   wrap.replaceChildren(image);
 }
 
+/** 仅保留数字字符，用于消毒竖式运算输入（防止 XSS） */
+function sanitizeDigits(s: string): string {
+  return s.replace(/[^\d]/g, '') || '0';
+}
+
 /** 前端竖式渲染：解析 \opadd / \opsub / \opmul / \opdiv 并生成 HTML 表格。导出供 markdown 同步调用。 */
 export function renderXlop(code: string): string | null {
   const mAdd = code.match(/\\opadd\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mAdd) return renderAddSub(mAdd[1], mAdd[2], '+');
+  if (mAdd) return renderAddSub(sanitizeDigits(mAdd[1]), sanitizeDigits(mAdd[2]), '+');
   const mSub = code.match(/\\opsub\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mSub) return renderAddSub(mSub[1], mSub[2], '−');
+  if (mSub) return renderAddSub(sanitizeDigits(mSub[1]), sanitizeDigits(mSub[2]), '−');
   const mMul = code.match(/\\opmul\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mMul) return renderMul(mMul[1], mMul[2]);
+  if (mMul) return renderMul(sanitizeDigits(mMul[1]), sanitizeDigits(mMul[2]));
   const mDiv = code.match(/\\opdiv\s*(?:\[.*?\])?\s*\{(.+?)\}\s*\{(.+?)\}/);
-  if (mDiv) return renderDiv(mDiv[1], mDiv[2]);
+  if (mDiv) return renderDiv(sanitizeDigits(mDiv[1]), sanitizeDigits(mDiv[2]));
   return null;
 }
 
@@ -252,7 +269,7 @@ export async function processTikzDiagrams(
       const data = await res.json().catch(() => ({})) as { svg?: string; error?: string };
       if (res.ok && data.svg) {
         // Treat renderer output as an image resource, never executable DOM.
-        renderCache.set(code, data.svg);
+        cacheSet(code, data.svg);
         replaceWithSvgImage(wrap, data.svg);
         wrap.dataset.tikzState = 'done';
       } else {

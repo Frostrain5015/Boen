@@ -5,6 +5,7 @@
  */
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { randomUUID } from 'node:crypto';
 
 export interface GameQuestion {
   id: string;
@@ -13,22 +14,106 @@ export interface GameQuestion {
   correctKey: string;
 }
 
-const SUBJECT_MAP: Record<string, { label: string; emoji: string }> = {
-  math: { label: '数学', emoji: '🔢' },
-  chinese: { label: '语文', emoji: '📖' },
-  english: { label: '英语', emoji: '🔤' },
-  science: { label: '科学', emoji: '🔬' },
+/** LLM 返回的原始题目 JSON 结构 */
+interface RawQuestionJson {
+  stem: string;
+  options: { key: string; text: string }[];
+  correctKey: string;
+}
+
+const SUBJECT_MAP: Record<string, { label: string }> = {
+  math: { label: '数学' },
+  chinese: { label: '语文' },
+  english: { label: '英语' },
+  science: { label: '科学' },
 };
+
+/** LLM 调用超时（毫秒）*/
+const LLM_TIMEOUT = 2000;
+
+/* ── 题目池：内存预生成，请求时秒出 ── */
+const questionPools = new Map<string, GameQuestion[]>();
+const poolRefilling = new Map<string, boolean>();
+let poolModel: BaseChatModel | null = null;
+const POOL_MIN = 5;   // 低于此数时后台补充
+const POOL_MAX = 20;  // 补充到此数
+
+/**
+ * 解析 LLM 返回文本为 GameQuestion
+ * 返回 null 表示解析失败，调用方应降级
+ */
+function parseLLMQuestion(text: string): GameQuestion | null {
+  if (!text) return null;
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    console.warn('[game] LLM 返回内容不含有效 JSON');
+    return null;
+  }
+
+  let parsed: RawQuestionJson;
+  try {
+    parsed = JSON.parse(jsonMatch[0]) as RawQuestionJson;
+  } catch {
+    console.warn('[game] LLM 返回 JSON 解析失败');
+    return null;
+  }
+
+  // 校验必需字段
+  if (!parsed.stem || !Array.isArray(parsed.options) || parsed.options.length < 2 || !parsed.correctKey) {
+    console.warn('[game] LLM 返回题目缺少必需字段');
+    return null;
+  }
+
+  // 补充/截断选项到 4 个
+  if (parsed.options.length < 4) {
+    console.warn(`[game] LLM 返回选项不足 (${parsed.options.length})，补足到 4 个`);
+    const placeholders = ['此选项无效', '此选项无效', '此选项无效', '此选项无效'];
+    for (let i = parsed.options.length; i < 4; i++) {
+      parsed.options.push({ key: String.fromCharCode(65 + i), text: placeholders[i] });
+    }
+  }
+
+  // 归一化 correctKey 为大写
+  parsed.correctKey = parsed.correctKey.toUpperCase().trim();
+  if (!/^[A-D]$/.test(parsed.correctKey)) {
+    parsed.correctKey = 'A'; // 无效 key 降级为 A
+  }
+
+  // 找到正确答案在原始顺序中的索引
+  const correctIndex = parsed.options.findIndex(o => o.key === parsed.correctKey);
+  const safeCorrectIndex = correctIndex >= 0 ? correctIndex : 0;
+
+  // 重写 key 为 A/B/C/D（按原始顺序），只取前 4 个
+  const options = parsed.options.slice(0, 4).map((o, i) => ({
+    key: String.fromCharCode(65 + i),
+    text: String(o.text ?? '').trim() || '（空选项）',
+  }));
+
+  // 安全检查：options 必须至少 2 项
+  if (options.length < 2) return null;
+
+  // 打乱选项并定位正确答案
+  const { shuffled, newCorrectKey } = shuffleOptionsAndLocateCorrect(options, options[safeCorrectIndex]?.key ?? 'A');
+
+  return {
+    id: `q_${Date.now()}_${randomUUID().slice(0, 6)}`,
+    stem: parsed.stem.trim() || '请选择正确答案',
+    options: shuffled,
+    correctKey: newCorrectKey,
+  };
+}
 
 /** 按学科出题 */
 export async function generateGameQuestion(model: BaseChatModel, subject: string): Promise<GameQuestion> {
-  // 先尝试 LLM 生成
-  try {
-    const sub = SUBJECT_MAP[subject];
-    if (!sub) return getFallbackQuestion(subject);
+  const sub = SUBJECT_MAP[subject];
+  if (!sub) return getFallbackQuestion(subject);
 
+  // 先尝试 LLM 生成（带超时）
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
     const prompt = `你是一名${sub.label}老师。请出一道${sub.label}选择题，要求：
-1. 题目难度适中
+1. 题目难度适中，适合中小学生
 2. 有 4 个选项（A/B/C/D）
 3. 只有一个正确答案
 4. 用 JSON 格式输出，结构如下：
@@ -44,30 +129,36 @@ export async function generateGameQuestion(model: BaseChatModel, subject: string
 }
 只输出 JSON，不要其他内容。`;
 
-    const result = await model.invoke([
+    const invokePromise = model.invoke([
       new SystemMessage('你是一名有经验的学科教师，擅长出题。只输出 JSON。'),
       new HumanMessage(prompt),
     ]);
 
-    const text = typeof result.content === 'string' ? result.content.trim() : '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (parsed.stem && Array.isArray(parsed.options) && parsed.options.length === 4 && parsed.correctKey) {
-        const options = parsed.options.map((o: any, i: number) => ({
-          key: String.fromCharCode(65 + i),
-          text: o.text,
-        }));
-        const validKeys = new Set(options.map((o: any) => o.key));
-        const correctKey = validKeys.has(parsed.correctKey) ? parsed.correctKey : options[0].key;
-        const shuffled = shuffleArray(options);
-        const correctText = options.find((o: any) => o.key === correctKey)?.text ?? options[0].text;
-        const newCorrectKey = shuffled.find((o: any) => o.text === correctText)?.key ?? shuffled[0].key;
-        return { id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, stem: parsed.stem, options: shuffled, correctKey: newCorrectKey };
-      }
-    }
+    // 超时竞速（超时后清理 timer 防止泄漏）
+    const result: Awaited<typeof invokePromise> = await Promise.race([
+      invokePromise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('LLM_TIMEOUT')), LLM_TIMEOUT);
+      }),
+    ]);
+    clearTimeout(timeoutId);
+
+    const text = typeof result.content === 'string'
+      ? result.content.trim()
+      : Array.isArray(result.content)
+        ? result.content.map(b => (typeof b === 'string' ? b : (b as { text?: string }).text ?? '')).join('').trim()
+        : '';
+
+    const question = parseLLMQuestion(text);
+    if (question) return question;
+
   } catch (err) {
-    console.warn('[game] LLM 出题失败，降级内置题库:', err instanceof Error ? err.message.slice(0, 100) : err);
+    // 无论成功还是超时，都要清理 timer
+    if (timeoutId) clearTimeout(timeoutId);
+    const reason = err instanceof Error && err.message === 'LLM_TIMEOUT'
+      ? '超时'
+      : err instanceof Error ? err.message.slice(0, 100) : String(err);
+    console.warn(`[game] LLM 出题失败(${reason})，降级内置题库`);
   }
 
   return getFallbackQuestion(subject);
@@ -75,7 +166,14 @@ export async function generateGameQuestion(model: BaseChatModel, subject: string
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  // 使用 crypto.getRandomValues 替代 Math.random()，提供更好的均匀性
+  const buf = new Uint32Array(a.length);
+  crypto.getRandomValues(buf);
+  // Fisher-Yates 洗牌（从后向前，每次从前缀中随机选取元素交换）
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = buf[i] % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
   return a;
 }
 
@@ -113,13 +211,87 @@ const FALLBACK: Record<string, GameQuestion[]> = {
 
 const FALLBACK_INDICES: Record<string, number> = {};
 
+/** 打乱选项并重新定位正确选项的 key */
+function shuffleOptionsAndLocateCorrect(
+  options: { key: string; text: string }[],
+  correctKey: string,
+): { shuffled: { key: string; text: string }[]; newCorrectKey: string } {
+  const correctOption = options.find(o => o.key === correctKey);
+  if (!correctOption) return { shuffled: options, newCorrectKey: options[0]?.key ?? 'A' };
+  const shuffled = shuffleArray(options);
+  const newCorrectKey = shuffled.find(o => o.text === correctOption.text)?.key ?? shuffled[0]?.key ?? 'A';
+  return { shuffled, newCorrectKey };
+}
+
 function getFallbackQuestion(subject: string): GameQuestion {
   const bank = FALLBACK[subject] || FALLBACK.math;
+  if (!FALLBACK[subject]) console.warn(`[game] 未知学科 "${subject}"，降级使用数学兜底题库`);
   FALLBACK_INDICES[subject] ??= 0;
   const idx = FALLBACK_INDICES[subject]++ % bank.length;
   const q = { ...bank[idx] };
-  const shuffled = shuffleArray(q.options);
-  const correctText = q.options.find(o => o.key === q.correctKey)!.text;
-  const newCorrectKey = shuffled.find(o => o.text === correctText)!.key;
-  return { ...q, id: `q_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, options: shuffled, correctKey: newCorrectKey };
+  const { shuffled, newCorrectKey } = shuffleOptionsAndLocateCorrect(q.options, q.correctKey);
+  return { ...q, id: `q_${Date.now()}_${randomUUID().slice(0, 6)}`, options: shuffled, correctKey: newCorrectKey };
+}
+
+/* ── 题目池 ── */
+
+/** 初始化题目池：用兜底题库预填充，后续请求秒出 */
+export function initQuestionPool(model: BaseChatModel) {
+  poolModel = model;
+  for (const subject of Object.keys(SUBJECT_MAP)) {
+    questionPools.set(subject, []);
+    fillPoolWithFallback(subject);
+  }
+  console.log('[game] 题目池已初始化（全部学科）');
+}
+
+function fillPoolWithFallback(subject: string) {
+  const pool = questionPools.get(subject)!;
+  while (pool.length < POOL_MAX) {
+    pool.push(getFallbackQuestion(subject));
+  }
+}
+
+/** 后台用 LLM 补充题目池（不阻塞主请求） */
+async function refillPool(subject: string) {
+  if (!poolModel || poolRefilling.get(subject)) return;
+  poolRefilling.set(subject, true);
+  const pool = questionPools.get(subject)!;
+  try {
+    let added = 0;
+    while (pool.length < POOL_MAX && added < 5) {
+      try {
+        const q = await generateGameQuestion(poolModel, subject);
+        pool.push(q);
+        added++;
+      } catch {
+        pool.push(getFallbackQuestion(subject));
+        added++;
+      }
+    }
+  } finally {
+    poolRefilling.set(subject, false);
+  }
+}
+
+/** 从题目池获取一道题（秒出） */
+export function getPooledQuestion(subject: string): GameQuestion {
+  let pool = questionPools.get(subject);
+  if (!pool) {
+    pool = [];
+    questionPools.set(subject, pool);
+  }
+  if (pool.length === 0) {
+    pool.push(getFallbackQuestion(subject));
+  }
+  // 后台异步补充（不阻塞）
+  if (pool.length < POOL_MIN && poolModel) {
+    refillPool(subject).catch(e => console.warn('[game] pool refill:', e instanceof Error ? e.message : String(e)));
+  }
+  return pool.shift() ?? getFallbackQuestion(subject);
+}
+
+/** 从题目池批量获取题目 */
+export function getPooledQuestions(subject: string, count: number): GameQuestion[] {
+  return Array.from({ length: count }, () => getPooledQuestion(subject));
 }

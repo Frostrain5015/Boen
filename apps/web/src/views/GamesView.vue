@@ -20,8 +20,8 @@ function start(subject: Subject): void {
   playing.value = true;
 }
 
-function onGameOver(score: number): void {
-  finalScore.value = score;
+function onGameOver(stats: { score: number; totalQuestions: number; correctQuestions: number; accuracyRate: number }): void {
+  finalScore.value = stats.score;
 }
 
 function backToMenu(): void {

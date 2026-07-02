@@ -40,12 +40,14 @@ export interface CurrencyStatus {
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return beijingDateStr();
 }
 
-/** 北京时间（UTC+8）的 YYYY-MM-DD，用于每日登录领取判定 */
-function beijingDateStr(): string {
-  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+/** 北京时间（UTC+8）的 YYYY-MM-DD，用于每日相关判定 */
+export function beijingDateStr(): string {
+  const now = new Date();
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(now);
 }
 
 /** 查询今日（北京时间）是否已领取登录奖励 */

@@ -141,7 +141,7 @@ db.exec(`
     applied_at INTEGER NOT NULL DEFAULT (unixepoch())
   );
 `);
-const currentVersion = (db.prepare(`SELECT MAX(version) FROM schema_version`).pluck() ?? 0) as number;
+const currentVersion = (db.prepare(`SELECT MAX(version) FROM schema_version`).pluck().get() ?? 0) as number;
 
 /** 安全添加列：仅在目标列不存在时执行 ALTER TABLE ADD COLUMN */
 function addColumnIfNotExists(table: string, column: string, def: string): void {

@@ -85,6 +85,11 @@ export const RedeemCodeSchema = z.object({
   code: z.string().min(1),
 }).strict();
 
+/** GET /api/game/question */
+export const GameQuestionSchema = z.object({
+  subject: z.enum(['math', 'chinese', 'english', 'science']).default('math'),
+});
+
 /** REDEEM 积分兑换 */
 export const RedeemPointsSchema = z.object({
   productKey: z.string().min(1),
@@ -97,6 +102,20 @@ export const RedeemPointsSchema = z.object({
 export function sanitizeError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   // 只取第一行，限制 200 字符
-  const firstLine = msg.split('\n')[0].trim();
+  let firstLine = msg.split('\n')[0].trim();
+  // 过滤可能泄露内部信息的关键词：文件路径、SQL 片段、堆栈信息等
+  const sensitivePatterns = [
+    /File\s+"[^"]+"/gi,
+    /at\s+\S+\s+\(/g,
+    /node_modules/g,
+    /SELECT\s|INSERT\s|UPDATE\s|DELETE\s|DROP\s|CREATE\s/gi,
+    /SQLITE_/g,
+    /(?:\\|\/)[\w.-]+(?:\\|\/)[\w.-]+(?:\\|\/)[\w.-]+/g, // Unix/Windows 路径
+  ];
+  for (const pattern of sensitivePatterns) {
+    firstLine = firstLine.replace(pattern, '');
+  }
+  firstLine = firstLine.trim();
+  if (!firstLine) return '系统处理出错，请稍后再试';
   return firstLine.length > 200 ? firstLine.slice(0, 200) + '…' : firstLine;
 }

@@ -8,9 +8,12 @@
     "skipLibCheck": true,
     "types": ["node"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "declaration": false,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@boen/shared": ["../../packages/shared/src/index.ts"],
+      "@boen/agent-core": ["../../packages/agent-core/src/index.ts"]
+    }
   },
   "include": ["src"]
 }
