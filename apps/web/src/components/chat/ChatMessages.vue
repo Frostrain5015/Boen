@@ -100,12 +100,12 @@ onMounted(() => {
           <!-- 用户消息 -->
           <div v-else-if="m.kind === 'user'" class="flex flex-col items-end gap-1 anim-fadeUp">
             <div class="max-w-[85%] text-right">
-              <!-- 图片预览 -->
-              <div v-if="m.images && m.images.length" class="mb-1 flex flex-wrap justify-end gap-1.5">
+              <!-- 附件预览 -->
+              <div v-if="m.attachments && m.attachments.length" class="mb-1 flex flex-wrap justify-end gap-1.5">
                 <img
-                  v-for="(img, j) in m.images"
+                  v-for="(a, j) in m.attachments"
                   :key="j"
-                  :src="`data:image/jpeg;base64,${img}`"
+                  :src="`data:${a.mimeType};base64,${a.data}`"
                   class="max-h-48 max-w-full rounded-xl border border-[var(--line)] object-contain shadow-sm"
                   alt="用户上传图片"
                   loading="lazy"

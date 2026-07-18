@@ -34,9 +34,9 @@ onUnmounted(() => {
       class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-[var(--line)] bg-[var(--surface)] shadow-[0_6px_16px_-8px_rgba(86,64,40,0.4),inset_0_1.5px_0_rgba(255,255,255,0.8)] transition-all hover:border-[var(--accent)] hover:shadow-[0_9px_22px_-8px_var(--accent-glow),inset_0_1.5px_0_rgba(255,255,255,0.8)]"
     >
       <img
-        v-if="authStore.currentUser?.picture"
-        :src="authStore.currentUser.picture"
-        :alt="authStore.currentUser.username"
+        v-if="authStore.selectedAvatar"
+        :src="authStore.selectedAvatar"
+        alt="头像"
         class="h-full w-full object-cover"
       />
       <User v-else class="h-4 w-4 text-[var(--ink-soft)]" />
@@ -51,7 +51,9 @@ onUnmounted(() => {
       :enter="{ opacity: 1, scale: 1, y: 0, transition: { duration: 200 } }"
     >
       <div class="px-4 py-3">
-        <p class="text-sm font-semibold text-[var(--ink)]">{{ authStore.currentUser?.username ?? '用户' }}</p>
+        <div class="mb-1 flex items-center gap-1.5">
+          <p class="text-sm font-semibold text-[var(--ink)]">{{ authStore.currentUser?.username ?? '用户' }}</p>
+        </div>
         <p class="text-xs text-[var(--ink-soft)]">{{ authStore.currentUser?.email ?? '' }}</p>
       </div>
       <!-- 卡片状态 -->

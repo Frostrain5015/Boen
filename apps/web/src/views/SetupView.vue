@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth';
 import { getToken } from '@/services/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipCard from '@/components/MembershipCard.vue';
+import AvatarPicker from '@/components/AvatarPicker.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -294,9 +295,41 @@ const fontSize = ref<'sm' | 'md' | 'lg'>(
   (localStorage.getItem('boen_font_size') as 'sm' | 'md' | 'lg') || 'md',
 );
 
+/** 暂存选中的头像（保存按钮提交后才持久化） */
+const pendingAvatar = ref(authStore.selectedAvatar);
+const saveLoading = ref(false);
+const isEditing = ref(false);
+
+/** 进入编辑模式：从 store 加载当前值 */
+function enterEdit() {
+  pendingAvatar.value = authStore.selectedAvatar;
+  name.value = authStore.userProfile?.name ?? '';
+  grade.value = authStore.userProfile?.grade ?? '8';
+  selectedBand.value = detectBand(grade.value);
+  isEditing.value = true;
+}
+
+/** 取消编辑：恢复原值 */
+function cancelEdit() {
+  pendingAvatar.value = authStore.selectedAvatar;
+  name.value = authStore.userProfile?.name ?? '';
+  grade.value = authStore.userProfile?.grade ?? '8';
+  selectedBand.value = detectBand(grade.value);
+  isEditing.value = false;
+}
+
 const currentBandItems = computed(() =>
   GRADE_GROUPS.find(g => g.band === selectedBand.value)?.items ?? [],
 );
+
+/** 年级值转显示文字 */
+function gradeLabel(g: Grade): string {
+  for (const group of GRADE_GROUPS) {
+    const found = group.items.find(i => i.value === g);
+    if (found) return found.label;
+  }
+  return '未知';
+}
 
 const FONT_SIZE_OPTIONS = [
   { value: 'sm' as const, label: '小', px: '14px' },
@@ -328,15 +361,38 @@ function setProvider(val: string) {
   autoSave();
 }
 
-/** 名称失焦时自动保存 */
-function onNameBlur() {
-  if (name.value.trim()) autoSave();
+/** 保存个人信息：头像 + 名字 + 年级 */
+async function handleSave() {
+  const trimmed = name.value.trim();
+  if (!trimmed) {
+    toast.error('请输入你的名字');
+    return;
+  }
+  saveLoading.value = true;
+  try {
+    // 保存头像
+    if (pendingAvatar.value) {
+      authStore.saveAvatar(pendingAvatar.value);
+    }
+    // 保存名字 + 年级
+    authStore.saveProfile({ name: trimmed, grade: grade.value, avatar: pendingAvatar.value || undefined });
+    toast.success('个人信息已保存');
+    isEditing.value = false;
+  } catch {
+    toast.error('保存失败，请稍后再试');
+  } finally {
+    saveLoading.value = false;
+  }
 }
 
-/** 年级点击时自动保存 */
+/** 名称失焦时不自动保存（由保存按钮统一提交） */
+function onNameBlur() {
+  /* no-op */
+}
+
+/** 年级点击时不自动保存（由保存按钮统一提交） */
 function setGrade(g: Grade) {
   grade.value = g;
-  autoSave();
 }
 
 // 字体大小实时预览 + 保存
@@ -501,22 +557,59 @@ function handleBack() {
       <div class="flex-1 min-w-0 space-y-4">
         <!-- 个人信息 -->
         <div class="clay clay-glass overflow-hidden">
-          <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3">
-            <User class="h-4 w-4 text-[var(--accent)]" />
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">个人信息</h2>
+          <div class="flex items-center justify-between border-b border-[var(--line)] px-5 py-3">
+            <div class="flex items-center gap-2">
+              <User class="h-4 w-4 text-[var(--accent)]" />
+              <h2 class="font-display text-sm font-bold text-[var(--ink)]">个人信息</h2>
+            </div>
+            <!-- 编辑按钮（只读模式显示） -->
+            <button
+              v-if="!isEditing"
+              @click="enterEdit"
+              class="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent-soft)] active:scale-95"
+            >
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              编辑
+            </button>
           </div>
-          <div class="space-y-4 px-5 py-4">
-            <!-- 头像 + 账号 -->
+
+          <!-- ═══ 只读模式 ═══ -->
+          <div v-if="!isEditing" class="space-y-3 px-5 py-4">
             <div class="flex items-center gap-3">
-              <div class="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--accent-soft)]">
+              <div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--accent-soft)]">
                 <img
-                  v-if="authStore.currentUser?.picture"
-                  :src="authStore.currentUser.picture"
-                  :alt="authStore.currentUser.username"
+                  v-if="authStore.selectedAvatar"
+                  :src="authStore.selectedAvatar"
+                  alt=""
                   class="h-full w-full object-cover"
                 />
-                <User v-else class="h-5 w-5 text-[var(--accent-strong)]" />
+                <svg v-else class="h-6 w-6 text-[var(--accent-strong)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
               </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <p class="truncate text-sm font-bold text-[var(--ink)]">
+                    {{ authStore.userProfile?.name || authStore.currentUser?.username || '用户' }}
+                  </p>
+                </div>
+                <p class="text-xs text-[var(--ink-soft)]">
+                  <GraduationCap class="mr-0.5 inline h-3 w-3" />
+                  {{ gradeLabel(authStore.userProfile?.grade ?? '8') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ 编辑模式 ═══ -->
+          <div v-else class="space-y-4 px-5 py-4">
+            <!-- 头像（点击可更换） -->
+            <div class="flex items-center gap-3">
+              <AvatarPicker v-model:avatar="pendingAvatar" />
               <div class="min-w-0 flex-1">
                 <p class="truncate text-sm font-bold text-[var(--ink)]">{{ authStore.currentUser?.username ?? '用户' }}</p>
                 <div class="flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
@@ -530,27 +623,17 @@ function handleBack() {
               <span class="flex items-center gap-1.5 font-display text-xs font-semibold" style="color: var(--ink-soft)">
                 <User class="h-3.5 w-3.5" /> 你的名字
               </span>
-              <input v-model="name" @blur="onNameBlur" placeholder="输入你的名字或昵称…" maxlength="20"
+              <input v-model="name" placeholder="输入你的名字或昵称…" maxlength="20"
                 class="w-full rounded-xl border bg-white px-3 py-2.5 text-sm outline-none transition-colors"
                 style="border-color: var(--line); color: var(--ink)"
                 @focus="($event.target as HTMLElement).style.borderColor = 'var(--accent)'"
               />
             </label>
-          </div>
-        </div>
-
-        <!-- 学习配置 -->
-        <div class="clay clay-glass overflow-hidden">
-          <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3">
-            <GraduationCap class="h-4 w-4 text-[var(--accent)]" />
-            <h2 class="font-display text-sm font-bold text-[var(--ink)]">学习配置</h2>
-          </div>
-          <div class="space-y-4 px-5 py-4">
-            <div class="flex flex-col gap-3">
+            <!-- 年级 -->
+            <div class="flex flex-col gap-2.5">
               <span class="flex items-center gap-1.5 font-display text-xs font-semibold" style="color: var(--ink-soft)">
                 <GraduationCap class="h-3.5 w-3.5" /> 当前年级
               </span>
-              <!-- 第一行：学段 -->
               <div class="grid grid-cols-3 gap-2">
                 <button
                   v-for="group in GRADE_GROUPS"
@@ -562,7 +645,6 @@ function handleBack() {
                     : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
                 >{{ group.band }}</button>
               </div>
-              <!-- 第二行：具体年级 -->
               <div class="flex flex-wrap gap-2">
                 <button
                   v-for="item in currentBandItems"
@@ -574,6 +656,30 @@ function handleBack() {
                     : 'bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
                 >{{ item.label }}</button>
               </div>
+            </div>
+            <!-- 保存 / 取消按钮 -->
+            <div class="flex gap-3 pt-1">
+              <button
+                @click="cancelEdit"
+                class="flex-1 rounded-2xl border border-[var(--line)] bg-white py-2.5 text-sm font-bold text-[var(--ink-soft)] transition-all hover:border-[var(--accent)] active:scale-[0.97]"
+              >取消</button>
+              <button
+                @click="handleSave"
+                :disabled="saveLoading"
+                class="flex flex-1 items-center justify-center gap-2 rounded-2xl py-2.5 text-sm font-bold text-white transition-all active:scale-[0.97] disabled:opacity-50"
+                :style="{ background: 'linear-gradient(135deg, var(--accent), var(--accent-strong))' }"
+              >
+                <svg v-if="saveLoading" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10" stroke-opacity="0.3"/>
+                  <path d="M12 2a10 10 0 0 1 10 10"/>
+                </svg>
+                <svg v-else class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                {{ saveLoading ? '保存中…' : '保存' }}
+              </button>
             </div>
           </div>
         </div>

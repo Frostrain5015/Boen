@@ -20,6 +20,18 @@ export class StreamInterruptedError extends Error {
   }
 }
 
+/** 带 HTTP 状态码的请求错误 */
+export class HttpError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+  constructor(message: string, status: number, body?: unknown) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 // ── 401 未授权回调 ─────────────────────────────
 // 由 authStore 在初始化时注册，避免 Pinia ↔ 服务层的循环依赖
 let _onUnauthorized: (() => void) | null = null;
@@ -55,12 +67,13 @@ async function streamSse(
     }
     try {
       const errBody = await res.json() as Record<string, unknown>;
-      const err = new Error(errBody.message as string || `请求失败 (${res.status})`);
-      (err as any).status = res.status;
-      (err as any).body = errBody;
-      throw err;
+      throw new HttpError(
+        errBody.message as string || `请求失败 (${res.status})`,
+        res.status,
+        errBody,
+      );
     } catch (e) {
-      if ((e as any).status) throw e; // 重新抛出已构造的错误
+      if (e instanceof HttpError) throw e;
       throw new Error(`请求失败 (${res.status})`);
     }
   }
@@ -94,7 +107,7 @@ async function streamSse(
 }
 
 /** 发起一轮对话 */
-export const streamChat = (req: ChatRequest & { conversationId?: string; subject?: string; userName?: string }, onEvent: (e: SseEvent) => void) =>
+export const streamChat = (req: ChatRequest, onEvent: (e: SseEvent) => void) =>
   streamSse('/api/chat', req, onEvent);
 
 /** 提交一道题的作答 */
@@ -215,7 +228,7 @@ async function streamAuthorizedSse(
         }
         onEvent(parsed as AnalyzeMistakeEvent);
       } catch (e) {
-        if ((e as any)?.message?.startsWith('分析失败') || (e as any)?.message?.includes('OCR')) throw e;
+        if (e instanceof Error && (e.message.startsWith('分析失败') || e.message.includes('OCR'))) throw e;
         /* ignore malformed SSE frame */
       }
     }

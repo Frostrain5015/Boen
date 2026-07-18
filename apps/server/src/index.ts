@@ -1,5 +1,6 @@
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 import { config as loadEnv } from 'dotenv';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
@@ -13,6 +14,16 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[FATAL] unhandledRejection:', reason instanceof Error ? reason.stack : reason);
 });
+
+// ── 优雅关闭：刷新熟练度缓存后退出 ──────────────────────────
+function shutdown(signal: string) {
+  console.log(`[shutdown] 收到 ${signal}，正在刷新熟练度缓存...`);
+  const flushed = flushAllProficiencyCaches();
+  console.log(`[shutdown] 已刷新 ${flushed} 条熟练度记录，进程退出`);
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 import { HumanMessage, SystemMessage, type BaseMessage, type AIMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -33,10 +44,12 @@ import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { ensureFtsTable, rebuildFtsIndex } from './fts.js';
 import { setRewriteModel } from './query-rewriter.js';
 import { generateConversationSummaryAsync } from './conversation-memory.js';
-import { getNodesByType, getNeighbors, getKgContextForUnit, formatKgContext, ensureKnowledgeGraphTables } from './knowledge-graph.js';
-import { getWeightInfo, getWeightDistribution, formatWeightGuide } from './kg-weights.js';
+import { z } from 'zod';
+import { SwitchModelSchema, RedeemCodeSchema, RedeemPointsSchema, sanitizeError } from './validation.js';
+import { getNodesByType, getNeighbors, getKgContextForUnit, ensureKnowledgeGraphTables } from './knowledge-graph.js';
+import { getWeightDistribution, formatWeightGuide } from './kg-weights.js';
 import { getPublishedKnowledgePointIds, getQuestionTaxonomyById, resolveQuestionTaxonomy } from './question-taxonomy.js';
-import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, expectedCorrectness, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory } from './knowledge-profile.js';
+import { updateProficiency, cacheProficiencyUpdate, flushProficiencyCache, discardProficiencyCache, getCachedProficiencySum, getCachedProficiencyExpected, setCachedProficiencyExpected, computeProficiencyDelta, difficultyLevelToValue, expectedCorrectness, ELO_RATING_INIT, ELO_SIGMA_INIT, getAllProficiencies, getWeakPoints, getStrongPoints, getLiteracyProficiency, getRecommendedKPs, getPrerequisiteWeaknessChain, getProfileOutline, seedProficiencyFromHistory, flushAllProficiencyCaches } from './knowledge-profile.js';
 import {
   createConversation,
   getConversations,
@@ -45,7 +58,6 @@ import {
   deleteConversation,
   addMessage,
   getMessages,
-  getRecentMessages,
   updateQuestionMessage,
 } from './conversation.js';
 import {
@@ -62,7 +74,7 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser, grantMembershipDays } from './redeem.js';
-import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin } from './currency.js';
+import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin, beijingDateStr } from './currency.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -100,6 +112,8 @@ let currentProvider = 'default';
 let model = createModel(currentProvider);
 // 出卷沿用用户所选档位，但开启 thinking（延迟被异步进度条吸收）
 let examModel = createModel(currentProvider, EXAM_MODEL_OPTS);
+// 初始化游戏题目池（启动时预填充，后续请求秒出）
+initQuestionPool(examModel);
 
 // LangGraph 对话状态持久化到 SQLite（重启不丢失）
 const checkpointer = new SqliteSaver(db);
@@ -107,7 +121,7 @@ const checkpointer = new SqliteSaver(db);
 // 初始化 FTS5 全文搜索索引（幂等）
 ensureFtsTable();
 // 从已有课程数据重建 FTS 索引（幂等，已有数据则跳过）
-try { rebuildFtsIndex(); } catch { /* FTS 表可能尚不存在，忽略 */ }
+try { rebuildFtsIndex(); } catch (e) { console.warn('[fts] rebuildFtsIndex 失败:', e instanceof Error ? e.message : e); }
 // 注入查询改写模型
 setRewriteModel(model);
 
@@ -116,8 +130,10 @@ let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, 
 /** 切换模型并重建 LangGraph 图 */
 function switchModel(provider: string) {
   currentProvider = provider;
+  // 创建新实例后原子替换引用；进行中的请求通过闭包保留旧实例，不受影响
   model = createModel(provider);
   examModel = createModel(provider, EXAM_MODEL_OPTS);
+  initQuestionPool(examModel);
   setRewriteModel(model);
   graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
   return provider;
@@ -126,17 +142,36 @@ function switchModel(provider: string) {
 // ── Frost ID：服务端换 token（内网直连，client_secret 只留服务端）──
 const FROST_ID_INTERNAL_URL = process.env.FROST_ID_INTERNAL_URL ?? 'http://127.0.0.1:4000';
 const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
-const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
+const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET;
+if (!FROST_ID_CLIENT_SECRET) {
+  console.error('[FATAL] FROST_ID_CLIENT_SECRET 未配置，Frost ID OAuth 依赖此密钥，拒绝启动');
+  process.exit(1);
+}
 
-// 兑换码签名密钥（自描述签名码用，仅存服务端 .env）。未配置则兑换接口拒绝服务。
-const REDEEM_CODE_SECRET = process.env.REDEEM_CODE_SECRET ?? '';
-if (!REDEEM_CODE_SECRET) console.warn('[redeem] REDEEM_CODE_SECRET 未配置，兑换码功能将拒绝服务');
+// 兑换码签名密钥（自描述签名码用，仅存服务端 .env）。未配置则拒绝启动。
+const REDEEM_CODE_SECRET = process.env.REDEEM_CODE_SECRET;
+if (!REDEEM_CODE_SECRET) {
+  console.error('[FATAL] REDEEM_CODE_SECRET 未配置，兑换码功能依赖此密钥，拒绝启动');
+  process.exit(1);
+}
 
 // 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
 const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null; activatedAt: number | null } }>();
 const MAX_USER_CACHE = 5000;
 /** 反向索引：userId → Set<token>，用于 O(1) 失效 */
 const userIdTokens = new Map<string, Set<string>>();
+/** 定期清理过期的 userIdCache 条目，防止内存泄漏 */
+const userCacheCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of userIdCache) {
+    if (entry.exp <= now) {
+      userIdCache.delete(token);
+      const tokens = userIdTokens.get(entry.sub);
+      if (tokens) { tokens.delete(token); if (!tokens.size) userIdTokens.delete(entry.sub); }
+    }
+  }
+}, 5 * 60_000); // 每 5 分钟清理
+if (userCacheCleanup?.unref) userCacheCleanup.unref();
 async function resolveUserId(c: Context): Promise<string | null> {
   const authz = c.req.header('authorization');
   if (!authz?.startsWith('Bearer ')) return null;
@@ -258,30 +293,44 @@ function requirePremium(c: Context, result: { userId: string; sub: SubscriptionI
   return null;
 }
 
-/** 查询当日消息用量 */
+/** 查询当日消息用量（北京时间） */
 function getDailyUsage(userId: string): number {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = beijingDateStr();
   const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id = ? AND date = ?').get(userId, today) as
     | { message_count: number }
     | undefined;
   return row?.message_count ?? 0;
 }
 
-/** 检查并递增每日用量，返回是否允许 + 剩余条数 */
-/** 只读：检查用户今日用量是否已达上限 */
+/** 检查并原子递增用户今日用量，防止并发绕过限额 */
 function checkUsage(userId: string): { allowed: boolean; remaining: number } {
-  const current = getDailyUsage(userId);
-  if (current >= FREE_DAILY_LIMIT) return { allowed: false, remaining: 0 };
-  return { allowed: true, remaining: FREE_DAILY_LIMIT - current };
+  const today = beijingDateStr();
+  // 在事务中原子完成 读取+递增，杜绝 check-then-act TOCTOU 竞态
+  return db.transaction((): { allowed: boolean; remaining: number } => {
+    const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id=? AND date=?')
+      .get(userId, today) as { message_count: number } | undefined;
+    const current = row?.message_count ?? 0;
+    if (current >= FREE_DAILY_LIMIT) {
+      return { allowed: false, remaining: 0 };
+    }
+    db.prepare(`
+      INSERT INTO daily_chat_usage (user_id, date, message_count) VALUES (?, ?, 1)
+      ON CONFLICT(user_id, date) DO UPDATE SET message_count = message_count + 1
+    `).run(userId, today);
+    return { allowed: true, remaining: FREE_DAILY_LIMIT - current - 1 };
+  })();
 }
 
-/** 原子递增用户今日用量（必须在 checkUsage 返回 allowed 后调用） */
-function incrementUsage(userId: string): void {
-  const today = new Date().toISOString().slice(0, 10);
-  db.prepare(`
-    INSERT INTO daily_chat_usage (user_id, date, message_count) VALUES (?, ?, 1)
-    ON CONFLICT(user_id, date) DO UPDATE SET message_count = message_count + 1
-  `).run(userId, today);
+/** SSE 异常时退还已扣除的免费配额，避免用户无结果却被扣次数 */
+function refundUsage(userId: string) {
+  const today = beijingDateStr();
+  db.transaction(() => {
+    const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id=? AND date=?')
+      .get(userId, today) as { message_count: number } | undefined;
+    if (!row || row.message_count <= 0) return;
+    db.prepare('UPDATE daily_chat_usage SET message_count = message_count - 1 WHERE user_id=? AND date=? AND message_count > 0')
+      .run(userId, today);
+  })();
 }
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
@@ -386,6 +435,7 @@ async function runGraph(
   input: Record<string, unknown> | Command<QuestionResume>,
   threadId: string,
   send: (e: SseEvent) => Promise<void>,
+  signal?: AbortSignal,
 ): Promise<GraphRunResult> {
   const events = graph.streamEvents(input as any, runConfig(threadId));
   let quizSignaled = false; // 「博文正在出题」只发一次
@@ -409,16 +459,21 @@ async function runGraph(
       const parsed = JSON.parse(existingTodo);
       stepCount = parsed.steps?.filter((s: any) => s.status === 'completed').length ?? 0;
     }
-  } catch { /* 首轮无 checkpoint */ }
+  } catch (e) { console.warn('[runGraph] 读取初始 checkpoint 失败:', e instanceof Error ? e.message : e); }
   const stepTimestamps: number[] = [Date.now()];
 
   // SSE keepalive：LLM 长时间思考时每 30s 发一次空事件，防止 nginx/proxy 断开
   const pingTimer = setInterval(() => {
-    send({ type: 'token' as any, value: '' }).catch(() => {});
+    send({ type: 'token' as any, value: '' }).catch((e) => { console.warn('[runGraph] keepalive send 失败:', e); });
   }, 30_000);
 
   try {
       for await (const ev of events) {
+        // 客户端断连时提前终止，避免浪费 LLM API 调用
+        if (signal?.aborted) {
+          console.log('[runGraph] 客户端断连，提前终止流');
+          break;
+        }
     if (ev.event === 'on_chat_model_stream') {
       const chunk = ev.data?.chunk as
         | { content?: unknown; tool_call_chunks?: Array<{ name?: string }>; tool_calls?: Array<{ name?: string }> }
@@ -574,7 +629,7 @@ async function runGraph(
   const question = getPendingQuestion(state);
   // 返回最后一条 AI 消息（含 tool_calls），而非 exitSession 节点产生的 ToolMessage
   for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i]._getType() === 'ai') return { last: msgs[i], question };
+    if (msgs[i].getType() === 'ai') return { last: msgs[i], question };
   }
   return { last: msgs[msgs.length - 1], question };
 }
@@ -605,12 +660,14 @@ function awardSessionPoints(
     const res = earnPoints(userId, total, reason, refId);
     if (res.earned <= 0 && !res.capped) return undefined;
     return { pointsEarned: res.earned, pointsBalance: res.balance, pointsCapped: res.capped };
-  } catch {
+  } catch (e) { console.warn('[awardSessionPoints] 结算失败:', e instanceof Error ? e.message : e);
     return undefined;
   }
 }
 
-async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string, subject?: string, grade?: string) {
+async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string, subject?: string, grade?: string, settled = false) {
+  // MODE_SCORE 路径已经完成结算，跳过避免重复发送
+  if (settled) return;
   let exitCall: ToolCall | undefined;
 
   // Case 1: last 本身是带 exit_session 的 AI 消息
@@ -629,7 +686,7 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
           if (found) { exitCall = found; break; }
         }
       }
-    } catch {}
+    } catch (e) { console.warn('[handleSessionExit] 回溯 exit_session 失败:', e instanceof Error ? e.message : e); }
   }
 
   if (exitCall?.args && userId && threadId) {
@@ -671,9 +728,12 @@ async function emitReviewCompleteIfAny(last: BaseMessage | undefined, send: (e: 
 /** 为新对话自动生成标题（基于首轮用户消息） */
 async function autoGenerateTitle(conversationId: string, userMessage: string, onTitle: (title: string) => Promise<void>) {
   try {
-    const result = await model.invoke([
-      new SystemMessage('用 2-8 个字概括用户提问的主题，直接输出标题，不要引号和标点。'),
-      new HumanMessage(userMessage),
+    const result = await Promise.race([
+      model.invoke([
+        new SystemMessage('用 2-8 个字概括用户提问的主题，直接输出标题，不要引号和标点。'),
+        new HumanMessage(userMessage),
+      ]),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TITLE_TIMEOUT')), 5000)),
     ]);
     let title = (typeof result.content === 'string' ? result.content : '').trim().replace(/["""']/g, '');
     if (!title) return;
@@ -684,9 +744,7 @@ async function autoGenerateTitle(conversationId: string, userMessage: string, on
       updateConversationTitle(conversationId, title);
       await onTitle(title);
     }
-  } catch {
-    console.warn('[title] auto-generation failed');
-  }
+  } catch (e) { console.warn('[title] auto-generation failed:', e instanceof Error ? e.message : e); }
 }
 
 /** 若最后一条消息触发了出题工具，推送 question 事件（每次只呈现第一道） */
@@ -759,7 +817,7 @@ async function safeDeliverQuestion(
     try {
       payload = databaseQuestionPayload(current, scope);
     } catch (err) {
-      reason = err instanceof Error ? err.message : String(err);
+      reason = sanitizeError(err);
     }
     if (payload) {
       if (persistConversationId) {
@@ -843,13 +901,22 @@ function sanitizeConversationQuestionMessage<T extends { role: string; content: 
     meta.payload = canonicalize(meta.payload);
     meta.grading = canonicalize(meta.grading);
     return { ...message, content: JSON.stringify(meta) };
-  } catch {
+  } catch (e) { console.warn('[sanitizeConversationQuestionMessage] 解析失败:', e instanceof Error ? e.message : e);
     return message;
   }
 }
 
 const app = new Hono();
 app.use('/api/*', cors());
+
+// 全局 Zod 校验错误处理
+app.onError((err, c) => {
+  if (err instanceof z.ZodError) {
+    return c.json({ error: 'validation_error', message: err.errors?.[0]?.message ?? '请求参数校验失败' }, 400);
+  }
+  console.error('[onError] 未捕获异常:', err instanceof Error ? err.stack : err);
+  return c.json({ error: 'internal_error' }, 500);
+});
 
 app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (model as any)?.modelName ?? 'deepseek-v4-flash' }));
 
@@ -858,7 +925,7 @@ app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (m
 app.post('/api/model/switch', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json() as { provider?: string };
+  const body = SwitchModelSchema.parse(await c.req.json());
   const p = body.provider;
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
   // V4 Pro 仅星耀卡可用
@@ -918,7 +985,8 @@ app.post('/api/render-tikz', async (c) => {
 ensureKnowledgeGraphTables();
 
 /** GET /api/kg/nodes?type=theme&subject=math — 按类型查节点 */
-app.get('/api/kg/nodes', (c) => {
+app.get('/api/kg/nodes', async (c) => {
+  if (!await resolveUserId(c)) return c.json({ error: 'unauthorized' }, 401);
   const type = c.req.query('type') as any;
   const subject = c.req.query('subject');
   if (!type) return c.json({ error: 'type 参数必填' }, 400);
@@ -927,7 +995,8 @@ app.get('/api/kg/nodes', (c) => {
 });
 
 /** GET /api/kg/neighbors/:nodeId — 查某节点的相邻节点 */
-app.get('/api/kg/neighbors/:nodeId', (c) => {
+app.get('/api/kg/neighbors/:nodeId', async (c) => {
+  if (!await resolveUserId(c)) return c.json({ error: 'unauthorized' }, 401);
   const nodeId = Number(c.req.param('nodeId'));
   const edgeType = c.req.query('edgeType') as any;
   if (isNaN(nodeId)) return c.json({ error: 'nodeId 无效' }, 400);
@@ -936,7 +1005,8 @@ app.get('/api/kg/neighbors/:nodeId', (c) => {
 });
 
 /** GET /api/kg/unit/:unitId — 查某章节的知识图谱上下文 */
-app.get('/api/kg/unit/:unitId', (c) => {
+app.get('/api/kg/unit/:unitId', async (c) => {
+  if (!await resolveUserId(c)) return c.json({ error: 'unauthorized' }, 401);
   const unitId = Number(c.req.param('unitId'));
   if (isNaN(unitId)) return c.json({ error: 'unitId 无效' }, 400);
   const context = getKgContextForUnit(unitId);
@@ -945,7 +1015,8 @@ app.get('/api/kg/unit/:unitId', (c) => {
 
 // ── 知识点权重 API ────────────────────────────
 /** GET /api/kg/weights/distribution?subject=math&grade=7 — 权重分布 */
-app.get('/api/kg/weights/distribution', (c) => {
+app.get('/api/kg/weights/distribution', async (c) => {
+  if (!await resolveUserId(c)) return c.json({ error: 'unauthorized' }, 401);
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade');
   const dist = getWeightDistribution(subject, grade);
@@ -953,7 +1024,8 @@ app.get('/api/kg/weights/distribution', (c) => {
 });
 
 /** GET /api/kg/weights/guide?subject=math&grade=7 — 出题参考文本 */
-app.get('/api/kg/weights/guide', (c) => {
+app.get('/api/kg/weights/guide', async (c) => {
+  if (!await resolveUserId(c)) return c.json({ error: 'unauthorized' }, 401);
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade') || '7';
   const guide = formatWeightGuide(subject, grade);
@@ -962,10 +1034,13 @@ app.get('/api/kg/weights/guide', (c) => {
 // ── 知识画像 API ────────────────────────────
 /** GET /api/profile/outline?subject=math&grade=7 — 章节树+掌握度 */
 app.get('/api/profile/outline', async (c) => {
-  const userId = await resolveUserId(c);
+  const authResult = await resolveSubscription(c);
+  const gate = requirePremium(c, authResult);
+  if (gate) return gate;
+  const userId = authResult!.userId;
   const subject = c.req.query('subject') || 'math';
   const grade = c.req.query('grade') || '7';
-  const outline = getProfileOutline(subject, grade, userId ?? undefined);
+  const outline = getProfileOutline(subject, grade, userId);
   return c.json(outline);
 });
 
@@ -1013,7 +1088,7 @@ app.get('/api/profile/report', async (c) => {
     const response = await model.invoke([new SystemMessage(prompt)]);
     const content = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
     return c.json({ report: content.trim() });
-  } catch { return c.json({ error: '生成报告失败' }, 500); }
+  } catch (e) { console.error('[profile/report] 生成报告失败:', e instanceof Error ? e.message : e); return c.json({ error: '生成报告失败' }, 500); }
 });
 
 /** GET /api/profile/weak-points — 薄弱知识点 */
@@ -1151,7 +1226,7 @@ app.post('/api/mistakes', async (c) => {
     });
     return c.json({ mistake }, 201);
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json({ error: sanitizeError(err) }, 400);
   }
 });
 
@@ -1166,6 +1241,8 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
     // SSE keepalive：图片错题的多模态识别为单次调用，密集整页可达 60~90s 无业务事件，
     // 每 20s 发一个 SSE 注释帧（: 开头，前端 data: 解析会跳过）防止 nginx proxy 断流。
     const ping = setInterval(() => { stream.write(': keepalive\n\n').catch(() => {}); }, 20_000);
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); clearInterval(ping); });
     try {
       await analyzeMistake(mistakeId, userId, model,
         (p) => send({ type: 'mistake_progress', step: p.step, message: p.message, progress: p.progress }),
@@ -1173,7 +1250,7 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
       );
       await send({ type: 'done' });
     } catch (err) {
-      try { await send({ type: 'error', message: err instanceof Error ? err.message : String(err) }); } catch {}
+      try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[mistakes/analyze] SSE send 失败:', e2); }
     } finally {
       clearInterval(ping);
     }
@@ -1200,7 +1277,7 @@ app.patch('/api/mistakes/:id', async (c) => {
     const mistake = updateMistake(c.req.param('id'), userId, body);
     return c.json({ mistake });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json({ error: sanitizeError(err) }, 400);
   }
 });
 
@@ -1235,7 +1312,7 @@ app.post('/api/mistakes/:id/practice', async (c) => {
   return c.json({ prompt: formatMistakePracticePrompt(detail.mistake) });
 });
 
-import { generateExam, createExamSession, updateExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, findKnowledgePointNode, generateDetailedReview } from './exam.js';
+import { generateExam, createExamSession, updateExamSession, getExamSession, submitExamSession, listExamSessions, deleteExamSession, createShortAnswerGrader, generateDetailedReview } from './exam.js';
 import { postExamRecommendation } from './exam-recommendation.js';
 
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
@@ -1250,13 +1327,19 @@ app.post('/api/exam/generate', async (c) => {
   const preCreatedId = body.examId;
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); });
     try {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
         examModel,
         { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes, totalScore: body.totalScore },
-        (p) => send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 }),
+        (p) => {
+          if (ac.signal.aborted) throw new DOMException('SSE stream aborted by client', 'AbortError');
+          return send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 });
+        },
         userId,
+        ac.signal,
       );
       // 使用预创建的 examId 更新记录，否则新建
       const session = preCreatedId
@@ -1272,9 +1355,9 @@ app.post('/api/exam/generate', async (c) => {
       });
       await send({ type: 'done' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = sanitizeError(err);
       console.error('出卷失败:', msg.slice(0, 200));
-      try { await send({ type: 'error', message: msg }); } catch {}
+      try { await send({ type: 'error', message: msg }); } catch (e2) { console.warn('[exam/generate] SSE send 失败:', e2); }
     }
   });
 });
@@ -1299,11 +1382,11 @@ app.post('/api/exam/submit', async (c) => {
         (results as any).recommendation = recommendation;
       }
     } catch (err) {
-      console.warn('[exam] recommendation generation failed:', err instanceof Error ? err.message : String(err));
+      console.warn('[exam] recommendation generation failed:', sanitizeError(err));
     }
     return c.json({ success: true, results });
   } catch (err) {
-    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    return c.json({ error: sanitizeError(err) }, 400);
   }
 });
 
@@ -1319,6 +1402,8 @@ app.post('/api/exam/submit/stream', async (c) => {
 
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); });
     try {
       const results = await submitExamSession(
         body.examId,
@@ -1335,13 +1420,13 @@ app.post('/api/exam/submit/stream', async (c) => {
           (results as any).recommendation = recommendation;
         }
       } catch (err) {
-        console.warn('[exam] recommendation generation failed:', err instanceof Error ? err.message : String(err));
+        console.warn('[exam] recommendation generation failed:', sanitizeError(err));
       }
       await send({ type: 'exam_graded', examId: body.examId, results });
       await send({ type: 'done' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      try { await send({ type: 'error', message: msg }); } catch {}
+      const msg = sanitizeError(err);
+      try { await send({ type: 'error', message: msg }); } catch (e2) { console.warn('[exam/submit/stream] SSE send 失败:', e2); }
     }
   });
 });
@@ -1354,7 +1439,7 @@ app.post('/api/exam', async (c) => {
   const userId = authResult!.userId;
   const body = await c.req.json() as { subject: string; grade: string; durationMinutes?: number; notes?: string };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
-  const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = `exam-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at) VALUES (?, ?, ?, ?, '', '[]', 0, ?, 'generating', ?)`).run(
     id, userId, body.subject, body.grade, body.durationMinutes ?? 45, now,
@@ -1452,7 +1537,7 @@ app.post('/api/exam/:examId/detailed-review', async (c) => {
 
     return c.json({ questionResults: enhancedResults });
   } catch (err) {
-    console.error('[detailed-review] failed:', err instanceof Error ? err.message : String(err));
+    console.error('[detailed-review] failed:', sanitizeError(err));
     return c.json({ error: '生成详解失败' }, 500);
   }
 });
@@ -1482,13 +1567,9 @@ app.post('/api/subscription/redeem', async (c) => {
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
 
-  let code = '';
-  try {
-    code = String((await c.req.json<{ code?: string }>()).code ?? '').trim();
-  } catch { /* 忽略 body 解析错误，下方按空码处理 */ }
-  if (!code) return c.json({ error: 'invalid_code', message: '请输入兑换码' }, 400);
+  const { code } = RedeemCodeSchema.parse(await c.req.json());
 
-  const result = redeemForUser(userId, code, REDEEM_CODE_SECRET);
+  const result = redeemForUser(userId, code.trim(), REDEEM_CODE_SECRET);
   if (!result.ok) {
     const msgMap: Record<string, string> = {
       invalid_code: '兑换码无效',
@@ -1549,10 +1630,7 @@ app.post('/api/currency/redeem-membership', async (c) => {
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
 
-  let productKey = '';
-  try {
-    productKey = String((await c.req.json<{ productKey?: string }>()).productKey ?? '').trim();
-  } catch { /* 忽略 body 解析错误 */ }
+  const { productKey } = RedeemPointsSchema.parse(await c.req.json());
 
   const result = redeemMembershipWithPoints(userId, productKey);
   if (!result.ok) {
@@ -1597,7 +1675,8 @@ app.post('/api/currency/claim-free-card', async (c) => {
       tier, isPremium: true, expiresAt: until,
       dailyLimit: null, dailyUsed: null, dailyRemaining: null,
     });
-  } catch {
+  } catch (e) {
+    console.error('[daily-claim] 领取失败:', e instanceof Error ? e.message : e);
     return c.json({ error: 'claim_failed', message: '领取失败' }, 500);
   }
 });
@@ -1638,6 +1717,8 @@ app.get('/api/auth/userinfo', async (c) => {
 
 /** POST /api/auth/revoke - 服务端撤销 token */
 app.post('/api/auth/revoke', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const { token } = await c.req.json<{ token: string }>();
   await fetch(`${FROST_ID_INTERNAL_URL}/oauth/revoke`, {
     method: 'POST',
@@ -1648,6 +1729,7 @@ app.post('/api/auth/revoke', async (c) => {
       client_secret: FROST_ID_CLIENT_SECRET,
     }),
   });
+  invalidateSubscriptionCache(userId);
   return c.json({ success: true });
 });
 
@@ -1713,15 +1795,13 @@ app.post('/api/chat', async (c) => {
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   const userId = result.userId;
 
-  // 免费用户每日限额检查（只读，流成功完成后再递增）
+  // 免费用户每日限额检查（已原子递增，无需 later 再 increment）
   let usageInfo: { dailyLimit: number; dailyUsed: number; dailyRemaining: number } | null = null;
-  let shouldIncrement = false;
   if (!result.sub.isPremium) {
     const usage = checkUsage(userId);
     if (!usage.allowed) {
       return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
-    shouldIncrement = true;
     usageInfo = { dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT - usage.remaining, dailyRemaining: usage.remaining };
   }
 
@@ -1729,11 +1809,13 @@ app.post('/api/chat', async (c) => {
     !!body.conversationId && getConversation(body.conversationId)?.userId === userId;
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); });
     try {
       // 如果有归属本人的 conversationId，保存用户消息
       if (owned) {
-        const userContent = body.images?.length
-          ? JSON.stringify({ text: body.message, images: body.images })
+        const userContent = body.attachments?.length
+          ? JSON.stringify({ text: body.message, attachments: body.attachments })
           : body.message;
         addMessage(body.conversationId!, 'user', userContent);
       }
@@ -1788,13 +1870,13 @@ app.post('/api/chat', async (c) => {
       }
 
       // 构建可能含图片的 HumanMessage
-      const humanMsg: HumanMessage = body.images?.length
+      const humanMsg: HumanMessage = body.attachments?.length
         ? new HumanMessage({
             content: [
               { type: 'text', text: body.message },
-              ...body.images.map((img: string) => ({
+              ...body.attachments.map((a) => ({
                 type: 'image_url' as const,
-                image_url: { url: `data:image/jpeg;base64,${img}` },
+                image_url: { url: `data:${a.mimeType};base64,${a.data}` },
               })),
             ],
           })
@@ -1814,7 +1896,11 @@ app.post('/api/chat', async (c) => {
         },
         body.threadId,
         send,
+        ac.signal,
       );
+
+      // 用于防止 MODE_SCORE 和 exit_session 双重结算
+      let settled = false;
 
       // 保存助手回复
       if (owned && last) {
@@ -1825,6 +1911,7 @@ app.post('/api/chat', async (c) => {
         const scoreMatch = content.match(/【MODE_SCORE:\s*(\d+)】/);
         const stepsMatch = content.match(/已完成\s*(\d+)\s*\/\s*(\d+)\s*步/);
         if (scoreMatch && userId && body.threadId) {
+          settled = true;
           const sessionScore = parseInt(scoreMatch[1]);
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
@@ -1853,14 +1940,12 @@ app.post('/api/chat', async (c) => {
         owned ? body.conversationId! : undefined,
       );
       // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
-      await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', body.grade);
+      await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', body.grade, settled);
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
       // 发送每日用量信息（供前端更新剩余次数）
       if (usageInfo) await send({ type: 'usage', ...usageInfo });
-      // 流成功完成，才递增用量
-      if (shouldIncrement) incrementUsage(userId);
       await send({ type: 'done' });
 
       // 非阻塞：异步生成对话摘要并存储（不等待）
@@ -1869,7 +1954,11 @@ app.post('/api/chat', async (c) => {
           .catch(err => console.warn('[memory] summary generation failed:', err));
       }
     } catch (err) {
-      try { await send({ type: 'error', message: err instanceof Error ? err.message : String(err) }); } catch {}
+      // SSE 异常时丢弃缓存的熟练度更新，避免陈旧数据残留
+      if (userId && body.threadId) discardProficiencyCache(userId, body.threadId);
+      // 退还已扣除的免费配额（用户无结果不应扣次）
+      if (usageInfo) refundUsage(userId);
+      try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[chat] SSE send 失败:', e2); }
     }
   });
 });
@@ -1892,6 +1981,8 @@ app.post('/api/explore', async (c) => {
 
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); });
     await send({ type: 'conversation_created', conversationId: threadId, title: entry.label });
     try {
       const { last, question } = await runGraph(
@@ -1907,6 +1998,7 @@ app.post('/api/explore', async (c) => {
         },
         threadId,
         send,
+        ac.signal,
       );
       if (last) {
         let content = typeof last.content === 'string' ? last.content : JSON.stringify(last.content);
@@ -1948,7 +2040,8 @@ app.post('/api/explore', async (c) => {
       );
       await send({ type: 'done' });
     } catch (err) {
-      try { await send({ type: 'error', message: err instanceof Error ? err.message : String(err) }); } catch {}
+      if (userId && threadId) discardProficiencyCache(userId, threadId);
+      try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[answer] SSE send 失败:', e2); }
     }
   });
 });
@@ -1966,7 +2059,7 @@ function autoCollectChatMistake(
   subject: string,
   grade: string,
   mode: string,
-  toolName: string,
+  _toolName: string,
   toolArgs: Record<string, any>,
   answer: AnswerPayload,
   result: { correct: boolean | null; score: number; maxScore: number; reference?: string; explanation?: string; knowledgePoints?: string[]; knowledgePointId?: number },
@@ -1980,7 +2073,7 @@ function autoCollectChatMistake(
   if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
 
   const now = Math.floor(Date.now() / 1000);
-  const id = `mistake-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const id = `mistake-${Date.now()}-${randomUUID().slice(0, 10)}`;
 
   const stem: string = toolArgs.stem ?? toolArgs.question ?? '';
   const knowledgePoint: string | undefined = result.knowledgePoints?.[0];
@@ -2058,7 +2151,9 @@ function autoCollectChatMistake(
             titleText, Math.floor(Date.now() / 1000), id, userId,
           );
         }
-      }).catch(() => {});
+      }).catch((err) => {
+        console.warn('[mistake] 错题标题异步生成失败:', err instanceof Error ? err.message : err);
+      });
     }
   } catch (err) {
     console.warn('[mistake] 对话错题归集失败:', err instanceof Error ? err.message : err);
@@ -2070,19 +2165,21 @@ app.post('/api/answer', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
 
-  // 免费用户每次 AI 调用都计为一次（只读检查，流成功后再递增）
-  let answerShouldIncrement = false;
+  // 免费用户每次 AI 调用都计为一次（checkUsage 内原子递增）
+  let usageDecremented = false;
   const subInfo = userId ? await resolveSubscription(c).catch(() => null) : null;
   if (subInfo && !subInfo.sub.isPremium) {
     const usage = checkUsage(userId);
     if (!usage.allowed) {
       return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
-    answerShouldIncrement = true;
+    usageDecremented = true;
   }
 
   return streamSSE(c, async (stream) => {
     const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const ac = new AbortController();
+    stream.onAbort(() => { ac.abort(); });
     try {
       const state = await graph.getState({ configurable: { thread_id: body.threadId } });
       const target = getPendingQuestion(state);
@@ -2212,7 +2309,7 @@ app.post('/api/answer', async (c) => {
             const cachedState = getCachedProficiencyExpected(userId, body.threadId, result.knowledgePointId, dbR?.rating ?? 0, dbR?.rating_sigma ?? 20, dbR?.last_updated ?? 0);
             if (cachedState.rating > 0) afterExpectedScore = cachedState.rating;
           }
-        } catch { /* 静默 */ }
+        } catch (e) { console.warn('[answer] 熟练度预期计算失败:', e instanceof Error ? e.message : e); }
       }
 
       // 错题自动归集（得分率 < 60% 时写入错题本）
@@ -2221,7 +2318,7 @@ app.post('/api/answer', async (c) => {
         const chatGrade = String((state.values as any)?.grade ?? '7');
         const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
         autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore, afterExpectedScore);
-      } catch { /* 归集失败不影响主流程 */ }
+      } catch (e) { console.warn('[answer] 错题自动归集失败:', e instanceof Error ? e.message : e); }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂
       if (body.conversationId && body.answer) {
@@ -2243,7 +2340,7 @@ app.post('/api/answer', async (c) => {
           toolCallId: target.id,
           toolContent: safeToolContent,
         },
-      }), body.threadId, send);
+      }), body.threadId, send, ac.signal);
       await handleSessionExit(last, send, userId, body.threadId, subject, grade || undefined);
       await safeDeliverQuestion(
         question, send,
@@ -2252,12 +2349,97 @@ app.post('/api/answer', async (c) => {
         body.conversationId || undefined,
       );
       await emitReviewCompleteIfAny(last, send);
-      if (answerShouldIncrement) incrementUsage(userId);
       await send({ type: 'done' });
     } catch (err) {
-      try { try { await send({ type: 'error', message: err instanceof Error ? err.message : String(err) }); } catch {} } catch {}
+      if (userId && body.threadId) discardProficiencyCache(userId, body.threadId);
+      if (usageDecremented) refundUsage(userId);
+      try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[answer-sse] SSE send 最终失败:', e2); }
     }
   });
+});
+
+// ── 教育游戏 ─────────────────────────────────────────
+import { initQuestionPool, getPooledQuestion, getPooledQuestions } from './game.js';
+import { GameQuestionSchema } from './validation.js';
+
+/* ── 通用限流工具 ── */
+const RATE_LIMIT_MAX_ENTRIES = 10000;
+const RATE_LIMIT_CLEANUP_MS = 5 * 60_000; // 每 5 分钟清理
+
+function getRateLimitMap(): Map<string, number[]> {
+  if (!(globalThis as any).__rateLimitMap) {
+    (globalThis as any).__rateLimitMap = new Map<string, number[]>();
+    // 定期清理过期条目，防止内存泄漏
+    (globalThis as any).__rateLimitCleanupTimer = setInterval(() => {
+      const map: Map<string, number[]> = (globalThis as any).__rateLimitMap;
+      const cutoff = Date.now() - 60_000; // 清理超过 1 分钟未活动的条目
+      for (const [k, ts] of map) {
+        const active = ts.filter(t => t > cutoff);
+        if (active.length === 0) map.delete(k);
+        else map.set(k, active);
+      }
+    }, RATE_LIMIT_CLEANUP_MS);
+    // 防止定时器阻止进程退出
+    if ((globalThis as any).__rateLimitCleanupTimer?.unref) {
+      (globalThis as any).__rateLimitCleanupTimer.unref();
+    }
+  }
+  return (globalThis as any).__rateLimitMap;
+}
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const map = getRateLimitMap();
+  // 条目数超过上限时全局清理
+  if (map.size > RATE_LIMIT_MAX_ENTRIES) {
+    const cutoff = Date.now() - windowMs;
+    for (const [k, ts] of map) {
+      if (ts.every(t => t <= cutoff)) map.delete(k);
+    }
+  }
+  const now = Date.now();
+  const timestamps = map.get(key) ?? [];
+  timestamps.push(now);
+  const recent = timestamps.filter(t => now - t < windowMs);
+  map.set(key, recent);
+  return recent.length <= maxRequests;
+}
+
+/** GET /api/game/question — 获取一道游戏用选择题（优先从题目池秒出） */
+app.get('/api/game/question', async (c) => {
+  const clientIp = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+  if (!checkRateLimit(`rate:game:${clientIp}`, 8, 1000)) {
+    return c.json({ error: '请求过于频繁，请稍后再试' }, 429);
+  }
+
+  try {
+    const raw = { subject: c.req.query('subject') || 'math' };
+    const parsed = GameQuestionSchema.safeParse(raw);
+    const subject: string = parsed.success ? parsed.data.subject : 'math';
+    if (!parsed.success) console.warn('[game] 非法 subject 参数，降级为 math');
+    const question = getPooledQuestion(subject);
+    return c.json({ question });
+  } catch (err) {
+    console.error('[game] 出题失败:', sanitizeError(err));
+    return c.json({ error: '出题失败，请稍后重试' }, 500);
+  }
+});
+
+/** GET /api/game/questions — 批量获取游戏选择题 */
+app.get('/api/game/questions', async (c) => {
+  const clientIp = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+  if (!checkRateLimit(`rate:game:batch:${clientIp}`, 3, 1000)) {
+    return c.json({ error: '请求过于频繁，请稍后再试' }, 429);
+  }
+
+  try {
+    const subject = c.req.query('subject') || 'math';
+    const count = Math.min(Math.max(Number(c.req.query('count')) || 5, 1), 10);
+    const questions = getPooledQuestions(subject, count);
+    return c.json({ questions });
+  } catch (err) {
+    console.error('[game] 批量出题失败:', sanitizeError(err));
+    return c.json({ error: '出题失败，请稍后重试' }, 500);
+  }
 });
 
 const port = Number(process.env.PORT ?? 8787);

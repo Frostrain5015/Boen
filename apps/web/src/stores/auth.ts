@@ -15,7 +15,7 @@ setOnUnauthorized(() => {
 
 // ── User Profile types & helpers ────────────────────────────
 const PROFILE_KEY = 'boen_user_profile';
-export type UserProfile = { name: string; grade: Grade };
+export type UserProfile = { name: string; grade: Grade; avatar?: string };
 /** Map legacy gradeBand to a representative grade */
 const BAND_TO_GRADE: Record<string, Grade> = { primary: '3', middle: '8', undergrad: 'college' };
 
@@ -50,6 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isPremium = computed(() => subscription.value?.isPremium ?? false);
   const dailyRemaining = computed(() => subscription.value?.dailyRemaining ?? null);
   const pointsBalance = computed(() => currency.value?.balance ?? 0);
+
 
   // ── Actions ───────────────────────────────────────────────
 
@@ -250,6 +251,17 @@ export const useAuthStore = defineStore('auth', () => {
     showSetupDialog.value = false;
   }
 
+  /** 仅保存头像，不修改其他个人信息 */
+  function saveAvatar(avatar: string) {
+    const current = userProfile.value ?? { name: '用户', grade: '8' as Grade };
+    saveProfile({ ...current, avatar });
+  }
+
+  /** 当前生效的头像 URL：优先本地选择，其次 OAuth 头像，最后返回空 */
+  const selectedAvatar = computed(() => {
+    return userProfile.value?.avatar ?? currentUser.value?.picture ?? '';
+  });
+
   function openSetupDialog() {
     router.push('/setup');
   }
@@ -271,6 +283,8 @@ export const useAuthStore = defineStore('auth', () => {
     handleOAuthError,
     doLogout,
     saveProfile,
+    saveAvatar,
+    selectedAvatar,
     openSetupDialog,
     fetchSubscription,
     redeemCode,
