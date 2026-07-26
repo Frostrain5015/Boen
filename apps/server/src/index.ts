@@ -1356,8 +1356,8 @@ app.post('/api/exam', async (c) => {
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
   const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = Math.floor(Date.now() / 1000);
-  db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at) VALUES (?, ?, ?, ?, '', '[]', 0, ?, 'generating', ?)`).run(
-    id, userId, body.subject, body.grade, body.durationMinutes ?? 45, now,
+  db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at, updated_at) VALUES (?, ?, ?, ?, '', '[]', 0, ?, 'generating', ?, ?)`).run(
+    id, userId, body.subject, body.grade, body.durationMinutes ?? 45, now, now,
   );
   return c.json({ examId: id });
 });

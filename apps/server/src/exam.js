@@ -1671,7 +1671,7 @@ async function autoCollectMistakes(userId, examId, questions, answers, results, 
 export function createExamSession(userId, config, data) {
     const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const now = Math.floor(Date.now() / 1000);
-    db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at, blueprint, quality_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`).run(id, userId, config.subject, config.grade, data.title, JSON.stringify(data.questions), data.totalScore, data.durationMinutes, now, JSON.stringify(data.blueprint), JSON.stringify(data.qualityReport));
+    db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at, updated_at, blueprint, quality_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`).run(id, userId, config.subject, config.grade, data.title, JSON.stringify(data.questions), data.totalScore, data.durationMinutes, now, now, JSON.stringify(data.blueprint), JSON.stringify(data.qualityReport));
     return {
         id,
         userId,

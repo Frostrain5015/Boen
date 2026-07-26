@@ -164,12 +164,18 @@ db.exec(`
     answers TEXT,
     results TEXT,
     created_at INTEGER DEFAULT (unixepoch()),
+    updated_at INTEGER DEFAULT (unixepoch()),
     submitted_at INTEGER
   );
   CREATE INDEX IF NOT EXISTS idx_exam_user ON exam_sessions(user_id);
 `);
 const examSessionColumns = db.prepare(`PRAGMA table_info(exam_sessions)`).all();
 const hasExamSessionColumn = (name) => examSessionColumns.some((col) => col.name === name);
+if (!hasExamSessionColumn('updated_at')) {
+    // SQLite only allows constant defaults when adding a column to an existing table.
+    db.exec(`ALTER TABLE exam_sessions ADD COLUMN updated_at INTEGER DEFAULT 0`);
+    db.exec(`UPDATE exam_sessions SET updated_at = COALESCE(created_at, unixepoch())`);
+}
 if (!hasExamSessionColumn('blueprint')) {
     db.exec(`ALTER TABLE exam_sessions ADD COLUMN blueprint TEXT`);
 }
