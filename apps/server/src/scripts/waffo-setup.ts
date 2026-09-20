@@ -107,7 +107,8 @@ async function check() {
 
   // Webhook：列出已注册项
   const hookRes = await client.graphql.query<{
-    storeWebhooks: Array<{ id: string; url: string; channel: string; events: string; testMode: boolean }>;
+    // events 在 schema 里标成 String，实际返回的是字符串数组，两种都兜住
+    storeWebhooks: Array<{ id: string; url: string; channel: string; events: string | string[]; testMode: boolean }>;
   }>({
     query: `query ($storeId: String!) { storeWebhooks(storeId: $storeId) { id url channel events testMode } }`,
     variables: { storeId: STORE_ID },
@@ -116,7 +117,14 @@ async function check() {
   console.log(`\n  Webhook（已注册 ${hooks.length} 条）`);
   if (!hooks.length) console.log('  （空）');
   for (const h of hooks) {
-    const n = (() => { try { return (JSON.parse(h.events) as string[]).length; } catch { return '?'; } })();
+    const n = (() => {
+      const e = h.events as unknown;
+      if (Array.isArray(e)) return e.length;
+      if (typeof e === 'string') {
+        try { return (JSON.parse(e) as string[]).length; } catch { return e.split(',').filter(Boolean).length; }
+      }
+      return '?';
+    })();
     console.log(`  ${h.testMode ? '[test]' : '[prod]'} ${h.channel}  ${h.url}  ${n} 个事件  id=${h.id}`);
   }
 
