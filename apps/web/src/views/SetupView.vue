@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import type { Grade } from '@boen/shared';
-import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock } from 'lucide-vue-next';
+import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Moon, Star, Lock, CreditCard, LoaderCircle } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { getToken } from '@/services/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipCard from '@/components/MembershipCard.vue';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 const toast = useToast();
 
@@ -46,7 +47,48 @@ const redeemHeadline = computed(() => {
   return `您的${cardName}已续期`;
 });
 
-onMounted(() => { authStore.fetchCurrencyStatus(); });
+// ── 现金购卡（Waffo Pancake 收银台）──
+// 档位由服务端下发（未配置商品 ID 的档位不会出现），因此年卡建成后前端无需改动。
+const purchasablePlans = computed(() => authStore.subscription?.plans ?? []);
+const payEnabled = computed(() => authStore.subscription?.payEnabled ?? false);
+/** 正在创建收银台会话的档位 key，用于按钮 loading */
+const buyingPlan = ref<string | null>(null);
+
+/** 创建收银台会话并在新标签页打开；弹窗被拦截时降级为当前页跳转 */
+async function handleBuy(planKey: string) {
+  if (buyingPlan.value) return;
+  buyingPlan.value = planKey;
+  try {
+    const r = await authStore.createCheckout(planKey);
+    if (!r.ok || !r.checkoutUrl) {
+      toast.error(r.message ?? '创建支付会话失败');
+      return;
+    }
+    const opened = window.open(r.checkoutUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) window.location.href = r.checkoutUrl;
+    toast.info('已打开支付页面，完成后回到本页即可看到结果');
+  } finally {
+    buyingPlan.value = null;
+  }
+}
+
+onMounted(async () => {
+  authStore.fetchCurrencyStatus();
+
+  // 收银台支付完成回跳（successUrl 带 paid=1）：轮询确认发卡结果并播放开卡动画
+  if (route.query.paid !== '1') return;
+  router.replace({ path: '/setup' }); // 先清 query，避免刷新重复轮询
+  toast.info('正在确认支付结果…');
+  const ok = await authStore.pollSubscription();
+  if (!ok) {
+    toast.error('暂未收到支付确认，稍后刷新页面即可');
+    return;
+  }
+  redeemedTier.value = authStore.subscription?.tier === 'yearly' ? 'yearly' : 'monthly';
+  try {
+    await startRedeemAnimation({ wasPremium: false, oldTier: 'monthly', srcRect: null });
+  } catch { /* 动画失败不影响发卡结果 */ }
+});
 
 // ── 二级确认弹窗 ─────────────────────────────
 const confirmState = ref<{ title: string; message: string; notice?: string; onConfirm: () => Promise<void> } | null>(null);
@@ -446,6 +488,22 @@ function handleBack() {
             点击卡片翻面，可用兑换码或积分激活
           </p>
         </template>
+
+        <!-- 现金购卡：档位由服务端下发，未配置商品的档位不会渲染 -->
+        <div v-if="payEnabled && purchasablePlans.length" class="flex flex-wrap justify-center gap-2">
+          <button
+            v-for="p in purchasablePlans"
+            :key="p.key"
+            class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition-transform hover:scale-[1.03] active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed"
+            style="background: linear-gradient(180deg, var(--premium-gold), var(--premium-gold-strong)); box-shadow: 0 8px 20px -10px rgba(86, 64, 40, 0.6)"
+            :disabled="!!buyingPlan"
+            @click="handleBuy(p.key)"
+          >
+            <LoaderCircle v-if="buyingPlan === p.key" :size="14" class="animate-spin" />
+            <CreditCard v-else :size="14" />
+            {{ authStore.isPremium ? `现金续费 · ${p.name}` : `立即开通 · ${p.name}` }}
+          </button>
+        </div>
 
         <!-- ═══ 限时活动：每日登录领星月积分 ═══ -->
         <div class="clay clay-glass overflow-hidden" style="border: 1px solid var(--premium-gold)">

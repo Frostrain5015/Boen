@@ -18,7 +18,9 @@
     "backfill:style-skills": "tsx src/scripts/backfill-style-skills.ts",
     "skills:clean-rebuild": "tsx src/scripts/clean-rebuild-skills.ts",
     "gen:codes": "tsx src/scripts/gen-codes.ts",
-    "revoke:codes": "tsx src/scripts/revoke-codes.ts"
+    "revoke:codes": "tsx src/scripts/revoke-codes.ts",
+    "waffo:check": "tsx src/scripts/waffo-setup.ts --check",
+    "waffo:setup": "tsx src/scripts/waffo-setup.ts --test"
   },
   "dependencies": {
     "@boen/agent-core": "*",
@@ -27,6 +29,7 @@
     "@huggingface/transformers": "^4.2.0",
     "@langchain/core": "^0.3.0",
     "@langchain/langgraph-checkpoint-sqlite": "^0.1.5",
+    "@waffo/pancake-ts": "^0.23.0",
     "better-sqlite3": "^12.11.1",
     "dotenv": "^16.4.0",
     "hono": "^4.6.0",

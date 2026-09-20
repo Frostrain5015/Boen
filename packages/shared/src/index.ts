@@ -463,6 +463,17 @@ export interface SubscriptionStatus {
   dailyLimit: number | null;
   dailyUsed: number | null;
   dailyRemaining: number | null;
+  /** Waffo 现金购卡通道是否可用（未配置时为 false，前端隐藏购买入口） */
+  payEnabled?: boolean;
+  /** 当前可现金购买的星月卡档位 */
+  plans?: PurchasablePlan[];
+}
+
+/** 可通过 Waffo 收银台购买的星月卡档位 */
+export interface PurchasablePlan {
+  key: string;
+  name: string;
+  days: number;
 }
 
 /** 星月积分（局内货币）可兑换的会员产品 */

@@ -23,11 +23,18 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-mathlive': ['mathlive'],
-          'vendor-katex': ['katex', '@traptitech/markdown-it-katex'],
-          'vendor-markdown': ['markdown-it'],
-          'vendor-motion': ['@vueuse/motion', '@formkit/auto-animate'],
+        // Vite 8 底层换成 rolldown，manualChunks 只接受函数形式（对象形式会报
+        // "Invalid type: Expected Function but received Object" 直接构建失败）。
+        // 判定顺序要紧：@traptitech/markdown-it-katex 的路径里含 markdown-it，
+        // 必须先判 katex 分包，否则会被误归到 vendor-markdown。
+        manualChunks(id) {
+          const norm = id.replace(/\\/g, '/');
+          if (!norm.includes('/node_modules/')) return;
+          if (norm.includes('/node_modules/mathlive/')) return 'vendor-mathlive';
+          if (norm.includes('/node_modules/katex/') || norm.includes('/node_modules/@traptitech/markdown-it-katex/')) return 'vendor-katex';
+          if (norm.includes('/node_modules/markdown-it/')) return 'vendor-markdown';
+          if (norm.includes('/node_modules/@vueuse/motion/') || norm.includes('/node_modules/@formkit/auto-animate/')) return 'vendor-motion';
+          return;
         },
       },
     },

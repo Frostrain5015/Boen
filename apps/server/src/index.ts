@@ -63,6 +63,7 @@ import {
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { redeemForUser, grantMembershipDays } from './redeem.js';
 import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin } from './currency.js';
+import { createMembershipCheckout, handleWaffoWebhook, isWaffoEnabled, listPurchasablePlans, listPaymentOrders } from './waffo.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1472,6 +1473,9 @@ app.get('/api/subscription/status', async (c) => {
     dailyLimit: result.sub.isPremium ? null : FREE_DAILY_LIMIT,
     dailyUsed,
     dailyRemaining: result.sub.isPremium ? null : Math.max(0, FREE_DAILY_LIMIT - (dailyUsed ?? 0)),
+    // 现金购卡通道状态：前端据此决定是否渲染「立即开通」入口
+    payEnabled: isWaffoEnabled(),
+    plans: listPurchasablePlans(),
   });
 });
 
@@ -1600,6 +1604,74 @@ app.post('/api/currency/claim-free-card', async (c) => {
   } catch {
     return c.json({ error: 'claim_failed', message: '领取失败' }, 500);
   }
+});
+
+// ── Waffo Pancake 支付（星月卡现金购卡）──────────────────────
+// 与兑换码/积分并列的第三条发卡路径。前端拿 checkoutUrl 后新标签页打开收银台，
+// 支付结果由 Waffo 服务端回调 /api/payment/webhook 落库并发卡。
+const WAFFO_WEB_ORIGIN = process.env.WAFFO_WEB_ORIGIN ?? 'https://boen.frostrain.tech';
+
+/** 收银台支付完成后的回跳地址（带 paid=1 供前端触发状态轮询） */
+function paymentSuccessUrl(c: Context): string {
+  // 优先用请求来源（本地开发/多域名自动适配），否则回落生产域名
+  const origin = c.req.header('origin')?.replace(/\/$/, '');
+  return `${origin || WAFFO_WEB_ORIGIN}/setup?paid=1`;
+}
+
+/** POST /api/payment/checkout - 创建订阅收银台会话，返回 checkoutUrl */
+app.post('/api/payment/checkout', async (c) => {
+  if (!isWaffoEnabled()) {
+    return c.json({ error: 'unavailable', message: '支付功能未启用' }, 503);
+  }
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '请求过于频繁，请稍后再试' }, 429);
+
+  let planKey = '';
+  let buyerEmail: string | undefined;
+  try {
+    const body = await c.req.json<{ planKey?: string; email?: string }>();
+    planKey = String(body.planKey ?? '').trim();
+    buyerEmail = body.email ? String(body.email).trim() : undefined;
+  } catch { /* 忽略 body 解析错误，下方按无效档位处理 */ }
+
+  const result = await createMembershipCheckout({
+    userId,
+    planKey,
+    buyerEmail,
+    successUrl: paymentSuccessUrl(c),
+  });
+  if (!result.ok) {
+    const status = result.error === 'invalid_plan' ? 400 : result.error === 'rate_limited' ? 429 : 502;
+    return c.json({ error: result.error, message: result.message }, status);
+  }
+  return c.json({
+    sessionId: result.sessionId,
+    checkoutUrl: result.checkoutUrl,
+    expiresAt: result.expiresAt,
+  });
+});
+
+/**
+ * POST /api/payment/webhook - Waffo 支付结果回调。
+ * ⚠️ 必须用 c.req.text() 读原始体：任何 JSON 解析都会让 RSA-SHA256 验签失败。
+ * 除验签失败外一律回 200，避免业务异常引发 Waffo 重投风暴。
+ */
+app.post('/api/payment/webhook', async (c) => {
+  const raw = await c.req.text();
+  const sig = c.req.header('x-waffo-signature') ?? null;
+  const outcome = handleWaffoWebhook(raw, sig, {
+    invalidateSubscription: (userId) => invalidateSubscriptionCache(userId),
+  });
+  if (!outcome.ok) return c.text('Invalid signature', 401);
+  return c.json({ received: true, ...(outcome.detail ?? {}) });
+});
+
+/** GET /api/payment/orders - 当前用户的购卡订单流水 */
+app.get('/api/payment/orders', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ orders: listPaymentOrders(userId, 20) });
 });
 
 // ── Frost ID 认证代理（服务端换 token，浏览器只与本服务同源通信）──

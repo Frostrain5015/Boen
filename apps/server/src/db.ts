@@ -446,6 +446,66 @@ db.exec(`
   );
 `);
 
+// ── Waffo Pancake 支付（星月卡现金购卡通道）──────────────────
+// 与兑换码/积分并列的第三条发卡路径，最终都收敛到 grantMembershipDays()。
+// 三张表各司其职，共同保证「一笔钱只发一次卡」：
+//   1) payment_orders        —— 收银台会话流水：站内 user_id ↔ Waffo 订单的唯一关联，
+//                               也是 Webhook 反查用户的兜底索引（业务订单号/订单号/邮箱）。
+//   2) membership_grants     —— 发卡去重：按「Waffo 订单 × 计费周期」唯一，首期 activated
+//                               与 payment_succeeded 同时到达、续费重投都不会重复发卡。
+//   3) waffo_webhook_events  —— 投递去重与审计：按投递 ID(event.id) 唯一，status 区分
+//                               received/processed/failed，便于排查重投与处理失败。
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payment_orders (
+    session_id   TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL,
+    plan_key     TEXT NOT NULL,
+    product_id   TEXT NOT NULL,
+    currency     TEXT NOT NULL,
+    amount       TEXT,
+    external_id  TEXT NOT NULL,
+    order_id     TEXT,
+    checkout_url TEXT,
+    buyer_email  TEXT,
+    status       TEXT NOT NULL DEFAULT 'pending',
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_payment_orders_user ON payment_orders(user_id, created_at DESC);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_orders_external ON payment_orders(external_id);
+  CREATE INDEX IF NOT EXISTS idx_payment_orders_order_id ON payment_orders(order_id);
+  CREATE INDEX IF NOT EXISTS idx_payment_orders_email ON payment_orders(buyer_email);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS membership_grants (
+    grant_key  TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL,
+    days       INTEGER NOT NULL,
+    source     TEXT NOT NULL,
+    order_id   TEXT,
+    until      INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_membership_grants_user ON membership_grants(user_id, created_at DESC);
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS waffo_webhook_events (
+    id         TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    event_id   TEXT,
+    mode       TEXT,
+    order_id   TEXT,
+    status     TEXT NOT NULL DEFAULT 'received',
+    note       TEXT,
+    raw        TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  );
+  CREATE INDEX IF NOT EXISTS idx_waffo_events_order ON waffo_webhook_events(order_id);
+  CREATE INDEX IF NOT EXISTS idx_waffo_events_type ON waffo_webhook_events(event_type, created_at DESC);
+`);
+
 // ── 对话记忆摘要 ──────────────────────────────
 db.exec(`
   CREATE TABLE IF NOT EXISTS conversation_summaries (

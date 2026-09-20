@@ -164,6 +164,42 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * 创建 Waffo 收银台会话，返回支付页地址。
+   * 调用方负责用 window.open(url, '_blank', 'noopener,noreferrer') 新标签页打开 ——
+   * 用 location.href 会丢失商户页面状态（未保存的输入、滚动位置等）。
+   */
+  async function createCheckout(planKey: string): Promise<{ ok: boolean; checkoutUrl?: string; error?: string; message?: string }> {
+    const token = getToken();
+    if (!token) return { ok: false, error: 'unauthorized', message: '请先登录' };
+    try {
+      const res = await fetch('/api/payment/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ planKey, email: currentUser.value?.email }),
+      });
+      const data = (await res.json()) as { checkoutUrl?: string; error?: string; message?: string };
+      if (res.ok && data.checkoutUrl) return { ok: true, checkoutUrl: data.checkoutUrl };
+      return { ok: false, error: data.error, message: data.message ?? '创建支付会话失败' };
+    } catch {
+      return { ok: false, error: 'network', message: '网络错误，请稍后再试' };
+    }
+  }
+
+  /**
+   * 支付回跳后轮询订阅状态。Waffo 的 Webhook 到达有秒级延迟，
+   * 且服务端 5 分钟订阅缓存已被发卡逻辑主动失效，所以轮询能真实反映结果。
+   */
+  async function pollSubscription(timeoutMs = 24000, intervalMs = 1500): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      await fetchSubscription();
+      if (subscription.value?.isPremium) return true;
+      if (Date.now() >= deadline) return false;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  }
+
   function decrementDailyUsage() {
     if (subscription.value && !subscription.value.isPremium && subscription.value.dailyRemaining != null) {
       subscription.value = {
@@ -279,5 +315,7 @@ export const useAuthStore = defineStore('auth', () => {
     applyEarnedPoints,
     redeemMembershipWithPoints,
     claimDailyLogin,
+    createCheckout,
+    pollSubscription,
   };
 });
