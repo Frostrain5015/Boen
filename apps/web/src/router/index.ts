@@ -21,6 +21,9 @@ const router = createRouter({
     { path: '/mistakes', name: 'mistakes', component: () => import('@/views/MistakesView.vue') },
     // OAuth 回调：Frost ID 登录后的授权码回调页
     { path: '/auth/callback', name: 'authCallback', component: () => import('@/components/OAuthCallback.vue') },
+    // 法律文件：公开可访问，供用户及支付平台审核
+    { path: '/terms', name: 'terms', component: () => import('@/views/LegalView.vue') },
+    { path: '/privacy', name: 'privacy', component: () => import('@/views/LegalView.vue') },
     // 设置与会员：个人信息、学习配置、会员卡管理、积分兑换
     { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
   ],

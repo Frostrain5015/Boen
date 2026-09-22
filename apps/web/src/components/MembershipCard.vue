@@ -61,8 +61,10 @@ const rootEl = ref<HTMLDivElement | null>(null);
 
 const isMonthly = computed(() => props.type === 'monthly');
 const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
-const cardPrice = computed(() => (isMonthly.value ? '¥18/月' : '¥188/年'));
-const cardOriginalPrice = computed(() => (isMonthly.value ? '' : '原价¥238.8'));
+// 现金购买目前仅开放 Waffo 的 USD 3.00/月皓月卡；星耀卡暂由兑换码激活。
+// 前台标价必须与收银台商品保持一致，避免支付审核和用户结账时产生歧义。
+const cardPrice = computed(() => (isMonthly.value ? '$3/月' : '兑换码激活'));
+const cardOriginalPrice = computed(() => '');
 
 // 持卡人名字
 const holderDisplay = computed(() => {

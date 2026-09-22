@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
@@ -16,6 +16,7 @@ import { useFavicon } from '@/composables/useFavicon';
 const authStore = useAuthStore();
 const uiStore = useUiStore();
 const router = useRouter();
+const isPublicLegalRoute = computed(() => router.currentRoute.value.name === 'terms' || router.currentRoute.value.name === 'privacy');
 
 // 类课堂模式：离开聊天页时自动退出
 watch(() => router.currentRoute.value.name, (name) => {
@@ -49,9 +50,12 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- 服务条款与隐私政策必须允许未登录访问，便于用户阅读及支付平台审核 -->
+  <router-view v-if="isPublicLegalRoute" />
+
   <!-- OAuth 回调页面 -->
   <OAuthCallback
-    v-if="authStore.isOAuthCallback"
+    v-else-if="authStore.isOAuthCallback"
     @success="authStore.handleOAuthSuccess()"
     @error="authStore.handleOAuthError()"
   />

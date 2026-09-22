@@ -79,6 +79,8 @@ async function handleLogin() {
         <span class="text-xs leading-relaxed text-[var(--ink-soft)]/80">
           我已阅读并同意
           <button type="button" @click.stop="showTos = true" class="text-[var(--accent-strong)] underline hover:opacity-80">服务条款</button>
+          和
+          <router-link to="/privacy" target="_blank" class="text-[var(--accent-strong)] underline hover:opacity-80">隐私政策</router-link>
         </span>
       </label>
     </div>
