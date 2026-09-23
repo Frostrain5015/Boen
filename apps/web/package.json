@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:release": "node ../../scripts/check-release.mjs && vue-tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

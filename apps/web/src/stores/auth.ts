@@ -68,27 +68,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** 兑换码开通会员：成功后写入最新订阅状态（后端已即时失效缓存） */
-  async function redeemCode(code: string): Promise<{ ok: boolean; error?: string; message?: string }> {
-    const token = getToken();
-    if (!token) return { ok: false, error: 'unauthorized', message: '请先登录' };
-    try {
-      const res = await fetch('/api/subscription/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ code }),
-      });
-      const data = (await res.json()) as Partial<SubscriptionStatus> & { error?: string; message?: string };
-      if (res.ok) {
-        subscription.value = data as SubscriptionStatus;
-        return { ok: true };
-      }
-      return { ok: false, error: data.error, message: data.message };
-    } catch {
-      return { ok: false, error: 'network', message: '网络错误，请稍后再试' };
-    }
-  }
-
   /** 拉取星月积分状态（余额/今日已赚/可兑换产品） */
   async function fetchCurrencyStatus() {
     try {
@@ -147,7 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
       });
       const data = (await res.json()) as Partial<SubscriptionStatus> & { balance?: number; error?: string; message?: string };
       if (res.ok) {
-        subscription.value = data as SubscriptionStatus;
+        await fetchSubscription();
         if (typeof data.balance === 'number' && currency.value) {
           currency.value = { ...currency.value, balance: data.balance };
         } else {
@@ -176,7 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await fetch('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ planKey, email: currentUser.value?.email }),
+        body: JSON.stringify({ planKey, email: currentUser.value?.email, acceptedTermsVersion: '1.1' }),
       });
       const data = (await res.json()) as { checkoutUrl?: string; error?: string; message?: string };
       if (res.ok && data.checkoutUrl) return { ok: true, checkoutUrl: data.checkoutUrl };
@@ -194,7 +173,7 @@ export const useAuthStore = defineStore('auth', () => {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       await fetchSubscription();
-      if (subscription.value?.isPremium) return true;
+      if (subscription.value?.membership.source === 'waffo') return true;
       if (Date.now() >= deadline) return false;
       await new Promise((r) => setTimeout(r, intervalMs));
     }
@@ -309,7 +288,6 @@ export const useAuthStore = defineStore('auth', () => {
     saveProfile,
     openSetupDialog,
     fetchSubscription,
-    redeemCode,
     decrementDailyUsage,
     fetchCurrencyStatus,
     applyEarnedPoints,

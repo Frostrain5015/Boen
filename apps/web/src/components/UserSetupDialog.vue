@@ -3,6 +3,9 @@ import { ref, computed } from 'vue';
 import type { Grade } from '@boen/shared';
 import { Sparkles, User, GraduationCap, X } from 'lucide-vue-next';
 import BoenSelect from '@/components/BoenSelect.vue';
+import { getToken } from '@/services/auth';
+import { useAuthStore } from '@/stores/auth';
+const authStore = useAuthStore();
 
 const props = defineProps<{
   profile: { name: string; grade: Grade } | null;
@@ -38,7 +41,7 @@ function handleSave() {
   // 通知服务器切换模型
   fetch('/api/model/switch', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}` },
     body: JSON.stringify({ provider: modelProvider.value }),
   }).catch(() => {});
 }
@@ -106,6 +109,7 @@ function handleSave() {
               </button>
               <button
                 @click="modelProvider = 'deepseek-pro'"
+                :disabled="!authStore.isPremium"
                 class="flex flex-1 items-center justify-center gap-1 rounded-xl border-1.5 py-2 px-3 font-display text-xs font-bold transition-all active:scale-[0.97]"
                 :class="modelProvider === 'deepseek-pro' ? 'border-[#E8A317] bg-[#fef3d2] text-[#b8730d]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[#E8A317]'"
               >

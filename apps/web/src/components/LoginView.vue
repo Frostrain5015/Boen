@@ -43,6 +43,7 @@ async function handleLogin() {
       <div class="text-center">
         <h1 class="brand-text text-3xl font-bold">博文 Boen</h1>
         <p class="mt-2 text-sm text-[var(--ink-soft)]">AI 原生时代的教育智能体</p>
+        <router-link to="/pricing" class="mt-3 inline-block text-xs text-[var(--accent-strong)] underline underline-offset-4">了解博文 · 功能与定价</router-link>
       </div>
 
       <!-- 登录按钮 -->
@@ -81,6 +82,7 @@ async function handleLogin() {
           <button type="button" @click.stop="showTos = true" class="text-[var(--accent-strong)] underline hover:opacity-80">服务条款</button>
           和
           <router-link to="/privacy" target="_blank" class="text-[var(--accent-strong)] underline hover:opacity-80">隐私政策</router-link>
+          <span class="block mt-1">未满 14 岁须由监护人同意并指导使用。</span>
         </span>
       </label>
     </div>

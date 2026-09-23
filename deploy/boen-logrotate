@@ -1,0 +1,10 @@
+/root/.pm2/logs/boen-server-out.log /root/.pm2/logs/boen-server-error.log {
+    daily
+    rotate 180
+    maxage 180
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}

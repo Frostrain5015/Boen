@@ -9,7 +9,7 @@ const kind = computed<'terms' | 'privacy'>(() => route.name === 'privacy' ? 'pri
 </script>
 
 <template>
-  <div class="relative min-h-full overflow-y-auto">
+  <div class="relative h-full overflow-y-auto">
     <div class="app-bg" aria-hidden="true"></div>
     <div class="app-grain" aria-hidden="true"></div>
 
@@ -20,6 +20,7 @@ const kind = computed<'terms' | 'privacy'>(() => route.name === 'privacy' ? 'pri
           返回博文
         </router-link>
         <div class="flex items-center gap-4">
+          <router-link to="/pricing" class="text-[var(--ink-soft)]">功能与定价</router-link>
           <router-link to="/terms" class="text-[var(--ink-soft)] hover:text-[var(--ink)]" active-class="!text-[var(--accent-strong)] font-semibold">
             服务条款
           </router-link>

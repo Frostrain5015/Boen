@@ -16,7 +16,7 @@ import { useFavicon } from '@/composables/useFavicon';
 const authStore = useAuthStore();
 const uiStore = useUiStore();
 const router = useRouter();
-const isPublicLegalRoute = computed(() => router.currentRoute.value.name === 'terms' || router.currentRoute.value.name === 'privacy');
+const isPublicLegalRoute = computed(() => ['terms', 'privacy', 'pricing'].includes(String(router.currentRoute.value.name)));
 
 // 类课堂模式：离开聊天页时自动退出
 watch(() => router.currentRoute.value.name, (name) => {
@@ -50,6 +50,8 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="flex h-full flex-col">
+  <div class="relative min-h-0 flex-1">
   <!-- 服务条款与隐私政策必须允许未登录访问，便于用户阅读及支付平台审核 -->
   <router-view v-if="isPublicLegalRoute" />
 
@@ -88,6 +90,14 @@ onMounted(() => {
 
     <!-- 新手引导（首次登录完成设置后在对话页触发） -->
     <OnboardingTour />
+  </div>
+
+  </div>
+  <footer aria-label="网站信息" class="relative z-20 flex shrink-0 items-center justify-center gap-5 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">
+    <router-link to="/pricing" class="hover:text-[var(--accent-strong)] focus-visible:underline">功能与定价</router-link>
+    <router-link to="/terms" class="hover:text-[var(--accent-strong)] focus-visible:underline">服务条款</router-link>
+    <router-link to="/privacy" class="hover:text-[var(--accent-strong)] focus-visible:underline">隐私政策</router-link>
+  </footer>
   </div>
 
   <!-- Toast 通知 & 确认弹窗（全局常驻） -->

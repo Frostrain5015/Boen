@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { Moon, Star, Sparkles, Ticket, ArrowRight, LoaderCircle, Lock } from 'lucide-vue-next';
+import { Moon, Star, Sparkles, Lock } from 'lucide-vue-next';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -10,22 +10,9 @@ interface Props {
   size?: 'sm' | 'md' | 'lg';
   /** 是否在卡面上显示价格（广告页显示，已有卡不显示） */
   showPrice?: boolean;
-  /** 背面是否内嵌兑换码输入框 */
-  redeemable?: boolean;
-  /** 兑换码（v-model:redeemCode） */
-  redeemCode?: string;
-  /** 兑换请求进行中 */
-  redeeming?: boolean;
-  /** 输入框提示文案 */
-  redeemPlaceholder?: string;
-  /** 未解锁态：正面叠加磨砂灰罩 + “未解锁”锁徽（无卡广告态用） */
   locked?: boolean;
-  /** 可免费领取（将锁徽改为”🎁免费领取”，点击触发 claim-free 事件） */
-  claimable?: boolean;
-  /** 星月积分余额（传入即在该卡背面右下角显示积分兑换按钮，仅皓月卡） */
-  pointsBalance?: number;
-  /** 积分兑换进行中 */
-  pointsRedeeming?: boolean;
+  statusLabel?: string;
+
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,36 +21,17 @@ const props = withDefaults(defineProps<Props>(), {
   showBack: false,
   size: 'md',
   showPrice: true,
-  redeemable: false,
-  redeemCode: '',
-  redeeming: false,
-  redeemPlaceholder: '输入兑换码',
   locked: false,
-  claimable: false,
-  pointsBalance: undefined,
-  pointsRedeeming: false,
+  statusLabel: '',
 });
-
-const emit = defineEmits<{
-  (e: 'update:redeemCode', value: string): void;
-  (e: 'redeem'): void;
-  (e: 'redeem-points'): void;
-  (e: 'claim-free'): void;
-}>();
-
-function onRedeemInput(e: Event) {
-  emit('update:redeemCode', (e.target as HTMLInputElement).value);
-}
 
 const isFlipped = ref(props.showBack);
 const cardRef = ref<HTMLDivElement | null>(null);
 const rootEl = ref<HTMLDivElement | null>(null);
 
 const isMonthly = computed(() => props.type === 'monthly');
-const cardName = computed(() => (isMonthly.value ? '皓月卡' : '星耀卡'));
-// 现金购买目前仅开放 Waffo 的 USD 3.00/月皓月卡；星耀卡暂由兑换码激活。
-// 前台标价必须与收银台商品保持一致，避免支付审核和用户结账时产生歧义。
-const cardPrice = computed(() => (isMonthly.value ? '$3/月' : '兑换码激活'));
+const cardName = computed(() => (isMonthly.value ? '星月卡' : '星耀卡'));
+const cardPrice = computed(() => (isMonthly.value ? '$3/月' : '历史会员'));
 const cardOriginalPrice = computed(() => '');
 
 // 持卡人名字
@@ -91,7 +59,7 @@ const fontSizes = {
 };
 
 function handleMouseMove(e: MouseEvent) {
-  if (!cardRef.value || isFlipped.value) return;
+  if (!cardRef.value || isFlipped.value || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const rect = cardRef.value.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width - 0.5;
   const y = (e.clientY - rect.top) / rect.height - 0.5;
@@ -104,6 +72,7 @@ function handleMouseLeave() {
 }
 
 function flip() {
+  handleMouseLeave();
   isFlipped.value = !isFlipped.value;
 }
 
@@ -123,6 +92,12 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
       :class="sizeClasses[size]"
       @mousemove="handleMouseMove"
       @mouseleave="handleMouseLeave"
+      role="button"
+      tabindex="0"
+      :aria-label="`${cardName}，${statusLabel || (locked ? '尚未开通' : '会员卡')}，按回车翻转查看权益`"
+      :aria-pressed="isFlipped"
+      @keydown.enter.prevent="flip"
+      @keydown.space.prevent="flip"
       @click="flip"
     >
     <div
@@ -160,7 +135,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
         <!-- 底部：持卡人 + 到期日 -->
         <div class="card-footer" :class="fontSizes[size].desc">
           <span v-if="holderDisplay" class="card-footer-holder">{{ holderDisplay }}</span>
-          <span v-else />
+          <span v-else>{{ statusLabel }}</span>
           <span v-if="expiresDate" class="card-footer-expires">{{ expiresDate }}到期</span>
         </div>
 
@@ -170,12 +145,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
         <!-- 未解锁遮罩：磨砂灰罩 + 锁徽；pointer-events:none 不挡翻面 -->
         <div v-if="locked" class="card-lock-overlay" aria-hidden="true">
           <div class="card-lock-veil" />
-          <!-- 可免费领取状态：独立按钮，点击触发 claim-free（不再翻面） -->
-          <button v-if="claimable && isMonthly" class="card-claim-badge" @click.stop="emit('claim-free')">
-            <span>🎁 免费领取</span>
-          </button>
-          <!-- 普通锁徽 -->
-          <div v-else class="card-lock-badge">
+          <div class="card-lock-badge">
             <span class="card-lock-ring"><Lock :size="size === 'sm' ? 12 : 14" /></span>
             <span class="card-lock-text">未解锁</span>
           </div>
@@ -190,49 +160,13 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             {{ cardName }}权益
           </div>
           <ul class="back-benefits" :class="fontSizes[size].desc">
-            <li><span class="benefit-dot" />DeepSeek V4 {{ isMonthly ? 'Flash' : 'Pro' }} 大模型</li>
+            <li><span class="benefit-dot" />DeepSeek V4 Pro 大模型</li>
             <li><span class="benefit-dot" />全题型考试</li>
             <li><span class="benefit-dot" />错题智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>
 
-          <!-- 背面底部：兑换码 + 积分按钮共享一条底线 -->
-          <div v-if="redeemable" class="back-bottom" @click.stop>
-            <Ticket class="back-redeem-icon" :size="14" />
-            <input
-              class="back-redeem-input"
-              :value="redeemCode"
-              @input="onRedeemInput"
-              @keydown.enter="emit('redeem')"
-              @click.stop
-              :disabled="redeeming"
-              :placeholder="redeemPlaceholder"
-              maxlength="48"
-              autocomplete="off"
-              spellcheck="false"
-            />
-            <button
-              class="back-redeem-btn"
-              @click.stop="emit('redeem')"
-              :disabled="redeeming || !redeemCode.trim()"
-              :title="redeemPlaceholder"
-            >
-              <LoaderCircle v-if="redeeming" :size="14" class="back-redeem-spin" />
-              <ArrowRight v-else :size="14" />
-            </button>
-            <!-- 积分兑换圆形按钮（同提交按钮样式，仅皓月卡） -->
-            <button
-              v-if="props.pointsBalance !== undefined && isMonthly"
-              class="back-points-btn"
-              :class="{ 'back-points-btn-ready': props.pointsBalance >= 2000, 'back-points-btn-short': props.pointsBalance < 2000 }"
-              @click.stop="emit('redeem-points')"
-              :disabled="props.pointsBalance < 2000 || props.pointsRedeeming"
-              :title="props.pointsBalance >= 2000 ? '积分兑换皓月卡' : `还差${2000 - props.pointsBalance}分`"
-            >
-              <LoaderCircle v-if="props.pointsRedeeming" :size="14" class="back-redeem-spin" />
-              <Sparkles v-else :size="14" />
-            </button>
-          </div>
+          <p class="mt-auto pt-3 text-xs opacity-70">点击卡面返回 · 订阅管理在卡片下方</p>
         </div>
       </div>
       </div>
@@ -246,6 +180,13 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
 </template>
 
 <style scoped>
+.membership-card-outer { width: 100%; }
+.membership-card-container { max-width: 100%; aspect-ratio: 400 / 252; height: auto; }
+.membership-card-container:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 18px; }
+@media (prefers-reduced-motion: reduce) {
+  .membership-card-outer *, .membership-card-outer *::before, .membership-card-outer *::after { animation: none !important; transition: none !important; }
+}
+
 .membership-card-outer {
   display: inline-flex;
   flex-direction: column;
@@ -720,119 +661,4 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
   background: #b07dd6;
 }
 
-/* ── 背面底部（兑换码 + 积分按钮共享一条底线）── */
-.back-bottom {
-  margin-top: auto;       /* 贴卡片底部 */
-  padding: 9px 0 4px;
-  cursor: default;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.18);
-  transition: border-color 0.2s ease;
-}
-.back-bottom:focus-within {
-  border-bottom-color: currentColor;
-}
-
-.back-redeem-icon {
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-
-.back-redeem-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-family: var(--font-body);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  color: inherit;
-  padding: 1px 0;
-}
-.back-redeem-input::placeholder {
-  color: currentColor;
-  opacity: 0.45;
-  letter-spacing: 0.02em;
-}
-.back-redeem-input:disabled {
-  opacity: 0.6;
-}
-
-.back-redeem-btn {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  color: #fff;
-  transition: opacity 0.2s ease, transform 0.15s ease;
-}
-.back-redeem-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.back-redeem-btn:not(:disabled):active {
-  transform: scale(0.9);
-}
-
-.card-monthly-back .back-redeem,
-.card-monthly-back .back-redeem-icon {
-  color: #6a6560;
-}
-.card-monthly-back .back-redeem-btn {
-  background: linear-gradient(180deg, #9a948c 0%, #7a756e 100%);
-}
-
-.card-yearly-back .back-redeem,
-.card-yearly-back .back-redeem-icon {
-  color: #5c3a80;
-}
-.card-yearly-back .back-redeem-btn {
-  background: linear-gradient(180deg, #9b72bf 0%, #7b4da8 100%);
-}
-
-.back-redeem-spin {
-  animation: back-redeem-spin 0.8s linear infinite;
-}
-@keyframes back-redeem-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ── 积分兑换圆形按钮（同提交按钮样式）── */
-.back-points-btn {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  color: #fff;
-  transition: opacity 0.2s ease, transform 0.15s ease;
-}
-.back-points-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.back-points-btn:not(:disabled):active { transform: scale(0.9); }
-
-/* 余额足 → 同提交按钮梯度色，略提亮以示可用 */
-.card-monthly-back .back-points-btn-ready {
-  background: linear-gradient(180deg, #9a948c, #7a756e);
-}
-.card-yearly-back .back-points-btn-ready {
-  background: linear-gradient(180deg, #9b72bf, #7b4da8);
-}
-
-/* 余额不足 → 灰掉 */
-.card-monthly-back .back-points-btn-short {
-  background: linear-gradient(180deg, #9a948c, #7a756e);
-}
-.card-yearly-back .back-points-btn-short {
-  background: linear-gradient(180deg, #9b72bf, #7b4da8);
-}
 </style>

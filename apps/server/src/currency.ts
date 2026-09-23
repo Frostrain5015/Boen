@@ -1,5 +1,5 @@
 import db from './db.js';
-import { grantMembershipDays } from './redeem.js';
+import { addReward } from './membership.js';
 
 // ── 星月积分（局内货币）经济参数 ─────────────────────────────
 // 积分 = LLM评分产出(主) + 星级跨越奖励(额外)
@@ -18,7 +18,7 @@ export const STAR_BONUS_RATE = 2;
 
 /** 积分可兑换的会员产品。仅保留皓月卡（月卡），星耀卡为现金专属。 */
 export const CURRENCY_PRODUCTS = {
-  month: { key: 'month', name: '皓月卡', days: 30, cost: 2000 },
+  month: { key: 'month', name: '30 天奖励会员', days: 30, cost: 2000 },
 } as const;
 
 export type CurrencyProductKey = keyof typeof CURRENCY_PRODUCTS;
@@ -207,7 +207,7 @@ export function earnPoints(
 export type RedeemMembershipError = 'invalid_product' | 'insufficient';
 
 export type RedeemMembershipResult =
-  | { ok: true; balance: number; until: number; days: number; tier: 'monthly' | 'yearly' }
+  | { ok: true; balance: number; until: number | null; days: number; tier: 'monthly' | 'yearly' }
   | { ok: false; error: RedeemMembershipError; balance: number; cost?: number };
 
 /**
@@ -239,8 +239,8 @@ export function redeemMembershipWithPoints(userId: string, productKey: string): 
         VALUES (?, 'spend', ?, ?, ?, ?)
       `).run(userId, -product.cost, balanceAfter, `redeem_${product.key}`, product.key);
 
-      const { until, tier } = grantMembershipDays(userId, product.days);
-      return { ok: true, balance: balanceAfter, until, days: product.days, tier };
+      const until = addReward(db, userId, product.days * 86400, crypto.randomUUID());
+      return { ok: true, balance: balanceAfter, until, days: product.days, tier: 'monthly' };
     })();
   } catch {
     const cur = getCurrencyStatus(userId);

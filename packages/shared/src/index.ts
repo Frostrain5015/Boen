@@ -99,7 +99,7 @@ export interface GradingResult {
   /** 填空题逐空详细匹配信息（含层级，供 Level 3 LLM 语义判定） */
   perBlankDetails?: Array<{
     matched: boolean;
-    level: 1 | 2 | 'miss';
+    level: 1 | 2 | 'miss' | 'llm';
     userNorm: string;
     acceptedNorms: string[];
   }>;
@@ -455,7 +455,16 @@ export interface ExamQualityReport {
 // 订阅系统
 // ─────────────────────────────────────────────────────────────
 
-export interface SubscriptionStatus {
+export type BillingStatus = 'none' | 'pending' | 'trialing' | 'active' | 'canceling' | 'past_due' | 'canceled';
+export interface MembershipDetails {
+  membership: { active: boolean; source: 'waffo' | 'legacy' | 'reward' | 'none'; accessEndsAt: number | null; legacyTier: 'monthly' | 'yearly' | null };
+  billing: { status: BillingStatus; currentPeriodStart: number | null; currentPeriodEnd: number | null;
+    renewsAt: number | null; cancelAtPeriodEnd: boolean; amount: string; currency: string;
+    trialEligible: boolean; checkoutAllowed: boolean; portalUrl: string };
+  rewards: { bankedSeconds: number; activeUntil: number | null };
+}
+
+export interface SubscriptionStatus extends MembershipDetails {
   tier: 'free' | 'monthly' | 'yearly';
   isPremium: boolean;
   expiresAt: number | null;

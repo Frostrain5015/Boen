@@ -24,6 +24,7 @@ const router = createRouter({
     // 法律文件：公开可访问，供用户及支付平台审核
     { path: '/terms', name: 'terms', component: () => import('@/views/LegalView.vue') },
     { path: '/privacy', name: 'privacy', component: () => import('@/views/LegalView.vue') },
+    { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
     // 设置与会员：个人信息、学习配置、会员卡管理、积分兑换
     { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
   ],

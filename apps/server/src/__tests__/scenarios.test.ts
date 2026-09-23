@@ -21,7 +21,7 @@ interface Step {
 interface Scenario {
   name: string;
   mode: string;
-  steps: Step[];
+  steps: string;
   expectMinStars: number;
   expectMaxStars: number;
 }
@@ -68,7 +68,7 @@ describe('结构化学习场景精算', () => {
       }
 
       const stars = starVal(rating);
-      expect(stars).withContext(
+      expect(stars,
         `mode=${sc.mode}, steps=${sc.steps}: rating=${Math.round(rating)}, stars=${stars}`,
       ).toBeGreaterThanOrEqual(sc.expectMinStars);
       expect(stars).toBeLessThanOrEqual(sc.expectMaxStars);

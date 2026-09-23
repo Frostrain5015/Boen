@@ -62,11 +62,11 @@ describe('压力测试：纯数学随机序列', () => {
           );
 
           // 不变量断言
-          expect(result.newRating).withContext(
+          expect(result.newRating,
             `mode=${mode} seq=${seq} q=${q}: rating out of range`,
           ).toBeGreaterThanOrEqual(0);
           expect(result.newRating).toBeLessThanOrEqual(100);
-          expect(result.newSigma).withContext(
+          expect(result.newSigma,
             `sigma out of range: ${result.newSigma}`,
           ).toBeGreaterThanOrEqual(3);
           expect(result.newSigma).toBeLessThanOrEqual(25);

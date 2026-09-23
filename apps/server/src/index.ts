@@ -1,4 +1,8 @@
 import { dirname, resolve, join } from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { scopedResource } from './request-scope.js';
+import { initPrivacyRetention, runPrivacyRetention } from './privacy-retention.js';
+import { ASSET_ROOT, DATA_DIR } from './paths.js';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { Hono, type Context } from 'hono';
@@ -61,9 +65,9 @@ import {
   updateMistake,
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
-import { redeemForUser, grantMembershipDays } from './redeem.js';
+import { membershipDetails } from './membership.js';
 import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin } from './currency.js';
-import { createMembershipCheckout, handleWaffoWebhook, isWaffoEnabled, listPurchasablePlans, listPaymentOrders } from './waffo.js';
+import { createMembershipCheckout, handleWaffoWebhook, isWaffoEnabled, listPurchasablePlans, listPaymentOrders, manageSubscription, reconcileMembership } from './waffo.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -97,10 +101,10 @@ function createModel(
     timeout: opts?.timeout,
   });
 }
-let currentProvider = 'default';
-let model = createModel(currentProvider);
+const providerScope = new AsyncLocalStorage<string>();
+const model = scopedResource(providerScope, (provider) => createModel(provider));
 // 出卷沿用用户所选档位，但开启 thinking（延迟被异步进度条吸收）
-let examModel = createModel(currentProvider, EXAM_MODEL_OPTS);
+const examModel = scopedResource(providerScope, (provider) => createModel(provider, EXAM_MODEL_OPTS));
 
 // LangGraph 对话状态持久化到 SQLite（重启不丢失）
 const checkpointer = new SqliteSaver(db);
@@ -112,15 +116,11 @@ try { rebuildFtsIndex(); } catch { /* FTS 表可能尚不存在，忽略 */ }
 // 注入查询改写模型
 setRewriteModel(model);
 
-let graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
+const graph = scopedResource(providerScope, (provider) => buildBoenGraph(createModel(provider), { retrieveCurriculum, lookupKnowledgePoint }, checkpointer));
 
 /** 切换模型并重建 LangGraph 图 */
-function switchModel(provider: string) {
-  currentProvider = provider;
-  model = createModel(provider);
-  examModel = createModel(provider, EXAM_MODEL_OPTS);
-  setRewriteModel(model);
-  graph = buildBoenGraph(model, { retrieveCurriculum, lookupKnowledgePoint }, checkpointer);
+function switchModel(userId: string, provider: string) {
+  db.prepare('INSERT INTO user_model_preferences(user_id,provider) VALUES (?,?) ON CONFLICT(user_id) DO UPDATE SET provider=excluded.provider').run(userId, provider);
   return provider;
 }
 
@@ -130,8 +130,6 @@ const FROST_ID_CLIENT_ID = process.env.FROST_ID_CLIENT_ID ?? 'boen-client';
 const FROST_ID_CLIENT_SECRET = process.env.FROST_ID_CLIENT_SECRET ?? '';
 
 // 兑换码签名密钥（自描述签名码用，仅存服务端 .env）。未配置则兑换接口拒绝服务。
-const REDEEM_CODE_SECRET = process.env.REDEEM_CODE_SECRET ?? '';
-if (!REDEEM_CODE_SECRET) console.warn('[redeem] REDEEM_CODE_SECRET 未配置，兑换码功能将拒绝服务');
 
 // 用 Bearer token 经 Frost ID 内网 userinfo 解析出用户 id（sub），带短缓存避免每请求开销
 const userIdCache = new Map<string, { sub: string; exp: number; subscription?: { tier: string; isPremium: boolean; expiresAt: number | null; activatedAt: number | null } }>();
@@ -220,34 +218,15 @@ interface SubscriptionInfo {
 
 /** 解析用户 ID 并查询订阅状态（复用 userIdCache，5 分钟 TTL） */
 async function resolveSubscription(c: Context): Promise<{ userId: string; sub: SubscriptionInfo } | null> {
-  const authz = c.req.header('authorization');
-  if (!authz?.startsWith('Bearer ')) return null;
-  const token = authz.slice(7);
-  const cached = userIdCache.get(token);
-  // 若缓存中有 userId 且有订阅信息且未过期，直接返回
-  if (cached && cached.exp > Date.now() && cached.subscription) {
-    return { userId: cached.sub, sub: cached.subscription as SubscriptionInfo };
-  }
-  // 先拿到 userId（可能已缓存但未含 subscription）
   const userId = await resolveUserId(c);
   if (!userId) return null;
-  // 查订阅表
-  const row = db.prepare('SELECT tier, expires_at, activated_at FROM subscriptions WHERE user_id = ?').get(userId) as
-    | { tier: string; expires_at: number | null; activated_at: number | null }
-    | undefined;
-  const now = Math.floor(Date.now() / 1000);
-  const sub: SubscriptionInfo = {
-    tier: (row?.tier === 'monthly' ? 'monthly' : row?.tier === 'yearly' ? 'yearly' : 'free') as 'free' | 'monthly' | 'yearly',
-    isPremium: (row?.tier === 'monthly' || row?.tier === 'yearly') && row?.expires_at != null && row.expires_at > now,
-    expiresAt: row?.expires_at ?? null,
-    activatedAt: row?.activated_at ?? null,
-  };
-  // 回写缓存
-  const entry = userIdCache.get(token);
-  if (entry) {
-    entry.subscription = sub;
-  }
-  return { userId, sub };
+  // Resolve access against the clock on every request; a cached boolean can outlive its period.
+  const details = membershipDetails(db, userId);
+  return { userId, sub: {
+    tier: details.membership.active ? details.membership.legacyTier ?? 'monthly' : 'free',
+    isPremium: details.membership.active, expiresAt: details.membership.accessEndsAt,
+    activatedAt: details.billing.currentPeriodStart,
+  } };
 }
 
 /** 守卫：要求 premium 订阅，否则返回 403 */
@@ -850,24 +829,33 @@ function sanitizeConversationQuestionMessage<T extends { role: string; content: 
 }
 
 const app = new Hono();
+initPrivacyRetention(db);
 app.use('/api/*', cors());
+app.use('/api/*', async (c, next) => {
+  const userId = c.req.header('authorization')?.startsWith('Bearer ') ? await resolveUserId(c) : null;
+  if (userId && db.prepare('SELECT 1 FROM privacy_deletion_requests WHERE user_id=?').get(userId)) {
+    return c.json({ error: 'account_deletion_requested', message: '该账户的数据删除申请正在处理或已经完成，请联系支持。' }, 410);
+  }
+  const preference = userId ? db.prepare('SELECT provider FROM user_model_preferences WHERE user_id=?').get(userId) as { provider: string } | undefined : undefined;
+  const provider = userId && preference?.provider === 'deepseek-pro' && membershipDetails(db, userId).membership.active ? 'deepseek-pro' : 'default';
+  return providerScope.run(provider, next);
+});
 
 app.get('/api/health', (c) => c.json({ ok: true, provider: 'deepseek', model: (model as any)?.modelName ?? 'deepseek-v4-flash' }));
 
 // ── 模型切换 API ────────────────────────────
-/** POST /api/model/switch — 切换模型提供商（需认证；deepseek-pro 仅限星耀卡年卡用户） */
+/** POST /api/model/switch — 切换模型提供商（需认证；deepseek-pro 需要有效会员） */
 app.post('/api/model/switch', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json() as { provider?: string };
   const p = body.provider;
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
-  // V4 Pro 仅星耀卡可用
+  // V4 Pro 对所有有效星月卡开放
   if (p === 'deepseek-pro') {
-    const row = db.prepare('SELECT tier FROM subscriptions WHERE user_id=?').get(userId) as { tier: string } | undefined;
-    if (row?.tier !== 'yearly') return c.json({ error: 'premium_required', message: 'DeepSeek V4 Pro 仅限星耀卡用户使用' }, 403);
+    if (!membershipDetails(db, userId).membership.active) return c.json({ error: 'premium_required', message: 'DeepSeek V4 Pro 需要有效的星月卡权益' }, 403);
   }
-  const switched = switchModel(p);
+  const switched = switchModel(userId, p);
   return c.json({ success: true, provider: switched });
 });
 
@@ -1462,10 +1450,14 @@ app.post('/api/exam/:examId/detailed-review', async (c) => {
 
 // ── 订阅状态 API ────────────────────────────
 app.get('/api/subscription/status', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  try { await reconcileMembership(userId); } catch { /* Keep the last confirmed period; never extend it on failure. */ }
   const result = await resolveSubscription(c);
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   const dailyUsed = result.sub.isPremium ? null : getDailyUsage(result.userId);
   return c.json({
+    ...membershipDetails(db, result.userId),
     tier: result.sub.tier,
     isPremium: result.sub.isPremium,
     expiresAt: result.sub.expiresAt,
@@ -1476,44 +1468,6 @@ app.get('/api/subscription/status', async (c) => {
     // 现金购卡通道状态：前端据此决定是否渲染「立即开通」入口
     payEnabled: isWaffoEnabled(),
     plans: listPurchasablePlans(),
-  });
-});
-
-// ── 兑换码激活卡片 ──────────────────────────────
-app.post('/api/subscription/redeem', async (c) => {
-  if (!REDEEM_CODE_SECRET) return c.json({ error: 'unavailable', message: '兑换功能未启用' }, 503);
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
-
-  let code = '';
-  try {
-    code = String((await c.req.json<{ code?: string }>()).code ?? '').trim();
-  } catch { /* 忽略 body 解析错误，下方按空码处理 */ }
-  if (!code) return c.json({ error: 'invalid_code', message: '请输入兑换码' }, 400);
-
-  const result = redeemForUser(userId, code, REDEEM_CODE_SECRET);
-  if (!result.ok) {
-    const msgMap: Record<string, string> = {
-      invalid_code: '兑换码无效',
-      code_disabled: '兑换码已失效',
-      code_used: '兑换码已被领完',
-      already_redeemed: '你已兑换过此码',
-    };
-    return c.json({ error: result.error, message: msgMap[result.error] ?? '兑换失败' }, 400);
-  }
-
-  // 即时生效：清掉订阅缓存，返回与 /status 同结构的最新状态
-  invalidateSubscriptionCache(userId);
-  const redeemedTier = result.durationDays >= 365 ? 'yearly' : 'monthly';
-  return c.json({
-    tier: redeemedTier,
-    isPremium: true,
-    expiresAt: result.until,
-    dailyLimit: null,
-    dailyUsed: null,
-    dailyRemaining: null,
-    redeemed: { durationDays: result.durationDays, until: result.until },
   });
 });
 
@@ -1570,40 +1524,16 @@ app.post('/api/currency/redeem-membership', async (c) => {
   // 即时生效：清掉订阅缓存，返回订阅 + 余额
   invalidateSubscriptionCache(userId);
   return c.json({
-    tier: result.tier,
-    isPremium: true,
-    expiresAt: result.until,
+    ...membershipDetails(db, userId),
+    tier: membershipDetails(db, userId).membership.active ? 'monthly' : 'free',
+    isPremium: membershipDetails(db, userId).membership.active,
+    expiresAt: membershipDetails(db, userId).membership.accessEndsAt,
     dailyLimit: null,
     dailyUsed: null,
     dailyRemaining: null,
     balance: result.balance,
     redeemed: { days: result.days, until: result.until },
   });
-});
-
-// 新账户免费领取皓月卡（仅限从未激活过会员的免费用户）
-app.post('/api/currency/claim-free-card', async (c) => {
-  const userId = await resolveUserId(c);
-  if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
-
-  try {
-    const row = db.prepare('SELECT tier, activated_at FROM subscriptions WHERE user_id=?').get(userId) as
-      | { tier: string; activated_at: number | null }
-      | undefined;
-    // 已激活过会员的不可再领
-    if (row?.activated_at != null) {
-      return c.json({ error: 'already_claimed', message: '已领取过免费皓月卡' }, 400);
-    }
-    const { until, tier } = grantMembershipDays(userId, 30);
-    invalidateSubscriptionCache(userId);
-    return c.json({
-      tier, isPremium: true, expiresAt: until,
-      dailyLimit: null, dailyUsed: null, dailyRemaining: null,
-    });
-  } catch {
-    return c.json({ error: 'claim_failed', message: '领取失败' }, 500);
-  }
 });
 
 // ── Waffo Pancake 支付（星月卡现金购卡）──────────────────────
@@ -1614,8 +1544,7 @@ const WAFFO_WEB_ORIGIN = process.env.WAFFO_WEB_ORIGIN ?? 'https://boen.frostrain
 /** 收银台支付完成后的回跳地址（带 paid=1 供前端触发状态轮询） */
 function paymentSuccessUrl(c: Context): string {
   // 优先用请求来源（本地开发/多域名自动适配），否则回落生产域名
-  const origin = c.req.header('origin')?.replace(/\/$/, '');
-  return `${origin || WAFFO_WEB_ORIGIN}/setup?paid=1`;
+  return `${WAFFO_WEB_ORIGIN.replace(/\/$/, '')}/setup?paid=1`;
 }
 
 /** POST /api/payment/checkout - 创建订阅收银台会话，返回 checkoutUrl */
@@ -1630,7 +1559,8 @@ app.post('/api/payment/checkout', async (c) => {
   let planKey = '';
   let buyerEmail: string | undefined;
   try {
-    const body = await c.req.json<{ planKey?: string; email?: string }>();
+    const body = await c.req.json<{ planKey?: string; email?: string; acceptedTermsVersion?: string }>();
+    if (body.acceptedTermsVersion !== '1.1') return c.json({ error: 'consent_required', message: '请阅读条款并确认自动续费授权' }, 400);
     planKey = String(body.planKey ?? '').trim();
     buyerEmail = body.email ? String(body.email).trim() : undefined;
   } catch { /* 忽略 body 解析错误，下方按无效档位处理 */ }
@@ -1642,7 +1572,7 @@ app.post('/api/payment/checkout', async (c) => {
     successUrl: paymentSuccessUrl(c),
   });
   if (!result.ok) {
-    const status = result.error === 'invalid_plan' ? 400 : result.error === 'rate_limited' ? 429 : 502;
+    const status = result.error === 'invalid_plan' ? 400 : result.error === 'conflict' ? 409 : result.error === 'rate_limited' ? 429 : 502;
     return c.json({ error: result.error, message: result.message }, status);
   }
   return c.json({
@@ -1655,17 +1585,29 @@ app.post('/api/payment/checkout', async (c) => {
 /**
  * POST /api/payment/webhook - Waffo 支付结果回调。
  * ⚠️ 必须用 c.req.text() 读原始体：任何 JSON 解析都会让 RSA-SHA256 验签失败。
- * 除验签失败外一律回 200，避免业务异常引发 Waffo 重投风暴。
+ * 处理失败返回 500，使 Waffo 重试；仅成功落库后确认。
  */
 app.post('/api/payment/webhook', async (c) => {
   const raw = await c.req.text();
   const sig = c.req.header('x-waffo-signature') ?? null;
-  const outcome = handleWaffoWebhook(raw, sig, {
+  const outcome = await handleWaffoWebhook(raw, sig, {
     invalidateSubscription: (userId) => invalidateSubscriptionCache(userId),
   });
-  if (!outcome.ok) return c.text('Invalid signature', 401);
+  if (!outcome.ok) return c.text(outcome.reason === 'invalid_signature' ? 'Invalid signature' : 'Retry required', outcome.reason === 'invalid_signature' ? 401 : 500);
   return c.json({ received: true, ...(outcome.detail ?? {}) });
 });
+
+for (const action of ['cancel', 'reactivate'] as const) {
+  app.post(`/api/payment/subscription/${action}`, async (c) => {
+    const userId = await resolveUserId(c);
+    if (!userId) return c.json({ error: 'unauthorized' }, 401);
+    if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '请稍后再试' }, 429);
+    const result = await manageSubscription(userId, action);
+    if (!result.ok) return c.json(result, result.error === 'not_found' ? 404 : result.error === 'conflict' ? 409 : 502);
+    invalidateSubscriptionCache(userId);
+    return c.json({ ok: true, ...membershipDetails(db, userId) });
+  });
+}
 
 /** GET /api/payment/orders - 当前用户的购卡订单流水 */
 app.get('/api/payment/orders', async (c) => {
@@ -2333,5 +2275,10 @@ app.post('/api/answer', async (c) => {
 });
 
 const port = Number(process.env.PORT ?? 8787);
+const retentionTimer = setInterval(() => {
+  try { runPrivacyRetention(db, ASSET_ROOT, join(DATA_DIR, 'backups')); }
+  catch (error: unknown) { console.error('[privacy] retention failed:', error instanceof Error ? error.message : 'unknown'); }
+}, 60 * 60 * 1000);
+retentionTimer.unref();
 serve({ fetch: app.fetch, port });
 console.log(`博文 Boen server → http://localhost:${port}`);
