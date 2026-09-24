@@ -40,12 +40,14 @@ export interface CurrencyStatus {
 }
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return beijingDateStr();
 }
 
-/** 北京时间（UTC+8）的 YYYY-MM-DD，用于每日登录领取判定 */
-function beijingDateStr(): string {
-  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+/** 北京时间（UTC+8）的 YYYY-MM-DD，用于每日相关判定 */
+export function beijingDateStr(): string {
+  const now = new Date();
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(now);
 }
 
 /** 查询今日（北京时间）是否已领取登录奖励 */
@@ -87,7 +89,8 @@ export function claimDailyLogin(userId: string): ClaimDailyResult {
       `).run(userId, DAILY_LOGIN_REWARD, balanceAfter, date);
       return { ok: true, reward: DAILY_LOGIN_REWARD, balance: balanceAfter };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] claimDailyLogin 事务失败:', e instanceof Error ? e.message : e);
     const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
     return { ok: false, error: 'already_claimed', balance: cur?.balance ?? 0 };
   }
@@ -197,7 +200,8 @@ export function earnPoints(
 
       return { earned, capped: amount > earned, balance: balanceAfter };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] earnPoints 事务失败:', e instanceof Error ? e.message : e);
     // 入账失败不应阻断主结算流程
     const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
     return { earned: 0, capped: false, balance: cur?.balance ?? 0 };
@@ -234,15 +238,17 @@ export function redeemMembershipWithPoints(userId: string, productKey: string): 
         UPDATE user_currency SET balance=?, total_spent=total_spent+?, updated_at=unixepoch() WHERE user_id=?
       `).run(balanceAfter, product.cost, userId);
 
+      // ledger 金额统一记录正数，方向由 type（'earn'/'spend'）区分
       db.prepare(`
         INSERT INTO currency_ledger (user_id, type, amount, balance_after, reason, ref_id)
         VALUES (?, 'spend', ?, ?, ?, ?)
-      `).run(userId, -product.cost, balanceAfter, `redeem_${product.key}`, product.key);
+      `).run(userId, product.cost, balanceAfter, `redeem_${product.key}`, product.key);
 
       const until = addReward(db, userId, product.days * 86400, crypto.randomUUID());
       return { ok: true, balance: balanceAfter, until, days: product.days, tier: 'monthly' };
     })();
-  } catch {
+  } catch (e) {
+    console.warn('[currency] redeemMembershipWithPoints 事务失败:', e instanceof Error ? e.message : e);
     const cur = getCurrencyStatus(userId);
     return { ok: false, error: 'insufficient', balance: cur.balance };
   }

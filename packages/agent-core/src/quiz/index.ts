@@ -89,7 +89,7 @@ function normAdvanced(s: string): string {
 /** 填空题匹配结果：含匹配层级信息，供 Level 3 LLM 语义判定使用 */
 export interface BlankMatchResult {
   matched: boolean;
-  level: 1 | 2 | 'miss';
+  level: 1 | 2 | 'miss' | 'llm';
   userNorm: string;
   acceptedNorms: string[];
 }
@@ -253,7 +253,7 @@ export async function gradeAnswer(
           `空${i + 1}参考答案：${b.acceptedAnswers.join(' / ')}`
         ).join('\n'),
         keyPoints: null,
-        userAnswer: a.blanks.map((b, i) =>
+        userAnswer: a.blanks.map((_b, i) =>
           `空${i + 1}学生答案：${answer.answers[i] ?? '（未作答）'}`
         ).join('\n'),
         maxScore: a.blanks.length,

@@ -18,7 +18,7 @@ export function gradeLabel(grade: Grade): string {
   if (grade === 'high') return '高中';
   if (grade === 'college') return '大学及以上';
   const n = Number(grade);
-  return n <= 6 ? `小学${'一二三四五六'[n - 1]}年级` : `初${['一', '二', '三'][n - 7]}`;
+  return n <= 6 ? `小学${['一','二','三','四','五','六'][n - 1]}年级` : `初${['一', '二', '三'][n - 7]}`;
 }
 
 /** 智能体工作模式 */
@@ -44,8 +44,8 @@ export interface ChatMessage {
 export interface ChatRequest {
   threadId: string;
   message: string;
-  /** Base64 编码的 JPEG/PNG 图片数据（不含 data: URI 前缀），可选 */
-  images?: string[];
+  /** 附件列表（支持图片等），可选 */
+  attachments?: Attachment[];
   gradeBand: GradeBand;
   grade?: Grade;
   userName?: string;

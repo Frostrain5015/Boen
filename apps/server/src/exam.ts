@@ -13,12 +13,12 @@
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint, ExamQualityReport } from '@boen/shared';
+import type { ExamQuestion, ExamResults, AnswerPayload, ExamQuestionResult, ExamSummary, ExamBlueprint, ExamQualityReport, BlueprintSection, BlueprintKnowledgePoint, BlueprintQuestionTypePlan, DimensionScore, ReviewDimension, ProficiencyChange } from '@boen/shared';
 import { gradeAnswer, multipleChoiceSchema, fillBlankSchema, trueFalseSchema, shortAnswerSchema, fuzzyMatchBlankDetailed } from '@boen/agent-core';
-import type { ShortAnswerGrader } from '@boen/agent-core';
-import { dirname, resolve, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { ShortAnswerGrader, ShortAnswerGraderParams } from '@boen/agent-core';
+import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { writeFileSync, readFileSync, existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +28,6 @@ import { earnPoints, computeScorePoints, computeStarBonus } from './currency.js'
 import db from './db.js';
 import { retrieveCurriculum } from './curriculum.js';
 import { retrieveGlobalStyleSkills } from './mistakes.js';
-import { embedTexts, cosineSim } from './embeddings.js';
 import { withConcurrencyLimit, Semaphore } from './concurrency.js';
 import { stepBlueprintArchitect, flattenBlueprint, type WriteTask } from './exam-blueprint.js';
 import { reviewBoard, regenerateQuestions } from './exam-reviewers.js';
@@ -121,8 +120,8 @@ function canonicalizeExamBlueprint(blueprint: ExamBlueprint, config: ExamConfig)
     });
   const resolveName = (value: string): string | null => resolve({ title: value })?.knowledgePoint ?? null;
 
-  const sections = blueprint.sections.map((section, sectionIndex) => {
-    const knowledgePoints = section.knowledgePoints.map((candidate) => {
+  const sections = blueprint.sections.map((section: BlueprintSection, sectionIndex: number) => {
+    const knowledgePoints = section.knowledgePoints.map((candidate: BlueprintKnowledgePoint) => {
       const taxonomy = resolve(candidate);
       if (!taxonomy) {
         throw new Error(`蓝图第 ${sectionIndex + 1} 个板块引用了未发布知识点：${candidate.title || candidate.id || '空值'}`);
@@ -138,7 +137,7 @@ function canonicalizeExamBlueprint(blueprint: ExamBlueprint, config: ExamConfig)
     return {
       ...section,
       knowledgePoints,
-      questionTypes: section.questionTypes.map((plan) => {
+      questionTypes: section.questionTypes.map((plan: BlueprintQuestionTypePlan) => {
         const focusKps = [...new Set(plan.focusKps.map(resolveName).filter((name): name is string => Boolean(name)))];
         return { ...plan, focusKps: focusKps.length ? focusKps : [knowledgePoints[0].title] };
       }),
@@ -386,7 +385,7 @@ function choiceWithoutOptionsToShortAnswer(q: ExamQuestion): ExamQuestion {
   return {
     ...q,
     options,
-    correctKeys: q.correctKeys?.length ? q.correctKeys.filter(k => options.some(o => o.key === k)) : [options[0].key],
+    correctKeys: q.correctKeys?.length ? q.correctKeys.filter((k: string) => options.some((o: { key: string }) => o.key === k)) : [options[0].key],
     multiSelect: q.multiSelect ?? false,
     explanation: q.explanation || '本题选项结构不完整，将在审核阶段修正。',
   };
@@ -400,8 +399,8 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
   q2.explanation = cleanGeneratedText(q2.explanation);
   q2.referenceAnswer = q2.referenceAnswer ? cleanGeneratedText(q2.referenceAnswer) : undefined;
   q2.keyPoints = q2.keyPoints?.map(cleanGeneratedText).filter(Boolean);
-  q2.options = q2.options?.map((o) => ({ ...o, text: cleanGeneratedText(o.text) }));
-  q2.blanks = q2.blanks?.map((blank) => ({
+  q2.options = q2.options?.map((o: { key: string; text: string }) => ({ ...o, text: cleanGeneratedText(o.text) }));
+  q2.blanks = q2.blanks?.map((blank: { acceptedAnswers: string[] }) => ({
     acceptedAnswers: blank.acceptedAnswers.map(cleanGeneratedText),
   }));
   if (q2.type === 'multiple_choice') {
@@ -412,7 +411,7 @@ function localFormatFix(q: ExamQuestion, i: number): ExamQuestion {
       return localFormatFix(choiceWithoutOptionsToShortAnswer(q2), i);
     }
     if (!q2.correctKeys?.length) q2.correctKeys = [q2.options[0].key];
-    q2.correctKeys = q2.correctKeys.filter((k) => q2.options!.some((o) => o.key === k));
+    q2.correctKeys = q2.correctKeys.filter((k: string) => q2.options!.some((o: { key: string }) => o.key === k));
     if (!q2.correctKeys.length) q2.correctKeys = [q2.options[0].key];
   }
   if (q2.type === 'fill_blank') {
@@ -478,7 +477,7 @@ function validateExamQuestionForDelivery(q: ExamQuestion): string | null {
   if (q.type === 'multiple_choice') {
     if (!q.options || q.options.length < 3) return `选择题选项不足（${q.options?.length ?? 0} 个）`;
     if (!q.correctKeys?.length) return '选择题正确答案缺失';
-    if (q.options.some(o => isPlaceholderOptionText(o.text, o.key))) return '选择题选项存在占位符';
+    if (q.options.some((o: { key: string; text: string }) => isPlaceholderOptionText(o.text, o.key))) return '选择题选项存在占位符';
   }
   if (q.type === 'fill_blank') {
     const markerCount = countBlankMarkers(q.stem);
@@ -535,7 +534,7 @@ function tikzSourceTexts(q: ExamQuestion): string[] {
     q.passage,
     q.explanation,
     q.referenceAnswer,
-    ...(q.options ?? []).map((o) => o.text),
+    ...(q.options ?? []).map((o: { key: string; text: string }) => o.text),
   ].filter((text): text is string => typeof text === 'string' && text.length > 0);
 }
 
@@ -544,7 +543,7 @@ const tikzRenderPool = new Semaphore(3);
 
 function execFileAsync(cmd: string, args: string[], options: { timeout: number; cwd?: string }): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(cmd, args, { ...options, encoding: 'utf-8' }, (err, stdout) => {
+    execFile(cmd, args, { ...options, windowsHide: true, encoding: 'utf-8' }, (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout ?? '');
     });
@@ -566,10 +565,11 @@ async function renderTikzBlockAsync(texCode: string): Promise<string | null> {
       await execFileAsync('dvisvgm', ['--pdf', '--no-fonts', `--output=${svgPath}`, pdfPath], { timeout: 15000 });
       if (!existsSync(svgPath)) return null;
       return readFileSync(svgPath, 'utf-8') || null;
-    } catch {
+    } catch (e) {
+      console.warn('[exam] TiKZ 渲染失败:', e instanceof Error ? e.message.slice(0, 200) : e);
       return null;
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* 清理 */ }
+      try { rmSync(tmpDir, { recursive: true, force: true }); } catch (e2) { console.warn('[exam] 清理临时目录失败:', e2); }
     }
   });
 }
@@ -586,7 +586,10 @@ export async function generateExam(
   config: ExamConfig,
   onProgress?: ExamProgressFn,
   userId?: string,
+  signal?: AbortSignal,
 ): Promise<GeneratedExam> {
+  // 如果 signal 已中断则立即退出
+  if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
   try {
     const weightDist = getWeightDistribution(config.subject, config.grade);
     const mode = (config.durationMinutes ?? 45) <= 15 ? 'quiz' : 'exam';
@@ -611,6 +614,9 @@ export async function generateExam(
     const blueprint = canonicalizeExamBlueprint(rawBlueprint, enrichedConfig);
 
     await onProgress?.({ step: 'blueprint', message: 'blueprint', progress: 18 });
+
+    // 客户端断开连接 → 尽早退出，避免无效消耗 AI token
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
 
     // ─── 阶段二：题目编写组（按 section × questionType 并发，限 6 路） ────
     const writeTasks = flattenBlueprint(blueprint);
@@ -646,6 +652,9 @@ export async function generateExam(
 
     await onProgress?.({ step: 'write', message: 'write', progress: 66 });
 
+    // 客户端断开 → 停止进入审核阶段
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
+
     // ─── 阶段三：审核委员会（5 维度并发） ──────
     await onProgress?.({ step: 'review', message: 'review', progress: 70 });
     let { scores } = await reviewBoard(model, questions, { subject: enrichedConfig.subject, grade: enrichedConfig.grade }, blueprint);
@@ -658,6 +667,7 @@ export async function generateExam(
     const maxRegenerationRounds = 3;
     const regenHistory: number[] = [regenCount]; // 追踪每轮未通过数，用于趋势检测
     for (let round = 1; regenCount > 0 && round <= maxRegenerationRounds; round++) {
+      if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
       await onProgress?.({ step: 'regenerate', message: 'regenerate', progress: Math.min(96, 78 + round * 5) });
       const crossGroupContext = buildCrossGroupContext(questions);
       const regenResult = await regenerateQuestions(
@@ -710,7 +720,7 @@ export async function generateExam(
 
     if (stillFailing.length > 0) {
       const summary = stillFailing.slice(0, 5).map((s) => {
-        const dims = Object.entries(s.dimensions)
+        const dims = (Object.entries(s.dimensions) as [ReviewDimension, DimensionScore][])
           .filter(([, d]) => d.score < 60)
           .map(([dim, d]) => `${dim}:${d.score}`)
           .join(',');
@@ -799,6 +809,9 @@ export async function generateExam(
     }
     const estMinutes = enrichedConfig.durationMinutes ?? Math.max(20, Math.min(90, Math.round(questions.length * 1.5)));
 
+    // 客户端断开 → 跳过 TikZ 渲染等耗时后处理
+    if (signal?.aborted) throw new DOMException('Exam generation aborted by client', 'AbortError');
+
     // ─── TikZ 预渲染：异步渲染，全局最多 3 路并发 ────
     {
       const tikzQS = questions.filter(q => tikzSourceTexts(q).some(hasTikzBlocks));
@@ -846,7 +859,7 @@ function buildCrossGroupContext(allQuestions: ExamQuestion[]): string {
  * 按 section × questionType 出题，用 DeepSeek JSON Output + 本地 schema 强制结构化输出。
  * 失败 → 重试 2 次 → 降级题量 → 标记 __needs_review__ 强制进入重出池。
  */
-async function stepWriteQuestionsV2(
+export async function stepWriteQuestionsV2(
   model: BaseChatModel,
   config: ExamConfig,
   task: WriteTask,
@@ -903,7 +916,7 @@ async function stepWriteQuestionsV2(
     try {
       const questions = await invokeGenerateQuestions(model, prompt, task.questionType, task.count);
       if (questions.length > 0) return toValidatedExamQuestions(questions, task, config);
-    } catch { /* 继续到兜底 */ }
+    } catch (e) { console.warn('[exam] invokeGenerateQuestions 失败，继续兜底:', e instanceof Error ? e.message.slice(0, 200) : e); }
   }
 
     // 最终兜底：标记 __needs_review__，审核阶段强制重出
@@ -1006,7 +1019,7 @@ function toExamQuestion(raw: any, task: WriteTask, index: number, config: ExamCo
     if (!base.options || base.options.length < 2) {
       return localFormatFix(choiceWithoutOptionsToShortAnswer(base), index);
     }
-    base.correctKeys = (raw.correctKeys ?? []).filter((k: string) => base.options!.some(o => o.key === k));
+    base.correctKeys = (raw.correctKeys ?? []).filter((k: string) => base.options!.some((o: { key: string }) => o.key === k));
     if (!base.correctKeys!.length) base.correctKeys = [base.options![0].key];
     base.multiSelect = raw.multiSelect ?? false;
   }
@@ -1039,7 +1052,8 @@ async function writeSingleQuestion(model: BaseChatModel, prompt: string, questio
       // published nodes here and validate the selected ID again below.
       sectionKnowledgePoints: getPublishedKnowledgePointIds(config.subject, config.grade).map((id) => ({ id, title: '', weight: 1 })),
     } as WriteTask, 0, config);
-  } catch {
+  } catch (e) {
+    console.warn('[exam] generateWriteTask 失败:', e instanceof Error ? e.message.slice(0, 200) : e);
     return null;
   }
 }
@@ -1131,7 +1145,7 @@ function buildGradingHumanMessage(params: { stem: string; referenceAnswer?: stri
 
 /** 构建基于 LLM 的简答题/填空题评分器（单题模式，JSON Output + Injection 防御） */
 export function createShortAnswerGrader(model: BaseChatModel): ShortAnswerGrader {
-  return async (params) => {
+  return async (params: ShortAnswerGraderParams) => {
     try {
       const response = await model.invoke(
         [
@@ -1191,7 +1205,7 @@ export async function batchGradeShortAnswers(
   }
 
   // 构造批量评分的 HumanMessage
-  const questionList = items.map((item, i) => ({
+  const questionList = items.map((item) => ({
     questionIndex: item.questionIndex,
     题目: item.stem,
     参考答案: item.referenceAnswer ?? '（未提供）',
@@ -1333,7 +1347,7 @@ async function generateExamAnalysis(
   const subjectLabel: Record<string, string> = { chinese: '语文', math: '数学', english: '英语', science: '科学' };
   const subject = subjectLabel[config.subject] ?? config.subject;
 
-  const questionDetails = results.questionResults.map((qr) => {
+  const questionDetails = results.questionResults.map((qr: ExamQuestionResult) => {
     const q = questions.find(x => x.index === qr.index);
     const typeLabel: Record<string, string> = { multiple_choice: '选择', fill_blank: '填空', true_false: '判断', short_answer: '简答' };
     const status = qr.correct === true ? '✅ 正确' : qr.correct === false ? '❌ 错误' : '⬜ 未答';
@@ -1342,7 +1356,7 @@ async function generateExamAnalysis(
   }).join('\n');
 
   const kpSummary = results.kpBreakdown
-    .map(kp => `- ${kp.kp}：${kp.score}/${kp.maxScore}（${kp.percentage}%）`)
+    .map((kp: { kp: string; score: number; maxScore: number; percentage: number }) => `- ${kp.kp}：${kp.score}/${kp.maxScore}（${kp.percentage}%）`)
     .join('\n');
 
   const prompt = EXAM_ANALYSIS_PROMPT
@@ -1726,7 +1740,7 @@ export async function generateDetailedReview(
 ): Promise<ExamQuestionResult[]> {
   // Collect wrong objective questions (multiple_choice, fill_blank, true_false)
   const wrongObjectives = results.questionResults.filter(
-    (qr) => qr.correct === false && qr.maxScore > 0,
+    (qr: ExamQuestionResult) => qr.correct === false && qr.maxScore > 0,
   );
 
   if (wrongObjectives.length === 0) return results.questionResults;
@@ -1734,7 +1748,7 @@ export async function generateDetailedReview(
   const answerMap = new Map(answers.map((a) => [a.questionIndex, a.answer]));
 
   // Build per-question context for the LLM
-  const questionContexts = wrongObjectives.map((qr) => {
+  const questionContexts = wrongObjectives.map((qr: ExamQuestionResult) => {
     const q = questions.find((x) => x.index === qr.index);
     const answer = answerMap.get(qr.index);
     if (!q) return null;
@@ -1752,7 +1766,7 @@ export async function generateDetailedReview(
       index: qr.index,
       type: typeLabel[q.type] ?? q.type,
       stem: q.stem?.slice(0, 300),
-      options: q.type === 'multiple_choice' ? q.options?.map((o) => `${o.key}. ${o.text}`).join('；') : undefined,
+      options: q.type === 'multiple_choice' ? q.options?.map((o: { key: string; text: string }) => `${o.key}. ${o.text}`).join('；') : undefined,
       correctAnswer: qr.reference || q.explanation?.slice(0, 100),
       studentAnswer: studentAnswerText,
       knowledgePoint: q.knowledgePoint,
@@ -1764,7 +1778,7 @@ export async function generateDetailedReview(
   // Only include objective question types
   const objectiveContexts = questionContexts.filter((ctx) =>
     ctx!.type === '选择题' || ctx!.type === '填空题' || ctx!.type === '判断题',
-  );
+  ) as Array<{ index: number; type: string; stem: string; options?: string; correctAnswer: string; studentAnswer: string; knowledgePoint?: string }>;
 
   if (objectiveContexts.length === 0) return results.questionResults;
 
@@ -1791,7 +1805,7 @@ export async function generateDetailedReview(
 
     // Merge detailed explanations into the existing questionResults
     const resultMap = new Map(detailedResults.map((r) => [r.index, r.explanation]));
-    return results.questionResults.map((qr) => {
+    return results.questionResults.map((qr: ExamQuestionResult) => {
       const explanation = resultMap.get(qr.index);
       if (explanation) {
         return { ...qr, detailedExplanation: String(explanation) };
@@ -1826,7 +1840,7 @@ async function autoCollectMistakes(
 
   // 筛选得分率 < 60% 的题目
   const penalized = results.questionResults.filter(
-    (qr) => qr.maxScore > 0 && qr.score / qr.maxScore < 0.6,
+    (qr: ExamQuestionResult) => qr.maxScore > 0 && qr.score / qr.maxScore < 0.6,
   );
   if (penalized.length === 0) return { count: 0, mistakeIds };
 
@@ -1841,7 +1855,7 @@ async function autoCollectMistakes(
         'errorReason：用一两句话具体说明错因，不要只写"粗心"。',
         'title：10字以内的精炼摘要，概括该题的核心考点（如"绝对值性质"、"分数加减法"）。',
         '',
-        ...penalized.map((qr, i) => {
+        ...penalized.map((qr: ExamQuestionResult, i: number) => {
           const q = questions.find((x) => x.index === qr.index);
           return [
             `第${i + 1}题（${q?.type ?? '未知'}）：`,
@@ -1877,7 +1891,7 @@ async function autoCollectMistakes(
     const q = questions.find((x) => x.index === qr.index);
     if (!q) continue;
 
-    const id = `mistake-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const id = `mistake-${Date.now()}-${randomUUID().slice(0, 10)}`;
     const analysis = analyses[i];
     const errorType = analysis?.errorType ?? undefined;
     const errorReason = analysis?.errorReason ?? undefined;
@@ -1934,7 +1948,7 @@ async function autoCollectMistakes(
     // 知识点映射（before 取答题前的值，after 取 DB 当前值）
     const kpTitle = q.knowledgePoint;
     if (kpTitle && results.proficiencyChanges) {
-      const qBefore = results.proficiencyChanges.find(p => p.kpTitle === kpTitle);
+      const qBefore = results.proficiencyChanges.find((p: ProficiencyChange) => p.kpTitle === kpTitle);
       if (qBefore) {
         const node = findKnowledgePointNode(kpTitle, subject);
         if (node) {
@@ -1957,7 +1971,7 @@ async function autoCollectMistakes(
 // ── 会话管理 ─────────────────────────────────
 
 export function createExamSession(userId: string, config: ExamConfig, data: GeneratedExam): ExamSession {
-  const id = `exam-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = `exam-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const now = Math.floor(Date.now() / 1000);
   db.prepare(`INSERT INTO exam_sessions (id, user_id, subject, grade, title, questions, total_score, duration_minutes, status, created_at, updated_at, blueprint, quality_report) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`).run(
     id,
@@ -2084,7 +2098,8 @@ function readGradingCheckpoint(examId: string): ExamQuestionResult[] | null {
   try {
     const parsed = JSON.parse(row.grading_checkpoint);
     return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-  } catch {
+  } catch (e) {
+    console.warn('[exam] 解析 grading_checkpoint 失败:', e instanceof Error ? e.message.slice(0, 200) : e);
     return null;
   }
 }
@@ -2143,7 +2158,7 @@ export async function submitExamSession(
       if (node) nodesToUpdate.push(node);
     }
     if (nodesToUpdate.length === 0 && qr.knowledgePoint) {
-      for (const kp of qr.knowledgePoint.split(/[；;]/).map(s => s.trim()).filter(Boolean)) {
+      for (const kp of qr.knowledgePoint.split(/[；;]/).map((s: string) => s.trim()).filter(Boolean)) {
         const node = findKnowledgePointNode(kp, session.subject);
         if (node) nodesToUpdate.push({ id: node.id, title: kp });
       }

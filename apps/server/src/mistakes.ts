@@ -137,7 +137,8 @@ function toMistake(row: any): MistakeItem {
 function safeJson<T>(raw: string, fallback: T): T {
   try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (e) {
+    console.warn('[mistakes] safeJson 解析失败:', e instanceof Error ? e.message.slice(0, 100) : e);
     return fallback;
   }
 }
@@ -277,12 +278,14 @@ function safeParseJson(raw: string): any {
   const input = fenced || trimmed;
   try {
     return JSON.parse(input);
-  } catch {
+  } catch (e) {
+    console.warn('[mistakes] 解析 LLM 输出 JSON 失败，尝试正则提取:', e instanceof Error ? e.message.slice(0, 100) : e);
     const match = input.match(/\{[\s\S]*\}/);
     if (match) {
       try {
         return JSON.parse(match[0].replace(/,\s*([}\]])/g, '$1'));
-      } catch {
+      } catch (e2) {
+        console.warn('[mistakes] 正则提取后仍解析失败:', e2 instanceof Error ? e2.message.slice(0, 100) : e2);
         /* continue */
       }
     }
@@ -843,7 +846,8 @@ async function saveStyleFeature(
   try {
     const [vec] = await embedTexts([styleText]);
     vector = vec ?? null;
-  } catch {
+  } catch (e) {
+    console.warn('[mistakes] embedStyle embedTexts 失败:', e instanceof Error ? e.message : e);
     vector = null;
   }
   db.prepare(`
@@ -1027,7 +1031,8 @@ async function sedimentConsolidatedSkills(skills: ConsolidatedSkill[], subject: 
     try {
       const [v] = await embedTexts([skillText]);
       vector = v ?? null;
-    } catch {
+    } catch (e) {
+      console.warn('[mistakes] sedimentConsolidatedSkills embedTexts 失败:', e instanceof Error ? e.message : e);
       vector = null;
     }
     sedimentGlobalStyleSkill({ subject, grade, userId, kgNodeId: null, analysis: skill, vector });
@@ -1101,7 +1106,8 @@ export async function consolidateGlobalSkills(model: BaseChatModel, subject: str
     try {
       const [v] = await embedTexts([skillText]);
       embedding = v ? vectorToBlob(v) : null;
-    } catch {
+    } catch (e) {
+      console.warn('[mistakes] skillGroup embedding 失败:', e instanceof Error ? e.message : e);
       embedding = null;
     }
     if (!embedding) {

@@ -7,6 +7,7 @@
  */
 
 import db from './db.js';
+import { randomUUID } from 'node:crypto';
 import { embedTexts, embedQuery, cosineSim, vectorToBlob, blobToVector } from './embeddings.js';
 import { getMessages } from './conversation.js';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -118,7 +119,7 @@ export function storeConversationSummary(
   unresolvedQuestions: string,
   embedding: number[],
 ): void {
-  const id = `sum-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const id = `sum-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const now = Math.floor(Date.now() / 1000);
 
   db.prepare(`

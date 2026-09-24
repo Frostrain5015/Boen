@@ -27,6 +27,8 @@ const router = createRouter({
     { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
     // 设置与会员：个人信息、学习配置、会员卡管理、积分兑换
     { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
+    // 教育游戏：知识跑酷
+    { path: '/games', name: 'games', component: () => import('@/views/GamesView.vue') },
   ],
 });
 

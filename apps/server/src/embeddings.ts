@@ -44,5 +44,8 @@ export function vectorToBlob(v: number[]): Buffer {
   return Buffer.from(new Float32Array(v).buffer);
 }
 export function blobToVector(b: Buffer): number[] {
-  return Array.from(new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4));
+  // 安全构造 Float32Array：复制到对齐缓冲区，防止 b.buffer 未按 4 字节对齐导致 RangeError
+  const aligned = Buffer.alloc(b.length);
+  b.copy(aligned);
+  return Array.from(new Float32Array(aligned.buffer, aligned.byteOffset, aligned.byteLength / 4));
 }

@@ -1,4 +1,5 @@
 import db from './db.js';
+import { randomUUID } from 'node:crypto';
 
 export interface Conversation {
   id: string;
@@ -20,7 +21,7 @@ export interface ChatMessage {
 // ── 对话 CRUD ───────────────────────────────
 
 export function createConversation(userId: string, title: string, subject: string): Conversation {
-  const id = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const id = `conv-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const now = Math.floor(Date.now() / 1000);
   db.prepare('INSERT INTO conversations (id, user_id, title, subject, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
     .run(id, userId, title, subject, now, now);

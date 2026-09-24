@@ -178,6 +178,17 @@ export async function getCurrentUser(): Promise<FrostUser | null> {
   const token = getToken();
   if (!token) return null;
 
+  // 本地开发测试 token：直接返回虚拟用户，不请求后端（仅开发构建生效，生产构建会被静态消除）
+  if (import.meta.env.DEV && token.startsWith('local-dev-token-')) {
+    return {
+      sub: 'local-dev-sub',
+      preferred_username: '本地测试用户',
+      username: 'local-dev-user',
+      email: 'dev@boen.local',
+      email_verified: true,
+    };
+  }
+
   try {
     const response = await fetch('/api/auth/userinfo', {
       headers: { Authorization: `Bearer ${token}` },
@@ -213,4 +224,28 @@ export async function logout() {
   }
   clearToken();
   window.location.reload();
+}
+
+/** 本地开发测试登录：绕过 OAuth，直接设置认证状态，不触发页面重载（仅开发构建可用） */
+export function loginAsTestUser(profile: { name?: string; grade?: string } = {}) {
+  if (!import.meta.env.DEV) throw new Error('loginAsTestUser is dev-only');
+  const fakeToken = `local-dev-token-${Date.now()}`;
+  saveToken(fakeToken);
+  const profileData = {
+    name: profile.name ?? '本地测试用户',
+    grade: profile.grade ?? '8',
+  };
+  localStorage.setItem('boen_user_profile', JSON.stringify(profileData));
+  // 不 reload，由调用方（LoginView）直接推入路由
+  return {
+    token: fakeToken,
+    user: {
+      sub: 'local-dev-sub',
+      preferred_username: profileData.name,
+      username: 'local-dev-user',
+      email: 'dev@boen.local',
+      email_verified: true,
+    } as FrostUser,
+    profile: profileData,
+  };
 }

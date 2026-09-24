@@ -71,16 +71,24 @@ const todoPanelStyle = computed(() => {
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
-    const images = pickedImages.value.map(img => img.data);
-    chatStore.send(chatStore.input, images.length ? images : undefined);
-    if (images.length) clearImages();
+    const attachments = pickedImages.value.map(img => ({
+      type: 'image' as const,
+      data: img.data,
+      mimeType: img.mimeType,
+    }));
+    chatStore.send(chatStore.input, attachments.length ? attachments : undefined);
+    if (attachments.length) clearImages();
   }
 }
 
 function onSendClick() {
-  const images = pickedImages.value.map(img => img.data);
-  chatStore.send(chatStore.input, images.length ? images : undefined);
-  if (images.length) clearImages();
+  const attachments = pickedImages.value.map(img => ({
+    type: 'image' as const,
+    data: img.data,
+    mimeType: img.mimeType,
+  }));
+  chatStore.send(chatStore.input, attachments.length ? attachments : undefined);
+  if (attachments.length) clearImages();
 }
 
 onMounted(() => {
