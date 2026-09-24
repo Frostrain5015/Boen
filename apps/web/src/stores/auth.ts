@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Grade, SubscriptionStatus, CurrencyStatus } from '@boen/shared';
+import { MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
 import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { setOnUnauthorized } from '@/services/chat';
 import { useChatStore } from './chat';
@@ -155,7 +156,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await fetch('/api/payment/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ planKey, email: currentUser.value?.email, acceptedTermsVersion: '1.1' }),
+        body: JSON.stringify({ planKey, email: currentUser.value?.email, acceptedTermsVersion: MEMBERSHIP_TERMS_VERSION }),
       });
       const data = (await res.json()) as { checkoutUrl?: string; error?: string; message?: string };
       if (res.ok && data.checkoutUrl) return { ok: true, checkoutUrl: data.checkoutUrl };

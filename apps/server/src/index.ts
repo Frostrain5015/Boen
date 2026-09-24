@@ -30,6 +30,7 @@ import {
 } from '@boen/agent-core';
 import type { QuestionInterrupt, QuestionResume } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
+import { MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
@@ -223,7 +224,7 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
   // Resolve access against the clock on every request; a cached boolean can outlive its period.
   const details = membershipDetails(db, userId);
   return { userId, sub: {
-    tier: details.membership.active ? details.membership.legacyTier ?? 'monthly' : 'free',
+    tier: details.membership.active ? details.membership.legacyTier ?? (details.membership.source === 'waffo' ? details.billing.planKey : 'monthly') : 'free',
     isPremium: details.membership.active, expiresAt: details.membership.accessEndsAt,
     activatedAt: details.billing.currentPeriodStart,
   } };
@@ -1560,7 +1561,7 @@ app.post('/api/payment/checkout', async (c) => {
   let buyerEmail: string | undefined;
   try {
     const body = await c.req.json<{ planKey?: string; email?: string; acceptedTermsVersion?: string }>();
-    if (body.acceptedTermsVersion !== '1.1') return c.json({ error: 'consent_required', message: '请阅读条款并确认自动续费授权' }, 400);
+    if (body.acceptedTermsVersion !== MEMBERSHIP_TERMS_VERSION) return c.json({ error: 'consent_required', message: '请阅读条款并确认自动续费授权' }, 400);
     planKey = String(body.planKey ?? '').trim();
     buyerEmail = body.email ? String(body.email).trim() : undefined;
   } catch { /* 忽略 body 解析错误，下方按无效档位处理 */ }

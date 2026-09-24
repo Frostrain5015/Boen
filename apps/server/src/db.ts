@@ -7,7 +7,6 @@ const db = new Database(join(DATA_DIR, 'boen.db'));
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
-initMembership(db);
 
 // ── 对话表 ──────────────────────────────────
 db.exec(`
@@ -526,4 +525,5 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cs_created ON conversation_summaries(created_at DESC);
 `);
 
+initMembership(db);
 export default db;

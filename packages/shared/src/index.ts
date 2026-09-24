@@ -456,10 +456,16 @@ export interface ExamQualityReport {
 // ─────────────────────────────────────────────────────────────
 
 export type BillingStatus = 'none' | 'pending' | 'trialing' | 'active' | 'canceling' | 'past_due' | 'canceled';
+export type MembershipPlanKey = 'monthly' | 'yearly';
+export const MEMBERSHIP_TERMS_VERSION = '1.2';
+export const MEMBERSHIP_PLANS = [
+  { key: 'monthly', name: '皓月卡', days: 30, amount: '2.99', currency: 'USD', intervalLabel: '月', trialDays: 7 },
+  { key: 'yearly', name: '星耀卡', days: 365, amount: '29.99', currency: 'USD', intervalLabel: '年', trialDays: 7 },
+] as const;
 export interface MembershipDetails {
   membership: { active: boolean; source: 'waffo' | 'legacy' | 'reward' | 'none'; accessEndsAt: number | null; legacyTier: 'monthly' | 'yearly' | null };
   billing: { status: BillingStatus; currentPeriodStart: number | null; currentPeriodEnd: number | null;
-    renewsAt: number | null; cancelAtPeriodEnd: boolean; amount: string; currency: string;
+    renewsAt: number | null; cancelAtPeriodEnd: boolean; amount: string; currency: string; planKey: MembershipPlanKey;
     trialEligible: boolean; checkoutAllowed: boolean; portalUrl: string };
   rewards: { bankedSeconds: number; activeUntil: number | null };
 }
@@ -480,9 +486,13 @@ export interface SubscriptionStatus extends MembershipDetails {
 
 /** 可通过 Waffo 收银台购买的星月卡档位 */
 export interface PurchasablePlan {
-  key: string;
+  key: MembershipPlanKey;
   name: string;
   days: number;
+  amount: string;
+  currency: string;
+  intervalLabel: string;
+  trialDays: number;
 }
 
 /** 星月积分（局内货币）可兑换的会员产品 */

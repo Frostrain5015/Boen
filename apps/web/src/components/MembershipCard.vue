@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Moon, Star, Sparkles, Lock } from 'lucide-vue-next';
+import { MEMBERSHIP_PLANS } from '@boen/shared';
 
 interface Props {
   type: 'monthly' | 'yearly';
@@ -30,8 +31,9 @@ const cardRef = ref<HTMLDivElement | null>(null);
 const rootEl = ref<HTMLDivElement | null>(null);
 
 const isMonthly = computed(() => props.type === 'monthly');
-const cardName = computed(() => (isMonthly.value ? '星月卡' : '星耀卡'));
-const cardPrice = computed(() => (isMonthly.value ? '$3/月' : '历史会员'));
+const plan = computed(() => MEMBERSHIP_PLANS[isMonthly.value ? 0 : 1]);
+const cardName = computed(() => plan.value.name);
+const cardPrice = computed(() => `$${plan.value.amount}/${plan.value.intervalLabel}`);
 const cardOriginalPrice = computed(() => '');
 
 // 持卡人名字

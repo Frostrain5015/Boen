@@ -15,7 +15,7 @@ beforeEach(() => {
   db = new Database(':memory:');
   initMembership(db);
   db.exec(`CREATE TABLE subscriptions(user_id TEXT PRIMARY KEY,tier TEXT,expires_at INTEGER,activated_at INTEGER);
-    CREATE TABLE payment_orders(user_id TEXT,order_id TEXT,status TEXT);`);
+    CREATE TABLE payment_orders(user_id TEXT,order_id TEXT,status TEXT,environment TEXT DEFAULT 'test');`);
 });
 afterEach(() => db.close());
 describe('membership lifecycle', () => {
@@ -76,5 +76,14 @@ describe('membership lifecycle', () => {
     addReward(db, 'alice', day, 'reward', now);
     initMembership(db);
     expect(membershipDetails(db, 'alice', now).membership.accessEndsAt).toBe(now + day);
+  });
+  it('keeps sandbox trial/order history separate from first production trial', () => {
+    applySubscription(db, row(), now);
+    db.prepare('INSERT INTO payment_orders VALUES (?,?,?,?)').run('alice', 'order', 'active', 'test');
+    process.env.WAFFO_ENVIRONMENT = 'prod';
+    expect(membershipDetails(db, 'alice', now).billing.trialEligible).toBe(true);
+    expect(membershipDetails(db, 'alice', now).membership.active).toBe(false);
+    applySubscription(db, row({ order_id: 'production', environment: 'prod', plan_key: 'yearly', amount: '29.99', currency: 'USD' }), now);
+    expect(membershipDetails(db, 'alice', now).billing).toMatchObject({ planKey: 'yearly', amount: '29.99', trialEligible: false });
   });
 });

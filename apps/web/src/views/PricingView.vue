@@ -1,6 +1,11 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue';
+import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 import { ArrowLeft, ArrowUpRight, ScanLine, Sparkles, BookOpen, ChartNoAxesCombined, Check } from 'lucide-vue-next';
 import MembershipCard from '@/components/MembershipCard.vue';
+import MembershipPlanPicker from '@/components/MembershipPlanPicker.vue';
+const selectedPlanKey = ref<MembershipPlanKey>('monthly');
+const selectedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === selectedPlanKey.value)!);
 const features = [
   { icon: ScanLine, title: '把一道题，变成一次进步', body: '拍照或输入题目，用 OCR 整理试题内容，再逐步理解解题思路。' },
   { icon: BookOpen, title: '练习有方向，错题有回响', body: '按学科学习和练习，整理错题，借助智能归因找出容易卡住的地方。' },
@@ -21,12 +26,13 @@ const features = [
           <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">可先使用免费基础对话，每日 10 次。AI 输出可能有误，请结合教材与教师指导核对。</p>
         </section>
         <section id="membership" class="clay clay-glass p-5 sm:p-6" aria-label="星月卡定价">
-          <MembershipCard type="monthly" size="lg" :show-price="false" status-label="为求知，多一份陪伴" />
+          <MembershipCard :type="selectedPlanKey" size="lg" :show-price="false" status-label="为求知，多一份陪伴" />
           <p class="mt-3 text-center text-xs text-[var(--ink-soft)]">轻触卡面，查看会员权益</p>
-          <div class="mt-6 flex items-end justify-between"><h2 class="font-display text-lg font-bold">星月卡</h2><p><span class="font-display text-3xl font-bold">$3</span><span class="ml-1 text-sm text-[var(--ink-soft)]">USD / 月</span></p></div>
+          <MembershipPlanPicker v-model="selectedPlanKey" :plans="MEMBERSHIP_PLANS" class="mt-6" />
+          <div class="mt-6 flex items-end justify-between"><h2 class="font-display text-lg font-bold">{{ selectedPlan.name }}</h2><p><span class="font-display text-3xl font-bold">${{ selectedPlan.amount }}</span><span class="ml-1 text-sm text-[var(--ink-soft)]">USD / {{ selectedPlan.intervalLabel }}</span></p></div>
           <ul class="my-5 space-y-2 text-sm text-[var(--ink-soft)]"><li v-for="benefit in ['DeepSeek V4 Pro 大模型', '全题型考试与错题智能归因', '学习诊断报告']" :key="benefit" class="flex items-center gap-2"><Check :size="15" class="text-[var(--accent-strong)]" />{{ benefit }}</li></ul>
-          <router-link to="/setup" class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold">登录后查看订阅</router-link>
-          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">首次订阅享 7 天免费试用；结束后按 $3/月自动续费，直至取消。税费以 Waffo 收银台为准。订阅开放状态以个人中心为准，未开放前不会收款。</p>
+          <router-link :to="{ path: '/setup', query: { plan: selectedPlanKey } }" class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold">登录后订阅{{ selectedPlan.name }}</router-link>
+          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">首次订阅享 7 天免费试用；结束后按 USD ${{ selectedPlan.amount }}/{{ selectedPlan.intervalLabel }} 自动续费，直至取消。年付方案按年一次收取 USD $29.99，并非每月扣款。两种方案权益相同，每个账户仅一次试用。税费以 Waffo 收银台为准。</p>
         </section>
       </div>
       <section class="grid gap-4 md:grid-cols-3" aria-label="产品功能"><article v-for="feature in features" :key="feature.title" class="clay clay-glass p-6"><component :is="feature.icon" :size="23" class="text-[var(--accent-strong)]" /><h2 class="font-display mt-4 text-base font-bold">{{ feature.title }}</h2><p class="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{{ feature.body }}</p></article></section>

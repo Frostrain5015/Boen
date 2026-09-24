@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue';
+import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 import { useRoute, useRouter } from 'vue-router';
 import { CreditCard, Sparkles, LoaderCircle, ArrowUpRight, RefreshCw } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { getToken } from '@/services/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipCard from './MembershipCard.vue';
+import MembershipPlanPicker from './MembershipPlanPicker.vue';
 
 const auth = useAuthStore();
 const toast = useToast();
@@ -19,6 +21,16 @@ const dialog = ref<HTMLDialogElement | null>(null);
 const action = ref<'cancel' | 'reactivate' | 'reward'>('cancel');
 const sub = computed(() => auth.subscription);
 const billing = computed(() => sub.value?.billing);
+const selectedPlanKey = ref<MembershipPlanKey>(route.query.plan === 'yearly' ? 'yearly' : 'monthly');
+const selectedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === selectedPlanKey.value)!);
+const plans = computed(() => sub.value?.plans ?? []);
+const billedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === billing.value?.planKey) ?? MEMBERSHIP_PLANS[0]);
+const hasBilling = computed(() => billing.value && !['none', 'canceled'].includes(billing.value.status));
+const priceLabel = computed(() => hasBilling.value
+  ? `${billing.value!.currency} $${billing.value!.amount}/${billedPlan.value.intervalLabel}`
+  : `USD $${selectedPlan.value.amount}/${selectedPlan.value.intervalLabel}`);
+const cardType = computed(() => sub.value?.membership.legacyTier ?? (hasBilling.value ? billedPlan.value.key : sub.value?.membership.source === 'reward' ? 'monthly' : selectedPlanKey.value));
+watch(selectedPlanKey, () => { agreed.value = false; });
 const canBuy = computed(() => Boolean(sub.value?.payEnabled && billing.value?.checkoutAllowed));
 const date = (value?: number | null) => value ? new Date(value * 1000).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '等待确认';
 const labels = { none: '尚未开通', pending: '等待支付', trialing: '免费试用中', active: '订阅生效中', canceling: '已取消续费', past_due: '付款待处理', canceled: '订阅已结束' };
@@ -30,19 +42,19 @@ const statusLabel = computed(() => {
 const statusDetail = computed(() => {
   if (!sub.value) return '正在读取你的会员信息…';
   if (sub.value.membership.source === 'legacy') return `原有权益保留至 ${date(sub.value.expiresAt)}，到期后可订阅星月卡。`;
-  if (billing.value?.status === 'trialing') return `首次扣款：${date(billing.value.renewsAt)}，之后 $3/月自动续费。`;
-  if (billing.value?.status === 'active') return `下次续费：${date(billing.value.renewsAt)} · $3/月。税费以账单为准。`;
+  if (billing.value?.status === 'trialing') return `首次扣款：${date(billing.value.renewsAt)}，之后 ${priceLabel.value} 自动续费。`;
+  if (billing.value?.status === 'active') return `下次续费：${date(billing.value.renewsAt)} · ${priceLabel.value}。税费以账单为准。`;
   if (billing.value?.status === 'canceling') return `不再自动扣款，当前权益保留至 ${date(billing.value.currentPeriodEnd)}。`;
   if (billing.value?.status === 'past_due') return `未能完成扣款，请更新付款方式。已付权益截止 ${date(billing.value.currentPeriodEnd)}。`;
   if (sub.value.membership.source === 'reward') return `学习积累的奖励正在生效，有效期至 ${date(sub.value.expiresAt)}。`;
-  return billing.value?.trialEligible ? '先体验 7 天，再决定是否继续。试用结束后 $3/月自动续费，可随时取消。' : '以 $3/月继续学习，可随时取消自动续费。';
+  return billing.value?.trialEligible ? `先体验 7 天，再决定是否继续。试用结束后 ${priceLabel.value} 自动续费，可随时取消。` : `以 ${priceLabel.value} 继续学习，可随时取消自动续费。`;
 });
 const confirmTitle = computed(() => action.value === 'reward' ? '兑换 30 天奖励会员' : action.value === 'cancel' ? '取消自动续费' : '恢复自动续费');
 const confirmDetail = computed(() => action.value === 'reward'
   ? '将使用 2000 星月积分。已有订阅或历史会员期间，奖励时长会存起来，在现有权益结束后使用。'
   : action.value === 'cancel'
     ? `取消后不再自动扣款，当前权益保留至 ${date(billing.value?.currentPeriodEnd)}。付款失败且已过周期时，不会延长权益。`
-    : `恢复后按 $3/月自动续费，下一次扣款时间以 Waffo 账单为准。可再次取消。`);
+    : `恢复后按 ${priceLabel.value} 自动续费，下一次扣款时间以 Waffo 账单为准。可再次取消。`);
 
 async function refresh() {
   await Promise.all([auth.fetchSubscription(), auth.fetchCurrencyStatus()]);
@@ -52,7 +64,7 @@ async function buy() {
   if (busy.value || !agreed.value || !canBuy.value) return;
   busy.value = true;
   try {
-    const result = await auth.createCheckout('monthly');
+    const result = await auth.createCheckout(selectedPlanKey.value);
     if (!result.ok || !result.checkoutUrl) { toast.error(result.message ?? '暂时无法创建订阅'); return; }
     // Same-tab navigation avoids popup blockers and duplicate checkout tabs.
     window.location.assign(result.checkoutUrl);
@@ -117,22 +129,24 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
         <h2 id="membership-heading" class="font-display text-sm font-bold text-[var(--ink)]">会员与订阅</h2>
         <button class="text-xs text-[var(--ink-soft)] inline-flex items-center gap-1 rounded-lg p-1" :disabled="busy" @click="refresh"><RefreshCw :size="12" />刷新</button>
       </div>
-      <MembershipCard ref="card" :type="sub?.membership.legacyTier === 'yearly' ? 'yearly' : 'monthly'" size="lg"
+      <MembershipCard ref="card" :type="cardType" size="lg"
         :holder-name="auth.userProfile?.name ?? auth.currentUser?.username ?? ''" :expires-at="sub?.expiresAt"
         :show-price="false" :locked="!auth.isPremium" :status-label="statusLabel" />
       <p class="text-center text-xs text-[var(--ink-soft)]"><Sparkles class="inline mr-1 h-3 w-3" />轻触卡面，看看你的学习权益</p>
       <div class="clay clay-glass p-5 space-y-4" aria-live="polite">
-        <div class="flex items-center justify-between gap-2"><span class="status-pill">{{ statusLabel }}</span><span v-if="sub?.membership.source !== 'legacy' && sub?.membership.source !== 'reward'" class="text-sm font-semibold text-[var(--ink-soft)]">$3 <span class="text-xs font-normal">/ 月</span></span></div>
+        <div class="flex items-center justify-between gap-2"><span class="status-pill">{{ statusLabel }}</span><span v-if="sub?.membership.source !== 'legacy' && sub?.membership.source !== 'reward'" class="text-sm font-semibold text-[var(--ink-soft)]">{{ priceLabel }}</span></div>
         <p class="text-sm leading-6 text-[var(--ink-soft)]">{{ statusDetail }}</p>
         <p v-if="loadFailed" class="text-sm text-[var(--error)]">会员信息暂未加载，请点击刷新。</p>
         <template v-if="billing?.checkoutAllowed">
+          <MembershipPlanPicker v-if="plans.length" v-model="selectedPlanKey" :plans="plans" :disabled="busy" />
+          <p class="text-xs leading-5 text-[var(--ink-soft)]">月付与年付权益相同；首次试用每个账户限一次，不因更换方案重复提供。已有订阅须结束后才能选择另一方案。</p>
           <label v-if="canBuy" class="flex items-start gap-2 text-xs leading-5 text-[var(--ink-soft)]">
             <input v-model="agreed" type="checkbox" class="mt-1 accent-[var(--accent)]" />
-            <span>我同意<router-link to="/terms" class="underline">服务条款</router-link>与<router-link to="/privacy" class="underline">隐私政策</router-link>，并授权{{ billing.trialEligible ? '7 天试用后' : '' }}按 $3/月自动续费，直至取消。未满 18 岁购买须经监护人同意。</span>
+            <span>我同意<router-link to="/terms" class="underline">服务条款</router-link>与<router-link to="/privacy" class="underline">隐私政策</router-link>，并授权{{ billing.trialEligible ? '7 天试用后' : '' }}按 {{ priceLabel }} 自动续费，直至取消。未满 18 岁购买须经监护人同意。</span>
           </label>
           <button class="membership-primary w-full" :disabled="busy || !agreed || !canBuy" @click="buy">
             <LoaderCircle v-if="busy" :size="16" class="animate-spin" /><CreditCard v-else :size="16" />
-            {{ !sub?.payEnabled ? '订阅即将开放' : billing.trialEligible ? '开始 7 天免费试用' : '订阅星月卡 · $3/月' }}
+            {{ !sub?.payEnabled ? '订阅暂未开放' : billing.trialEligible ? `开始 7 天免费试用 · ${selectedPlan.name}` : `订阅${selectedPlan.name} · ${priceLabel}` }}
           </button>
           <p v-if="sub?.membership.source === 'reward'" class="text-xs leading-5 text-[var(--ink-soft)]">开通订阅后，剩余奖励时长会暂停保留，订阅结束后接着用。</p>
         </template>

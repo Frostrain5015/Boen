@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { MembershipDetails, BillingStatus } from '@boen/shared';
+import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 
 export function initMembership(db: Database.Database): void {
   db.exec(`
@@ -41,12 +42,25 @@ export function initMembership(db: Database.Database): void {
   if (!rewardColumns.some(column => column.name === 'active_started_at')) {
     db.exec('ALTER TABLE membership_reward_accounts ADD COLUMN active_started_at INTEGER');
   }
+  // Existing data belongs to the previously deployed sandbox. Never reinterpret it as production.
+  const migrations = [
+    ['payment_orders', 'environment', "TEXT NOT NULL DEFAULT 'test'"],
+    ['payment_checkout_attempts', 'plan_key', "TEXT NOT NULL DEFAULT 'monthly'"],
+    ['waffo_subscriptions', 'plan_key', "TEXT NOT NULL DEFAULT 'monthly'"],
+    ['waffo_subscriptions', 'amount', "TEXT NOT NULL DEFAULT '3.00'"],
+    ['waffo_subscriptions', 'currency', "TEXT NOT NULL DEFAULT 'USD'"],
+  ];
+  for (const [table, column, definition] of migrations) {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (columns.length && !columns.some(item => item.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 export interface SubscriptionRow {
   order_id: string; user_id: string; environment: string; status: BillingStatus;
   period_start: number; period_end: number; canceled_at: number | null;
   event_at: number; event_id: string; trial_used: number;
+  plan_key?: MembershipPlanKey; amount?: string; currency?: string;
 }
 interface RewardRow { balance_seconds: number; expires_at: number | null; active_started_at: number | null }
 interface LegacyRow { tier: 'monthly' | 'yearly'; expires_at: number; activated_at: number }
@@ -110,7 +124,7 @@ export function addReward(db: Database.Database, userId: string, seconds: number
 export function trialEligible(db: Database.Database, userId: string): boolean {
   return !db.prepare('SELECT 1 FROM membership_trial_history WHERE user_id=? AND environment=?').get(userId, billingEnvironment())
     && !currentSubscription(db, userId)
-    && !db.prepare("SELECT 1 FROM payment_orders WHERE user_id=? AND order_id IS NOT NULL AND status NOT IN ('pending','failed')").get(userId);
+    && !db.prepare("SELECT 1 FROM payment_orders WHERE user_id=? AND environment=? AND order_id IS NOT NULL AND status NOT IN ('pending','failed')").get(userId, billingEnvironment());
 }
 
 export function membershipDetails(db: Database.Database, userId: string, now = nowSeconds()): MembershipDetails {
@@ -128,7 +142,8 @@ export function membershipDetails(db: Database.Database, userId: string, now = n
       billing: { status: sub?.status ?? 'none', currentPeriodStart: sub?.period_start ?? null,
         currentPeriodEnd: sub?.period_end ?? null,
         renewsAt: sub && ['active','trialing'].includes(sub.status) ? sub.period_end : null,
-        cancelAtPeriodEnd: sub?.status === 'canceling', amount: '3.00', currency: 'USD',
+        cancelAtPeriodEnd: sub?.status === 'canceling', planKey: sub?.plan_key ?? 'monthly',
+        amount: sub?.amount ?? MEMBERSHIP_PLANS[0].amount, currency: sub?.currency ?? 'USD',
         trialEligible: trialEligible(db, userId),
         checkoutAllowed: !legacy && (!sub || (sub.status === 'canceled' && sub.period_end <= now)),
         portalUrl: process.env.WAFFO_PORTAL_URL || 'https://pancake.waffo.ai/consumer/portal/login' },
@@ -145,12 +160,14 @@ export function applySubscription(db: Database.Database, row: SubscriptionRow, n
     if (prior?.event_id === row.event_id) return false;
     // A canceled order cannot be resurrected by a delayed lifecycle notification.
     if (prior?.status === 'canceled' && row.status !== 'canceled') return false;
-    db.prepare(`INSERT INTO waffo_subscriptions(order_id,user_id,environment,status,period_start,period_end,canceled_at,event_at,event_id,trial_used)
-      VALUES (@order_id,@user_id,@environment,@status,@period_start,@period_end,@canceled_at,@event_at,@event_id,@trial_used)
+    const plan = MEMBERSHIP_PLANS.find(plan => plan.key === row.plan_key) ?? MEMBERSHIP_PLANS[0];
+    db.prepare(`INSERT INTO waffo_subscriptions(order_id,user_id,environment,status,period_start,period_end,canceled_at,event_at,event_id,trial_used,plan_key,amount,currency)
+      VALUES (@order_id,@user_id,@environment,@status,@period_start,@period_end,@canceled_at,@event_at,@event_id,@trial_used,@plan_key,@amount,@currency)
       ON CONFLICT(order_id) DO UPDATE SET status=excluded.status,period_start=excluded.period_start,
       period_end=excluded.period_end,canceled_at=excluded.canceled_at,event_at=excluded.event_at,
-      event_id=excluded.event_id,trial_used=MAX(waffo_subscriptions.trial_used,excluded.trial_used),updated_at=unixepoch()`)
-      .run(row);
+      event_id=excluded.event_id,trial_used=MAX(waffo_subscriptions.trial_used,excluded.trial_used),
+      plan_key=excluded.plan_key,amount=excluded.amount,currency=excluded.currency,updated_at=unixepoch()`)
+      .run({ ...row, plan_key: plan.key, amount: row.amount ?? plan.amount, currency: row.currency ?? plan.currency });
     db.prepare('INSERT OR IGNORE INTO membership_trial_history(user_id,environment) VALUES (?,?)').run(row.user_id, row.environment);
     syncRewards(db, row.user_id, now, ['active','trialing','canceling'].includes(row.status) ? row.period_start : undefined);
     return true;

@@ -22,16 +22,18 @@ async function checkSupportFooter(page) {
   if (!await link.evaluate(element => element === document.activeElement)) throw new Error('Support contact not keyboard accessible');
 }
 function status(state = 'active') {
+  const yearly = state.startsWith('yearly-');
+  if (yearly) state = state.slice(7);
   const legacy = state === 'legacy';
   const reward = state === 'reward';
   const none = state === 'none';
   const ends = now + 7 * 86400;
   return { tier: legacy ? 'yearly' : none ? 'free' : 'monthly', isPremium: !none && state !== 'canceled', expiresAt: none ? null : ends,
     activatedAt: now, dailyLimit: none ? 10 : null, dailyUsed: 0, dailyRemaining: 10, payEnabled: true,
-    plans: [{ key: 'monthly', name: '星月卡', days: 30 }],
+    plans: [{ key: 'monthly', name: '皓月卡', days: 30, amount: '2.99', currency: 'USD', intervalLabel: '月', trialDays: 7 }, { key: 'yearly', name: '星耀卡', days: 365, amount: '29.99', currency: 'USD', intervalLabel: '年', trialDays: 7 }],
     membership: { active: !none, source: legacy ? 'legacy' : reward ? 'reward' : none ? 'none' : 'waffo', accessEndsAt: ends, legacyTier: legacy ? 'yearly' : null },
     billing: { status: legacy || reward ? 'none' : state, currentPeriodStart: now, currentPeriodEnd: ends, renewsAt: ends,
-      cancelAtPeriodEnd: state === 'canceling', amount: '3.00', currency: 'USD', trialEligible: none,
+      cancelAtPeriodEnd: state === 'canceling', planKey: yearly ? 'yearly' : 'monthly', amount: yearly ? '29.99' : '2.99', currency: 'USD', trialEligible: none,
       checkoutAllowed: none || reward || state === 'canceled', portalUrl: 'https://pancake.waffo.ai/consumer/portal/login' },
     rewards: { bankedSeconds: 30 * 86400, activeUntil: reward ? ends : null } };
 }
@@ -44,6 +46,8 @@ try {
     await page.goto(`${origin}/pricing`);
     await page.getByRole('heading', { name: /让学习/ }).waitFor();
     await page.locator('#boot-loader').waitFor({ state: 'detached' });
+    await page.getByRole('radio', { name: /星耀卡/ }).check();
+    if (!await page.getByRole('heading', { name: '星耀卡', exact: true }).isVisible()) throw new Error('Yearly pricing not rendered');
     await checkSupportFooter(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     if (overflow) throw new Error(`Pricing overflows at ${width}`);
@@ -68,7 +72,7 @@ try {
   }
   await page.close();
   for (const width of [360, 390, 768, 1280]) {
-    for (const state of ['none', 'trialing', 'active', 'canceling', 'past_due', 'canceled', 'legacy', 'reward']) {
+    for (const state of ['none', 'trialing', 'active', 'canceling', 'past_due', 'canceled', 'legacy', 'reward', 'yearly-active', 'yearly-trialing', 'yearly-canceling']) {
       const context = await browser.newContext({ viewport: { width, height: 1050 }, reducedMotion: 'reduce' });
       await context.addInitScript(() => {
         sessionStorage.setItem('boen_access_token', 'ui-fixture');
@@ -92,6 +96,14 @@ try {
       await ui.getByRole('heading', { name: '会员与订阅', exact: true }).waitFor();
       await ui.locator('#boot-loader').waitFor({ state: 'detached' });
       await checkSupportFooter(ui);
+      if (state.startsWith('yearly-') && !(await ui.locator('.membership-panel').innerText()).includes('USD $29.99/年')) throw new Error('Yearly billing price missing');
+      if (state === 'none') {
+        const consent = ui.getByRole('checkbox');
+        await consent.check();
+        await ui.getByRole('radio', { name: /星耀卡/ }).check();
+        if (await consent.isChecked()) throw new Error('Changing plans must reset automatic-renewal consent');
+        if (!(await ui.locator('.membership-panel').innerText()).includes('USD $29.99/年')) throw new Error('Selected yearly checkout price missing');
+      }
       if (!await ui.locator('footer[aria-label="网站信息"] a[href="/terms"]').isVisible()) throw new Error('Missing authenticated legal footer');
       if (await ui.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error(`Setup overflows at ${width}/${state}`);
       const card = ui.locator('.membership-card-container');
@@ -114,5 +126,5 @@ try {
     }
   }
   if (errors.length) throw new Error(JSON.stringify(errors));
-  console.log('Public pages and 32 responsive membership states passed. Screenshots:', output);
+  console.log('Public pages and 44 responsive membership states passed. Screenshots:', output);
 } finally { await browser.close(); }

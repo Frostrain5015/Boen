@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { WaffoPancake, verifyWebhook, type WebhookEvent, type WebhookEventData } from '@waffo/pancake-ts';
-import type { BillingStatus } from '@boen/shared';
+import { MEMBERSHIP_TERMS_VERSION, type BillingStatus, type MembershipPlanKey } from '@boen/shared';
+import { configuredPlans, verifyCatalog } from './waffo-catalog.js';
 import db from './db.js';
 import { applySubscription, billingEnvironment, currentSubscription, membershipDetails, nowSeconds, trialEligible } from './membership.js';
 
@@ -16,22 +17,25 @@ export function isWaffoEnabled(): boolean {
   return Boolean(c.merchantId && c.privateKey && c.storeId && c.productId)
     && (c.environment === 'prod' || process.env.WAFFO_ALLOW_TEST_CHECKOUT === 'true');
 }
-export function listPurchasablePlans() { return cfg().productId ? [{ key: 'monthly', name: '星月卡', days: 30 }] : []; }
+export function listPurchasablePlans() { return configuredPlans().map(({ productId: _id, ...plan }) => plan); }
 type Failure = { ok: false; error: string; message: string };
 export type CheckoutResult = { ok: true; sessionId: string; checkoutUrl: string; expiresAt: string } | Failure;
-interface Attempt { external_id: string; environment: string; session_id: string | null; checkout_url: string | null; expires_at: number; state: string; with_trial: number; created_at: number }
-const checkoutInflight = new Map<string, Promise<CheckoutResult>>();
+interface Attempt { external_id: string; environment: string; plan_key: MembershipPlanKey; session_id: string | null; checkout_url: string | null; expires_at: number; state: string; with_trial: number; created_at: number }
+const checkoutInflight = new Map<string, { planKey: string; promise: Promise<CheckoutResult> }>();
 
 export async function createMembershipCheckout(opts: { userId: string; planKey: string; buyerEmail?: string; successUrl: string }): Promise<CheckoutResult> {
   const existing = checkoutInflight.get(opts.userId);
-  if (existing) return existing;
+  if (existing) return existing.planKey === opts.planKey ? existing.promise : { ok: false, error: 'conflict', message: '另一方案正在创建，请稍后重试' };
   const promise = createCheckout(opts);
-  checkoutInflight.set(opts.userId, promise);
+  checkoutInflight.set(opts.userId, { planKey: opts.planKey, promise });
   try { return await promise; } finally { checkoutInflight.delete(opts.userId); }
 }
 async function createCheckout(opts: { userId: string; planKey: string; buyerEmail?: string; successUrl: string }): Promise<CheckoutResult> {
   if (!isWaffoEnabled()) return { ok: false, error: 'unavailable', message: '订阅暂未开放，请稍后再来' };
-  if (opts.planKey !== 'monthly') return { ok: false, error: 'invalid_plan', message: '该会员档位不可购买' };
+  const plan = configuredPlans().find(plan => plan.key === opts.planKey);
+  if (!plan) return { ok: false, error: 'invalid_plan', message: '该会员档位不可购买' };
+  try { await verifyCatalog(getClient(), cfg().environment); }
+  catch { return { ok: false, error: 'catalog_unavailable', message: '商品配置正在核实，请稍后再试，当前不会创建扣款' }; }
   try { await reconcileMembership(opts.userId, true); }
   catch { return { ok: false, error: 'reconciliation_required', message: '暂时无法核实原有订单，请稍后重试，避免重复订阅' }; }
   if (!membershipDetails(db, opts.userId).billing.checkoutAllowed) return { ok: false, error: 'conflict', message: '你已有会员或订阅，请先管理现有权益' };
@@ -44,26 +48,27 @@ async function createCheckout(opts: { userId: string; planKey: string; buyerEmai
       row = undefined;
     }
     if (!row) {
-      db.prepare(`INSERT INTO payment_checkout_attempts(user_id,external_id,environment,expires_at,state,with_trial)
-        VALUES (?,?,?,?,'creating',?)`).run(opts.userId, randomUUID(), c.environment, now + 86400, trialEligible(db, opts.userId) ? 1 : 0);
+      db.prepare(`INSERT INTO payment_checkout_attempts(user_id,external_id,environment,expires_at,state,with_trial,plan_key)
+        VALUES (?,?,?,?,'creating',?,?)`).run(opts.userId, randomUUID(), c.environment, now + 86400, trialEligible(db, opts.userId) ? 1 : 0, plan.key);
       row = db.prepare('SELECT * FROM payment_checkout_attempts WHERE user_id=?').get(opts.userId) as Attempt;
     }
-    db.prepare("INSERT OR IGNORE INTO payment_consents(external_id,user_id,terms_version) VALUES (?,?,'1.1')").run(row.external_id, opts.userId);
+    db.prepare('INSERT OR IGNORE INTO payment_consents(external_id,user_id,terms_version) VALUES (?,?,?)').run(row.external_id, opts.userId, MEMBERSHIP_TERMS_VERSION);
     return row;
   })();
+  if (attempt.plan_key !== plan.key) return { ok: false, error: 'conflict', message: '已有另一方案的支付申请，请先完成原申请或等待其过期，避免重复订阅' };
   if (attempt.state === 'ready' && attempt.session_id && attempt.checkout_url) {
     return { ok: true, sessionId: attempt.session_id, checkoutUrl: attempt.checkout_url, expiresAt: new Date(attempt.expires_at * 1000).toISOString() };
   }
   if (attempt.created_at < now - 23 * 3600) return { ok: false, error: 'reconciliation_required', message: '上一笔支付尚待核实，请联系支持，避免重复订阅' };
   try {
     const result = await getClient().checkout.authenticated.create({
-      productId: c.productId, currency: 'USD', buyerIdentity: opts.userId, buyerEmail: opts.buyerEmail,
+      productId: plan.productId, currency: plan.currency, buyerIdentity: opts.userId, buyerEmail: opts.buyerEmail,
       successUrl: opts.successUrl, language: 'zh-Hans', withTrial: Boolean(attempt.with_trial),
-      orderMerchantExternalId: attempt.external_id, metadata: { userId: opts.userId, planKey: 'monthly' },
+      orderMerchantExternalId: attempt.external_id, metadata: { userId: opts.userId, planKey: plan.key },
     }, { idempotencyKey: `boen-checkout-${attempt.external_id}` });
     db.transaction(() => {
-      db.prepare(`INSERT OR IGNORE INTO payment_orders(session_id,user_id,plan_key,product_id,currency,external_id,checkout_url,buyer_email,status)
-        VALUES (?,?,'monthly',?,'USD',?,?,?,'pending')`).run(result.sessionId, opts.userId, c.productId, attempt.external_id, result.checkoutUrl, opts.buyerEmail ?? null);
+      db.prepare(`INSERT OR IGNORE INTO payment_orders(session_id,user_id,plan_key,product_id,currency,external_id,checkout_url,buyer_email,status,environment,amount)
+        VALUES (?,?,?,?,?,?,?,?,'pending',?,?)`).run(result.sessionId, opts.userId, plan.key, plan.productId, plan.currency, attempt.external_id, result.checkoutUrl, opts.buyerEmail ?? null, c.environment, plan.amount);
       db.prepare(`UPDATE payment_checkout_attempts SET session_id=?,checkout_url=?,expires_at=?,state='ready' WHERE user_id=? AND external_id=?`)
         .run(result.sessionId, result.checkoutUrl, dateSeconds(result.expiresAt), opts.userId, attempt.external_id);
     })();
@@ -86,14 +91,15 @@ function statusValue(value: string): BillingStatus {
 interface RemoteSubscription {
   id: string; status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null;
   canceledAt: string | null; updatedAt: string; isInTrial: boolean; testMode: boolean; merchantProvidedBuyerIdentity: string; subscriptionProduct: { id: string };
+  billingPeriod: string; currency: string; priceSnapshot: { regularPhase: { subtotal: string } } | null;
 }
 async function remoteSubscription(orderId: string): Promise<RemoteSubscription> {
   const result = await getClient().graphql.query<{ subscriptionOrder: RemoteSubscription | null }>({
-    query: `query ($id: ID!) { subscriptionOrder(id: $id) { id status isInTrial testMode merchantProvidedBuyerIdentity currentPeriodStart currentPeriodEnd canceledAt updatedAt subscriptionProduct { id } } }`,
+    query: `query ($id: ID!) { subscriptionOrder(id: $id) { id status isInTrial testMode merchantProvidedBuyerIdentity currentPeriodStart currentPeriodEnd canceledAt updatedAt billingPeriod currency priceSnapshot { regularPhase { subtotal } } subscriptionProduct { id } } }`,
     variables: { id: orderId },
   });
   const row = result.data?.subscriptionOrder;
-  if (!row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || row.subscriptionProduct.id !== cfg().productId) throw new Error('Subscription unavailable or product/environment mismatch');
+  if (!row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || !configuredPlans().some(plan => plan.productId === row.subscriptionProduct.id && plan.key === row.billingPeriod)) throw new Error('Subscription unavailable or product/environment mismatch');
   return row;
 }
 const orderInflight = new Map<string, Promise<unknown>>();
@@ -120,9 +126,12 @@ async function refreshOrder(userId: string, orderId: string, eventId: string): P
   if (start == null || end == null) throw new Error('Subscription has no authoritative billing period');
   const eventAt = Date.parse(remote.updatedAt);
   if (!Number.isFinite(eventAt)) throw new Error('Missing order version');
+  const plan = configuredPlans().find(plan => plan.productId === remote.subscriptionProduct.id)!;
+  const amount = remote.priceSnapshot?.regularPhase.subtotal;
+  if (!amount || !Number.isFinite(Number(amount)) || Number(amount) < 0 || !remote.currency) throw new Error('Missing authoritative recurring price');
   const changed = applySubscription(db, { order_id: orderId, user_id: userId, environment: cfg().environment,
     status, period_start: start, period_end: end, canceled_at: remote.canceledAt ? dateSeconds(remote.canceledAt) : null,
-    event_at: eventAt, event_id: eventId, trial_used: status === 'trialing' ? 1 : 0 });
+    event_at: eventAt, event_id: eventId, trial_used: status === 'trialing' ? 1 : 0, plan_key: plan.key, amount, currency: remote.currency });
   if (changed) {
     db.prepare('UPDATE payment_orders SET status=?,updated_at=unixepoch() WHERE order_id=? AND user_id=?').run(status, orderId, userId);
     db.prepare('DELETE FROM payment_checkout_attempts WHERE user_id=? AND session_id IN (SELECT session_id FROM payment_orders WHERE order_id=?)').run(userId, orderId);
@@ -132,7 +141,7 @@ const lastReconciled = new Map<string, number>();
 /** Repair missed webhooks and check old checkout outcomes before issuing another session. */
 export async function reconcileMembership(userId: string, force = false): Promise<void> {
   if (!force && (lastReconciled.get(userId) ?? 0) > Date.now() - 60_000) return;
-  if (!force && !db.prepare('SELECT 1 FROM payment_orders WHERE user_id=? LIMIT 1').get(userId)) return;
+  if (!force && !db.prepare('SELECT 1 FROM payment_orders WHERE user_id=? AND environment=? LIMIT 1').get(userId, cfg().environment)) return;
   if (!cfg().privateKey || !cfg().storeId) return;
   interface OrderIdentity { id: string; orderMerchantExternalId: string | null; merchantProvidedBuyerIdentity: string; status: string; testMode: boolean }
   for (let offset = 0; ; offset += 100) {
@@ -144,8 +153,8 @@ export async function reconcileMembership(userId: string, force = false): Promis
     if (!orders) throw new Error('Order reconciliation unavailable');
     for (const order of orders) {
       if (order.testMode !== (cfg().environment === 'test') || order.merchantProvidedBuyerIdentity !== userId) continue;
-      const local = db.prepare('SELECT session_id FROM payment_orders WHERE user_id=? AND (order_id=? OR external_id=?)')
-        .get(userId, order.id, order.orderMerchantExternalId ?? '') as { session_id: string } | undefined;
+      const local = db.prepare('SELECT session_id FROM payment_orders WHERE user_id=? AND environment=? AND (order_id=? OR external_id=?)')
+        .get(userId, cfg().environment, order.id, order.orderMerchantExternalId ?? '') as { session_id: string } | undefined;
       if (!local) {
         if (!['canceled','closed','expired'].includes(order.status)) throw new Error('Unmatched existing subscription');
         continue;
@@ -176,8 +185,8 @@ export async function handleWaffoWebhook(rawBody: string, signature: string | nu
         .run(event.id, event.eventType, event.eventId, event.mode, event.data.orderId, rawBody);
       if ((event.eventType.startsWith('subscription.') && event.eventType !== 'subscription.payment_succeeded') || event.eventType === 'refund.succeeded') {
         const data = event.data;
-        const order = db.prepare(`SELECT user_id,session_id FROM payment_orders WHERE external_id=? OR order_id=? ORDER BY CASE WHEN external_id=? THEN 0 ELSE 1 END LIMIT 1`)
-          .get(data.orderMerchantExternalId ?? '', data.orderId, data.orderMerchantExternalId ?? '') as { user_id: string; session_id: string } | undefined;
+        const order = db.prepare(`SELECT user_id,session_id FROM payment_orders WHERE environment=? AND (external_id=? OR order_id=?) ORDER BY CASE WHEN external_id=? THEN 0 ELSE 1 END LIMIT 1`)
+          .get(cfg().environment, data.orderMerchantExternalId ?? '', data.orderId, data.orderMerchantExternalId ?? '') as { user_id: string; session_id: string } | undefined;
         if (!order) throw new Error('Unmatched order; retry after checkout persistence');
         if (data.merchantProvidedBuyerIdentity && data.merchantProvidedBuyerIdentity !== order.user_id) throw new Error('Buyer identity mismatch');
         db.prepare('UPDATE payment_orders SET order_id=? WHERE session_id=?').run(data.orderId, order.session_id);
