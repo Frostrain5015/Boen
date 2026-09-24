@@ -61,9 +61,9 @@ onMounted(() => {
   });
 
   game.events.on('ready', () => {
-    scene = game!.scene.getScene('RunnerScene') as RunnerScene;
+    scene = game!.scene.getScene('RunnerScene') as unknown as RunnerScene;
     scene.setSubject(props.subject);
-    scene.setEvents({
+    scene.setGameEvents({
       onScoreChange: (s) => { score.value = s; },
       onLivesChange: (l) => { lives.value = l; },
       onStatsChange: (stats) => {

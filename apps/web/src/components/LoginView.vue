@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import type { SubscriptionStatus } from '@boen/shared';
 import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
 import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
-import { useAuthStore } from '@/stores/auth';
+import { useAuthStore, type UserProfile } from '@/stores/auth';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -28,15 +29,46 @@ async function handleLogin() {
 function handleTestLogin() {
   if (!isDev || !agreedToTerms.value) return;
   const { user, profile } = loginAsTestUser({ name: '本地测试用户', grade: '8' });
-  // 直接设置 auth store 状态，跳过 API 调用链条
-  authStore.$patch({
-    authenticated: true,
-    authChecked: true,
-    currentUser: user,
-    userProfile: profile,
-    subscription: { isPremium: true, plan: 'local-dev', dailyRemaining: 99, dailyUsed: 0 },
-    currency: { balance: 9999, totalEarned: 9999, totalSpent: 0, dailyEarned: 0, dailyCap: 100, claimedToday: true },
-  });
+  // 直接设置 auth store 状态，跳过 API 调用链条（仅本地开发）
+  authStore.authenticated = true;
+  authStore.authChecked = true;
+  authStore.currentUser = user;
+  authStore.userProfile = profile as unknown as UserProfile;
+  authStore.subscription = {
+    tier: 'monthly',
+    isPremium: true,
+    expiresAt: null,
+    activatedAt: null,
+    dailyLimit: null,
+    dailyUsed: 0,
+    dailyRemaining: 99,
+    membership: { active: true, source: 'legacy', accessEndsAt: null, legacyTier: 'monthly' },
+    billing: {
+      status: 'active',
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      renewsAt: null,
+      cancelAtPeriodEnd: false,
+      amount: '0',
+      currency: 'USD',
+      planKey: 'monthly',
+      trialEligible: false,
+      checkoutAllowed: false,
+      portalUrl: 'https://pancake.waffo.ai/consumer/portal/login',
+    },
+    rewards: { bankedSeconds: 0, activeUntil: null },
+  } as SubscriptionStatus;
+  authStore.currency = {
+    balance: 9999,
+    totalEarned: 9999,
+    totalSpent: 0,
+    todayEarned: 0,
+    dailyCap: 100,
+    dailyRemaining: 100,
+    products: [],
+    claimedToday: true,
+    loginReward: 50,
+  } as any;
   router.push('/');
 }
 </script>

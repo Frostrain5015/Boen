@@ -81,7 +81,7 @@ import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode 
 import { membershipDetails } from './membership.js';
 import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin, beijingDateStr } from './currency.js';
 import { createMembershipCheckout, handleWaffoWebhook, isWaffoEnabled, listPurchasablePlans, listPaymentOrders, manageSubscription, reconcileMembership } from './waffo.js';
-import { initQuestionPool, getPooledQuestions } from './game.js';
+import { initQuestionPool, getPooledQuestion, getPooledQuestions } from './game.js';
 
 // 从仓库根加载 .env
 const __dirname = dirname(fileURLToPath(import.meta.url));

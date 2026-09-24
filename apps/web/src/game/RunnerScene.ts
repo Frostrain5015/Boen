@@ -46,7 +46,7 @@ export class RunnerScene extends Phaser.Scene {
   private lives = INIT_LIVES;
   private speed = INITIAL_SPEED;
   private over = false;
-  private events: GameEvents = {};
+  private gameEvents: GameEvents = {};
   private subject: Subject = 'math';
   private subj!: { accent: number; strong: number; soft: number };
   private qQueue: GameQuestion[] = [];
@@ -71,7 +71,7 @@ export class RunnerScene extends Phaser.Scene {
 
   constructor() { super({ key: 'RunnerScene' }); }
 
-  setEvents(e: GameEvents) { this.events = e; }
+  setGameEvents(e: GameEvents) { this.gameEvents = e; }
   setSubject(s: Subject) {
     this.subject = s;
     this.subj = SUBJ[this.subject] || SUBJ.math;
@@ -206,7 +206,7 @@ export class RunnerScene extends Phaser.Scene {
     if (!q) return;
     this.currentQ = q;
     this.activeBarrierBatch = true;
-    this.events.onQuestionChange?.(q);
+    this.gameEvents.onQuestionChange?.(q);
     this.panel.setAlpha(1);
     this.panelTxt.setText(q.stem);
 
@@ -272,7 +272,7 @@ export class RunnerScene extends Phaser.Scene {
       this.score += BONUS;
       this.correctQuestions++;
       this.speed = Math.min(MAX_SPEED, this.speed + SPEED_STEP);
-      this.events.onScoreChange?.(this.score);
+      this.gameEvents.onScoreChange?.(this.score);
     } else {
       this.speed = Math.max(INITIAL_SPEED, this.speed - SPEED_STEP * 2);
       // 只停掉玩家身上的动画（防止上一次残留），虚化闪烁通过红色门
@@ -288,7 +288,7 @@ export class RunnerScene extends Phaser.Scene {
       });
       this.cameras.main.flash(300, 242, 85, 101, false);
       this.lives--;
-      this.events.onLivesChange?.(this.lives);
+      this.gameEvents.onLivesChange?.(this.lives);
     }
     this.emitStats();
 
@@ -337,7 +337,7 @@ export class RunnerScene extends Phaser.Scene {
     // 保持题目面板显示 1.5 秒后再隐藏
     this.questionHighlightTimer = 1500;
     this.currentQ = null;
-    this.events.onQuestionChange?.(null);
+    this.gameEvents.onQuestionChange?.(null);
 
     // 生命值耗尽 → 结束
     if (this.lives <= 0) {
@@ -356,7 +356,7 @@ export class RunnerScene extends Phaser.Scene {
     this.barriers.forEach(b => b.destroy());
     this.barriers = [];
     this.player.setAlpha(0);
-    this.events.onGameOver?.(this.getStats());
+    this.gameEvents.onGameOver?.(this.getStats());
   }
 
   private getStats(): GameStats {
@@ -369,7 +369,7 @@ export class RunnerScene extends Phaser.Scene {
   }
 
   private emitStats() {
-    this.events.onStatsChange?.({
+    this.gameEvents.onStatsChange?.({
       totalQuestions: this.totalQuestions,
       correctQuestions: this.correctQuestions,
       accuracyRate: this.totalQuestions === 0 ? 0 : Math.round((this.correctQuestions / this.totalQuestions) * 100),
@@ -391,8 +391,8 @@ export class RunnerScene extends Phaser.Scene {
     this.panel.setAlpha(0);
     this.cameras.main.resetFX();
     // 同步 Vue 覆盖层状态
-    this.events.onScoreChange?.(0);
-    this.events.onLivesChange?.(INIT_LIVES);
+    this.gameEvents.onScoreChange?.(0);
+    this.gameEvents.onLivesChange?.(INIT_LIVES);
     this.emitStats();
   }
 
