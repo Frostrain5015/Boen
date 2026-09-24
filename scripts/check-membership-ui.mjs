@@ -9,6 +9,18 @@ mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const errors = [];
 const now = Math.floor(Date.now() / 1000);
+async function checkSupportFooter(page) {
+  const link = page.locator('footer[aria-label="网站信息"] a[href="mailto:phy55015@hotmail.com"]');
+  await link.waitFor({ state: 'visible' });
+  if (!(await link.innerText()).includes('phy55015@hotmail.com')) throw new Error('Support email not visibly disclosed');
+  const box = await link.boundingBox();
+  const viewport = page.viewportSize();
+  if (!box || box.x < 0 || box.y < 0 || box.x + box.width > viewport.width || box.y + box.height > viewport.height) {
+    throw new Error('Support contact clipped or outside viewport');
+  }
+  await link.focus();
+  if (!await link.evaluate(element => element === document.activeElement)) throw new Error('Support contact not keyboard accessible');
+}
 function status(state = 'active') {
   const legacy = state === 'legacy';
   const reward = state === 'reward';
@@ -32,21 +44,26 @@ try {
     await page.goto(`${origin}/pricing`);
     await page.getByRole('heading', { name: /让学习/ }).waitFor();
     await page.locator('#boot-loader').waitFor({ state: 'detached' });
+    await checkSupportFooter(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     if (overflow) throw new Error(`Pricing overflows at ${width}`);
     const pricingCard = await page.locator('.membership-card-container').boundingBox();
     if (!pricingCard || pricingCard.x + pricingCard.width > width) throw new Error(`Clipped pricing card at ${width}`);
     await page.screenshot({ path: `${output}/pricing-${width}.png`, fullPage: true });
   }
-  for (const path of ['/', '/terms', '/privacy']) {
-    await page.goto(`${origin}${path}`);
-    if (path !== '/') {
-      await page.locator('.legal-copy h1').waitFor();
-      if ((await page.locator('body').innerText()).includes('使用 Frost ID 登录')) throw new Error(`Login wall on ${path}`);
-    }
-    for (const href of ['/pricing', '/terms', '/privacy']) {
-      const link = page.locator(`footer[aria-label="网站信息"] a[href="${href}"]`);
-      if (!await link.isVisible()) throw new Error(`Missing global footer link ${path} -> ${href}`);
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const path of ['/', '/terms', '/privacy']) {
+      await page.goto(`${origin}${path}`);
+      if (path !== '/') {
+        await page.locator('.legal-copy h1').waitFor();
+        if ((await page.locator('body').innerText()).includes('使用 Frost ID 登录')) throw new Error(`Login wall on ${path}`);
+      }
+      await checkSupportFooter(page);
+      for (const href of ['/pricing', '/terms', '/privacy']) {
+        const link = page.locator(`footer[aria-label="网站信息"] a[href="${href}"]`);
+        if (!await link.isVisible()) throw new Error(`Missing global footer link ${path} -> ${href}`);
+      }
     }
   }
   await page.close();
@@ -74,6 +91,7 @@ try {
       await ui.goto(`${origin}/setup`);
       await ui.getByRole('heading', { name: '会员与订阅', exact: true }).waitFor();
       await ui.locator('#boot-loader').waitFor({ state: 'detached' });
+      await checkSupportFooter(ui);
       if (!await ui.locator('footer[aria-label="网站信息"] a[href="/terms"]').isVisible()) throw new Error('Missing authenticated legal footer');
       if (await ui.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error(`Setup overflows at ${width}/${state}`);
       const card = ui.locator('.membership-card-container');

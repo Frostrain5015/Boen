@@ -93,10 +93,13 @@ onMounted(() => {
   </div>
 
   </div>
-  <footer aria-label="网站信息" class="relative z-20 flex shrink-0 items-center justify-center gap-5 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">
-    <router-link to="/pricing" class="hover:text-[var(--accent-strong)] focus-visible:underline">功能与定价</router-link>
-    <router-link to="/terms" class="hover:text-[var(--accent-strong)] focus-visible:underline">服务条款</router-link>
-    <router-link to="/privacy" class="hover:text-[var(--accent-strong)] focus-visible:underline">隐私政策</router-link>
+  <footer aria-label="网站信息" class="relative z-20 flex shrink-0 flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-xs text-[var(--ink-soft)]">
+    <nav aria-label="产品与法律" class="flex items-center gap-5">
+      <router-link to="/pricing" class="hover:text-[var(--accent-strong)] focus-visible:underline">功能与定价</router-link>
+      <router-link to="/terms" class="hover:text-[var(--accent-strong)] focus-visible:underline">服务条款</router-link>
+      <router-link to="/privacy" class="hover:text-[var(--accent-strong)] focus-visible:underline">隐私政策</router-link>
+    </nav>
+    <a href="mailto:phy55015@hotmail.com" class="whitespace-nowrap hover:text-[var(--accent-strong)] focus-visible:underline">客服：phy55015@hotmail.com</a>
   </footer>
   </div>
 
