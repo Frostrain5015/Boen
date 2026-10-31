@@ -20,7 +20,7 @@ onMounted(async () => {
       setTimeout(() => emit('success'), 800);
     } else {
       status.value = 'error';
-      errorMessage.value = '无效的回调参数';
+      errorMessage.value = '登录链接无效，请返回登录页重试';
       emit('error', errorMessage.value);
     }
   } catch (err) {
@@ -36,13 +36,13 @@ onMounted(async () => {
     :status="status"
     :message="
       status === 'processing' ? '正在登录…' :
-      status === 'success' ? '登录成功！' :
+      status === 'success' ? '登录成功' :
       `登录失败：${errorMessage}`
     "
     :hint="
-      status === 'processing' ? '正在验证你的身份' :
+      status === 'processing' ? '' :
       status === 'success' ? '正在跳转到应用…' :
-      '请稍后重试'
+      '请返回登录页重试'
     "
   />
 </template>

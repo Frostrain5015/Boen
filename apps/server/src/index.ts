@@ -265,7 +265,7 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
 function requirePremium(c: Context, result: { userId: string; sub: SubscriptionInfo } | null) {
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   if (!result.sub.isPremium) {
-    return c.json({ error: 'premium_required', message: '此功能需要星月卡才能使用' }, 403);
+    return c.json({ error: 'premium_required', message: '此功能需开通星月卡' }, 403);
   }
   return null;
 }
@@ -1578,7 +1578,7 @@ app.post('/api/currency/claim-daily', async (c) => {
   if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
   const r = claimDailyLogin(userId);
   if (!r.ok) {
-    return c.json({ error: r.error, message: '今日已领取，明天再来', claimedToday: true, balance: r.balance }, 400);
+    return c.json({ error: r.error, message: '今日已领取', claimedToday: true, balance: r.balance }, 400);
   }
   return c.json({ ok: true, reward: r.reward, balance: r.balance, claimedToday: true });
 });
@@ -1814,7 +1814,7 @@ app.post('/api/chat', async (c) => {
   if (!result.sub.isPremium) {
     const usage = checkUsage(userId);
     if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话已用完，请明日再试或开通星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
     usageInfo = { dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT - usage.remaining, dailyRemaining: usage.remaining };
   }
@@ -2185,7 +2185,7 @@ app.post('/api/answer', async (c) => {
   if (subInfo && !subInfo.sub.isPremium) {
     const usage = checkUsage(userId);
     if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话次数已用完，请明天再试或激活星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
+      return c.json({ error: 'daily_limit_reached', message: '今日免费对话已用完，请明日再试或开通星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
     }
     usageDecremented = true;
   }

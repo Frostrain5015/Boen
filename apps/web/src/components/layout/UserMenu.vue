@@ -4,12 +4,10 @@ import { useRouter } from 'vue-router';
 import { User, LogOut, Settings, Crown, MessageSquare, Moon, Star } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
-import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const uiStore = useUiStore();
-const toast = useToast();
 
 function onClickOutside(e: MouseEvent) {
   const target = e.target as HTMLElement;
@@ -66,7 +64,7 @@ onUnmounted(() => {
       </router-link>
       <div v-else class="flex items-center gap-1.5 px-4 py-2">
         <span class="badge-free">
-          <MessageSquare class="h-3 w-3" /> 今日剩余 {{ authStore.dailyRemaining ?? 0 }} 条
+          <MessageSquare class="h-3 w-3" /> 今日剩余 {{ authStore.dailyRemaining ?? 0 }} 次
         </span>
       </div>
       <div class="border-t border-[var(--line)]">
@@ -79,12 +77,12 @@ onUnmounted(() => {
         </button>
         <button
           v-if="!authStore.isPremium"
-          @click="toast.info('请联系管理员激活星月卡'); uiStore.showUserMenu = false"
+          @click="router.push('/setup'); uiStore.showUserMenu = false"
           class="flex w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-[var(--premium-gold-soft)]"
           style="color: var(--premium-gold-strong)"
         >
           <Crown class="h-4 w-4" />
-          <span>升级星月卡</span>
+          <span>查看星月卡</span>
         </button>
         <button
           @click="authStore.doLogout()"

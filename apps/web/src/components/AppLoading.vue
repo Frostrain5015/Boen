@@ -64,7 +64,7 @@ const show = () => props.loading || props.status !== undefined;
         <!-- 加载进度条（仅 loading / processing 态） -->
         <div v-if="loading || status === 'processing'" class="mt-1 flex flex-col items-center gap-2">
           <div class="loading-bar"><div class="loading-bar-inner"></div></div>
-          <p class="text-xs font-medium text-[var(--ink-soft)]/60">正在唤醒学习助手…</p>
+          <p v-if="!message && !hint" class="text-xs font-medium text-[var(--ink-soft)]/60">正在加载…</p>
         </div>
 
         <!-- 成功勾选（success 态） -->

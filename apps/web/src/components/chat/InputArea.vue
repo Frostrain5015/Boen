@@ -191,7 +191,8 @@ onMounted(() => {
             v-model="chatStore.input"
             @keydown="onKeydown"
             rows="1"
-            placeholder="今天想学习什么？"
+            placeholder="输入问题…"
+            aria-label="学习问题"
             class="max-h-32 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] placeholder:text-[var(--ink-soft)]/70 focus:outline-none"
           />
           <button

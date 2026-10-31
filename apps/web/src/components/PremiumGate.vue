@@ -28,14 +28,14 @@ function handleActivate() {
           <component v-if="icon" :is="icon" class="h-7 w-7" style="color: var(--locked-ink)" />
           <Lock v-else class="h-7 w-7" style="color: var(--locked-ink)" />
         </div>
-        <p class="font-display text-lg font-bold" style="color: var(--ink)">该功能为星月卡专属</p>
+        <p class="font-display text-lg font-bold" style="color: var(--ink)">{{ props.featureName }}需开通星月卡</p>
         <button @click="handleActivate"
           class="rounded-full px-6 py-2.5 text-sm font-semibold text-white transition-all"
           style="background: linear-gradient(180deg, var(--premium-gold) 0%, var(--premium-gold-strong) 100%);
             box-shadow: 0 10px 20px -10px var(--premium-gold-glow),
                         inset 0 -2px 0 rgba(0,0,0,0.12),
                         inset 0 1px 0 rgba(255,255,255,0.28);"
-        >点击激活</button>
+        >查看星月卡</button>
       </div>
     </div>
 

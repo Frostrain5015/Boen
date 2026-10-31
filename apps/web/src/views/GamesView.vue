@@ -53,8 +53,7 @@ function backToMenu(): void {
       <div v-if="!playing" class="flex h-full flex-col items-center justify-center gap-6 px-4 py-6">
         <div class="text-center">
           <div class="mb-2 text-5xl">🏃‍♂️</div>
-          <h2 class="mb-1 text-xl font-bold text-[var(--ink)]" style="font-family: var(--font-display)">选择科目</h2>
-          <p class="text-sm text-[var(--ink-soft)]">选一个科目开始跑酷答题</p>
+          <h2 class="mb-1 text-xl font-bold text-[var(--ink)]" style="font-family: var(--font-display)">选择学科</h2>
         </div>
 
         <div class="grid w-full max-w-sm grid-cols-1 gap-3 sm:grid-cols-2">
@@ -82,9 +81,8 @@ function backToMenu(): void {
 
         <div class="clay-sm max-w-xs bg-white/60 px-4 py-3 text-center">
           <p class="text-xs leading-relaxed text-[var(--ink-soft)]">
-            🎮 <strong>A/D</strong> 或 <strong>←/→</strong> 切换跑道<br>
-            选对穿门加分，选错扣命<br>
-            共 ❤️❤️❤️ 3 条命，冲！
+            <strong>A/D</strong> 或 <strong>←/→</strong> 切换跑道<br>
+            选择正确答案加分，答错失去 1 条命，共 3 条命
           </p>
         </div>
       </div>

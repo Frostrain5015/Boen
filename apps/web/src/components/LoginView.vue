@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import type { SubscriptionStatus } from '@boen/shared';
 import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
 import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
@@ -13,15 +12,24 @@ const authStore = useAuthStore();
 const isLoading = ref(false);
 const agreedToTerms = ref(false);
 const showTos = ref(false);
+const consentInput = ref<HTMLInputElement | null>(null);
+const loginError = ref('');
 /** 测试登录仅限本地开发构建，生产不可见 */
 const isDev = import.meta.env.DEV;
 
 async function handleLogin() {
-  if (!agreedToTerms.value) return;
+  if (isLoading.value) return;
+  if (!agreedToTerms.value) {
+    loginError.value = '请先阅读并同意服务条款与隐私政策';
+    consentInput.value?.focus();
+    return;
+  }
+  loginError.value = '';
   isLoading.value = true;
   try {
     await loginWithFrostId();
   } catch {
+    loginError.value = '无法打开登录页面，请重试';
     isLoading.value = false;
   }
 }
@@ -57,7 +65,7 @@ function handleTestLogin() {
       portalUrl: 'https://pancake.waffo.ai/consumer/portal/login',
     },
     rewards: { bankedSeconds: 0, activeUntil: null },
-  } as SubscriptionStatus;
+  };
   authStore.currency = {
     balance: 9999,
     totalEarned: 9999,
@@ -68,93 +76,83 @@ function handleTestLogin() {
     products: [],
     claimedToday: true,
     loginReward: 50,
-  } as any;
+  };
   router.push('/');
 }
 </script>
 
 <template>
-  <div class="relative flex h-full flex-col items-center justify-center">
-    <!-- 背景 -->
-    <div class="app-bg"></div>
-    <div class="app-grain"></div>
+  <div class="login-page">
+    <main class="login-main">
+      <section class="login-content" aria-labelledby="login-heading">
+        <header class="login-brand">
+          <div aria-hidden="true"><Mascot :size="64" :float="false" state="idle" /></div>
+          <div>
+            <h1 id="login-heading">博文 <span>Boen</span></h1>
+            <p>AI 学习助手</p>
+          </div>
+        </header>
 
-    <!-- 登录卡片 -->
-    <div
-      class="relative z-10 flex w-full max-w-sm flex-col items-center gap-6 px-6"
-      v-motion
-      :initial="{ opacity: 0, y: 30, scale: 0.95 }"
-      :enter="{ opacity: 1, y: 0, scale: 1, transition: { duration: 600, ease: 'easeOut' } }"
-    >
-      <!-- 吉祥物 -->
-      <div class="relative">
-        <Mascot :size="100" :float="true" state="idle" />
-        <!-- 装饰光环 -->
-        <div class="absolute inset-0 -z-10 rounded-full bg-[var(--accent-soft)] opacity-50 blur-2xl"></div>
-      </div>
-
-      <!-- 标题 -->
-      <div class="text-center">
-        <h1 class="brand-text text-3xl font-bold">博文 Boen</h1>
-        <p class="mt-2 text-sm text-[var(--ink-soft)]">AI 原生时代的教育智能体</p>
-        <router-link to="/pricing" class="mt-3 inline-block text-xs text-[var(--accent-strong)] underline underline-offset-4">了解博文 · 功能与定价</router-link>
-      </div>
-
-      <!-- 登录按钮 -->
-      <button
-        @click="handleLogin"
-        :disabled="isLoading || !agreedToTerms"
-        class="btn-accent group flex w-full items-center justify-center gap-2 rounded-[18px] px-6 py-3.5 text-base font-semibold transition-all duration-300 disabled:opacity-60"
-      >
-        <span v-if="isLoading" class="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-        <svg
-          v-else
-          class="h-5 w-5 transition-transform duration-300 group-hover:scale-110"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-          <polyline points="10 17 15 12 10 7" />
-          <line x1="15" y1="12" x2="3" y2="12" />
-        </svg>
-        <span>{{ isLoading ? '正在跳转…' : '使用 Frost ID 登录' }}</span>
-      </button>
-
-      <button
-        v-if="isDev"
-        @click="handleTestLogin"
-        :disabled="!agreedToTerms"
-        class="flex w-full items-center justify-center gap-2 rounded-[18px] border border-slate-600 bg-slate-800/60 px-6 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-slate-800 disabled:opacity-60"
-      >
-        🧪 本地测试登录（免 OAuth）
-      </button>
-
-      <!-- 同意条款 -->
-      <label class="flex cursor-pointer items-start gap-2 text-left">
-        <input
-          type="checkbox"
-          v-model="agreedToTerms"
-          class="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--accent)]"
-        />
-        <span class="text-xs leading-relaxed text-[var(--ink-soft)]/80">
-          我已阅读并同意
-          <button type="button" @click.stop="showTos = true" class="text-[var(--accent-strong)] underline hover:opacity-80">服务条款</button>
-          和
-          <router-link to="/privacy" target="_blank" class="text-[var(--accent-strong)] underline hover:opacity-80">隐私政策</router-link>
-          <span class="block mt-1">未满 14 岁须由监护人同意并指导使用。</span>
-        </span>
-      </label>
-    </div>
-
-    <!-- 底部装饰 -->
-    <div class="absolute bottom-8 left-0 right-0 z-10 text-center">
-      <p class="text-xs text-[var(--ink-soft)]/40">Powered by Frost ID · 寒霜科技</p>
-    </div>
+        <form class="login-form" :aria-busy="isLoading" @submit.prevent="handleLogin">
+          <div class="login-consent">
+            <input
+              id="login-consent"
+              ref="consentInput"
+              v-model="agreedToTerms"
+              type="checkbox"
+              :disabled="isLoading"
+              aria-labelledby="login-consent-label"
+              :aria-invalid="loginError && !agreedToTerms ? 'true' : undefined"
+              :aria-describedby="loginError ? 'login-error login-age-notice' : 'login-age-notice'"
+              @change="loginError = ''"
+            />
+            <div>
+              <span id="login-consent-label">
+                <label for="login-consent">我已阅读并同意</label>
+                <button type="button" @click="showTos = true">服务条款</button>
+                和<router-link to="/privacy" target="_blank" rel="noopener noreferrer">隐私政策</router-link>
+              </span>
+              <p id="login-age-notice">未满 14 岁须由监护人同意并指导使用。</p>
+            </div>
+          </div>
+          <p v-if="loginError" id="login-error" class="login-error" role="alert">{{ loginError }}</p>
+          <button type="submit" class="login-primary" :disabled="isLoading">
+            <span v-if="isLoading" class="login-spinner" aria-hidden="true"></span>
+            <span>{{ isLoading ? '正在跳转…' : '使用 Frost ID 登录' }}</span>
+            <svg v-if="!isLoading" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+          </button>
+          <button v-if="isDev" type="button" class="login-test" :disabled="isLoading || !agreedToTerms" @click="handleTestLogin">本地测试登录</button>
+        </form>
+      </section>
+    </main>
   </div>
-
   <TermsOfService :show="showTos" @close="showTos = false" />
 </template>
+
+<style scoped>
+.login-page { height: 100%; overflow-y: auto; background: #faf9f5; color: #2c342f; }
+.login-main { display: flex; min-height: 100%; align-items: center; justify-content: center; padding: 48px 24px; }
+.login-content { width: 100%; max-width: 360px; }
+.login-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 44px; }
+.login-brand h1 { margin: 0; font-size: 30px; font-weight: 700; line-height: 1.25; letter-spacing: -.04em; }
+.login-brand h1 span { margin-left: 4px; font-family: var(--font-display); font-size: 26px; font-weight: 500; letter-spacing: -.02em; }
+.login-brand p { margin: 7px 0 0; font-size: 14px; color: #696f67; }
+.login-form { display: flex; flex-direction: column; gap: 24px; }
+.login-consent { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; line-height: 1.9; color: #555f55; }
+.login-consent input { flex-shrink: 0; width: 16px; height: 16px; margin: 4px 0 0; accent-color: #176448; cursor: pointer; }
+.login-consent label { cursor: pointer; }
+.login-consent button, .login-consent a { color: #176448; text-decoration: underline; text-underline-offset: 3px; }
+.login-consent p { margin: 5px 0 0; color: #696f67; }
+.login-primary { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; gap: 12px; padding: 13px 18px; border-radius: 12px; background: #176448; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s, transform .15s; }
+.login-primary:hover:not(:disabled) { background: #105137; }
+.login-primary:active:not(:disabled) { transform: translateY(1px); }
+.login-primary:disabled { opacity: .65; cursor: wait; }
+.login-test { color: #696f67; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.login-test:disabled { opacity: .5; }
+.login-error { margin: -12px 0; font-size: 12px; line-height: 1.7; color: #a32c32; }
+.login-spinner { width: 16px; height: 16px; border: 2px solid #ffffff60; border-top-color: #fff; border-radius: 50%; animation: login-spin .8s linear infinite; }
+.login-page :is(button, a, input):focus-visible { outline: 2px solid #176448; outline-offset: 4px; }
+@keyframes login-spin { to { transform: rotate(360deg); } }
+@media (max-height: 500px) { .login-main { padding-block: 28px; } .login-brand { margin-bottom: 28px; } }
+@media (prefers-reduced-motion: reduce) { .login-primary { transition: none; } .login-spinner { animation-duration: 1.6s; } }
+</style>

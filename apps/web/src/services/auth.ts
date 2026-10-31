@@ -131,7 +131,7 @@ export async function handleOAuthCallback(url: string): Promise<boolean> {
   const error = parsedUrl.searchParams.get('error');
 
   if (error) {
-    throw new Error(`OAuth error: ${error}`);
+    throw new Error(error === 'access_denied' ? '你已取消授权，可重新登录' : '登录授权失败，请重试');
   }
 
   if (!code) {
@@ -140,11 +140,11 @@ export async function handleOAuthCallback(url: string): Promise<boolean> {
 
   const pkce = loadPkceParams();
   if (!pkce) {
-    throw new Error('PKCE parameters not found');
+    throw new Error('登录信息已失效，请重新登录');
   }
 
   if (state !== pkce.state) {
-    throw new Error('State mismatch');
+    throw new Error('登录验证未通过，请重新登录');
   }
 
   // 交换 token：交给 Boen 后端在服务端完成（携带 client_secret + code_verifier）
@@ -159,13 +159,12 @@ export async function handleOAuthCallback(url: string): Promise<boolean> {
   });
 
   if (!tokenResponse.ok) {
-    const errorData = await tokenResponse.text();
-    throw new Error(`Token exchange failed: ${errorData}`);
+    throw new Error('登录验证失败，请重新登录');
   }
 
   const tokenData = (await tokenResponse.json()) as { access_token?: string };
   if (!tokenData.access_token) {
-    throw new Error('Token exchange failed: no access_token');
+    throw new Error('未能完成登录，请重试');
   }
   saveToken(tokenData.access_token);
   clearPkceParams();

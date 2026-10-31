@@ -63,8 +63,7 @@ function handleSave() {
           <div class="setup-avatar">
             <Sparkles class="h-6 w-6" />
           </div>
-          <h2 class="setup-title">欢迎来到博文</h2>
-          <p class="setup-desc">让我先认识一下你，为你提供更贴心的学习陪伴</p>
+          <h2 class="setup-title">{{ props.profile ? '学习设置' : '初始设置' }}</h2>
         </div>
 
         <!-- 表单 -->
@@ -175,11 +174,6 @@ function handleSave() {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--ink);
-}
-.setup-desc {
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  line-height: 1.4;
 }
 .setup-body {
   display: flex;

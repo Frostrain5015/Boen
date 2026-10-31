@@ -184,7 +184,7 @@ function onSkip() { tour.finish(); }
               </button>
               <button class="tour-btn tour-btn-accent" type="button" @click="onNext">
                 <template v-if="tour.isLast">
-                  开始学习 <Check class="h-4 w-4" />
+                  完成引导 <Check class="h-4 w-4" />
                 </template>
                 <template v-else>
                   下一步 <ChevronRight class="h-4 w-4" />

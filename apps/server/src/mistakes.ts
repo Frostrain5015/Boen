@@ -1195,7 +1195,7 @@ async function applyAnalysisToMistake(
   }
 
   // ── 知识点映射 ──
-  await onProgress?.({ step: 'map', message: `校验章节和知识图谱节点（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.35) });
+  await onProgress?.({ step: 'map', message: `匹配知识点（${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.35) });
   const mappings: Array<MistakeKpMapping & { evidenceJson: string }> = [];
   for (const rawMap of analysis.knowledgeNodes ?? []) {
     const directId = Number(rawMap.kgNodeId);
@@ -1299,9 +1299,9 @@ async function applyAnalysisToMistake(
     const correctBasis = matchScore >= ANSWER_MATCH_THRESHOLD
       ? `答案与标准答案高度一致（匹配度 ${Math.round(matchScore * 100)}%）`
       : 'AI 判定作答正确';
-    await onProgress?.({ step: 'profile', message: `${correctBasis}，跳过画像扣减`, progress: pct(0.65) });
+    await onProgress?.({ step: 'profile', message: `${correctBasis}，熟练度保持不变`, progress: pct(0.65) });
   } else {
-    await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `写入知识画像（第 ${questionIndex + 1}/${totalQuestions} 题）` : '未找到可信知识点，等待人工修正', progress: pct(0.65) });
+    await onProgress?.({ step: 'profile', message: status === 'analyzed' ? `更新学习档案（${questionIndex + 1}/${totalQuestions} 题）` : '未匹配到知识点，请补充题面后重新分析', progress: pct(0.65) });
     let appliedAt: number | undefined;
     for (const mapping of mappings) {
       const change = applyMistakeProficiency(userId, mistakeId, mapping.kgNodeId, mapping.role, mapping.confidence);
@@ -1320,12 +1320,12 @@ async function applyAnalysisToMistake(
 
   // ── 风格特征（仅写 per-user 审计行；全局技能改为流程末尾批量 LLM 整合）──
   // 题型沉淀逻辑不受答案正确率判断影响：做对的题同样沉淀出题风格
-  await onProgress?.({ step: 'style', message: `沉淀题型风格（第 ${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
+  await onProgress?.({ step: 'style', message: `保存题型（${questionIndex + 1}/${totalQuestions} 题）`, progress: pct(0.8) });
   if (status === 'analyzed' || isCorrect) {
     await saveStyleFeature(mistakeId, analysis, analysis.promptText || recognizedText);
   }
 
-  await onProgress?.({ step: 'complete', message: status === 'analyzed' ? `第 ${questionIndex + 1} 题分析完成` : '错题已保存，需补充知识点', progress: pct(1) });
+  await onProgress?.({ step: 'complete', message: status === 'analyzed' ? `第 ${questionIndex + 1} 题分析完成` : '错题已保存，请补充题面后重新分析', progress: pct(1) });
   const item = loadMistakeRows(mistakeId, userId);
   if (!item) throw new Error('错题分析结果读取失败');
   return item;
@@ -1360,7 +1360,7 @@ export async function analyzeMistake(
   let analyses: AnalysisJson[];
 
   if (!recognizedText && row.source_type === 'image') {
-    await onProgress?.({ step: 'ocr', message: '阿里云OCR正在识别', progress: 8 });
+    await onProgress?.({ step: 'ocr', message: '正在识别图片中的题目', progress: 8 });
     const assetPath = getOriginalAssetPath(mistakeId);
     if (!assetPath) throw new Error('找不到原始图片');
     const vlm = await recognizeAndAnalyzeWithVlm(assetPath, row.subject, row.grade, candidates0);
@@ -1374,9 +1374,9 @@ export async function analyzeMistake(
       db.prepare(`UPDATE mistake_items SET prompt_text=?, ocr_provider=?, updated_at=? WHERE id=?`).run(recognizedText, ocrProvider, nowSec(), mistakeId);
     }
   } else {
-    await onProgress?.({ step: 'ocr', message: '读取文本录入', progress: 8 });
+    await onProgress?.({ step: 'ocr', message: '正在读取题目', progress: 8 });
     if (!recognizedText) throw new Error('未识别到有效题目文本，请补充题面后重试');
-    await onProgress?.({ step: 'analyze', message: 'LLM 识别全部题目', progress: 30 });
+    await onProgress?.({ step: 'analyze', message: '正在分析题目', progress: 30 });
     analyses = await analyzeWithLlm(model, {
       subject: row.subject,
       grade: row.grade,
@@ -1430,7 +1430,7 @@ export async function analyzeMistake(
 
   // ── 4. 批量整合风格技能：每流程激进合并成 ≤3 个有效技能，沉淀进全局库 ──
   try {
-    await onProgress?.({ step: 'style', message: '整理出题风格', progress: 99 });
+    await onProgress?.({ step: 'style', message: '正在保存题型', progress: 99 });
     const summaries = analyses
       .filter((a) => (a.promptText || a.title))
       .map((a) => [

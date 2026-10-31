@@ -59,8 +59,8 @@ const STEP_META: Record<AnalyzeMistakeStep, { label: string; icon: typeof ScanTe
   ocr: { label: '识别题面', icon: ScanText },
   analyze: { label: '分析错因', icon: WandSparkles },
   map: { label: '定位知识点', icon: Target },
-  profile: { label: '写入画像', icon: BookOpenCheck },
-  style: { label: '沉淀题型', icon: Sparkles },
+  profile: { label: '更新学习档案', icon: BookOpenCheck },
+  style: { label: '保存题型', icon: Sparkles },
   complete: { label: '完成', icon: CheckCircle2 },
 };
 const STEPS: AnalyzeMistakeStep[] = ['ocr', 'analyze', 'map', 'profile', 'style', 'complete'];
@@ -107,7 +107,7 @@ const isTimedStep = computed(() =>
   (activeStep.value === 'ocr' && mode.value === 'image') ||
   (activeStep.value === 'style' && progress.value >= 99));
 const displayMessage = computed(() => {
-  const base = progressMessage.value || '准备分析错题';
+  const base = progressMessage.value || '正在分析错题';
   if (!isTimedStep.value) return base;
   const eta = STEP_ETA_SEC[activeStep.value as AnalyzeMistakeStep];
   return eta ? `${base} · 已 ${elapsedSec.value}s / 预计 ~${eta}s` : `${base} · 已 ${elapsedSec.value}s`;
@@ -253,8 +253,8 @@ function handleAnalyzeEvent(event: AnalyzeMistakeEvent) {
       const score = Math.round((event.mistake.answerMatchScore ?? 0) * 100);
       const basis = score >= 80
         ? `学生答案与正确答案高度一致（匹配度 ${score}%）`
-        : 'AI 判定该题作答正确（最终结果与标准答案一致）';
-      correctNotice.value = `${basis}，本题不收录进错题本（仅临时展示，刷新后消失）；其题型风格已沉淀，将融入后续智能出题。`;
+        : 'AI 判定作答正确';
+      correctNotice.value = `${basis}。此题不收录至错题列表，刷新后不再显示；题型已保存用于后续出题。`;
       // 从持久化列表移除（重分析场景下可能已存在）
       mistakes.value = mistakes.value.filter((m) => m.id !== event.mistake.id);
     } else {
@@ -312,7 +312,7 @@ const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB（nginx 上限 20MB，前端提
 function setImage(file?: File | null) {
   if (!file) return;
   if (file.size > MAX_IMAGE_SIZE) {
-    imageError.value = '图片大小不符合要求';
+    imageError.value = '图片须小于 15 MB，请压缩后重试';
     imagePreview.value = '';
     imageFile.value = null;
     return;
@@ -538,7 +538,6 @@ onBeforeUnmount(() => {
       </button>
       <div>
         <h1 class="font-display text-2xl font-bold text-[var(--ink)]">错题本</h1>
-        <p class="text-xs font-semibold text-[var(--ink-soft)]">真实作业错题，自动归因到知识画像</p>
       </div>
     </header>
 
@@ -632,10 +631,10 @@ onBeforeUnmount(() => {
         <div v-if="rightView === 'idle'" class="flex h-full min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">
           <Mascot :size="110" state="idle" />
           <div>
-            <h2 class="font-display text-2xl font-bold text-[var(--ink)]">{{ mistakes.length === 0 ? '暂无错题记录' : '选择一题查看详情' }}</h2>
+            <h2 class="font-display text-2xl font-bold text-[var(--ink)]">{{ mistakes.length === 0 ? '暂无错题记录' : '选择一道错题' }}</h2>
             <p class="mt-2 max-w-md text-sm leading-relaxed text-[var(--ink-soft)]">
-              <template v-if="mistakes.length === 0">点击左侧 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-bold text-white">+</span> 按钮新增错题，支持拍照上传和手动录入。</template>
-              <template v-else>从左侧列表选择错题，查看错因诊断、知识点映射与针对性练习。</template>
+              <template v-if="mistakes.length === 0">使用「新增错题」上传照片或手动录入。</template>
+              <template v-else>查看错因和知识点，开始针对性练习。</template>
             </p>
           </div>
         </div>
@@ -648,7 +647,6 @@ onBeforeUnmount(() => {
                   <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent-strong)]"><NotebookPen class="h-5 w-5" /></div>
                   <div class="min-w-0 flex-1">
                     <h2 class="font-display text-xl font-bold text-[var(--ink)]">新增错题</h2>
-                    <p class="text-xs font-semibold text-[var(--ink-soft)]">拍照或手动录入，系统自动分析错因并归入知识画像</p>
                   </div>
                 </div>
 
@@ -666,8 +664,7 @@ onBeforeUnmount(() => {
                       <template v-else>
                         <UploadCloud class="mb-3 h-12 w-12 text-[var(--accent)] transition-transform group-hover:-translate-y-1" />
                         <p class="text-sm font-bold text-[var(--ink)]">上传整页试卷或单题照片</p>
-                        <p class="mt-1.5 text-xs text-[var(--ink-soft)]">支持 jpg / png / webp，自动切题识别多道题</p>
-                        <p class="mt-0.5 text-[11px] text-[var(--ink-soft)] opacity-60">最大 15MB</p>
+                        <p class="mt-1.5 text-xs text-[var(--ink-soft)]">JPG、PNG、WebP，最大 15 MB；支持一图多题</p>
                       </template>
                       <input type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" class="sr-only" @change="onFileChange" />
                     </label>
@@ -680,14 +677,14 @@ onBeforeUnmount(() => {
                   <section>
                     <div class="mb-1 flex items-center gap-2">
                       <p class="text-xs font-bold text-[var(--ink-soft)]">{{ mode === 'image' ? '补充题面（可选）' : '题面' }}</p>
-                      <span v-if="mode === 'image'" class="text-[10px] text-[var(--ink-soft)] opacity-60">OCR 识别后自动填入，可手动修正</span>
+                      <span v-if="mode === 'image'" class="text-[10px] text-[var(--ink-soft)] opacity-60">识别后可修改</span>
                     </div>
-                    <textarea v-model="textPrompt" rows="5" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" :placeholder="mode === 'image' ? 'OCR 识别后将自动填入，也可在此补充...' : promptPlaceholder" />
+                    <textarea v-model="textPrompt" rows="5" class="w-full resize-none rounded-2xl border border-[var(--line)] bg-white/75 px-4 py-3 text-sm leading-relaxed text-[var(--ink)] outline-none transition-all focus:border-[var(--accent)] focus:bg-white focus:ring-4 focus:ring-[var(--accent-soft)]" :placeholder="mode === 'image' ? '可补充题目内容' : promptPlaceholder" />
                   </section>
 
                   <!-- ===== 选择题：四个选项输入 + radio 标记学生所选 ===== -->
                   <section v-if="mode === 'text' && questionType === '选择题'" class="space-y-2">
-                    <p class="text-xs font-bold text-[var(--ink-soft)]">选项内容 <span class="font-normal opacity-60">（点击圆圈标记学生选择的答案）</span></p>
+                    <p class="text-xs font-bold text-[var(--ink-soft)]">选项 <span class="font-normal opacity-60">（点选字母标记学生答案）</span></p>
                     <div v-for="(opt, i) in choiceOptions" :key="i" class="group flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/75 px-3 py-2.5 transition-all focus-within:border-[var(--accent)] focus-within:ring-4 focus-within:ring-[var(--accent-soft)]">
                       <button
                         @click="selectedChoice = String.fromCharCode(65 + i)"
@@ -789,19 +786,13 @@ onBeforeUnmount(() => {
                     <p class="mb-1 text-[11px] font-bold text-[var(--ink-soft)]">题型</p>
                     <BoenSelect v-model="questionType" :options="QUESTION_TYPE_OPTIONS" placeholder="自动识别题型" />
                   </div>
-                  <div class="rounded-2xl bg-[var(--paper)] p-3">
-                    <p class="text-[11px] leading-relaxed text-[var(--ink-soft)]">
-                      <template v-if="mode === 'image'">拍照后系统自动 OCR 识别题面，LLM 分析错因、定位知识点，并写入知识画像。一页照片可包含多道题，系统会逐题归档。</template>
-                      <template v-else>手动输入题面文本，系统将调用 LLM 分析错因、匹配知识点，并更新学生的知识画像熟练度。</template>
-                    </p>
-                  </div>
                 </div>
               </div>
 
               <button @click="submitMistake" :disabled="busy" class="btn-accent flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold disabled:cursor-not-allowed">
                 <Loader2 v-if="busy" class="h-4 w-4 animate-spin" />
                 <Sparkles v-else class="h-4 w-4" />
-                {{ busy ? '正在分析' : '识别并归档' }}
+                {{ busy ? '正在分析…' : '分析并收录' }}
               </button>
 
               <p v-if="error" class="flex items-start gap-2 rounded-2xl bg-[var(--error)]/10 px-3 py-2 text-xs font-semibold text-[var(--error)]"><AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />{{ error }}</p>
@@ -831,7 +822,7 @@ onBeforeUnmount(() => {
                   <div class="flex shrink-0 items-center gap-1">
                     <button v-if="batchMistakes.length > 1" @click="prevQuestion" :disabled="currentBatchIndex <= 0" class="grid h-9 w-9 place-items-center rounded-xl text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-30 disabled:hover:bg-transparent"><ChevronLeft class="h-4 w-4" /></button>
                     <button v-if="batchMistakes.length > 1" @click="nextQuestion" :disabled="currentBatchIndex >= batchMistakes.length - 1" class="grid h-9 w-9 place-items-center rounded-xl text-[var(--ink-soft)] transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-30 disabled:hover:bg-transparent"><ChevronRight class="h-4 w-4" /></button>
-                    <button @click="reanalyze(selectedMistake)" :disabled="busy" class="flex h-9 items-center gap-1 rounded-2xl bg-white px-2.5 text-xs font-bold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-50"><RefreshCw class="h-3.5 w-3.5" />重分析</button>
+                    <button @click="reanalyze(selectedMistake)" :disabled="busy" class="flex h-9 items-center gap-1 rounded-2xl bg-white px-2.5 text-xs font-bold text-[var(--ink-soft)] shadow-sm transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] disabled:opacity-50"><RefreshCw class="h-3.5 w-3.5" />重新分析</button>
                   </div>
                 </div>
 
@@ -871,9 +862,9 @@ onBeforeUnmount(() => {
               <div class="rounded-[24px] bg-[var(--accent-soft)] p-4">
                 <div class="mb-3 flex items-center gap-2">
                   <Target class="h-4 w-4 text-[var(--accent-strong)]" />
-                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">知识图谱映射</h3>
+                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">相关知识点</h3>
                 </div>
-                <div v-if="!selectedMistake.mappings?.length" class="rounded-2xl bg-white/70 p-4 text-sm text-[var(--ink-soft)]">没有找到可信知识点，请补充题面后重分析。</div>
+                <div v-if="!selectedMistake.mappings?.length" class="rounded-2xl bg-white/70 p-4 text-sm text-[var(--ink-soft)]">未匹配到知识点，请补充题面后重新分析。</div>
                 <div v-else class="space-y-2">
                   <div v-for="m in selectedMistake.mappings" :key="m.kgNodeId" class="rounded-2xl bg-white/80 p-3 shadow-sm">
                     <div class="flex items-start gap-2">
@@ -892,9 +883,9 @@ onBeforeUnmount(() => {
               <div class="rounded-[24px] bg-white/75 p-4">
                 <div class="mb-3 flex items-center gap-2">
                   <BookOpenCheck class="h-4 w-4 text-[#18a558]" />
-                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">熟练度影响</h3>
+                  <h3 class="font-display text-sm font-bold text-[var(--ink)]">熟练度变化</h3>
                 </div>
-                <div v-if="!mappedScoreDelta.length" class="text-sm text-[var(--ink-soft)]">暂无画像写入。</div>
+                <div v-if="!mappedScoreDelta.length" class="text-sm text-[var(--ink-soft)]">尚未更新熟练度</div>
                 <div v-else class="space-y-2">
                   <div v-for="m in mappedScoreDelta" :key="m.kgNodeId" class="flex items-center gap-2 rounded-2xl bg-[var(--paper)] px-3 py-2">
                     <span class="min-w-0 flex-1 truncate text-xs font-bold text-[var(--ink)]">{{ m.title }}</span>
@@ -908,7 +899,7 @@ onBeforeUnmount(() => {
               </div>
 
               <button @click="startPractice(selectedMistake)" class="btn-accent flex h-12 w-full items-center justify-center gap-2 rounded-[18px] font-display text-sm font-bold">
-                <Sparkles class="h-4 w-4" />举一反三练习
+                <Sparkles class="h-4 w-4" />针对性练习
               </button>
             </aside>
           </div>

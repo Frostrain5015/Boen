@@ -20,7 +20,7 @@ function handleRefresh() {
 </script>
 
 <template>
-  <PremiumGate feature-name="AI 智能考试" :icon="FileText">
+  <PremiumGate feature-name="考试" :icon="FileText">
     <ExamView
       :key="`exam-${examStore.examViewKey}`"
       class="flex-1"

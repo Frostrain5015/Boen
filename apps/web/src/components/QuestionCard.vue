@@ -288,7 +288,7 @@ watch(
           class="mathfield mathfield-area"
           @input="onShortInput"
         ></math-field>
-        <textarea v-else v-model="shortText" :disabled="answered" @keydown.enter.exact.prevent="submit" rows="4" class="field" placeholder="写下你的思路与答案…（回车提交，Shift+回车换行）" />
+        <textarea v-else v-model="shortText" :disabled="answered" @keydown.enter.exact.prevent="submit" rows="4" class="field" placeholder="输入答案（回车提交，Shift+回车换行）" />
       </div>
 
       <!-- 提交 -->
@@ -304,9 +304,9 @@ watch(
             <XCircle v-else-if="grading.correct === false" class="check h-6 w-6 text-[var(--error)]" />
             <Lightbulb v-else class="check h-6 w-6 text-[#E0A92E]" />
             <span>
-              <template v-if="grading.correct === true">太棒了，回答正确！</template>
-              <template v-else-if="grading.correct === false">差一点，继续加油～</template>
-              <template v-else>已提交，看看点评</template>
+              <template v-if="grading.correct === true">回答正确</template>
+              <template v-else-if="grading.correct === false">回答有误</template>
+              <template v-else>答案已提交</template>
             </span>
             <span class="ml-auto rounded-full bg-white/70 px-2.5 py-0.5 text-sm font-bold">
               {{ grading.score }} / {{ grading.maxScore }}

@@ -160,7 +160,7 @@ export const useAuthStore = defineStore('auth', () => {
       });
       const data = (await res.json()) as { checkoutUrl?: string; error?: string; message?: string };
       if (res.ok && data.checkoutUrl) return { ok: true, checkoutUrl: data.checkoutUrl };
-      return { ok: false, error: data.error, message: data.message ?? '创建支付会话失败' };
+      return { ok: false, error: data.error, message: data.message ?? '无法打开收银台，请稍后重试' };
     } catch {
       return { ok: false, error: 'network', message: '网络错误，请稍后再试' };
     }

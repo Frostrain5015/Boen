@@ -41,8 +41,8 @@ onMounted(() => {
       <div v-if="!chatStore.hasItems" class="flex flex-col items-center gap-5 pt-[8vh] text-center">
         <Mascot :size="120" :state="chatStore.mascotState" />
         <div>
-          <h2 class="font-display text-2xl font-bold">嗨，我是博文！👋</h2>
-          <p class="mt-1.5 text-[var(--ink-soft)]">想问什么？开始学习吧～</p>
+          <h2 class="font-display text-2xl font-bold">今天想学什么？</h2>
+          <p class="mt-1.5 text-[var(--ink-soft)]">输入问题或上传题目图片</p>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ onMounted(() => {
         <div class="clay clay-glass mx-4 w-full max-w-md overflow-hidden" v-motion :initial="{ opacity: 0, scale: 0.9, y: 20 }" :enter="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 25 } }">
           <div class="border-b border-[var(--line)] bg-[var(--accent-soft)] px-5 py-4 text-center">
             <span class="text-2xl">🎉</span>
-            <h3 class="mt-1 font-display text-lg font-bold text-[var(--ink)]">本次学习完成！</h3>
+            <h3 class="mt-1 font-display text-lg font-bold text-[var(--ink)]">学习完成</h3>
           </div>
           <div class="space-y-4 px-5 py-4">
             <div class="flex items-center justify-center gap-4">
@@ -183,7 +183,7 @@ onMounted(() => {
               <span class="font-display text-sm font-bold text-[var(--premium-gold)]">+{{ chatStore.learningSettlement.pointsEarned }} 星月积分</span>
             </div>
             <p v-else-if="chatStore.learningSettlement.pointsCapped"
-              class="text-center text-[11px] text-[var(--ink-soft)]">🌙 今日星月积分已满，明天再来</p>
+              class="text-center text-[11px] text-[var(--ink-soft)]">今日学习积分奖励已达上限</p>
 
             <!-- 详细熟练度变化（结算时批量写入后的各知识点变化） -->
             <div v-if="chatStore.learningSettlement.proficiencyChanges?.length" class="rounded-xl border border-[var(--line)] bg-white/60 px-3 py-2.5">

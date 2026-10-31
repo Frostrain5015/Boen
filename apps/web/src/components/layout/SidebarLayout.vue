@@ -255,7 +255,7 @@ function onSubmenuLeave(el: Element) {
         <Transition name="submenu" @enter="onSubmenuEnter" @after-enter="onSubmenuAfterEnter" @leave="onSubmenuLeave">
         <div v-if="(uiStore.expandedSection as string) === 'exam'" class="submenu-panel mb-1 mt-1 space-y-0.5 pl-2">
           <button @click="startNewExam" class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-[#5848d6] transition-colors hover:bg-[#e8e4ff]">
-            <Plus class="h-3.5 w-3.5" /> 新考试
+            <Plus class="h-3.5 w-3.5" /> 新建考试
           </button>
           <div v-if="examStore.exams.length === 0" class="px-3 py-3 text-center text-xs text-[var(--ink-soft)]">还没有考试记录</div>
           <div
@@ -350,7 +350,7 @@ function onSubmenuLeave(el: Element) {
               <span class="truncate">{{ authStore.userProfile?.name ?? authStore.currentUser?.username ?? '用户' }}</span>
               <router-link v-if="authStore.isPremium" to="/setup" :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'" class="shrink-0 cursor-pointer transition-opacity hover:opacity-80">
                 <component :is="authStore.subscription?.tier === 'yearly' ? Star : Moon" class="h-2.5 w-2.5" />
-                {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '星月卡' }}
+                {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
               </router-link>
             </p>
             <p class="text-[10px] text-[var(--ink-soft)]">{{ userGradeLabel }} · {{ userModelLabel }}</p>

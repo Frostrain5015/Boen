@@ -75,7 +75,7 @@ async function generateReport() {
   try {
     const res = await fetch(`/api/profile/report?subject=${subject.value}&grade=${grade.value}`, { headers: authHeaders() });
     const data = await res.json();
-    report.value = data.report || '生成失败';
+    report.value = data.report || '报告生成失败，请重试。';
   } catch { report.value = '报告生成失败，请稍后再试。'; }
   reportLoading.value = false;
 }
@@ -206,7 +206,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
     <div v-if="loading" class="flex h-full items-center justify-center">
       <div class="flex flex-col items-center gap-3">
         <Mascot :size="80" state="thinking" />
-        <p class="text-sm font-medium text-[var(--ink-soft)]">加载学习画像…</p>
+        <p class="text-sm font-medium text-[var(--ink-soft)]">正在加载学习档案…</p>
       </div>
     </div>
 
@@ -294,8 +294,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
             <FileText class="h-4 w-4 text-[var(--accent-strong)]" />
           </div>
           <div class="flex-1">
-            <p class="text-xs font-bold text-[var(--ink)]">生成学习诊断报告</p>
-            <p class="text-[10px] text-[var(--ink-soft)]">AI 智能分析薄弱点与学习建议</p>
+            <p class="text-xs font-bold text-[var(--ink)]">生成诊断报告</p>
           </div>
           <BarChart3 class="h-4 w-4 text-[var(--ink-soft)]" />
         </button>
@@ -311,7 +310,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
           <!-- 无薄弱点 -->
           <div v-if="recommendations.length === 0" class="flex flex-col items-center gap-2 px-4 py-7 text-center">
             <Sparkles class="h-8 w-8 text-[var(--accent)] opacity-50" />
-            <p class="text-xs text-[var(--ink-soft)]">暂无薄弱知识点，继续加油！✨</p>
+            <p class="text-xs text-[var(--ink-soft)]">暂无推荐练习</p>
           </div>
 
           <!-- 薄弱点竖向列表，整行点击即开始针对练习 -->
@@ -349,7 +348,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
                   <span class="font-display text-xs font-bold text-[var(--ink)]">{{ tb.volume }}</span>
                   <div class="flex items-center gap-2">
                     <StarDisplay :score="tb.weightedScore" />
-                    <span @click.stop="emit('exam', { subject, grade, durationMinutes: 45, notes: tb.volume + ' 综合测试' })" class="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]">📝 册测试</span>
+                    <span @click.stop="emit('exam', { subject, grade, durationMinutes: 45, notes: tb.volume + ' 综合测试' })" class="flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--line)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)] active:scale-[0.96]">📝 全册测试</span>
                   </div>
                 </div>
               </div>
@@ -453,7 +452,7 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
             <template v-if="selectedKp.isExplore">
               <div class="rounded-xl bg-[#fef7e6] p-4">
                 <p class="text-xs leading-relaxed text-[#9a6b1a]">
-                  这是一个探索型学习主题，没有标准考题。博文 AI 导师将带你通过对话式探索来理解这个主题，结束后会给出一个参考评分。
+                  通过对话探索主题，结束后获得参考评分，不设标准考题。
                 </p>
               </div>
               <div class="rounded-xl bg-[var(--accent-soft)] p-3">

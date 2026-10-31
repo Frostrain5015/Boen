@@ -48,15 +48,9 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     const isCollege = useUiStore().isCollege;
     const list: TourStep[] = [
       {
-        title: '嗨，我是博文！👋',
-        text: '欢迎加入！我是你的专属学习小伙伴。花 20 秒带你认识一下，很快就好～',
-        placement: 'center',
-        mascot: 'happy',
-      },
-      {
         target: '[data-tour="nav"]',
-        title: '这里是导航栏',
-        text: '对话、考试、错题本和学习档案都在这儿，随时点开规划你的学习。',
+        title: '学习工具',
+        text: '在这里打开对话、考试、错题本和学习档案。',
         placement: 'right',
         mascot: 'idle',
       },
@@ -65,30 +59,24 @@ export const useOnboardingStore = defineStore('onboarding', () => {
       list.push({
         target: '[data-tour="subject"]',
         title: '切换学科',
-        text: '在语文、数学、英语、科学之间自由切换，我会跟着你一起换思路。',
+        text: '选择语文、数学、英语或科学。',
         placement: 'bottom',
         mascot: 'quiz',
       });
       list.push({
         target: '[data-tour="modes"]',
-        title: '选个学习模式',
-        text: '复习巩固、预习新课、集中突破弱项——选好模式，我就知道该怎么陪你学。',
+        title: '学习模式',
+        text: '选择复习、预习或练习，按步骤学习。',
         placement: 'top',
         mascot: 'thinking',
       });
     }
     list.push({
       target: '[data-tour="input"]',
-      title: '在这里向我提问',
-      text: '不会的题、想学的知识，直接打字或点麦克风说给我听，我随时都在。',
+      title: '提问',
+      text: '输入问题或上传题目图片；支持的浏览器也可使用语音输入。',
       placement: 'top',
       mascot: 'listening',
-    });
-    list.push({
-      title: '开始学习吧！🎉',
-      text: '就是这么简单。有任何问题尽管问我，我们一起加油！',
-      placement: 'center',
-      mascot: 'happy',
     });
     return list;
   }
@@ -96,30 +84,18 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   function buildMistakesSteps(): TourStep[] {
     return [
       {
-        title: '错题本来啦 📒',
-        text: '这里把你做错的题集中归档，自动分析错因并归入知识画像。带你看看怎么用～',
-        placement: 'center',
-        mascot: 'happy',
-      },
-      {
         target: '[data-tour="mistake-add"]',
         title: '新增错题',
-        text: '点这个加号，拍照上传整页试卷或单题照片，也能手动录入，我会自动识别切题。',
+        text: '上传整页试卷、单题照片，或手动输入题目。',
         placement: 'bottom',
         mascot: 'quiz',
       },
       {
         target: '[data-tour="mistake-list"]',
         title: '错题列表',
-        text: '所有错题按学科归档在这儿。点开任意一题，右侧会显示错因诊断、知识点归因和针对性练习。',
+        text: '选择错题，查看错因和相关知识点，开始针对性练习。',
         placement: 'right',
         mascot: 'idle',
-      },
-      {
-        title: '随时来复盘！✨',
-        text: '错题越攒越少，说明你越来越强。需要讲解时随时叫我～',
-        placement: 'center',
-        mascot: 'happy',
       },
     ];
   }
@@ -127,44 +103,32 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   function buildProfileSteps(): TourStep[] {
     return [
       {
-        title: '这是你的学习档案 🧠',
-        text: '这里汇总你各知识点的熟练度，帮你看清强项和薄弱点。快速带你逛一圈～',
-        placement: 'center',
-        mascot: 'happy',
-      },
-      {
         target: '[data-tour="profile-overall"]',
         title: '综合熟练度',
-        text: '星级是你当前学科的整体掌握度，下面分别是待加强 / 良好 / 优秀的知识点数量。',
+        text: '星级表示当前学科的整体掌握程度，下方是各熟练度的知识点数量。',
         placement: 'right',
         mascot: 'idle',
       },
       {
         target: '[data-tour="profile-report"]',
         title: '诊断报告',
-        text: '点一下，我会用 AI 生成一份学习诊断报告，分析薄弱点并给出学习建议。',
+        text: '生成薄弱点分析和学习建议。',
         placement: 'right',
         mascot: 'thinking',
       },
       {
         target: '[data-tour="profile-recommend"]',
         title: '推荐练习',
-        text: '我会挑出最该补强的知识点放在这里，点任意一项就能立刻开始针对练习。',
+        text: '选择一个知识点，开始针对性练习。',
         placement: 'right',
         mascot: 'quiz',
       },
       {
         target: '[data-tour="profile-outline"]',
         title: '课程大纲',
-        text: '按教材章节展开知识点，可以逐章测试或深入探索，掌握进度一目了然。',
+        text: '展开教材章节，查看知识点，开始章节测试或探索学习。',
         placement: 'left',
         mascot: 'listening',
-      },
-      {
-        title: '一起变强吧！🎉',
-        text: '常回来看看档案，你的进步都会记录在这里。',
-        placement: 'center',
-        mascot: 'happy',
       },
     ];
   }

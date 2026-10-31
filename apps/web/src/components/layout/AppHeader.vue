@@ -16,7 +16,6 @@ const chatStore = useChatStore();
         <span class="brand-text-bg">博文 Boen</span>
         <span class="brand-text-overlay">博文 Boen</span>
       </h1>
-      <p class="text-xs font-semibold text-[var(--ink-soft)]">AI 原生时代的教育智能体</p>
     </div>
 
     <div class="ml-auto flex items-center gap-3" data-tour="subject">

@@ -119,7 +119,7 @@ const gradingProgress = ref<{ step: GradingStep; message: string; progress: numb
 const gradingSteps: Array<{ step: GradingStep; label: string }> = [
   { step: 'grade', label: '批改评分' },
   { step: 'analyze', label: '生成分析' },
-  { step: 'profile', label: '写入画像' },
+  { step: 'profile', label: '更新学习档案' },
   { step: 'save', label: '保存结果' },
 ];
 const scoreRevealed = ref(false);
@@ -465,8 +465,8 @@ function generationDotIcon(step: GenerationStep): string {
 }
 function generationStepLabel(step: GenerationStep): string {
   const labels: Record<GenerationStep, string> = {
-    kg: '知识图谱扫描',
-    blueprint: '试卷蓝图设计',
+    kg: '分析考点',
+    blueprint: '规划试卷',
     write: '试题编写',
     review: '质量审核',
     regenerate: '修订试题',
@@ -477,8 +477,8 @@ function generationStepLabel(step: GenerationStep): string {
 const generationDetailText = computed(() => {
   const step = genProgress.value.step;
   const progress = genProgress.value.progress;
-  if (step === 'blueprint' && progress < 10) return '正在扫描知识图谱';
-  if (step === 'blueprint') return '正在订立大纲';
+  if (step === 'blueprint' && progress < 10) return '正在分析考点';
+  if (step === 'blueprint') return '正在规划试卷';
   if (step === 'write') return '正在编写试题';
   if (step === 'review') return '正在进行复核';
   if (step === 'regenerate') return '正在修订试题';
@@ -520,7 +520,7 @@ function gradingDotClass(step: GradingStep): string {
 function stepLabel(step: string): string {
   const s = stepState(step);
   const labels: Record<string, [string, string, string]> = {
-    blueprint: ['待分析知识图谱', '正在分析知识图谱', '分析已完成'],
+    blueprint: ['待分析考点', '正在分析考点', '分析已完成'],
     write: ['待编写试题', '正在编写试题', '编写已完成'],
     review: ['待审核试题', '正在审核试题', '审核已完成'],
     regenerate: ['待修正试题', '正在修正试题', '修正已完成'],
@@ -1035,7 +1035,7 @@ onUnmounted(() => {
     <div v-if="examState === 'generating'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在出卷</h2>
+        <h2 class="brand-text text-xl font-bold tracking-tight">正在生成试卷</h2>
         <div class="w-80 space-y-0.5">
           <div
             v-for="item in generationSteps"
@@ -1047,7 +1047,7 @@ onUnmounted(() => {
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ generationStepLabel(item.step) }}</span>
             <span v-if="generationStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <p class="px-1 pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ generationDetailText }}</p>
+          <p class="sr-only" role="status">{{ generationDetailText }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill" :style="generationProgressStyle"></div>
@@ -1168,7 +1168,7 @@ onUnmounted(() => {
             {{ currentGroupIndex + 1 }}/{{ totalGroups }}
           </div>
           <button @click="nextGroup" class="exam-nav-btn" :class="isLastGroup ? 'exam-nav-btn-submit' : 'exam-nav-btn-primary'">
-            {{ isLastGroup ? '提交' : '下一大题' }} <component :is="isLastGroup ? Send : ChevronRight" class="h-4 w-4" />
+            {{ isLastGroup ? '提交试卷' : '下一大题' }} <component :is="isLastGroup ? Send : ChevronRight" class="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -1179,7 +1179,7 @@ onUnmounted(() => {
     <div v-if="examState === 'grading'" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { delay: 100, duration: 500 } }">
         <div class="loading-mascot"><Mascot :size="80" state="thinking" /></div>
-        <h2 class="brand-text text-xl font-bold tracking-tight">博文正在评分</h2>
+        <h2 class="brand-text text-xl font-bold tracking-tight">正在批改试卷</h2>
         <div class="w-80 space-y-1">
           <div
             v-for="item in gradingSteps"
@@ -1191,7 +1191,7 @@ onUnmounted(() => {
             <span class="flex-1 font-display text-sm font-semibold text-[var(--ink)]">{{ item.label }}</span>
             <span v-if="gradingStepState(item.step) === 'active'" class="step-active-dot"></span>
           </div>
-          <p class="pt-2 text-center text-xs font-medium text-[var(--ink-soft)]">{{ gradingProgress.step === 'grade' ? '正在批改评分' : gradingProgress.step === 'analyze' ? '正在生成分析' : gradingProgress.step === 'profile' ? '正在写入画像' : gradingProgress.step === 'save' ? '正在保存结果' : '' }}</p>
+          <p class="sr-only" role="status">{{ gradingProgress.step === 'grade' ? '正在批改评分' : gradingProgress.step === 'analyze' ? '正在生成分析' : gradingProgress.step === 'profile' ? '正在更新学习档案' : gradingProgress.step === 'save' ? '正在保存结果' : '' }}</p>
         </div>
         <div class="h-1.5 w-80 overflow-hidden rounded-full bg-[var(--line)]">
           <div class="progress-fill h-full rounded-full" :style="{ width: gradingProgress.progress + '%' }"></div>
@@ -1203,7 +1203,7 @@ onUnmounted(() => {
     <div v-if="examState === 'graded' && results" class="flex h-full flex-col items-center justify-center">
       <div class="flex flex-col items-center gap-6" v-motion :initial="{ opacity: 0, scale: 0.9 }" :enter="{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 20 } }">
         <div class="loading-mascot"><Mascot :size="80" state="happy" /></div>
-        <p class="font-display text-lg font-bold text-[var(--ink)]">批改完成！</p>
+        <p class="font-display text-lg font-bold text-[var(--ink)]">批改完成</p>
         <button @click="revealResults" class="btn-accent flex items-center gap-2 rounded-2xl px-8 py-3 font-display text-base font-bold transition-all active:scale-[0.96]"><BarChart3 class="h-5 w-5" /> 查看成绩</button>
       </div>
     </div>
@@ -1245,7 +1245,7 @@ onUnmounted(() => {
           class="clay clay-glass flex items-center gap-3 px-4 py-3"
         >
           <Sparkles class="h-5 w-5 shrink-0 text-[var(--ink-soft)]" />
-          <span class="text-sm text-[var(--ink-soft)]">🌙 今日星月积分已满，明天再来</span>
+          <span class="text-sm text-[var(--ink-soft)]">今日学习积分奖励已达上限</span>
         </div>
 
         <!-- 自动错题收集通知 -->
@@ -1267,7 +1267,7 @@ onUnmounted(() => {
           <div class="flex items-start gap-3 p-4">
             <div class="shrink-0"><Mascot :size="44" state="happy" /></div>
             <div class="min-w-0 flex-1">
-              <p class="mb-2 font-display text-xs font-bold text-[var(--accent)]">博文的总结</p>
+              <p class="mb-2 font-display text-xs font-bold text-[var(--accent)]">考试总结</p>
               <div class="analysis-body text-sm leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(results.analysis)"></div>
             </div>
           </div>
@@ -1275,7 +1275,7 @@ onUnmounted(() => {
 
         <!-- Tier Breakdown -->
         <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 150 } }">
-          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">权重层级得分</h3>
+          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">各类知识点得分</h3>
           <div v-for="t in results.tierBreakdown" :key="t.tier" class="mb-2 last:mb-0">
             <div class="mb-1 flex items-center justify-between text-xs">
               <span class="font-semibold text-[var(--ink)]">{{ { Core: '核心知识点', Important: '重要知识点', Standard: '标准知识点' }[t.tier] || t.tier }}</span>
@@ -1304,7 +1304,7 @@ onUnmounted(() => {
 
         <!-- 核心素养（主指标，优先展示） -->
         <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 16 }" :enter="{ opacity: 1, y: 0, transition: { delay: 180 } }">
-          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养 <span class="font-normal text-[var(--ink-soft)]/60">— 综合能力评价</span></h3>
+          <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养</h3>
           <div class="flex flex-wrap gap-3">
             <div v-for="lit in results.literacyBreakdown" :key="lit.literacy" class="flex flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3 min-w-[100px]">
               <span class="text-xs font-semibold text-[var(--ink)]">{{ lit.literacy }}</span>
@@ -1353,7 +1353,7 @@ onUnmounted(() => {
             <TrendingUp class="h-3.5 w-3.5 text-[var(--accent)]" />
             <span class="text-[10px] font-semibold text-[var(--accent-strong)]">
               难度建议：
-              {{ results.recommendation.difficultyAdjustment.suggestedLevel === 'hard' ? '近期表现优秀，建议挑战更高难度题目' : '近期得分偏低，建议适当降低难度巩固基础' }}
+              {{ results.recommendation.difficultyAdjustment.suggestedLevel === 'hard' ? '表现良好，可尝试更高难度' : '建议降低难度，巩固基础' }}
             </span>
           </div>
           <button class="btn-accent mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 font-display text-xs font-bold">
@@ -1436,7 +1436,6 @@ onUnmounted(() => {
                     <button @click="requestDetailedExplanation" class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--accent-strong)] transition-all hover:bg-[var(--accent)] hover:text-white active:scale-[0.97]">
                       <BrainCircuit class="h-3 w-3" /> 查看详解
                     </button>
-                    <span class="text-[10px] text-[var(--ink-soft)]">AI 针对你的答案分析错因</span>
                   </div>
                   <div v-if="qr.detailedExplanation" class="rounded-xl border border-[var(--accent)]/20 bg-[var(--accent-soft)] p-3 text-[var(--ink)] md-body">
                     <div class="mb-1.5 flex items-center gap-1.5">
@@ -1463,7 +1462,7 @@ onUnmounted(() => {
         <!-- Back Button -->
         <div class="flex items-center justify-center gap-3 pb-6">
           <button @click="session = null; results = null; answers = new Map(); $emit('back')" class="inline-flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-white px-5 py-2.5 font-display text-sm font-semibold text-[var(--ink)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] active:scale-[0.97]"><ArrowLeft class="h-4 w-4" /> 返回首页</button>
-          <span class="text-xs text-[var(--ink-soft)]">成绩已保存，可在侧边栏「考试」中查看</span>
+          <span class="text-xs text-[var(--ink-soft)]">成绩已保存至「考试」</span>
         </div>
       </div>
     </div>

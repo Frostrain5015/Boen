@@ -9,7 +9,7 @@ const { isOnline } = useNetworkStatus();
   <Transition name="network-status">
     <div v-if="!isOnline" class="network-status" role="status" aria-live="polite">
       <WifiOff class="h-4 w-4" />
-      <span>网络已断开，正在进行的请求会在恢复后同步结果</span>
+      <span>网络已断开，恢复连接后可继续操作</span>
     </div>
   </Transition>
 </template>

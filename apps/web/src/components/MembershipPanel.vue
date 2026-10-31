@@ -40,18 +40,18 @@ const statusLabel = computed(() => {
   return labels[billing.value?.status ?? 'none'];
 });
 const statusDetail = computed(() => {
-  if (!sub.value) return '正在读取你的会员信息…';
+  if (!sub.value) return '正在加载会员信息…';
   if (sub.value.membership.source === 'legacy') return `原有权益保留至 ${date(sub.value.expiresAt)}，到期后可订阅星月卡。`;
   if (billing.value?.status === 'trialing') return `首次扣款：${date(billing.value.renewsAt)}，之后 ${priceLabel.value} 自动续费。`;
   if (billing.value?.status === 'active') return `下次续费：${date(billing.value.renewsAt)} · ${priceLabel.value}。税费以账单为准。`;
   if (billing.value?.status === 'canceling') return `不再自动扣款，当前权益保留至 ${date(billing.value.currentPeriodEnd)}。`;
   if (billing.value?.status === 'past_due') return `未能完成扣款，请更新付款方式。已付权益截止 ${date(billing.value.currentPeriodEnd)}。`;
-  if (sub.value.membership.source === 'reward') return `学习积累的奖励正在生效，有效期至 ${date(sub.value.expiresAt)}。`;
-  return billing.value?.trialEligible ? `先体验 7 天，再决定是否继续。试用结束后 ${priceLabel.value} 自动续费，可随时取消。` : `以 ${priceLabel.value} 继续学习，可随时取消自动续费。`;
+  if (sub.value.membership.source === 'reward') return `奖励会员有效期至 ${date(sub.value.expiresAt)}。`;
+  return billing.value?.trialEligible ? `免费试用 7 天，结束后 ${priceLabel.value} 自动续费，可随时取消。` : `${priceLabel.value} 自动续费，可随时取消。`;
 });
 const confirmTitle = computed(() => action.value === 'reward' ? '兑换 30 天奖励会员' : action.value === 'cancel' ? '取消自动续费' : '恢复自动续费');
 const confirmDetail = computed(() => action.value === 'reward'
-  ? '将使用 2000 星月积分。已有订阅或历史会员期间，奖励时长会存起来，在现有权益结束后使用。'
+  ? '消耗 2000 星月积分。已有订阅或历史会员时，奖励时长保留至现有权益结束后使用。'
   : action.value === 'cancel'
     ? `取消后不再自动扣款，当前权益保留至 ${date(billing.value?.currentPeriodEnd)}。付款失败且已过周期时，不会延长权益。`
     : `恢复后按 ${priceLabel.value} 自动续费，下一次扣款时间以 Waffo 账单为准。可再次取消。`);
@@ -94,7 +94,7 @@ async function execute() {
     await refresh();
     card.value?.playShimmer();
     dialog.value?.close();
-  } catch { toast.error('网络暂时无法连接，请刷新确认结果'); }
+  } catch { toast.error('网络连接失败，请刷新确认操作结果'); }
   finally { busy.value = false; }
 }
 async function claim() {
@@ -102,7 +102,7 @@ async function claim() {
   busy.value = true;
   try {
     const result = await auth.claimDailyLogin();
-    if (result.ok) toast.success(`+${result.reward} 星月积分，已到账`);
+    if (result.ok) toast.success(`+${result.reward} 星月积分`);
     else toast.error(result.message ?? '领取未完成');
   } finally { busy.value = false; }
 }
@@ -114,8 +114,8 @@ onMounted(async () => {
     busy.value = true;
     try {
       const confirmed = await auth.pollSubscription();
-      if (confirmed) { card.value?.playShimmer(); toast.success('星月卡已为你开启'); }
-      else toast.info('订阅结果仍在确认，稍后刷新即可查看');
+      if (confirmed) { card.value?.playShimmer(); toast.success('星月卡已开通'); }
+      else toast.info('订阅结果待确认，请稍后刷新');
     } finally { busy.value = false; }
   }
 });
@@ -132,14 +132,14 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
       <MembershipCard ref="card" :type="cardType" size="lg"
         :holder-name="auth.userProfile?.name ?? auth.currentUser?.username ?? ''" :expires-at="sub?.expiresAt"
         :show-price="false" :locked="!auth.isPremium" :status-label="statusLabel" />
-      <p class="text-center text-xs text-[var(--ink-soft)]"><Sparkles class="inline mr-1 h-3 w-3" />轻触卡面，看看你的学习权益</p>
+      <p class="text-center text-xs text-[var(--ink-soft)]"><Sparkles class="inline mr-1 h-3 w-3" />翻面查看权益</p>
       <div class="clay clay-glass p-5 space-y-4" aria-live="polite">
         <div class="flex items-center justify-between gap-2"><span class="status-pill">{{ statusLabel }}</span><span v-if="sub?.membership.source !== 'legacy' && sub?.membership.source !== 'reward'" class="text-sm font-semibold text-[var(--ink-soft)]">{{ priceLabel }}</span></div>
         <p class="text-sm leading-6 text-[var(--ink-soft)]">{{ statusDetail }}</p>
-        <p v-if="loadFailed" class="text-sm text-[var(--error)]">会员信息暂未加载，请点击刷新。</p>
+        <p v-if="loadFailed" class="text-sm text-[var(--error)]">会员信息加载失败，请刷新。</p>
         <template v-if="billing?.checkoutAllowed">
           <MembershipPlanPicker v-if="plans.length" v-model="selectedPlanKey" :plans="plans" :disabled="busy" />
-          <p class="text-xs leading-5 text-[var(--ink-soft)]">月付与年付权益相同；首次试用每个账户限一次，不因更换方案重复提供。已有订阅须结束后才能选择另一方案。</p>
+          <p class="text-xs leading-5 text-[var(--ink-soft)]">月付、年付权益相同，每个账户限一次试用。更换方案须等现有订阅结束。</p>
           <label v-if="canBuy" class="flex items-start gap-2 text-xs leading-5 text-[var(--ink-soft)]">
             <input v-model="agreed" type="checkbox" class="mt-1 accent-[var(--accent)]" />
             <span>我同意<router-link to="/terms" class="underline">服务条款</router-link>与<router-link to="/privacy" class="underline">隐私政策</router-link>，并授权{{ billing.trialEligible ? '7 天试用后' : '' }}按 {{ priceLabel }} 自动续费，直至取消。未满 18 岁购买须经监护人同意。</span>
@@ -148,7 +148,7 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
             <LoaderCircle v-if="busy" :size="16" class="animate-spin" /><CreditCard v-else :size="16" />
             {{ !sub?.payEnabled ? '订阅暂未开放' : billing.trialEligible ? `开始 7 天免费试用 · ${selectedPlan.name}` : `订阅${selectedPlan.name} · ${priceLabel}` }}
           </button>
-          <p v-if="sub?.membership.source === 'reward'" class="text-xs leading-5 text-[var(--ink-soft)]">开通订阅后，剩余奖励时长会暂停保留，订阅结束后接着用。</p>
+          <p v-if="sub?.membership.source === 'reward'" class="text-xs leading-5 text-[var(--ink-soft)]">订阅期间暂停消耗奖励时长，订阅结束后继续使用。</p>
         </template>
         <button v-if="billing && ['trialing','active','past_due'].includes(billing.status)" class="membership-secondary w-full" :disabled="busy" @click="confirm('cancel')">{{ billing.status === 'trialing' ? '取消试用后的续费' : '取消自动续费' }}</button>
         <button v-if="billing?.status === 'canceling'" class="membership-primary w-full" :disabled="busy" @click="confirm('reactivate')">恢复自动续费</button>
@@ -159,15 +159,15 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
     <section aria-labelledby="rewards-heading" class="clay clay-glass overflow-hidden">
       <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3"><Sparkles :size="16" class="text-[var(--premium-gold)]" /><h2 id="rewards-heading" class="font-display text-sm font-bold">积分与奖励</h2></div>
       <div class="p-5 space-y-4">
-        <div class="flex items-end justify-between gap-3"><div><p class="text-xs text-[var(--ink-soft)]">星月积分</p><p class="font-display text-3xl font-bold mt-1">{{ auth.pointsBalance.toLocaleString() }}</p></div><div class="text-right text-xs text-[var(--ink-soft)]">已储备奖励<p class="mt-1 text-base font-semibold">{{ ((sub?.rewards.bankedSeconds ?? 0) / 86400).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) }} 天</p></div></div>
+        <div class="flex items-end justify-between gap-3"><div><p class="text-xs text-[var(--ink-soft)]">星月积分</p><p class="font-display text-3xl font-bold mt-1">{{ auth.pointsBalance.toLocaleString() }}</p></div><div class="text-right text-xs text-[var(--ink-soft)]">待用奖励时长<p class="mt-1 text-base font-semibold">{{ ((sub?.rewards.bankedSeconds ?? 0) / 86400).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) }} 天</p></div></div>
         <button class="membership-secondary w-full" :disabled="busy || auth.pointsBalance < 2000" @click="confirm('reward')">2000 积分 · 兑换 30 天奖励会员</button>
-        <p class="text-xs leading-5 text-[var(--ink-soft)]">订阅期间，奖励时长只积累、不消耗。没有订阅时自动开始使用。积分不可购买或提现。</p>
-        <div class="daily-reward flex items-center justify-between gap-3 rounded-2xl p-3"><div><p class="font-display text-sm font-bold">每日签到</p><p class="text-xs text-[var(--ink-soft)] mt-1">今天也为学习积累 50 积分</p></div><button class="membership-secondary shrink-0" :disabled="busy || auth.currency?.claimedToday" @click="claim">{{ auth.currency?.claimedToday ? '今日已领' : '领取' }}</button></div>
+        <p class="text-xs leading-5 text-[var(--ink-soft)]">奖励时长在订阅或历史会员结束后自动使用。积分不可购买或提现。</p>
+        <div class="daily-reward flex items-center justify-between gap-3 rounded-2xl p-3"><div><p class="font-display text-sm font-bold">每日登录奖励</p><p class="text-xs text-[var(--ink-soft)] mt-1">每日领取 50 积分</p></div><button class="membership-secondary shrink-0" :disabled="busy || auth.currency?.claimedToday" @click="claim">{{ auth.currency?.claimedToday ? '今日已领' : '领取' }}</button></div>
       </div>
     </section>
     <dialog ref="dialog" class="membership-dialog clay p-6" @cancel="busy && $event.preventDefault()">
       <h2 class="font-display text-lg font-bold">{{ confirmTitle }}</h2><p class="mt-3 text-sm leading-6 text-[var(--ink-soft)]">{{ confirmDetail }}</p>
-      <div class="flex gap-3 mt-6"><button autofocus class="membership-secondary flex-1" :disabled="busy" @click="dialog?.close()">暂不操作</button><button class="membership-primary flex-1" :disabled="busy" @click="execute">{{ busy ? '正在确认…' : '确认' }}</button></div>
+      <div class="flex gap-3 mt-6"><button autofocus class="membership-secondary flex-1" :disabled="busy" @click="dialog?.close()">返回</button><button class="membership-primary flex-1" :disabled="busy" @click="execute">{{ busy ? '正在处理…' : confirmTitle }}</button></div>
     </dialog>
   </div>
 </template>

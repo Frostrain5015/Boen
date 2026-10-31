@@ -71,7 +71,7 @@ export const useExamStore = defineStore('exam', () => {
 
   async function handleDeleteExam(examId: string, event: Event) {
     event.stopPropagation();
-    const ok = await confirm({ title: '\u5220\u9664\u8003\u8bd5', message: '\u786e\u5b9a\u8981\u5220\u9664\u8fd9\u573a\u8003\u8bd5\u5417\uff1f\u5220\u9664\u540e\u65e0\u6cd5\u6062\u590d\u3002', confirmText: '\u5220\u9664', danger: true });
+    const ok = await confirm({ title: '\u5220\u9664\u8003\u8bd5', message: '将删除此考试及其答题记录，无法恢复。', confirmText: '删除考试', danger: true });
     if (!ok) return;
     try {
       await apiDeleteExam(examId);

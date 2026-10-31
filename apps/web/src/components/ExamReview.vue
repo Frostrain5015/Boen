@@ -152,7 +152,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
       <div class="mx-auto max-w-2xl">
         <div v-if="!examId" class="flex flex-col items-center gap-3 py-24 text-center text-[var(--ink-soft)]">
           <FileSearch class="h-12 w-12 opacity-40" />
-          <p class="text-sm font-medium">从左侧选择一场考试查看回顾</p>
+          <p class="text-sm font-medium">选择一场考试查看结果</p>
         </div>
         <div v-else-if="loading" class="py-16 text-center text-sm text-[var(--ink-soft)]">加载中…</div>
         <div v-else-if="error" class="py-16 text-center text-sm text-[#f2557a]">{{ error }}</div>
@@ -180,14 +180,14 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
               <div class="flex items-start gap-3 p-4">
                 <Mascot :size="44" state="happy" class="shrink-0" />
                 <div class="min-w-0 flex-1">
-                  <p class="mb-2 font-display text-xs font-bold text-[var(--accent)]">博文的总结</p>
+                  <p class="mb-2 font-display text-xs font-bold text-[var(--accent)]">考试总结</p>
                   <div class="analysis-body text-sm leading-relaxed text-[var(--ink)]" v-html="renderMarkdown(detail.results.analysis)"></div>
                 </div>
               </div>
             </div>
 
             <div class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 130 } }">
-              <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">权重层级得分</h3>
+              <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">各类知识点得分</h3>
               <div v-for="t in detail.results.tierBreakdown" :key="t.tier" class="mb-2 last:mb-0">
                 <div class="mb-1 flex items-center justify-between text-xs">
                   <span class="font-semibold text-[var(--ink)]">{{ { Core: '核心知识点', Important: '重要知识点', Standard: '标准知识点' }[t.tier] || t.tier }}</span>
@@ -214,7 +214,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
             </div>
 
             <div v-if="detail.results.literacyBreakdown.length" class="clay clay-glass p-4" v-motion :initial="{ opacity: 0, y: 14 }" :enter="{ opacity: 1, y: 0, transition: { delay: 210 } }">
-              <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养 <span class="font-normal text-[var(--ink-soft)]/60">— 综合能力评价</span></h3>
+              <h3 class="mb-3 font-display text-xs font-bold text-[var(--ink-soft)]">核心素养</h3>
               <div class="flex flex-wrap gap-3">
                 <div v-for="lit in detail.results.literacyBreakdown" :key="lit.literacy" class="flex min-w-[100px] flex-1 flex-col items-center gap-1.5 rounded-xl border border-[var(--line)] px-3 py-3">
                   <span class="text-xs font-semibold text-[var(--ink)]">{{ lit.literacy }}</span>
@@ -230,7 +230,7 @@ watch(() => props.examId, (id) => { if (id) load(id); }, { immediate: true });
 
           <!-- 逐题回顾 -->
           <div class="mb-3 flex items-center justify-between">
-            <h3 class="font-display text-sm font-bold text-[var(--ink)]">完整题目与判卷详情</h3>
+            <h3 class="font-display text-sm font-bold text-[var(--ink)]">逐题详情</h3>
             <span class="text-xs font-medium text-[var(--ink-soft)]">共 {{ detail.questions.length }} 题</span>
           </div>
           <div class="space-y-3">

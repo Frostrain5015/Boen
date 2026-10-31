@@ -104,9 +104,6 @@ function handleBack() {
         <h1 class="font-display text-xl font-bold" style="color: var(--ink)">
           {{ isFirstSetup ? '初始设置' : '个人中心' }}
         </h1>
-        <p class="text-sm" style="color: var(--ink-soft)">
-          {{ isFirstSetup ? '让我们先认识一下你' : '个性化你的学习体验' }}
-        </p>
       </div>
     </div>
 

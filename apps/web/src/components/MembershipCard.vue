@@ -168,7 +168,7 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>
 
-          <p class="mt-auto pt-3 text-xs opacity-70">点击卡面返回 · 订阅管理在卡片下方</p>
+          <p class="mt-auto pt-3 text-xs opacity-70">翻面返回</p>
         </div>
       </div>
       </div>

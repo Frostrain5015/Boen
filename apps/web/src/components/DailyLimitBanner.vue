@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { AlertCircle, X } from 'lucide-vue-next';
-import { useToast } from '@/composables/useToast';
+import { useRouter } from 'vue-router';
 
-const toast = useToast();
+const router = useRouter();
 defineProps<{ show: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 function handleUpgrade() {
-  toast.info('请联系管理员激活星月卡');
+  router.push('/setup');
 }
 </script>
 
@@ -19,14 +19,14 @@ function handleUpgrade() {
     >
       <AlertCircle class="h-[18px] w-[18px] shrink-0" style="color: var(--error)" />
       <span class="flex-1 text-[0.85rem]" style="color: var(--ink)">
-        今日免费对话次数已用完
+        今日免费对话已用完，明日恢复
       </span>
       <button
         @click="handleUpgrade"
         class="shrink-0 text-[0.85rem] font-semibold transition-all hover:underline"
         style="color: var(--premium-gold-strong)"
       >
-        升级星月卡
+        查看星月卡
       </button>
       <button
         @click="emit('close')"

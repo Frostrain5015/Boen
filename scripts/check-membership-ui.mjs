@@ -44,10 +44,11 @@ try {
   for (const width of [360, 390, 768, 1280]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`${origin}/pricing`);
-    await page.getByRole('heading', { name: /让学习/ }).waitFor();
+    await page.getByRole('heading', { name: 'AI 学习助手', exact: true }).waitFor();
     await page.locator('#boot-loader').waitFor({ state: 'detached' });
-    await page.getByRole('radio', { name: /星耀卡/ }).check();
-    if (!await page.getByRole('heading', { name: '星耀卡', exact: true }).isVisible()) throw new Error('Yearly pricing not rendered');
+    await page.getByRole('radio', { name: /星耀卡/ }).locator('..').click();
+    if (!await page.getByRole('radio', { name: /星耀卡/ }).isChecked()) throw new Error('Yearly plan selection failed');
+    if (!await page.getByRole('heading', { name: '星耀卡', exact: true, level: 2 }).isVisible()) throw new Error('Yearly pricing not rendered');
     await checkSupportFooter(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     if (overflow) throw new Error(`Pricing overflows at ${width}`);
@@ -100,7 +101,8 @@ try {
       if (state === 'none') {
         const consent = ui.getByRole('checkbox');
         await consent.check();
-        await ui.getByRole('radio', { name: /星耀卡/ }).check();
+        await ui.getByRole('radio', { name: /星耀卡/ }).locator('..').click();
+        if (!await ui.getByRole('radio', { name: /星耀卡/ }).isChecked()) throw new Error('Yearly plan selection failed');
         if (await consent.isChecked()) throw new Error('Changing plans must reset automatic-renewal consent');
         if (!(await ui.locator('.membership-panel').innerText()).includes('USD $29.99/年')) throw new Error('Selected yearly checkout price missing');
       }
@@ -117,7 +119,7 @@ try {
       if (state === 'active') {
         await ui.getByRole('button', { name: '取消自动续费', exact: true }).click();
         await ui.getByRole('dialog').waitFor();
-        await ui.getByRole('button', { name: '暂不操作', exact: true }).click();
+        await ui.getByRole('button', { name: '返回', exact: true }).click();
       }
       if (['none', 'active', 'legacy'].includes(state)) await ui.screenshot({ path: `${output}/setup-${width}-${state}.png`, fullPage: true });
       await ui.getByText('字体大小', { exact: true }).scrollIntoViewIfNeeded();
