@@ -151,7 +151,7 @@ export interface EarnResult {
 export function earnPoints(
   userId: string,
   amount: number,
-  reason: 'session' | 'exam',
+  reason: 'session' | 'exam' | 'game',
   refId?: string,
 ): EarnResult {
   if (amount <= 0) {
@@ -201,6 +201,7 @@ export function earnPoints(
       return { earned, capped: amount > earned, balance: balanceAfter };
     })();
   } catch (e) {
+    if (reason === 'game') throw e;
     console.warn('[currency] earnPoints 事务失败:', e instanceof Error ? e.message : e);
     // 入账失败不应阻断主结算流程
     const cur = db.prepare(`SELECT balance FROM user_currency WHERE user_id=?`).get(userId) as { balance: number } | undefined;
