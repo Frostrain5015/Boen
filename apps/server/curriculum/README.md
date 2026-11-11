@@ -54,3 +54,15 @@ npm run verify:curriculum --workspace @boen/server -- 7 math 一元一次方程
 ## 范围（当前）
 
 语文、数学、英语覆盖义务教育 1–9 年级；科学覆盖 1–9 年级，其中初中科学采用浙教版科学课程结构。每册可用性以已提交源数据、`sourceUrl` 与 `verify:curriculum` 校验结果为准。
+
+## 外部课程资料
+
+`npm run import:external-curriculum -w @boen/server -- <来源> <数据版本> <本地绝对目录>` 按来源生成独立 SQLite 文件，默认位于 `apps/server/data/external-curriculum/`。导入成功后才替换旧文件。导入器保留原始文件、SHA-256、来源 ID、版本和许可，校验先修边的端点及必需依赖环。可加 `--no-vectors` 只建立关键词索引，或用 `--output-dir <目录>` 在独立目录验证。
+
+| 来源 | 本地输入 | 许可 |
+| --- | --- | --- |
+| `marble` | `topics.json`、`dependencies.json`、`LICENSE`、`LICENSE-CONTENT`、`PROVENANCE.md` | ODbL 1.0 / CC BY-SA 4.0，随库保留许可与署名。第三方课标原文文件另按来源授权。 |
+| `k12-kgraph` | `K12-KGraph/` 目录（`global_KG/` 和可选的 `subject_specific_KG/`），也支持直接给出全局 `nodes.json`、`edges.json` 的目录 | CC BY-NC-SA 4.0，取得商用授权后以 `--authorization <记录编号>` 导入。 |
+| `cn-math-taxonomy` | `topics.json`、`dependencies.json` | CC BY-NC 4.0，取得商用授权后以 `--authorization <记录编号>` 导入。 |
+
+已安装的外部库会按学科和年级为教材检索补充知识点与直接先修关系。Marble 的年龄段作为小学检索范围的近似值。中文问题先由现有查询改写模型提炼英文教材术语，再进行关键词或多语言向量检索。章节和进度以博文教材为准。公开使用 Marble 时，可通过 `/api/curriculum/sources/marble` 下载独立数据库及其中的许可文件。外部库独立于教材目录和学生掌握度。题库、评测集和训练集不在此导入范围。

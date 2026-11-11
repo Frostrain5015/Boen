@@ -10,6 +10,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { streamSSE } from 'hono/streaming';
 import { serve } from '@hono/node-server';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { getConnInfo } from '@hono/node-server/conninfo';
 
 // ── 全局未捕获异常兜底（防止进程静默退出导致 SSE 流中断） ──────
@@ -47,6 +48,7 @@ import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
+import { externalCatalogPath, hasPublishedMarbleCatalog } from './external-curriculum.js';
 import { ensureFtsTable, rebuildFtsIndex } from './fts.js';
 import { setRewriteModel } from './query-rewriter.js';
 import { generateConversationSummaryAsync } from './conversation-memory.js';
@@ -972,6 +974,14 @@ app.post('/api/render-tikz', async (c) => {
 // ── 知识图谱 API ────────────────────────────
 // 初始化表（幂等）
 ensureKnowledgeGraphTables();
+
+const serveMarbleCatalog = serveStatic({ path: externalCatalogPath('marble') });
+app.get('/api/curriculum/sources/marble', async (c) => {
+  if (!hasPublishedMarbleCatalog()) return c.notFound();
+  c.header('Content-Disposition', 'attachment; filename="marble-curriculum.sqlite3"');
+  const response = await serveMarbleCatalog(c, async () => {});
+  return response ?? c.notFound();
+});
 
 /** GET /api/kg/nodes?type=theme&subject=math — 按类型查节点 */
 app.get('/api/kg/nodes', async (c) => {

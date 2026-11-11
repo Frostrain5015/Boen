@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "seed:curriculum": "tsx src/seed-curriculum.ts",
+    "import:external-curriculum": "tsx src/scripts/import-external-curriculum.ts",
     "seed:kg": "tsx src/seed-knowledge-graph.ts",
     "repair:kg": "tsx src/production-kg.ts",
     "verify:kg": "tsx src/production-kg.ts --verify",

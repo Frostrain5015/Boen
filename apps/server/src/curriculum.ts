@@ -2,6 +2,7 @@ import db from './db.js';
 import { embedTexts, embedQuery, cosineSim, vectorToBlob, blobToVector } from './embeddings.js';
 import { rewriteQuery } from './query-rewriter.js';
 import { searchFts, indexFtsRow } from './fts.js';
+import { externalCurriculumContext, shouldTranslateForMarble } from './external-curriculum.js';
 
 // ── 入库数据格式（seed JSON）──────────────────
 export interface UnitNode {
@@ -259,6 +260,13 @@ export async function lookupKnowledgePoint(args: {
     }
   }
 
+  if (mode !== 'keyword') {
+    const translated = shouldTranslateForMarble(subject, grade, query)
+      ? await rewriteQuery(query, subject, grade, true)
+      : undefined;
+    const external = await externalCurriculumContext(subject, grade, translated?.query ?? query, translated?.english);
+    if (external) parts.push(external);
+  }
   if (parts.length === 0) return `没有在${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}课程知识库中找到「${query}」。`;
   return parts.join('\n\n');
 }
@@ -271,20 +279,26 @@ export async function retrieveCurriculum(args: { grade?: string; subject?: strin
   const { grade, subject, query } = args;
   if (!grade || !subject || !/^[1-9]$/.test(grade)) return '';
   const outline = getOutline(grade, subject);
-  if (!outline) return '';
-  const parts = [`【当前学情】学生正在学「${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}」，本学期教材编排如下：`, outline];
+  const parts = outline
+    ? [`【当前学情】学生正在学「${gradeCn(grade)}·${SUBJECT_LABEL[subject] ?? subject}」，本学期教材编排如下：`, outline]
+    : [];
   if (query) {
     // 查询改写：将口语化提问改写为更适合检索的形式
-    const rewritten = await rewriteQuery(query, subject, grade);
-    const searchQuery = rewritten !== query ? rewritten : query;
+    const bilingual = shouldTranslateForMarble(subject, grade, query);
+    const { query: searchQuery, english } = outline || bilingual
+      ? await rewriteQuery(query, subject, grade, bilingual)
+      : { query, english: undefined };
 
     // 混合检索：向量语义 + BM25 全文搜索
-    const related = await hybridRetrieve(grade, subject, searchQuery, 5);
+    const related = outline ? await hybridRetrieve(grade, subject, searchQuery, 5) : [];
     if (related.length) {
-      const label = rewritten !== query ? `（检索优化："${query}" → "${rewritten}"）` : '';
+      const label = searchQuery !== query ? `（检索优化："${query}" → "${searchQuery}"）` : '';
       parts.push(`\n与学生当前问题最相关的章节/知识点：${label}\n` + related.map((c) => `- ${c}`).join('\n'));
     }
+    const external = await externalCurriculumContext(subject, grade, searchQuery, english);
+    if (external) parts.push(external);
   }
+  if (!outline) return parts.join('\n\n');
   parts.push('\n讲解时贴合该教材的编排与进度，不超纲；可据此判断学生处于哪个章节、需要哪些前置知识。');
   parts.push('\n【学习周期提示】一个单元完整的闭环是：预习 → 同步练习 → 错题追练 → 单元复习 → 考前巩固。根据学生的提问和行为判断当前阶段，主动引导到下一步。');
 
