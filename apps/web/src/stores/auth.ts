@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Grade, SubscriptionStatus, CurrencyStatus, MembershipPlanKey } from '@boen/shared';
-import { MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
-import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
+import { isGrade, MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
+import { clearToken, isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { setOnUnauthorized } from '@/services/chat';
 import { useChatStore } from './chat';
 import { useExamStore } from './exam';
@@ -16,23 +16,14 @@ setOnUnauthorized(() => {
 
 // ── User Profile types & helpers ────────────────────────────
 const PROFILE_KEY = 'boen_user_profile';
-export type UserProfile = { name: string; grade: Grade };
-/** Map legacy gradeBand to a representative grade */
-const BAND_TO_GRADE: Record<string, Grade> = { primary: '3', middle: '8', undergrad: 'college' };
+const DEV_GRADE_KEY = 'boen_dev_learning_grade';
 
-/** 初始化时尝试所有可能的 key（scoped + unscoped），scoped 优先级高 */
-function loadProfileFallback(sub?: string): UserProfile | null {
-  const keys = sub ? [`${PROFILE_KEY}_${sub}`, PROFILE_KEY] : [PROFILE_KEY];
-  for (const key of keys) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const p = JSON.parse(raw);
-      if (p.name && p.grade) return { name: p.name, grade: p.grade };
-      if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
-    } catch { /* ignore */ }
-  }
-  return null;
+function readName(sub: string): string {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(`${PROFILE_KEY}_${sub}`) ?? 'null');
+    if (stored && typeof stored === 'object' && 'name' in stored && typeof stored.name === 'string') return stored.name;
+  } catch { /* ignore */ }
+  return '';
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -41,10 +32,15 @@ export const useAuthStore = defineStore('auth', () => {
   const authenticated = ref(false);
   const currentUser = ref<FrostUser | null>(null);
   const isOAuthCallback = ref(window.location.pathname === '/auth/callback');
-  const showSetupDialog = ref(false);
-  // 初始化时还没有 currentUser，只能扫 unscoped key；scoped 的稍后在 checkAuth 中补扫
-  const userProfile = ref<UserProfile | null>(loadProfileFallback());
+  const grade = ref<Grade | null>(null);
+  const gradeStatus = ref<'loading' | 'ready' | 'error'>('loading');
+  const profileName = ref('');
+  const userProfile = computed(() => grade.value
+    ? { grade: grade.value, name: profileName.value || currentUser.value?.preferred_username || currentUser.value?.username || '' }
+    : null);
+  let loadingGradeToken: string | null = null;
   const subscription = ref<SubscriptionStatus | null>(null);
+  const subscriptionChecked = ref(false);
   const currency = ref<CurrencyStatus | null>(null);
 
   // ── Computed ──────────────────────────────────────────────
@@ -55,17 +51,20 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Actions ───────────────────────────────────────────────
 
   async function fetchSubscription() {
+    const token = getToken();
+    if (!token) return;
     try {
-      const token = getToken();
-      if (!token) return;
       const res = await fetch('/api/subscription/status', {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        subscription.value = (await res.json()) as SubscriptionStatus;
+        const status = (await res.json()) as SubscriptionStatus;
+        if (getToken() === token) subscription.value = status;
       }
     } catch {
       /* 静默失败，不影响基础功能 */
+    } finally {
+      if (getToken() === token) subscriptionChecked.value = true;
     }
   }
 
@@ -190,64 +189,103 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function loadProfileFromStorage(): UserProfile | null {
-    // 1. 优先 scoped key（saveProfile 的写入路径）
-    const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : null;
-    if (scopedKey) {
-      try {
-        const raw = localStorage.getItem(scopedKey);
-        if (raw) {
-          const p = JSON.parse(raw);
-          if (p.name && p.grade) return p;
-          if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
-        }
-      } catch { /* ignore */ }
-    }
-    // 2. 降级到 unscoped key（旧版本遗留数据）
+  async function loadLearningProfile() {
+    const token = getToken();
+    if (!token || loadingGradeToken === token) return;
+    gradeStatus.value = 'loading';
+    loadingGradeToken = token;
     try {
-      const raw = localStorage.getItem(PROFILE_KEY);
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p.name && p.grade) return p;
-        if (p.name && p.gradeBand) return { name: p.name, grade: BAND_TO_GRADE[p.gradeBand] ?? '8' };
+      if (import.meta.env.DEV && token.startsWith('local-dev-token-')) {
+        const stored = sessionStorage.getItem(DEV_GRADE_KEY);
+        grade.value = isGrade(stored) ? stored : null;
+        gradeStatus.value = 'ready';
+        return;
       }
-    } catch { /* ignore */ }
-    return null;
+      const res = await fetch('/api/account/learning-profile', {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (getToken() !== token) return;
+      if (res.status === 401) {
+        clearToken();
+        authenticated.value = false;
+        grade.value = null;
+        return;
+      }
+      if (!res.ok) throw new Error('Learning profile unavailable');
+      const data: unknown = await res.json();
+      if (getToken() !== token) return;
+      if (!data || typeof data !== 'object' || !('grade' in data) || (data.grade !== null && !isGrade(data.grade))) {
+        throw new Error('Invalid learning profile');
+      }
+      grade.value = data.grade;
+      gradeStatus.value = 'ready';
+    } catch {
+      if (getToken() === token) gradeStatus.value = 'error';
+    } finally {
+      if (loadingGradeToken === token) loadingGradeToken = null;
+    }
+  }
+
+  async function saveGrade(selected: Grade): Promise<void> {
+    const token = getToken();
+    if (!token) throw new Error('请重新登录');
+    if (import.meta.env.DEV && token.startsWith('local-dev-token-')) {
+      sessionStorage.setItem(DEV_GRADE_KEY, selected);
+      grade.value = selected;
+      return;
+    }
+    const res = await fetch('/api/account/learning-profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ grade: selected }),
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    if (getToken() !== token) throw new Error('请重新登录');
+    if (res?.status === 401) {
+      clearToken();
+      authenticated.value = false;
+      grade.value = null;
+      throw new Error('请重新登录');
+    }
+    if (!res?.ok) throw new Error('年级未保存，请重试');
+    grade.value = selected;
+  }
+
+  function saveName(name: string) {
+    profileName.value = name;
+    const sub = currentUser.value?.sub;
+    if (!sub) return;
+    try { localStorage.setItem(`${PROFILE_KEY}_${sub}`, JSON.stringify({ name })); }
+    catch { /* browser storage can be unavailable */ }
   }
 
   async function checkAuth() {
     if (isOAuthCallback.value) return;
+    grade.value = null;
+    gradeStatus.value = 'loading';
+    profileName.value = '';
+    subscription.value = null;
+    subscriptionChecked.value = false;
     const auth = isAuthenticated();
     authenticated.value = auth;
     if (auth) {
       currentUser.value = await getCurrentUser();
       authenticated.value = isAuthenticated();
-      if (authenticated.value) {
-        userProfile.value = loadProfileFromStorage();
-        const chatStore = useChatStore();
-        const examStore = useExamStore();
-        await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription(), fetchCurrencyStatus()]);
-      }
     }
     authChecked.value = true;
-  }
-
-  function handleOAuthSuccess(plan?: MembershipPlanKey) {
-    router.replace(plan ? { name: 'setup', query: { plan } } : '/');
-    isOAuthCallback.value = false;
-    authenticated.value = true;
-    authChecked.value = true;
-    getCurrentUser().then((user) => {
-      currentUser.value = user;
-      userProfile.value = loadProfileFallback(user?.sub);
-      if (!userProfile.value && !plan) router.push('/setup');
-    });
-    fetchSubscription();
-    fetchCurrencyStatus();
+    if (!authenticated.value) return;
+    profileName.value = currentUser.value ? readName(currentUser.value.sub) : '';
     const chatStore = useChatStore();
     const examStore = useExamStore();
-    chatStore.loadConversations();
-    examStore.loadExams();
+    await Promise.all([loadLearningProfile(), chatStore.loadConversations(), examStore.loadExams(), fetchSubscription(), fetchCurrencyStatus()]);
+  }
+
+  async function handleOAuthSuccess(plan?: MembershipPlanKey) {
+    await router.replace(plan ? { name: 'setup', query: { plan } } : '/');
+    isOAuthCallback.value = false;
+    authChecked.value = false;
+    await checkAuth();
   }
 
   function handleOAuthError() {
@@ -261,25 +299,17 @@ export const useAuthStore = defineStore('auth', () => {
     logout();
   }
 
-  function saveProfile(p: UserProfile) {
-    userProfile.value = p;
-    const scopedKey = currentUser.value?.sub ? `${PROFILE_KEY}_${currentUser.value.sub}` : PROFILE_KEY;
-    localStorage.setItem(scopedKey, JSON.stringify(p));
-    showSetupDialog.value = false;
-  }
-
-  function openSetupDialog() {
-    router.push('/setup');
-  }
-
   return {
     authChecked,
     authenticated,
     currentUser,
     isOAuthCallback,
-    showSetupDialog,
+    grade,
+    gradeStatus,
+    profileName,
     userProfile,
     subscription,
+    subscriptionChecked,
     currency,
     isPremium,
     dailyRemaining,
@@ -288,8 +318,9 @@ export const useAuthStore = defineStore('auth', () => {
     handleOAuthSuccess,
     handleOAuthError,
     doLogout,
-    saveProfile,
-    openSetupDialog,
+    loadLearningProfile,
+    saveGrade,
+    saveName,
     fetchSubscription,
     decrementDailyUsage,
     fetchCurrencyStatus,

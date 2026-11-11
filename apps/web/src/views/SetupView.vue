@@ -1,40 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import type { Grade } from '@boen/shared';
+import { ref, watch } from 'vue';
 import { ArrowLeft, User, GraduationCap, Sparkles, Type, Mail, Lock } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
 import { getToken } from '@/services/auth';
 import { useToast } from '@/composables/useToast';
 import MembershipPanel from '@/components/MembershipPanel.vue';
-const router = useRouter();
+import LearningGradeSetting from '@/components/LearningGradeSetting.vue';
 const authStore = useAuthStore();
 const toast = useToast();
-const isFirstSetup = computed(() => !authStore.userProfile);
-// ── 设置 ──
-const GRADE_GROUPS: { band: string; items: { value: Grade; label: string }[] }[] = [
-  { band: '小学', items: ['一', '二', '三', '四', '五', '六'].map((c, i) => ({ value: String(i + 1) as Grade, label: `${c}年级` })) },
-  { band: '初中', items: ['一', '二', '三'].map((c, i) => ({ value: String(i + 7) as Grade, label: `初${c}` })) },
-  { band: '其他', items: [{ value: 'high', label: '高中' }, { value: 'college', label: '大学及以上' }] },
-];
-
-function detectBand(g: Grade): string {
-  for (const group of GRADE_GROUPS) {
-    if (group.items.some(i => i.value === g)) return group.band;
-  }
-  return '初中';
-}
-
-const name = ref(authStore.userProfile?.name ?? '');
-const grade = ref<Grade>(authStore.userProfile?.grade ?? '8');
-const selectedBand = ref(detectBand(grade.value));
+const name = ref(authStore.profileName);
 const modelProvider = ref(localStorage.getItem('boen_model_provider') || 'default');
 const fontSize = ref<'sm' | 'md' | 'lg'>(
   (localStorage.getItem('boen_font_size') as 'sm' | 'md' | 'lg') || 'md',
-);
-
-const currentBandItems = computed(() =>
-  GRADE_GROUPS.find(g => g.band === selectedBand.value)?.items ?? [],
 );
 
 const FONT_SIZE_OPTIONS = [
@@ -43,20 +20,6 @@ const FONT_SIZE_OPTIONS = [
   { value: 'lg' as const, label: '大', px: '18px' },
 ];
 
-/** 自动保存所有设置到 localStorage + 后端 */
-function autoSave() {
-  const trimmed = name.value.trim();
-  if (!trimmed) return;
-  localStorage.setItem('boen_model_provider', modelProvider.value);
-  localStorage.setItem('boen_font_size', fontSize.value);
-  authStore.saveProfile({ name: trimmed, grade: grade.value });
-  fetch('/api/model/switch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}` },
-    body: JSON.stringify({ provider: modelProvider.value }),
-  }).catch(() => {});
-}
-
 /** 选择模型：非星月卡点 DS 弹窗，否则立即切换+保存 */
 function setProvider(val: string) {
   if (val !== 'default' && !authStore.isPremium) {
@@ -64,45 +27,40 @@ function setProvider(val: string) {
     return;
   }
   modelProvider.value = val;
-  autoSave();
+  localStorage.setItem('boen_model_provider', val);
+  fetch('/api/model/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}` },
+    body: JSON.stringify({ provider: val }),
+  }).catch(() => {});
 }
 
 /** 名称失焦时自动保存 */
 function onNameBlur() {
-  if (name.value.trim()) autoSave();
-}
-
-/** 年级点击时自动保存 */
-function setGrade(g: Grade) {
-  grade.value = g;
-  autoSave();
+  if (name.value.trim()) authStore.saveName(name.value.trim());
 }
 
 // 字体大小实时预览 + 保存
 watch(fontSize, (val) => {
   localStorage.setItem('boen_font_size', val);
   document.documentElement.setAttribute('data-fontsize', val);
-  autoSave();
 }, { immediate: true });
 
-function handleBack() {
-  if (!isFirstSetup.value) router.push('/');
-}
 </script>
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-y-auto p-4 pt-6 sm:p-6 sm:pt-8">
     <!-- 头部 -->
     <div class="mb-6 flex items-center gap-3">
-      <button
-        v-if="!isFirstSetup"
-        @click="handleBack"
+      <router-link
+        to="/"
+        aria-label="返回博文"
         class="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--line)]/50"
       >
         <ArrowLeft class="h-5 w-5" style="color: var(--ink-soft)" />
-      </button>
+      </router-link>
       <div>
         <h1 class="font-display text-xl font-bold" style="color: var(--ink)">
-          {{ isFirstSetup ? '初始设置' : '个人中心' }}
+          个人中心
         </h1>
       </div>
     </div>
@@ -160,36 +118,9 @@ function handleBack() {
             <GraduationCap class="h-4 w-4 text-[var(--accent)]" />
             <h2 class="font-display text-sm font-bold text-[var(--ink)]">学习配置</h2>
           </div>
-          <div class="space-y-4 px-5 py-4">
-            <div class="flex flex-col gap-3">
-              <span class="flex items-center gap-1.5 font-display text-xs font-semibold" style="color: var(--ink-soft)">
-                <GraduationCap class="h-3.5 w-3.5" /> 当前年级
-              </span>
-              <!-- 第一行：学段 -->
-              <div class="grid grid-cols-3 gap-2">
-                <button
-                  v-for="group in GRADE_GROUPS"
-                  :key="group.band"
-                  @click="selectedBand = group.band"
-                  class="flex h-10 items-center justify-center rounded-2xl border-2 text-xs font-bold transition-all active:scale-[0.97]"
-                  :class="selectedBand === group.band
-                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]'
-                    : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"
-                >{{ group.band }}</button>
-              </div>
-              <!-- 第二行：具体年级 -->
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="item in currentBandItems"
-                  :key="item.value"
-                  @click="setGrade(item.value)"
-                  class="flex h-9 items-center justify-center rounded-xl px-3.5 text-xs font-bold transition-all active:scale-[0.97]"
-                  :class="grade === item.value
-                    ? 'bg-[var(--accent)] text-white shadow-sm'
-                    : 'bg-[var(--paper)] text-[var(--ink-soft)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
-                >{{ item.label }}</button>
-              </div>
-            </div>
+          <div class="px-5 py-4">
+            <LearningGradeSetting v-if="authStore.grade || authStore.gradeStatus !== 'ready'" />
+            <router-link v-else to="/" class="btn-accent inline-block rounded-xl px-4 py-2 text-sm font-semibold">选择年级</router-link>
           </div>
         </div>
 

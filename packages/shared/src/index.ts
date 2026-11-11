@@ -4,7 +4,16 @@
 export type GradeBand = 'primary' | 'middle' | 'undergrad';
 
 /** 具体年级：义务教育 1–9 年级细化 + 高中/大学粗档 */
-export type Grade = '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'high' | 'college';
+export const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'high', 'college'] as const;
+export type Grade = typeof GRADES[number];
+
+export function isGrade(value: unknown): value is Grade {
+  return GRADES.some(grade => grade === value);
+}
+
+export interface LearningProfile {
+  grade: Grade | null;
+}
 
 /** 具体年级 → 语气年龄段 */
 export function gradeToBand(grade: Grade): GradeBand {
@@ -48,6 +57,8 @@ export interface ChatRequest {
   attachments?: Attachment[];
   gradeBand: GradeBand;
   grade?: Grade;
+  /** 年级不同的旧错题，本次练习使用该年级。 */
+  practiceGrade?: Grade;
   userName?: string;
   mode?: BoenMode;
   practiceType?: string;

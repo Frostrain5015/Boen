@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, nextTick } from 'vue';
+import { isGrade } from '@boen/shared';
 import { createConversation } from '@/services/chat';
 import { useToast } from '@/composables/useToast';
 import { useChatStore, type Subject } from './chat';
@@ -194,7 +195,6 @@ export const useUiStore = defineStore('ui', () => {
 
   async function handleMistakePractice(detail: { prompt: string; subject: Subject; grade: string }) {
     const chatStore = useChatStore();
-    const authStore = useAuthStore();
     expandedSection.value = 'chat';
     activeMode.value = 'weakness';
     modeTagSent.value = false;
@@ -207,11 +207,7 @@ export const useUiStore = defineStore('ui', () => {
       } catch { toast.error('\u521b\u5efa\u9519\u9898\u7ec3\u4e60\u5bf9\u8bdd\u5931\u8d25'); }
     }
     subject.value = detail.subject;
-    if (authStore.userProfile) {
-      authStore.userProfile.grade = detail.grade as import('@boen/shared').Grade;
-      authStore.saveProfile(authStore.userProfile);
-    }
-    await chatStore.send(detail.prompt);
+    await chatStore.send(detail.prompt, undefined, isGrade(detail.grade) ? detail.grade : undefined);
   }
 
   return {

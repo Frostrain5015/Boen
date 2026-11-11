@@ -5,7 +5,7 @@ import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
 import SiteLinks from '@/components/layout/SiteLinks.vue';
 import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
-import { useAuthStore, type UserProfile } from '@/stores/auth';
+import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const route = useRoute();
@@ -39,12 +39,13 @@ async function handleLogin() {
 
 function handleTestLogin() {
   if (!isDev || !agreedToTerms.value) return;
-  const { user, profile } = loginAsTestUser({ name: '本地测试用户', grade: '8' });
+  const user = loginAsTestUser();
   // 直接设置 auth store 状态，跳过 API 调用链条（仅本地开发）
   authStore.authenticated = true;
   authStore.authChecked = true;
   authStore.currentUser = user;
-  authStore.userProfile = profile as unknown as UserProfile;
+  authStore.saveName(user.preferred_username);
+  void authStore.loadLearningProfile();
   authStore.subscription = {
     tier: 'monthly',
     isPremium: true,

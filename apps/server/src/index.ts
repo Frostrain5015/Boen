@@ -43,10 +43,11 @@ import {
 } from '@boen/agent-core';
 import type { QuestionInterrupt, QuestionResume } from '@boen/agent-core';
 import type { AnalyzeMistakeEvent, ChatRequest, AnswerRequest, AnswerPayload, SseEvent } from '@boen/shared';
-import { MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
+import { gradeToBand, isGrade, MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
 import { Command } from '@langchain/langgraph';
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite';
 import db from './db.js';
+import { getLearningGrade, GRADE_REQUIRED, learningProfileRoutes } from './learning-profile.js';
 import { lookupKnowledgePoint, retrieveCurriculum } from './curriculum.js';
 import { externalCatalogPath, hasPublishedMarbleCatalog } from './external-curriculum.js';
 import { ensureFtsTable, rebuildFtsIndex } from './fts.js';
@@ -1762,6 +1763,8 @@ app.post('/api/auth/revoke', async (c) => {
 
 // ── 对话管理 API ────────────────────────────
 
+app.route('/api/account/learning-profile', learningProfileRoutes(db, resolveUserId));
+
 /** GET /api/conversations - 获取当前登录用户的所有对话 */
 app.get('/api/conversations', async (c) => {
   const userId = await resolveUserId(c);
@@ -1774,6 +1777,7 @@ app.get('/api/conversations', async (c) => {
 app.post('/api/conversations', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!getLearningGrade(db, userId)) return c.json(GRADE_REQUIRED, 409);
   const body = await c.req.json<{ title?: string; subject: string }>();
   const conversation = createConversation(userId, body.title ?? '新对话', body.subject ?? 'math');
   return c.json({ conversation }, 201);
@@ -1816,11 +1820,14 @@ app.delete('/api/conversations/:id', async (c) => {
 // ── 聊天 API ────────────────────────────────
 
 app.post('/api/chat', async (c) => {
-  const body = (await c.req.json()) as ChatRequest & { conversationId?: string; subject: string };
   // 硬认证：必须登录才能对话
   const result = await resolveSubscription(c);
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   const userId = result.userId;
+  const accountGrade = getLearningGrade(db, userId);
+  if (!accountGrade) return c.json(GRADE_REQUIRED, 409);
+  const body = await c.req.json<ChatRequest & { conversationId?: string; subject: string }>();
+  const grade = body.mode === 'weakness' && isGrade(body.practiceGrade) ? body.practiceGrade : accountGrade;
 
   // 免费用户每日限额检查（已原子递增，无需 later 再 increment）
   let usageInfo: { dailyLimit: number; dailyUsed: number; dailyRemaining: number } | null = null;
@@ -1863,7 +1870,7 @@ app.post('/api/chat', async (c) => {
       let weaknessData: string | undefined;
       if (body.mode === 'weakness' && userId) {
         try {
-          const weakPoints = getWeakPoints(userId, body.subject ?? 'math', body.grade, 60, 8);
+          const weakPoints = getWeakPoints(userId, body.subject ?? 'math', grade, 60, 8);
           if (weakPoints.length > 0) {
             weaknessData = '【你的薄弱知识点（来自知识画像）】\n' + weakPoints.map(w =>
               `- ${w.title}（当前掌握度 ${w.weightedScore}%，等级：${w.level === 'needs_practice' ? '需练习' : w.level === 'developing' ? '发展中' : w.level === 'proficient' ? '熟练' : '掌握'}，最近更新：${new Date(w.lastUpdated * 1000).toLocaleDateString('zh-CN')}）`
@@ -1881,7 +1888,7 @@ app.post('/api/chat', async (c) => {
       let styleExamples: string | undefined;
       if (userId && (body.mode === 'weakness' || body.practiceType || /错题|举一反三|出题|练习|测验|测试|考我|quiz/i.test(body.message))) {
         try {
-          styleExamples = await retrieveGlobalStyleSkills(body.subject ?? 'math', body.grade ?? '7', body.message, [], 3);
+          styleExamples = await retrieveGlobalStyleSkills(body.subject ?? 'math', grade, body.message, [], 3);
         } catch (err) {
           console.warn('[mistakes] style samples retrieval failed:', err);
           styleExamples = undefined;
@@ -1912,8 +1919,8 @@ app.post('/api/chat', async (c) => {
       const { last, question } = await runGraph(
         {
           messages: [modeSystemMsg, humanMsg].filter(Boolean),
-          gradeBand: body.gradeBand ?? 'middle',
-          grade: body.grade,
+          gradeBand: gradeToBand(grade),
+          grade,
           subject: body.subject ?? 'math',
           userName: body.userName,
           weaknessData,
@@ -1943,7 +1950,7 @@ app.post('/api/chat', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
           const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, body.threadId);
-          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', body.threadId, sessionScore);
+          const points = awardSessionPoints(userId, profChanges, body.subject, grade, 'session', body.threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
@@ -1962,12 +1969,12 @@ app.post('/api/chat', async (c) => {
       // 出题：构建+持久化+下发一体化，失败自动跳空中断（不卡线程、不断流）
       await safeDeliverQuestion(
         question, send,
-        { subject: body.subject ?? 'math', grade: body.grade },
+        { subject: body.subject ?? 'math', grade },
         body.threadId,
         owned ? body.conversationId! : undefined,
       );
       // 检测 exit_session 工具调用 → 发送结算事件 + 清缓存
-      await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', body.grade, settled);
+      await handleSessionExit(last, send, userId, body.threadId, body.subject ?? 'math', grade, settled);
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
@@ -1992,10 +1999,13 @@ app.post('/api/chat', async (c) => {
 
 // ── 探索课对话 ─────────────────────────
 app.post('/api/explore', async (c) => {
-  const body = await c.req.json<{ title: string; subject: string; grade: string }>();
   const result = await resolveSubscription(c);
   if (!result) return c.json({ error: 'unauthorized' }, 401);
   const userId = result.userId;
+  const accountGrade = getLearningGrade(db, userId);
+  if (!accountGrade) return c.json(GRADE_REQUIRED, 409);
+  const body = await c.req.json<{ title: string; subject: string; grade: string }>();
+  const grade = isGrade(body.grade) ? body.grade : accountGrade;
 
   const { getExplorePrompt } = await import('./explore-prompts.js');
   const entry = getExplorePrompt(body.title);
@@ -2018,8 +2028,8 @@ app.post('/api/explore', async (c) => {
             new SystemMessage(entry.prompt),
             new HumanMessage(`我准备好探索「${body.title}」了，请开始吧。`),
           ],
-          gradeBand: 'middle',
-          grade: body.grade,
+          gradeBand: gradeToBand(grade),
+          grade,
           subject: body.subject ?? 'math',
           mode: 'explore',
         },
@@ -2046,7 +2056,7 @@ app.post('/api/explore', async (c) => {
             updateProficiency(userId, node.id, sessionScore, 100, 'explore');
           }
 
-          const points = awardSessionPoints(userId, profChanges, body.subject, body.grade, 'session', threadId, sessionScore);
+          const points = awardSessionPoints(userId, profChanges, body.subject, grade, 'session', threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '').trim(),
@@ -2062,7 +2072,7 @@ app.post('/api/explore', async (c) => {
       }
       await safeDeliverQuestion(
         question, send,
-        { subject: body.subject ?? 'math', grade: body.grade },
+        { subject: body.subject ?? 'math', grade },
         threadId, threadId,
       );
       await send({ type: 'done' });

@@ -230,25 +230,16 @@ export async function logout() {
 }
 
 /** 本地开发测试登录：绕过 OAuth，直接设置认证状态，不触发页面重载（仅开发构建可用） */
-export function loginAsTestUser(profile: { name?: string; grade?: string } = {}) {
+export function loginAsTestUser(): FrostUser {
   if (!import.meta.env.DEV) throw new Error('loginAsTestUser is dev-only');
   const fakeToken = `local-dev-token-${Date.now()}`;
   saveToken(fakeToken);
-  const profileData = {
-    name: profile.name ?? '本地测试用户',
-    grade: profile.grade ?? '8',
-  };
-  localStorage.setItem('boen_user_profile', JSON.stringify(profileData));
   // 不 reload，由调用方（LoginView）直接推入路由
   return {
-    token: fakeToken,
-    user: {
-      sub: 'local-dev-sub',
-      preferred_username: profileData.name,
-      username: 'local-dev-user',
-      email: 'dev@boen.local',
-      email_verified: true,
-    } as FrostUser,
-    profile: profileData,
+    sub: 'local-dev-sub',
+    preferred_username: '本地测试用户',
+    username: 'local-dev-user',
+    email: 'dev@boen.local',
+    email_verified: true,
   };
 }

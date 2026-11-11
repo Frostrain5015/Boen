@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { DATA_DIR } from './paths.js';
 import { initMembership } from './membership.js';
+import { initLearningProfiles } from './learning-profile.js';
 
 const db = new Database(join(DATA_DIR, 'boen.db'));
 
@@ -223,6 +224,11 @@ const MIGRATIONS: Array<{ version: number; run: () => void; description: string 
       }
       if (exists('game_sessions')) addColumnIfNotExists('game_sessions', 'settlement', 'TEXT');
     },
+  },
+  {
+    version: 8,
+    description: '按账号保存已确认的学习年级',
+    run: () => initLearningProfiles(db),
   },
 ];
 

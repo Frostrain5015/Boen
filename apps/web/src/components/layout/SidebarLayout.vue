@@ -47,23 +47,6 @@ const currentView = computed<SidebarView>(() => {
   return 'chat';
 });
 
-const userGradeLabel = computed(() => {
-  const g = authStore.userProfile?.grade;
-  if (!g) return '';
-  const n = Number(g);
-  if (n >= 1 && n <= 6) return `${'一二三四五六'[n - 1]}年级`;
-  if (n >= 7 && n <= 9) return `初${'一二三'[n - 7]}`;
-  if (g === 'high') return '高中';
-  if (g === 'college') return '大学';
-  return g;
-});
-
-const userModelLabel = computed(() => {
-  const p = localStorage.getItem('boen_model_provider') || 'default';
-  if (p === 'deepseek-pro') return 'Pro';
-  return 'Flash';
-});
-
 function subjectLabel(val: string) {
   const found = [
     { value: 'chinese', label: '语文', emoji: '📖' },
@@ -354,7 +337,6 @@ function onSubmenuLeave(el: Element) {
                 {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
               </router-link>
             </p>
-            <p class="text-[10px] text-[var(--ink-soft)]">{{ userGradeLabel }} · {{ userModelLabel }}</p>
           </div>
           <Settings class="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
         </router-link>

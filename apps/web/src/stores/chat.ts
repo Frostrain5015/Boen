@@ -248,7 +248,7 @@ export const useChatStore = defineStore('chat', () => {
 
   // ── Actions ───────────────────────────────────────────────
 
-  async function send(text: string, attachments?: Attachment[]) {
+  async function send(text: string, attachments?: Attachment[], practiceGrade?: Grade) {
     const t = text.trim();
     if ((!t || busy.value) && (!attachments || !attachments.length)) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -256,6 +256,11 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
     const authStore = useAuthStore();
+    const grade = authStore.grade;
+    if (!grade) {
+      toast.info('请先选择你的年级');
+      return;
+    }
     const uiStore = useUiStore();
     // 发送第一条消息时锁定类课堂模式
     if (uiStore.activeMode !== 'none' && !uiStore.sessionActive) {
@@ -302,8 +307,8 @@ export const useChatStore = defineStore('chat', () => {
           threadId: currentConversationId.value!,
           message: t,
           attachments,
-          gradeBand: authStore.userProfile ? gradeToBand(authStore.userProfile.grade) : 'middle',
-          grade: authStore.userProfile?.grade,
+          gradeBand: gradeToBand(practiceGrade ?? grade),
+          practiceGrade,
           userName: authStore.userProfile?.name,
           subject: uiStore.subject,
           conversationId: currentConversationId.value ?? undefined,

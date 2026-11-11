@@ -38,7 +38,7 @@ const features = [
           <div class="mt-6 flex items-end justify-between"><h2 class="font-display text-lg font-bold">{{ selectedPlan.name }}</h2><p><span class="font-display text-3xl font-bold">${{ selectedPlan.amount }}</span><span class="ml-1 text-sm text-[var(--ink-soft)]">USD / {{ selectedPlan.intervalLabel }}</span></p></div>
           <ul class="my-5 space-y-2 text-sm text-[var(--ink-soft)]"><li v-for="benefit in ['DeepSeek V4 Pro 大模型', '全题型考试与错题智能归因', '学习诊断报告']" :key="benefit" class="flex items-center gap-2"><Check :size="15" class="text-[var(--accent-strong)]" />{{ benefit }}</li></ul>
           <router-link
-            v-if="auth.authChecked"
+            v-if="auth.authChecked && (!auth.authenticated || auth.subscriptionChecked || auth.subscription)"
             :to="{ name: 'setup', query: manageMembership ? {} : { plan: selectedPlanKey } }"
             class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold"
           >{{ subscribeLabel }}</router-link>

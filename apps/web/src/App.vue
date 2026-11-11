@@ -3,6 +3,8 @@ import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import OAuthCallback from '@/components/OAuthCallback.vue';
 import LoginView from '@/components/LoginView.vue';
+import AppLoading from '@/components/AppLoading.vue';
+import LearningGradeSetting from '@/components/LearningGradeSetting.vue';
 import ToastProvider from '@/components/ToastProvider.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import NetworkStatusBanner from '@/components/NetworkStatusBanner.vue';
@@ -17,6 +19,7 @@ const authStore = useAuthStore();
 const uiStore = useUiStore();
 const router = useRouter();
 const isPublicLegalRoute = computed(() => ['terms', 'privacy', 'pricing'].includes(String(router.currentRoute.value.name)));
+const requiresGrade = computed(() => authStore.grade === null && router.currentRoute.value.name !== 'setup');
 
 // 类课堂模式：离开聊天页时自动退出
 watch(() => router.currentRoute.value.name, (name) => {
@@ -62,8 +65,21 @@ onMounted(() => {
     @error="authStore.handleOAuthError()"
   />
 
-  <!-- 登录页面（authChecked 为 false 时也拦截，防止闪未登录对话界面） -->
-  <LoginView v-else-if="!authStore.authChecked || !authStore.authenticated" />
+  <AppLoading v-else-if="!authStore.authChecked" loading message="正在确认登录状态…" />
+  <LoginView v-else-if="!authStore.authenticated" />
+
+  <AppLoading v-else-if="requiresGrade && authStore.gradeStatus === 'loading'" loading message="正在读取年级…" />
+  <main v-else-if="requiresGrade"
+    class="flex h-full items-center justify-center overflow-y-auto bg-[var(--paper)] p-5 text-[var(--ink)]">
+    <section :aria-labelledby="authStore.gradeStatus === 'ready' ? 'choose-grade-title' : undefined"
+      class="w-full max-w-sm rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5 sm:p-7">
+      <template v-if="authStore.gradeStatus === 'ready'">
+        <h1 id="choose-grade-title" class="mb-2 font-display text-2xl font-bold">选择你的年级</h1>
+        <p class="mb-5 text-sm text-[var(--ink-soft)]">博文会按你的年级查找教材和练习。</p>
+      </template>
+      <LearningGradeSetting onboarding />
+    </section>
+  </main>
 
   <!-- 主应用 -->
   <div v-else :class="{ 'boen-session': uiStore.sessionActive }" :data-subject="uiStore.subject" class="relative flex h-full flex-col">
