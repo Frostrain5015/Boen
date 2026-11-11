@@ -37,6 +37,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import {
   getChatModel,
   buildBoenGraph,
+  REPLY_MODEL_TAG,
   QUIZ_TOOL_NAMES,
   COMPLETE_REVIEW_TOOL,
   toQuestionPayload,
@@ -423,7 +424,7 @@ async function runGraph(
           console.log('[runGraph] 客户端断连，提前终止流');
           break;
         }
-    if (ev.event === 'on_chat_model_stream') {
+    if (ev.event === 'on_chat_model_stream' && ev.tags?.includes(REPLY_MODEL_TAG)) {
       const chunk = ev.data?.chunk as
         | { content?: unknown; tool_call_chunks?: Array<{ name?: string }>; tool_calls?: Array<{ name?: string }> }
         | undefined;
@@ -477,7 +478,7 @@ async function runGraph(
         const names = [...toolNames, toolNameBuf];
         if (names.some(looksLikeQuiz)) await signalQuiz();
       }
-    } else if (ev.event === 'on_chat_model_end') {
+    } else if (ev.event === 'on_chat_model_end' && ev.tags?.includes(REPLY_MODEL_TAG)) {
       // 兜底：模型不分片流式输出 tool_call
       if (!quizSignaled) {
         const out = ev.data?.output as { tool_calls?: Array<{ name?: string }> } | undefined;
@@ -855,15 +856,14 @@ app.use('/api/*', async (c, next) => {
   }
   const preference = userId ? db.prepare('SELECT provider FROM user_model_preferences WHERE user_id=?').get(userId) as { provider: string } | undefined : undefined;
   const entitlements = userId ? membershipCreditEntitlements(membershipDetails(db, userId)) : null;
-  const canUsePro = Boolean(entitlements?.canUsePro);
-  const provider = preference?.provider === 'deepseek-pro' && canUsePro ? 'deepseek-pro' : 'default';
+  const provider = preference?.provider === 'deepseek-pro' ? 'deepseek-pro' : 'default';
   const aiRequest = (c.req.method === 'GET' && c.req.path === '/api/profile/report')
     || (c.req.method === 'POST' && /^\/api\/(?:chat|answer|explore|mistakes\/[^/]+\/(?:analyze|practice)|exam\/(?:generate|submit(?:\/stream)?|[^/]+\/detailed-review))$/.test(c.req.path));
   if (!userId || !aiRequest) {
     return providerScope.run(provider, next);
   }
   syncUserCredits(userId);
-  const examLimit = c.req.path === '/api/exam/generate' ? EXAM_CREDIT_LIMIT[canUsePro ? 'advanced' : 'standard'] : Infinity;
+  const examLimit = c.req.path === '/api/exam/generate' ? EXAM_CREDIT_LIMIT[provider === 'deepseek-pro' ? 'advanced' : 'standard'] : Infinity;
   const meter = newCreditMeter(db, userId, c.req.path, examLimit, entitlements?.legacyAccess);
   try {
     await creditScope.run(meter, () => providerScope.run(provider, next));
@@ -892,10 +892,6 @@ app.post('/api/model/switch', async (c) => {
   const body = SwitchModelSchema.parse(await c.req.json());
   const p = body.provider;
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
-  // V4 Pro 对所有有效星月卡开放
-  if (p === 'deepseek-pro') {
-    if (!membershipCreditEntitlements(membershipDetails(db, userId)).canUsePro) return c.json({ error: 'premium_required', message: 'DeepSeek Pro 需开通星耀卡' }, 403);
-  }
   const switched = switchModel(userId, p);
   return c.json({ success: true, provider: switched });
 });
@@ -1297,9 +1293,6 @@ app.post('/api/exam/generate', async (c) => {
   const score = body.totalScore ?? (duration <= 15 ? 20 : duration <= 45 ? 50 : 100);
   if (!Number.isFinite(duration) || duration < 1 || duration > 90 || !Number.isFinite(score) || score < 1 || score > 100) {
     return c.json({ error: 'invalid_exam_size', message: '请选择有效的试卷规模' }, 400);
-  }
-  if ((duration > 45 || score > 50) && !authResult.sub.canUsePro) {
-    return c.json({ error: 'premium_required', message: '90 分钟期末试卷需开通星耀卡' }, 403);
   }
   // 如果前端传入了 examId（来自 POST /api/exam 的预创建记录），直接用这个 ID
   const preCreatedId = body.examId;

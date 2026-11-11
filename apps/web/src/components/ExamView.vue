@@ -629,7 +629,6 @@ function totalScoreForDuration(minutes: number): number {
 }
 
 async function generateExamPaper() {
-  if (config.value.durationMinutes > 45 && !authStore.canUsePro) return;
   examState.value = 'generating';
   genProgress.value = { step: 'blueprint', message: '正在准备…', progress: 0 };
   let ready: ExamReadyData | undefined;
@@ -1025,13 +1024,13 @@ onUnmounted(() => {
           <div>
             <p class="mb-2 text-xs font-semibold text-[var(--ink-soft)]">限时</p>
             <div class="flex gap-2">
-              <button v-for="d in DURATIONS" :key="d.value" @click="config.durationMinutes = d.value" :disabled="d.value > 45 && !authStore.canUsePro" class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97] disabled:opacity-50" :class="config.durationMinutes === d.value ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"><Clock class="h-3.5 w-3.5" />{{ d.label }}{{ d.value > 45 && !authStore.canUsePro ? ' · 星耀卡' : '' }}</button>
+              <button v-for="d in DURATIONS" :key="d.value" @click="config.durationMinutes = d.value" class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97]" :class="config.durationMinutes === d.value ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)] hover:border-[var(--accent)]'"><Clock class="h-3.5 w-3.5" />{{ d.label }}</button>
             </div>
           </div>
         </div>
         <div class="border-t border-[var(--line)] px-6 py-4">
           <p v-if="!authStore.subscription?.legacyComputeAccess" class="text-xs text-[var(--ink-soft)]">按实际用量扣积分，本次最多 {{ Math.min(authStore.pointsBalance, EXAM_CREDIT_LIMIT[authStore.canUsePro ? 'advanced' : 'standard']).toLocaleString('zh-CN') }} 积分。</p>
-          <button @click="generateExamPaper" :disabled="(!authStore.pointsBalance && !authStore.subscription?.legacyComputeAccess) || (config.durationMinutes > 45 && !authStore.canUsePro)" class="btn-accent flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-display text-sm font-bold disabled:opacity-50"><Sparkles class="h-4 w-4" /> 生成试卷</button>
+          <button @click="generateExamPaper" :disabled="!authStore.pointsBalance && !authStore.subscription?.legacyComputeAccess" class="btn-accent flex w-full items-center justify-center gap-2 rounded-2xl py-3 font-display text-sm font-bold disabled:opacity-50"><Sparkles class="h-4 w-4" /> 生成试卷</button>
         </div>
       </div>
     </div>

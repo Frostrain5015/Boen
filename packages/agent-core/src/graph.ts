@@ -16,6 +16,8 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { GradeBand, BoenMode } from '@boen/shared';
 import type { Grade } from '@boen/shared';
 import { systemPromptForQa, systemPromptForReview, systemPromptForPreview, systemPromptForWeakness, systemPromptForPractice } from './prompts.js';
+
+export const REPLY_MODEL_TAG = 'boen-reply';
 import type { PracticeType } from './prompts.js';
 import { quizTools, QUIZ_TOOL_NAMES } from './quiz/index.js';
 import {
@@ -454,7 +456,7 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     const messages = state.curriculum
       ? [system, new SystemMessage(state.curriculum), ...filteredMessages]
       : [system, ...filteredMessages];
-    const response = await llm.invoke(messages);
+    const response = await llm.invoke(messages, { tags: [REPLY_MODEL_TAG] });
 
     // 检测模式切换工具调用 → 记录待确认状态
     const calls = (response as any)?.tool_calls ?? [];

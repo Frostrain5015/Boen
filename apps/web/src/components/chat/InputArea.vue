@@ -1,18 +1,43 @@
 <script setup lang="ts">
 import { nextTick, onMounted, computed, ref, type Component } from 'vue';
-import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2, ImagePlus, X } from 'lucide-vue-next';
+import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChecks, CheckCircle, XCircle, Loader2, ImagePlus, X, ChevronDown, Check, Zap } from 'lucide-vue-next';
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
 import { useVoiceInput } from '@/composables/useVoiceInput';
 import { useImagePicker } from '@/composables/useImagePicker';
+import { useToast } from '@/composables/useToast';
+import { getToken } from '@/services/auth';
 import Mascot from '@/components/Mascot.vue';
 
 const chatStore = useChatStore();
 const uiStore = useUiStore();
 const authStore = useAuthStore();
+const toast = useToast();
 const { speechSupported, voiceListening, voiceButtonLabel, toggleVoiceInput, initVoiceSupport } = useVoiceInput();
 const { pickedImages, pickFromFile, removeImage, clearImages } = useImagePicker();
+
+const currentModel = ref<'default' | 'deepseek-pro'>(
+  (localStorage.getItem('boen_model_provider') as 'default' | 'deepseek-pro') || 'default',
+);
+const modelMenuOpen = ref(false);
+const isPro = computed(() => currentModel.value === 'deepseek-pro');
+
+async function setModel(provider: 'default' | 'deepseek-pro') {
+  currentModel.value = provider;
+  localStorage.setItem('boen_model_provider', provider);
+  const token = getToken();
+  if (token) {
+    try {
+      await fetch('/api/model/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ provider }),
+      });
+    } catch { /* 静默失败 */ }
+  }
+  toast.success(provider === 'deepseek-pro' ? '已选用 DeepSeek Pro（深度逻辑链）' : '已选用 DeepSeek V4 Flash（极速推理）');
+}
 
 let _inputEl: HTMLTextAreaElement | null = null;
 function setInputEl(el: unknown) {
@@ -206,6 +231,73 @@ onMounted(() => {
             <Sparkles v-if="chatStore.busy" class="h-5 w-5 animate-spin" />
             <Send v-else class="h-5 w-5" />
           </button>
+        </div>
+
+        <!-- 对话框下方工具条：模型选择器 Pill 放在最显眼易操作处 -->
+        <div class="mt-2.5 flex items-center justify-between px-1 text-xs">
+          <!-- 左侧：模型选择器 Pill -->
+          <div class="relative">
+            <button
+              @click="modelMenuOpen = !modelMenuOpen"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-display font-semibold transition-all active:scale-[0.98] select-none shadow-xs"
+              :class="isPro
+                ? 'border-amber-400/50 bg-[#fdf6e7] text-amber-900 hover:border-amber-500'
+                : 'border-[var(--line)] bg-white/80 text-[var(--ink)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'"
+            >
+              <Zap v-if="isPro" :size="13" class="text-amber-500 fill-current" />
+              <Sparkles v-else :size="13" class="text-[var(--accent-strong)]" />
+              <span>{{ isPro ? 'DeepSeek Pro' : 'DeepSeek V4 Flash' }}</span>
+              <ChevronDown :size="13" class="opacity-60 transition-transform duration-200" :class="{ 'rotate-180': modelMenuOpen }" />
+            </button>
+
+            <!-- 弹出菜单 -->
+            <Transition name="fade-fast">
+              <div
+                v-if="modelMenuOpen"
+                class="absolute left-0 bottom-full mb-2 z-50 w-64 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-1.5 shadow-xl"
+              >
+                <div class="px-2.5 py-1 text-[11px] font-bold text-[var(--ink-soft)] border-b border-[var(--line)] mb-1">
+                  选择本次对话模型
+                </div>
+                <button
+                  type="button"
+                  @click="setModel('default'); modelMenuOpen = false"
+                  class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs transition-colors"
+                  :class="!isPro ? 'bg-[var(--accent-soft)] font-bold text-[var(--accent-strong)]' : 'hover:bg-[var(--line)]/40 text-[var(--ink)]'"
+                >
+                  <div>
+                    <div class="font-bold">DeepSeek V4 Flash</div>
+                    <div class="text-[10px] opacity-75 mt-0.5">高速低耗 · 基础学科问答标配</div>
+                  </div>
+                  <Check v-if="!isPro" :size="14" />
+                </button>
+                <button
+                  type="button"
+                  @click="setModel('deepseek-pro'); modelMenuOpen = false"
+                  class="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs transition-colors mt-1"
+                  :class="isPro ? 'bg-amber-100/70 font-bold text-amber-900' : 'hover:bg-[var(--line)]/40 text-[var(--ink)]'"
+                >
+                  <div>
+                    <div class="font-bold flex items-center gap-1.5">
+                      <span>DeepSeek Pro</span>
+                      <span class="rounded bg-amber-500 text-white px-1 py-0.2 text-[9px] font-black">PRO</span>
+                    </div>
+                    <div class="text-[10px] opacity-75 mt-0.5">满血大模型 · 综合压轴大题深度推导</div>
+                  </div>
+                  <Check v-if="isPro" :size="14" class="text-amber-700" />
+                </button>
+              </div>
+            </Transition>
+          </div>
+
+          <!-- 右侧：当前算力提示 -->
+          <div class="flex items-center gap-2 text-[11px] text-[var(--ink-soft)]">
+            <span v-if="authStore.authenticated && authStore.pointsBalance !== undefined" class="font-medium">
+              算力余额: <span class="font-bold text-[var(--ink)]">{{ authStore.pointsBalance }}</span>
+            </span>
+            <span v-else class="opacity-70">按实际用量透明扣除积分</span>
+          </div>
         </div>
       </div>
     </div>
