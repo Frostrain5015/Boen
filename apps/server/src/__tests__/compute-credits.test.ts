@@ -35,6 +35,7 @@ describe('compute credit settlement', () => {
     const usage = { prompt_tokens: 150, prompt_cache_hit_tokens: 50, prompt_cache_miss_tokens: 100, completion_tokens: 50 };
     const text = { id: 'test-id', created: 1, model: 'deepseek-flash', choices: [{ index: 0, message: { role: 'assistant', content: '答案' }, finish_reason: 'stop' }], usage };
     const upstream = vi.fn<typeof fetch>(async (_input, init) => {
+      expect(new Headers(init?.headers).has('content-length')).toBe(false);
       const body = JSON.parse(String(init?.body)) as { stream?: boolean; stream_options?: { include_usage: boolean } };
       if (!body.stream) return Response.json(text);
       expect(body.stream_options?.include_usage).toBe(true);

@@ -144,7 +144,9 @@ export const meteredDeepSeekFetch: typeof fetch = async (input, init) => {
   try {
     const lifetime = AbortSignal.timeout(Math.max(1, (operation.startedAt + 840 - creditNow()) * 1000));
     const signal = init.signal ? AbortSignal.any([init.signal, lifetime]) : lifetime;
-    const response = await fetch(input, { ...init, signal, body: JSON.stringify(body) });
+    const headers = new Headers(init.headers);
+    headers.delete('content-length');
+    const response = await fetch(input, { ...init, headers, signal, body: JSON.stringify(body) });
     if (!response.ok) { complete(null, response.status >= 500); return response; }
     if (!response.body) { complete(null); return response; }
     if (body.stream === true) {

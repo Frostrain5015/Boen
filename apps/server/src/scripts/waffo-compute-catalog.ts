@@ -19,17 +19,17 @@ interface Product {
   hasProdVersion: boolean;
   prices: Array<{ currency: string; priceInfo: { amount: string } }>;
 }
-const catalog = await client.graphql.query<{
-  subscriptionProducts: Product[];
-  onetimeProducts: Product[];
-}>({
-  query: `query ($store: String!) {
-    subscriptionProducts(storeId:$store,limit:100) { id name billingPeriod status hasProdVersion prices{currency priceInfo{amount}} }
-    onetimeProducts(storeId:$store,limit:100) { id name status hasProdVersion prices{currency priceInfo{amount}} }
-  }`,
-  variables: { store: storeId },
-});
-if (catalog.errors?.length || !catalog.data) throw new Error('无法读取 Waffo 商品列表');
+async function readCatalog() {
+  const response = await client.graphql.query<{ subscriptionProducts: Product[]; onetimeProducts: Product[] }>({
+    query: `query ($store: String!) {
+      subscriptionProducts(storeId:$store,limit:100) { id name billingPeriod status hasProdVersion prices{currency priceInfo{amount}} }
+      onetimeProducts(storeId:$store,limit:100) { id name status hasProdVersion prices{currency priceInfo{amount}} }
+    }`,
+    variables: { store: storeId },
+  });
+  if (response.errors?.length || !response.data) throw new Error('无法读取 Waffo 商品列表');
+  return response.data;
+}
 
 function existing(products: Product[], name: string, amount: string, recurring: boolean) {
   const found = products.filter(product => product.name === name);
@@ -43,28 +43,33 @@ function existing(products: Product[], name: string, amount: string, recurring: 
 }
 
 const bindings: Record<string, string> = {};
+const catalog = await readCatalog();
 for (const plan of MEMBERSHIP_PLANS) {
   const name = `博文 ${plan.name} · 连续月订阅`;
-  const product = existing(catalog.data.subscriptionProducts, name, plan.amount, true);
+  const product = existing(catalog.subscriptionProducts, name, plan.amount, true);
   const id = product?.id ?? (await client.subscriptionProducts.create({
     storeId, name, billingPeriod: BillingPeriod.Monthly,
     description: `博文 AI 学习助手会员，每周发放 ${plan.weeklyPoints} 星月积分。`,
     prices: { USD: { amount: plan.amount, taxCategory: TaxCategory.SaaS } },
     metadata: { sku: `boen-compute-${plan.key}` },
   }, { idempotencyKey: `boen-compute-v2-${plan.key}` })).product.id;
-  if (publish && !product?.hasProdVersion) await client.subscriptionProducts.publish({ id }, { idempotencyKey: `boen-compute-v2-publish-${plan.key}` });
+  if (publish && !(await readCatalog()).subscriptionProducts.some(row => row.id === id && row.hasProdVersion)) {
+    await client.subscriptionProducts.publish({ id }, { idempotencyKey: `boen-compute-v2-publish-${plan.key}` });
+  }
   bindings[`WAFFO_PRODUCT_${plan.key.toUpperCase()}`] = id;
 }
 
 const topUpName = '博文 AI 算力包 · 一次性购买';
 const topUpAmount = creditTopUpAmount(CREDIT_TOP_UP.minimum)!;
-const topUp = existing(catalog.data.onetimeProducts, topUpName, topUpAmount, false);
+const topUp = existing(catalog.onetimeProducts, topUpName, topUpAmount, false);
 const topUpId = topUp?.id ?? (await client.onetimeProducts.create({
   storeId, name: topUpName,
   description: '为购买账号增加博文 AI 功能用量，供对话、拍照问答及组卷使用。',
   prices: { USD: { amount: topUpAmount, taxCategory: TaxCategory.SaaS } },
   metadata: { sku: 'boen-compute-topup' },
 }, { idempotencyKey: 'boen-compute-v2-topup' })).product.id;
-if (publish && !topUp?.hasProdVersion) await client.onetimeProducts.publish({ id: topUpId }, { idempotencyKey: 'boen-compute-v2-publish-topup' });
+if (publish && !(await readCatalog()).onetimeProducts.some(row => row.id === topUpId && row.hasProdVersion)) {
+  await client.onetimeProducts.publish({ id: topUpId }, { idempotencyKey: 'boen-compute-v2-publish-topup' });
+}
 bindings.WAFFO_PRODUCT_TOPUP = topUpId;
 for (const [key, value] of Object.entries(bindings)) console.log(`${key}=${value}`);

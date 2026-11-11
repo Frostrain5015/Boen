@@ -5,6 +5,7 @@
  * 校验失败时抛出 ZodError，由调用方 catch 后返回 400。
  */
 import { z } from 'zod';
+import { CreditError } from './compute-credits.js';
 
 /** POST /api/model/switch */
 export const SwitchModelSchema = z.object({
@@ -145,6 +146,11 @@ export const RedeemPointsSchema = z.object({
  * 只暴露第一行、限制长度，不暴露堆栈或内部路径
  */
 export function sanitizeError(err: unknown): string {
+  let cause = err;
+  for (let depth = 0; depth < 5 && cause instanceof Error; depth++) {
+    if (cause instanceof CreditError) return cause.message;
+    cause = cause.cause;
+  }
   const msg = err instanceof Error ? err.message : String(err);
   // 只取第一行，限制 200 字符
   let firstLine = msg.split('\n')[0].trim();

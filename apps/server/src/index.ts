@@ -570,6 +570,7 @@ async function runGraph(
   }
   } catch (err) {
     console.error('[runGraph] 流式执行异常:', err instanceof Error ? err.message : err);
+    throw err;
   } finally {
     clearInterval(pingTimer);
   }
