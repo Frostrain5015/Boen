@@ -174,6 +174,7 @@ describe('Waffo integration', () => {
       onetimeProduct: { id: 'topup-product' }, priceSnapshot: { currency: 'USD', subtotal: '2.49', total: '2.50' } };
     mocks.query.mockResolvedValue({ data: { onetimeOrder: { ...order, payments: [{ status: 'succeeded', refunds: [] }] } } });
     expect((await handleWaffoWebhook(event('pay-1', 'order.completed', data), 'valid', hooks)).ok).toBe(true);
+    expect(mocks.query).toHaveBeenCalledWith(expect.objectContaining({ query: expect.stringContaining('$id:String!') }));
     expect((await handleWaffoWebhook(event('pay-2', 'order.completed', data), 'valid', hooks)).ok).toBe(true);
     expect(creditBalance(db, 'alice').purchased).toBe(2000);
     const refunds = [{ id: 'refund-1', status: 'succeeded', requestedAmountDetails: { currency: 'USD', amount: '1.25' } }];

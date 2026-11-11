@@ -252,7 +252,7 @@ interface RemoteTopUp {
 }
 async function reconcileTopUp(topUp: TopUp, orderId: string, refundEvent: boolean) {
   const response = await getClient().graphql.query<{ onetimeOrder: RemoteTopUp | null }>({
-    query: `query($id:ID!) { onetimeOrder(id:$id) { id status testMode merchantProvidedBuyerIdentity
+    query: `query($id:String!) { onetimeOrder(id:$id) { id status testMode merchantProvidedBuyerIdentity
       onetimeProduct { id } priceSnapshot { currency subtotal total }
       payments { status refunds { id status requestedAmountDetails { currency amount } } } } }`,
     variables: { id: orderId },
