@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import Mascot from '@/components/Mascot.vue';
 import TermsOfService from '@/components/TermsOfService.vue';
+import SiteLinks from '@/components/layout/SiteLinks.vue';
 import { loginWithFrostId, loginAsTestUser } from '@/services/auth';
 import { useAuthStore, type UserProfile } from '@/stores/auth';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
 
 const isLoading = ref(false);
@@ -27,7 +29,8 @@ async function handleLogin() {
   loginError.value = '';
   isLoading.value = true;
   try {
-    await loginWithFrostId();
+    const plan = route.name === 'setup' ? route.query.plan : undefined;
+    await loginWithFrostId(plan === 'monthly' || plan === 'yearly' ? plan : undefined);
   } catch {
     loginError.value = '无法打开登录页面，请重试';
     isLoading.value = false;
@@ -125,13 +128,14 @@ function handleTestLogin() {
         </form>
       </section>
     </main>
+    <SiteLinks />
   </div>
   <TermsOfService :show="showTos" @close="showTos = false" />
 </template>
 
 <style scoped>
-.login-page { height: 100%; overflow-y: auto; background: #faf9f5; color: #2c342f; }
-.login-main { display: flex; min-height: 100%; align-items: center; justify-content: center; padding: 48px 24px; }
+.login-page { display: flex; flex-direction: column; height: 100%; overflow-y: auto; background: #faf9f5; color: #2c342f; }
+.login-main { display: flex; flex: 1; align-items: center; justify-content: center; padding: 48px 24px; }
 .login-content { width: 100%; max-width: 360px; }
 .login-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 44px; }
 .login-brand h1 { margin: 0; font-size: 30px; font-weight: 700; line-height: 1.25; letter-spacing: -.04em; }

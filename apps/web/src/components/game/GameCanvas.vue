@@ -30,6 +30,8 @@ const emit = defineEmits<{
 const canvasContainer = ref<HTMLDivElement>();
 let game: Phaser.Game | null = null;
 let scene: RunnerScene | null = null;
+let canvasObserver: ResizeObserver | null = null;
+let onCanvasResize: (() => void) | null = null;
 
 const score = ref(0);
 const lives = ref(3);
@@ -66,28 +68,30 @@ function toggleVoice() {
   scene?.setVoiceEnabled(voiceOn.value);
 }
 
-/**
- * 按容器实际尺寸决定逻辑分辨率（竖屏 2:3），
- * 不再固定 480×720 导致桌面端大面积留白；后续缩放交给 Scale.FIT。
- */
-function measureCanvas(): { width: number; height: number } {
-  const rect = canvasContainer.value?.getBoundingClientRect();
-  const height = Math.max(360, Math.round(rect?.height || 720));
+function measureGame(container: HTMLDivElement): { width: number; height: number } {
+  const height = Math.max(360, container.clientHeight || 720);
   const width = Math.round(height * (2 / 3));
   return { width: Math.max(320, Math.min(560, width)), height };
 }
 
 onMounted(() => {
-  if (!canvasContainer.value) return;
-  const size = measureCanvas();
+  const container = canvasContainer.value;
+  if (!container) return;
+  const size = measureGame(container);
+  const measureRenderScale = () => {
+    const fit = Math.min(container.clientWidth / size.width, container.clientHeight / size.height);
+    return Math.max(1, Math.ceil(fit * Math.min(window.devicePixelRatio || 1, 2)));
+  };
+  let renderScale = measureRenderScale();
+  const runner = new RunnerScene(size.width, size.height, renderScale);
 
   game = new Phaser.Game({
     type: Phaser.AUTO,
-    width: size.width,
-    height: size.height,
-    parent: canvasContainer.value,
+    width: size.width * renderScale,
+    height: size.height * renderScale,
+    parent: container,
     backgroundColor: '#fbf6ee',
-    scene: [RunnerScene],
+    scene: [runner],
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -95,7 +99,18 @@ onMounted(() => {
   });
 
   game.events.on('ready', () => {
-    scene = game!.scene.getScene('RunnerScene') as unknown as RunnerScene;
+    scene = runner;
+    onCanvasResize = () => {
+      if (!game || !container.clientWidth || !container.clientHeight) return;
+      const nextScale = measureRenderScale();
+      if (nextScale === renderScale) return;
+      renderScale = nextScale;
+      game.scale.setGameSize(size.width * renderScale, size.height * renderScale);
+      runner.setRenderScale(renderScale);
+    };
+    canvasObserver = new ResizeObserver(onCanvasResize);
+    canvasObserver.observe(container);
+    window.addEventListener('resize', onCanvasResize);
     scene.setRoundId(props.roundId);
     scene.setGrade(props.grade);
     scene.setRunLimit(props.limit, props.passTarget ?? 0);
@@ -153,6 +168,8 @@ watch(() => props.grade, (g) => {
 });
 
 onUnmounted(() => {
+  canvasObserver?.disconnect();
+  if (onCanvasResize) window.removeEventListener('resize', onCanvasResize);
   if (game) { game.destroy(true); game = null; }
   scene = null;
   try { window.speechSynthesis?.cancel(); } catch { /* ignore */ }

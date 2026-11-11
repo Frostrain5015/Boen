@@ -20,7 +20,7 @@ import { MEMBERSHIP_PLANS } from '@boen/shared';
 import { createMembershipCheckout, handleWaffoWebhook, manageSubscription } from '../waffo.js';
 const now = Math.floor(Date.now() / 1000);
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
-let remote: { id: string; status: string; isInTrial: boolean; testMode: boolean; merchantProvidedBuyerIdentity: string; currentPeriodStart: string; currentPeriodEnd: string; canceledAt: string | null; updatedAt: string; subscriptionProduct: { id: string }; billingPeriod: string; currency: string; priceSnapshot: { regularPhase: { subtotal: string } } };
+let remote: { id: string; status: string; isInTrial: boolean; testMode: boolean; merchantProvidedBuyerIdentity: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null; updatedAt: string; subscriptionProduct: { id: string }; billingPeriod: string; currency: string; priceSnapshot: { regularPhase: { subtotal: string } } };
 const products = () => MEMBERSHIP_PLANS.map(plan => ({ id: plan.key === 'monthly' ? 'product' : 'year-product', status: 'active', billingPeriod: plan.key, hasProdVersion: true, metadata: '{"trialDays":7}', prices: [{ currency: 'USD', priceInfo: { amount: String(plan.amount), trialAmount: null } }] }));
 function event(id = 'event-1', type = 'subscription.activated', extra: Record<string, unknown> = {}) {
   return JSON.stringify({ id, timestamp: iso(now), eventId: id, eventType: type, storeId: 'store', mode: 'test',
@@ -43,6 +43,27 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ token: 'scoped-token' });
 });
 describe('Waffo integration', () => {
+  it('reconciles a closed checkout using the order API String identifier before issuing a new session', async () => {
+    remote = { ...remote, status: 'closed', isInTrial: false, currentPeriodStart: null, currentPeriodEnd: null };
+    mocks.query.mockImplementation(async ({ query }: { query: string }) => {
+      if (query.includes('subscriptionOrder(')) {
+        return query.includes('$id: String!')
+          ? { data: { subscriptionOrder: remote } }
+          : { errors: [{ message: 'subscriptionOrder expects String!' }] };
+      }
+      return { data: {
+        subscriptionOrders: [{ id: 'order', orderMerchantExternalId: 'external', merchantProvidedBuyerIdentity: 'alice', status: 'closed', testMode: true }],
+        store: { prodEnabled: true, payinEnable: true },
+        subscriptionProducts: products(),
+      } };
+    });
+    mocks.checkout.mockResolvedValue({ sessionId: 'new-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
+    const result = await createMembershipCheckout({ userId: 'alice', planKey: 'monthly', successUrl: 'https://boen.frostrain.tech/setup?paid=1' });
+    expect(result).toMatchObject({ ok: true, sessionId: 'new-session' });
+    expect(db.prepare("SELECT status FROM payment_orders WHERE session_id='session'").get()).toEqual({ status: 'canceled' });
+    expect(mocks.checkout).toHaveBeenCalledTimes(1);
+  });
+
   it('creates yearly checkout and rejects switching a pending checkout to another plan', async () => {
     mocks.checkout.mockResolvedValue({ sessionId: 'year-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
     const opts = { userId: 'bob', planKey: 'yearly', successUrl: 'https://boen.frostrain.tech/setup?paid=1' };

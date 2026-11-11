@@ -4,8 +4,15 @@ import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 import { ArrowLeft, ArrowUpRight, ScanLine, Sparkles, BookOpen, ChartNoAxesCombined, Check } from 'lucide-vue-next';
 import MembershipCard from '@/components/MembershipCard.vue';
 import MembershipPlanPicker from '@/components/MembershipPlanPicker.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
 const selectedPlanKey = ref<MembershipPlanKey>('monthly');
 const selectedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === selectedPlanKey.value)!);
+const manageMembership = computed(() => auth.authenticated && auth.subscription?.billing.checkoutAllowed === false);
+const subscribeLabel = computed(() => manageMembership.value
+  ? '管理会员与订阅'
+  : `${auth.authenticated ? '' : '登录后'}订阅${selectedPlan.value.name}`);
 const features = [
   { icon: ScanLine, title: '拍照解题', body: '识别题目，查看解题思路。' },
   { icon: BookOpen, title: '练习与错题', body: '按学科练习，整理错题并分析错因。' },
@@ -30,7 +37,12 @@ const features = [
           <MembershipPlanPicker v-model="selectedPlanKey" :plans="MEMBERSHIP_PLANS" class="mt-6" />
           <div class="mt-6 flex items-end justify-between"><h2 class="font-display text-lg font-bold">{{ selectedPlan.name }}</h2><p><span class="font-display text-3xl font-bold">${{ selectedPlan.amount }}</span><span class="ml-1 text-sm text-[var(--ink-soft)]">USD / {{ selectedPlan.intervalLabel }}</span></p></div>
           <ul class="my-5 space-y-2 text-sm text-[var(--ink-soft)]"><li v-for="benefit in ['DeepSeek V4 Pro 大模型', '全题型考试与错题智能归因', '学习诊断报告']" :key="benefit" class="flex items-center gap-2"><Check :size="15" class="text-[var(--accent-strong)]" />{{ benefit }}</li></ul>
-          <router-link :to="{ path: '/setup', query: { plan: selectedPlanKey } }" class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold">登录后订阅{{ selectedPlan.name }}</router-link>
+          <router-link
+            v-if="auth.authChecked"
+            :to="{ name: 'setup', query: manageMembership ? {} : { plan: selectedPlanKey } }"
+            class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold"
+          >{{ subscribeLabel }}</router-link>
+          <span v-else class="block rounded-2xl px-4 py-3 text-center text-sm text-[var(--ink-soft)]" role="status">正在确认登录状态…</span>
           <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">首次订阅享 7 天免费试用；结束后按 USD ${{ selectedPlan.amount }}/{{ selectedPlan.intervalLabel }} 自动续费，直至取消。年付方案按年一次收取 USD $29.99，并非每月扣款。两种方案权益相同，每个账户仅一次试用。税费以 Waffo 收银台为准。</p>
         </section>
       </div>

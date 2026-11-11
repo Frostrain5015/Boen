@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SiteLinks from './SiteLinks.vue';
 import { computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
@@ -366,12 +367,7 @@ function onSubmenuLeave(el: Element) {
         </button>
       </div>
 
-      <!-- ICP 备案 -->
-      <div class="shrink-0 border-t border-[var(--line)] px-3 py-2 text-center">
-        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="text-[10px] text-(--ink-soft)/50 hover:text-(--ink-soft)/80 transition-colors">
-          浙ICP备2026040257号-1
-        </a>
-      </div>
+      <SiteLinks />
     </div>
   </aside>
 

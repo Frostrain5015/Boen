@@ -95,11 +95,11 @@ interface RemoteSubscription {
 }
 async function remoteSubscription(orderId: string): Promise<RemoteSubscription> {
   const result = await getClient().graphql.query<{ subscriptionOrder: RemoteSubscription | null }>({
-    query: `query ($id: ID!) { subscriptionOrder(id: $id) { id status isInTrial testMode merchantProvidedBuyerIdentity currentPeriodStart currentPeriodEnd canceledAt updatedAt billingPeriod currency priceSnapshot { regularPhase { subtotal } } subscriptionProduct { id } } }`,
+    query: `query ($id: String!) { subscriptionOrder(id: $id) { id status isInTrial testMode merchantProvidedBuyerIdentity currentPeriodStart currentPeriodEnd canceledAt updatedAt billingPeriod currency priceSnapshot { regularPhase { subtotal } } subscriptionProduct { id } } }`,
     variables: { id: orderId },
   });
   const row = result.data?.subscriptionOrder;
-  if (!row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || !configuredPlans().some(plan => plan.productId === row.subscriptionProduct.id && plan.key === row.billingPeriod)) throw new Error('Subscription unavailable or product/environment mismatch');
+  if (result.errors?.length || !row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || !configuredPlans().some(plan => plan.productId === row.subscriptionProduct.id && plan.key === row.billingPeriod)) throw new Error('Subscription unavailable or product/environment mismatch');
   return row;
 }
 const orderInflight = new Map<string, Promise<unknown>>();
@@ -150,7 +150,7 @@ export async function reconcileMembership(userId: string, force = false): Promis
       variables: { store: cfg().storeId, buyer: userId, offset },
     });
     const orders = response.data?.subscriptionOrders;
-    if (!orders) throw new Error('Order reconciliation unavailable');
+    if (response.errors?.length || !orders) throw new Error('Order reconciliation unavailable');
     for (const order of orders) {
       if (order.testMode !== (cfg().environment === 'test') || order.merchantProvidedBuyerIdentity !== userId) continue;
       const local = db.prepare('SELECT session_id FROM payment_orders WHERE user_id=? AND environment=? AND (order_id=? OR external_id=?)')

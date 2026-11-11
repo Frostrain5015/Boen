@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Grade, SubscriptionStatus, CurrencyStatus } from '@boen/shared';
+import type { Grade, SubscriptionStatus, CurrencyStatus, MembershipPlanKey } from '@boen/shared';
 import { MEMBERSHIP_TERMS_VERSION } from '@boen/shared';
 import { isAuthenticated, getCurrentUser, logout, getToken, type FrostUser } from '@/services/auth';
 import { setOnUnauthorized } from '@/services/chat';
@@ -221,24 +221,26 @@ export const useAuthStore = defineStore('auth', () => {
     authenticated.value = auth;
     if (auth) {
       currentUser.value = await getCurrentUser();
-      // 初始化时 loadProfile() 读不到 scoped key，这里从双 key 重新加载
-      userProfile.value = loadProfileFromStorage();
-      const chatStore = useChatStore();
-      const examStore = useExamStore();
-      await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription(), fetchCurrencyStatus()]);
+      authenticated.value = isAuthenticated();
+      if (authenticated.value) {
+        userProfile.value = loadProfileFromStorage();
+        const chatStore = useChatStore();
+        const examStore = useExamStore();
+        await Promise.all([chatStore.loadConversations(), examStore.loadExams(), fetchSubscription(), fetchCurrencyStatus()]);
+      }
     }
     authChecked.value = true;
   }
 
-  function handleOAuthSuccess() {
-    router.replace('/');
+  function handleOAuthSuccess(plan?: MembershipPlanKey) {
+    router.replace(plan ? { name: 'setup', query: { plan } } : '/');
     isOAuthCallback.value = false;
     authenticated.value = true;
     authChecked.value = true;
     getCurrentUser().then((user) => {
       currentUser.value = user;
       userProfile.value = loadProfileFallback(user?.sub);
-      if (!userProfile.value) router.push('/setup');
+      if (!userProfile.value && !plan) router.push('/setup');
     });
     fetchSubscription();
     fetchCurrencyStatus();

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import type { MembershipPlanKey } from '@boen/shared';
 import { handleOAuthCallback } from '@/services/auth';
 import AppLoading from '@/components/AppLoading.vue';
 
 const emit = defineEmits<{
-  (e: 'success'): void;
+  (e: 'success', plan?: MembershipPlanKey): void;
   (e: 'error', message: string): void;
 }>();
 
@@ -17,7 +18,7 @@ onMounted(async () => {
     if (success) {
       status.value = 'success';
       window.history.replaceState({}, document.title, window.location.pathname);
-      setTimeout(() => emit('success'), 800);
+      setTimeout(() => emit('success', success.plan), 800);
     } else {
       status.value = 'error';
       errorMessage.value = '登录链接无效，请返回登录页重试';

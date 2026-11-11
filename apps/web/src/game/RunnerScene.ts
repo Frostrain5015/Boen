@@ -148,7 +148,24 @@ export class RunnerScene extends Phaser.Scene {
   private voiceEnabled = false;
   private audioCtx: AudioContext | null = null;
 
-  constructor() { super({ key: 'RunnerScene' }); }
+  constructor(
+    private readonly courseWidth: number,
+    private readonly courseHeight: number,
+    private renderScale: number,
+  ) {
+    super({ key: 'RunnerScene' });
+  }
+
+  setRenderScale(scale: number) {
+    this.renderScale = scale;
+    this.cameras.main.setZoom(scale).centerOn(this.courseWidth / 2, this.courseHeight / 2);
+    this.panelTxt?.setResolution(scale);
+    for (const barrier of this.barriers) {
+      for (const object of barrier.list) {
+        if (object instanceof Phaser.GameObjects.Text) object.setResolution(scale);
+      }
+    }
+  }
 
   setGameEvents(e: GameEvents) { this.gameEvents = e; }
   setRoundId(roundId: string) { this.roundId = roundId; }
@@ -186,11 +203,12 @@ export class RunnerScene extends Phaser.Scene {
 
   create() {
     this.subj = SUBJ[this.subject] || SUBJ.math;
-    const W = this.scale.width;
-    const H = this.scale.height;
+    const W = this.courseWidth;
+    const H = this.courseHeight;
     this.startedAt = Date.now();
 
     this.cameras.main.setBackgroundColor('#fbf6ee');
+    this.setRenderScale(this.renderScale);
 
     // Background
     const g = this.add.graphics();
@@ -222,6 +240,7 @@ export class RunnerScene extends Phaser.Scene {
     pb.setStrokeStyle(1.5, this.subj.accent);
     this.panel.add(pb);
     this.panelTxt = this.add.text(0, 0, '', {
+      resolution: this.renderScale,
       fontSize: '12px', fontFamily: 'Nunito, sans-serif', color: '#2c2722',
       wordWrap: { width: W - 44 }, align: 'center',
     }).setOrigin(0.5);
@@ -283,7 +302,7 @@ export class RunnerScene extends Phaser.Scene {
         }
       }
       // 移出屏幕后销毁；本批全消失则解锁下一题
-      if (b.y > this.scale.height + 100) {
+      if (b.y > this.courseHeight + 100) {
         b.destroy();
         this.barriers.splice(i, 1);
       }
@@ -314,7 +333,7 @@ export class RunnerScene extends Phaser.Scene {
     this.panelTxt.setText(q.stem);
     this.speak(q.stem);
 
-    const W = this.scale.width;
+    const W = this.courseWidth;
     const lw = W / LANES;
 
     for (let lane = 0; lane < LANES; lane++) {
@@ -350,6 +369,7 @@ export class RunnerScene extends Phaser.Scene {
     circle.setStrokeStyle(1, this.subj.accent);
     c.add(circle);
     const letter = this.add.text(badgeX, 0, optKey, {
+      resolution: this.renderScale,
       fontSize: '9px', fontFamily: 'Fredoka, sans-serif',
       color: `#${this.subj.strong.toString(16).padStart(6, '0')}`,
     }).setOrigin(0.5);
@@ -360,6 +380,7 @@ export class RunnerScene extends Phaser.Scene {
 
     // ✓ 标记：默认隐藏，答错时用来指出正确答案（不只靠颜色，色盲也可辨）
     const mark = this.add.text(markX, 0, '✓', {
+      resolution: this.renderScale,
       fontSize: '13px', fontFamily: 'Fredoka, sans-serif', color: '#18a558', fontStyle: 'bold',
     }).setOrigin(0.5).setAlpha(0);
     c.add(mark);
@@ -384,6 +405,7 @@ export class RunnerScene extends Phaser.Scene {
   private makeFittedText(text: string, x: number, maxWidth: number, maxHeight: number): Phaser.GameObjects.Text {
     let size = 12;
     const t = this.add.text(x, 0, text, {
+      resolution: this.renderScale,
       fontSize: `${size}px`,
       fontFamily: 'Nunito, "Microsoft YaHei", sans-serif',
       color: '#2c2722',
@@ -622,7 +644,7 @@ export class RunnerScene extends Phaser.Scene {
 
     this.barriers.forEach(b => { try { b.destroy(); } catch { console.warn('[game] barrier destroy failed during restart'); } });
     this.barriers = [];
-    this.player.setAlpha(1); this.player.x = this.lanesX[this.lane]!; this.player.y = this.scale.height - 90;
+    this.player.setAlpha(1); this.player.x = this.lanesX[this.lane]!; this.player.y = this.courseHeight - 90;
     this.player.setScale(1);
     this.panel.setAlpha(0);
     this.cameras.main.resetFX();

@@ -3,6 +3,8 @@
 // token / userinfo / revoke 一律经由 Boen 自己的后端（同源 /api/auth/*）在服务端完成，
 // 既避免跨域 CORS，也让 client_secret 只留在服务端（与 PP Typeset 等同生态客户端一致）。
 
+import type { MembershipPlanKey } from '@boen/shared';
+
 const FROST_ID_BASE = import.meta.env.VITE_FROST_ID_URL ?? 'https://frostrain.tech';
 const CLIENT_ID = import.meta.env.VITE_FROST_ID_CLIENT_ID ?? 'boen-client';
 const REDIRECT_URI = `${window.location.origin}/auth/callback`;
@@ -22,6 +24,7 @@ interface PkceParams {
   codeVerifier: string;
   state: string;
   nonce: string;
+  plan?: MembershipPlanKey;
 }
 
 /** 生成随机字符串 */
@@ -103,9 +106,9 @@ export function isAuthenticated(): boolean {
 }
 
 /** 发起 Frost ID 登录 */
-export async function loginWithFrostId() {
+export async function loginWithFrostId(plan?: MembershipPlanKey) {
   const pkce = await generatePkceParams();
-  savePkceParams(pkce);
+  savePkceParams({ ...pkce, plan });
 
   const codeChallenge = base64urlencode(await sha256(pkce.codeVerifier));
 
@@ -124,7 +127,7 @@ export async function loginWithFrostId() {
 }
 
 /** 处理 OAuth 回调 */
-export async function handleOAuthCallback(url: string): Promise<boolean> {
+export async function handleOAuthCallback(url: string): Promise<{ plan?: MembershipPlanKey } | null> {
   const parsedUrl = new URL(url);
   const code = parsedUrl.searchParams.get('code');
   const state = parsedUrl.searchParams.get('state');
@@ -135,7 +138,7 @@ export async function handleOAuthCallback(url: string): Promise<boolean> {
   }
 
   if (!code) {
-    return false;
+    return null;
   }
 
   const pkce = loadPkceParams();
@@ -169,7 +172,8 @@ export async function handleOAuthCallback(url: string): Promise<boolean> {
   saveToken(tokenData.access_token);
   clearPkceParams();
 
-  return true;
+  const plan = pkce.plan;
+  return { plan: plan === 'monthly' || plan === 'yearly' ? plan : undefined };
 }
 
 /** 获取当前用户信息 */
