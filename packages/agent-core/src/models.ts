@@ -1,4 +1,4 @@
-import { ChatOpenAI } from '@langchain/openai';
+import { ChatOpenAI, type ChatOpenAIFields } from '@langchain/openai';
 import { ChatAnthropic } from '@langchain/anthropic';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
@@ -18,6 +18,7 @@ export interface ModelConfig {
   enableThinking?: boolean;
   /** 请求超时（ms），默认 120000。thinking 模式耗时长，出卷场景建议调大。 */
   timeout?: number;
+  fetch?: typeof fetch;
 }
 
 /**
@@ -53,11 +54,14 @@ export function getChatModel(cfg: ModelConfig): BaseChatModel {
     temperature: cfg.temperature ?? 0.7,
     timeout: cfg.timeout ?? 120000,
     maxTokens: cfg.maxTokens ?? 4096,
-    maxRetries: 2,
+    maxRetries: cfg.fetch ? 0 : 2,
     streamUsage: false,
     modelKwargs: Object.keys(modelKwargs).length > 0 ? modelKwargs : undefined,
     configuration: {
       baseURL: isDeepSeek ? 'https://api.deepseek.com' : (cfg.baseUrl || undefined),
+      // OpenAI's Node fetch types use node-fetch's Request shape. The SDK
+      // supplies a URL and serialized JSON to the native fetch on this path.
+      ...(cfg.fetch ? { fetch: cfg.fetch as unknown as NonNullable<ChatOpenAIFields['configuration']>['fetch'] } : {}),
     },
   });
 }

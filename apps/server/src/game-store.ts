@@ -17,10 +17,9 @@ import {
   type GameSubject,
 } from '@boen/shared';
 import db from './db.js';
-import { earnPoints } from './currency.js';
+import { getCurrencyStatus } from './currency.js';
 import { updateProficiency } from './knowledge-profile.js';
 import { gameSessionId, verifySubmittedAnswers, type GameQuestion, type SubmittedAnswer } from './game.js';
-import { computeGamePoints } from './game-core.js';
 import { beijingDateStr, startOfBeijingDay, startOfBeijingWeek } from './game-time.js';
 
 // 计分与时间边界都抽成了纯函数（game-core / game-time），这里转出去方便调用方统一引用
@@ -28,7 +27,6 @@ export { computeGamePoints, GAME_POINTS_MAX } from './game-core.js';
 export { beijingDateStr, startOfBeijingDay, startOfBeijingWeek } from './game-time.js';
 
 /** 每日挑战完成额外奖励 */
-const DAILY_BONUS = 15;
 /** 单局回写错题本的上限，避免一次刷满 */
 const MAX_MISTAKES_PER_SESSION = 5;
 /** 单局最大时长，用于 clamp 异常上报 */
@@ -231,12 +229,7 @@ function settleGameSession(input: FinishGameInput): FinishGameResult | null {
     };
   }
 
-  // 3) 积分（含每日挑战完成奖励；每日上限由 earnPoints 统一处理）
   const dailyCompleted = mode === 'daily' && verified.totalQuestions === GAME_DAILY_SIZE;
-  const basePoints = computeGamePoints(verified.correctCount, verified.totalQuestions, verified.maxCombo)
-    + (dailyCompleted ? DAILY_BONUS : 0);
-  const earned = earnPoints(input.userId, mode === 'daily' && !dailyCompleted ? 0 : basePoints, 'game', sessionId);
-
   const result: FinishGameResult = {
     sessionId,
     mode,
@@ -245,9 +238,9 @@ function settleGameSession(input: FinishGameInput): FinishGameResult | null {
     totalQuestions: verified.totalQuestions,
     maxCombo: verified.maxCombo,
     unverified: verified.unverified,
-    points: earned.earned,
-    capped: earned.capped,
-    balance: earned.balance,
+    points: 0,
+    capped: false,
+    balance: getCurrencyStatus(input.userId).balance,
     proficiencyUpdated: updated,
     mistakesCreated: mistakes,
     isBest,
@@ -255,7 +248,7 @@ function settleGameSession(input: FinishGameInput): FinishGameResult | null {
     dailyCompleted,
   };
   db.prepare('UPDATE game_sessions SET points_awarded=?, settlement=? WHERE id=?')
-    .run(earned.earned, JSON.stringify(result), sessionId);
+    .run(0, JSON.stringify(result), sessionId);
   db.prepare('UPDATE game_question_issue SET consumed_at=unixepoch() WHERE user_id=? AND round_id=?')
     .run(input.userId, input.roundId);
   return result;

@@ -8,7 +8,9 @@ import { randomUUID } from 'node:crypto';
 import { config as loadEnv } from 'dotenv';
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
-import { streamSSE } from 'hono/streaming';
+import { streamSSE as honoStreamSSE } from 'hono/streaming';
+import { CreditError, creditBalance, syncCreditGrants } from './compute-credits.js';
+import { creditScope, meteredDeepSeekFetch, newCreditMeter, settleCreditMeter } from './compute-meter.js';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { getConnInfo } from '@hono/node-server/conninfo';
@@ -83,8 +85,10 @@ import {
 } from './mistakes.js';
 import { consumeTikzRateLimit, renderTikzSvg, TikzRenderError, validateTikzCode } from './tikz-renderer.js';
 import { membershipDetails } from './membership.js';
-import { earnPoints, computeScorePoints, computeStarBonus, getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS, claimDailyLogin, beijingDateStr } from './currency.js';
-import { createMembershipCheckout, handleWaffoWebhook, isWaffoEnabled, listPurchasablePlans, listPaymentOrders, manageSubscription, reconcileMembership } from './waffo.js';
+import { getCurrencyStatus, redeemMembershipWithPoints, listLedger, CURRENCY_PRODUCTS } from './currency.js';
+import { createMembershipCheckout, createTopUpCheckout, handleWaffoWebhook, isTopUpEnabled, isWaffoEnabled, listPurchasablePlans, listPaymentOrders, manageSubscription, reconcileMembership, topUpStatus } from './waffo.js';
+import { membershipCreditEntitlements } from './membership.js';
+import { EXAM_CREDIT_LIMIT, type MembershipPlanKey } from '@boen/shared';
 import { initQuestionPool, getPooledQuestion, getPooledQuestions, issueGameQuestion, publicGameQuestion, purgeOldGameData, submitGameAnswer } from './game.js';
 import { finishGameSession, getGameStats, getLeaderboard, getRecentSessions, getDailyChallenge, getStageProgress, getAllStageProgress } from './game-store.js';
 import { GAME_DAILY_SIZE, GAME_STAGE_SIZE } from '@boen/shared';
@@ -119,6 +123,7 @@ function createModel(
     enableThinking: opts?.thinking ?? false, // 默认关闭：聊天追求快速出结果
     maxTokens: opts?.maxTokens,
     timeout: opts?.timeout,
+    fetch: meteredDeepSeekFetch,
   });
 }
 const providerScope = new AsyncLocalStorage<string>();
@@ -138,7 +143,9 @@ try { rebuildFtsIndex(); } catch (e) { console.warn('[fts] rebuildFtsIndex 失�
 // 注入查询改写模型
 setRewriteModel(model);
 
-const graph = scopedResource(providerScope, (provider) => buildBoenGraph(createModel(provider), { retrieveCurriculum, lookupKnowledgePoint }, checkpointer));
+const graph = scopedResource(providerScope, (provider) => buildBoenGraph(createModel(provider), {
+  retrieveCurriculum, lookupKnowledgePoint, historyMessages: provider === 'deepseek-pro' ? 50 : 20, allowImages: provider !== 'deepseek-pro',
+}, checkpointer));
 
 /** 切换模型并重建 LangGraph 图 */
 function switchModel(userId: string, provider: string) {
@@ -245,11 +252,10 @@ function checkRedeemRate(userId: string): boolean {
 }
 
 // ── 订阅系统辅助函数 ──────────────────────────────
-const FREE_DAILY_LIMIT = 10;
-
 interface SubscriptionInfo {
-  tier: 'free' | 'monthly' | 'yearly';
+  tier: 'free' | MembershipPlanKey;
   isPremium: boolean;
+  canUsePro: boolean;
   expiresAt: number | null;
   activatedAt: number | null;
 }
@@ -262,7 +268,7 @@ async function resolveSubscription(c: Context): Promise<{ userId: string; sub: S
   const details = membershipDetails(db, userId);
   return { userId, sub: {
     tier: details.membership.active ? details.membership.legacyTier ?? (details.membership.source === 'waffo' ? details.billing.planKey : 'monthly') : 'free',
-    isPremium: details.membership.active, expiresAt: details.membership.accessEndsAt,
+    isPremium: details.membership.active, canUsePro: membershipCreditEntitlements(details).canUsePro, expiresAt: details.membership.accessEndsAt,
     activatedAt: details.billing.currentPeriodStart,
   } };
 }
@@ -274,46 +280,6 @@ function requirePremium(c: Context, result: { userId: string; sub: SubscriptionI
     return c.json({ error: 'premium_required', message: '此功能需开通星月卡' }, 403);
   }
   return null;
-}
-
-/** 查询当日消息用量（北京时间） */
-function getDailyUsage(userId: string): number {
-  const today = beijingDateStr();
-  const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id = ? AND date = ?').get(userId, today) as
-    | { message_count: number }
-    | undefined;
-  return row?.message_count ?? 0;
-}
-
-/** 检查并原子递增用户今日用量，防止并发绕过限额 */
-function checkUsage(userId: string): { allowed: boolean; remaining: number } {
-  const today = beijingDateStr();
-  // 在事务中原子完成 读取+递增，杜绝 check-then-act TOCTOU 竞态
-  return db.transaction((): { allowed: boolean; remaining: number } => {
-    const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id=? AND date=?')
-      .get(userId, today) as { message_count: number } | undefined;
-    const current = row?.message_count ?? 0;
-    if (current >= FREE_DAILY_LIMIT) {
-      return { allowed: false, remaining: 0 };
-    }
-    db.prepare(`
-      INSERT INTO daily_chat_usage (user_id, date, message_count) VALUES (?, ?, 1)
-      ON CONFLICT(user_id, date) DO UPDATE SET message_count = message_count + 1
-    `).run(userId, today);
-    return { allowed: true, remaining: FREE_DAILY_LIMIT - current - 1 };
-  })();
-}
-
-/** SSE 异常时退还已扣除的免费配额，避免用户无结果却被扣次数 */
-function refundUsage(userId: string) {
-  const today = beijingDateStr();
-  db.transaction(() => {
-    const row = db.prepare('SELECT message_count FROM daily_chat_usage WHERE user_id=? AND date=?')
-      .get(userId, today) as { message_count: number } | undefined;
-    if (!row || row.message_count <= 0) return;
-    db.prepare('UPDATE daily_chat_usage SET message_count = message_count - 1 WHERE user_id=? AND date=? AND message_count > 0')
-      .run(userId, today);
-  })();
 }
 
 type ToolCall = { id?: string; name: string; args: Record<string, unknown> };
@@ -618,36 +584,6 @@ async function runGraph(
 }
 
 /** 检测 exit_session 工具调用 → 结算 + 清缓存 */
-/** 按 LLM 评分（主）+ 星级跨越奖（额外）结算积分并入账。
- *  scorePoints + starBonus 合并后走 earnPoints 日上限封顶。
- *  均为 0 时返回 undefined（不附带积分字段）。 */
-function awardSessionPoints(
-  userId: string,
-  changes: Array<{ before: number; after: number }>,
-  subject: string | undefined,
-  grade: string | undefined,
-  reason: 'session' | 'exam',
-  refId?: string,
-  sessionScore?: number,
-): { pointsEarned: number; pointsBalance: number; pointsCapped: boolean } | undefined {
-  try {
-    let S = 0;
-    if (subject && grade) {
-      const outline = getProfileOutline(subject, grade, userId) as { overall?: { weightedScore?: number } };
-      S = Math.max(0, outline.overall?.weightedScore ?? 0);
-    }
-    const scorePoints = computeScorePoints(sessionScore ?? 0, S);
-    const starBonus = computeStarBonus(changes, S);
-    const total = Math.max(0, Math.round(scorePoints + starBonus));
-    if (total <= 0) return undefined;
-    const res = earnPoints(userId, total, reason, refId);
-    if (res.earned <= 0 && !res.capped) return undefined;
-    return { pointsEarned: res.earned, pointsBalance: res.balance, pointsCapped: res.capped };
-  } catch (e) { console.warn('[awardSessionPoints] 结算失败:', e instanceof Error ? e.message : e);
-    return undefined;
-  }
-}
-
 async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEvent) => Promise<void>, userId?: string, threadId?: string, subject?: string, grade?: string, settled = false) {
   // MODE_SCORE 路径已经完成结算，跳过避免重复发送
   if (settled) return;
@@ -678,7 +614,6 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
     await send({ type: 'todo_done', action: 'exit', detail: '课堂已结束' });
     // 仅当 cache 非空才发结算事件（MODE_SCORE 路径已发过时跳过）
     if (updatedKps > 0) {
-      const points = awardSessionPoints(userId, profChanges, subject, grade, 'session', threadId, Number(args.score ?? 0));
       await send({
         type: 'settlement',
         summary: String(args.summary ?? ''),
@@ -687,7 +622,6 @@ async function handleSessionExit(last: BaseMessage | undefined, send: (e: SseEve
         totalSteps: Number(args.totalSteps ?? 0),
         updatedKps,
         proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
-        ...points,
       });
     }
   }
@@ -890,6 +824,27 @@ function sanitizeConversationQuestionMessage<T extends { role: string; content: 
 }
 
 const app = new Hono();
+function syncUserCredits(userId: string) {
+  const membership = membershipDetails(db, userId);
+  syncCreditGrants(db, userId, membershipCreditEntitlements(membership).weekly, membership.membership.accessEndsAt);
+  return { ...creditBalance(db, userId), topUpEnabled: isTopUpEnabled() };
+}
+function streamSSE(c: Context, callback: Parameters<typeof honoStreamSSE>[1]) {
+  const meter = creditScope.getStore();
+  if (meter) meter.streaming = true;
+  return honoStreamSSE(c, async (stream) => {
+    try { await callback(stream); } finally { settleCreditMeter(false, meter); }
+  });
+}
+function streamEvent(stream: Parameters<Parameters<typeof honoStreamSSE>[1]>[0], event: { type: string; message?: string }) {
+  if (event.type === 'error') settleCreditMeter(false);
+  if (event.type === 'done') {
+    const credits = settleCreditMeter(!stream.aborted);
+    if (credits) return stream.writeSSE({ data: JSON.stringify({ type: 'credits', ...credits }) })
+      .then(() => stream.writeSSE({ data: JSON.stringify(event) }));
+  }
+  return stream.writeSSE({ data: JSON.stringify(event) });
+}
 initPrivacyRetention(db);
 app.use('/api/*', cors());
 app.use('/api/*', async (c, next) => {
@@ -898,12 +853,27 @@ app.use('/api/*', async (c, next) => {
     return c.json({ error: 'account_deletion_requested', message: '该账户的数据删除申请正在处理或已经完成，请联系支持。' }, 410);
   }
   const preference = userId ? db.prepare('SELECT provider FROM user_model_preferences WHERE user_id=?').get(userId) as { provider: string } | undefined : undefined;
-  const provider = userId && preference?.provider === 'deepseek-pro' && membershipDetails(db, userId).membership.active ? 'deepseek-pro' : 'default';
-  return providerScope.run(provider, next);
+  const entitlements = userId ? membershipCreditEntitlements(membershipDetails(db, userId)) : null;
+  const canUsePro = Boolean(entitlements?.canUsePro);
+  const provider = preference?.provider === 'deepseek-pro' && canUsePro ? 'deepseek-pro' : 'default';
+  const aiRequest = (c.req.method === 'GET' && c.req.path === '/api/profile/report')
+    || (c.req.method === 'POST' && /^\/api\/(?:chat|answer|explore|mistakes\/[^/]+\/(?:analyze|practice)|exam\/(?:generate|submit(?:\/stream)?|[^/]+\/detailed-review))$/.test(c.req.path));
+  if (!userId || !aiRequest) {
+    return providerScope.run(provider, next);
+  }
+  syncUserCredits(userId);
+  const examLimit = c.req.path === '/api/exam/generate' ? EXAM_CREDIT_LIMIT[canUsePro ? 'advanced' : 'standard'] : Infinity;
+  const meter = newCreditMeter(db, userId, c.req.path, examLimit, entitlements?.legacyAccess);
+  try {
+    await creditScope.run(meter, () => providerScope.run(provider, next));
+  } finally {
+    if (!meter.streaming) settleCreditMeter(c.res.status < 400, meter);
+  }
 });
 
 // 全局 Zod 校验错误处理
 app.onError((err, c) => {
+  if (err instanceof CreditError) return c.json({ error: err.code, message: err.message }, err.code === 'insufficient_credits' ? 402 : 409);
   if (err instanceof z.ZodError) {
     return c.json({ error: 'validation_error', message: err.errors?.[0]?.message ?? '请求参数校验失败' }, 400);
   }
@@ -923,7 +893,7 @@ app.post('/api/model/switch', async (c) => {
   if (!p || !DEEPSEEK_MODELS[p]) return c.json({ error: '不支持的 provider' }, 400);
   // V4 Pro 对所有有效星月卡开放
   if (p === 'deepseek-pro') {
-    if (!membershipDetails(db, userId).membership.active) return c.json({ error: 'premium_required', message: 'DeepSeek V4 Pro 需要有效的星月卡权益' }, 403);
+    if (!membershipCreditEntitlements(membershipDetails(db, userId)).canUsePro) return c.json({ error: 'premium_required', message: 'DeepSeek Pro 需开通星耀卡' }, 403);
   }
   const switched = switchModel(userId, p);
   return c.json({ success: true, provider: switched });
@@ -1237,7 +1207,7 @@ app.post('/api/mistakes/:id/analyze', async (c) => {
   const userId = authResult!.userId;
   const mistakeId = c.req.param('id');
   return streamSSE(c, async (stream) => {
-    const send = (e: AnalyzeMistakeEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const send = (e: AnalyzeMistakeEvent) => streamEvent(stream, e);
     // SSE keepalive：图片错题的多模态识别为单次调用，密集整页可达 60~90s 无业务事件，
     // 每 20s 发一个 SSE 注释帧（: 开头，前端 data: 解析会跳过）防止 nginx proxy 断流。
     const ping = setInterval(() => { stream.write(': keepalive\n\n').catch(() => {}); }, 20_000);
@@ -1318,22 +1288,29 @@ import { postExamRecommendation } from './exam-recommendation.js';
 /** POST /api/exam/generate — 生成新试卷（SSE 流式：实时推送规划→出题→审核进度） */
 app.post('/api/exam/generate', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   const body = await c.req.json() as { subject: string; grade: string; difficulty?: string; durationMinutes?: number; notes?: string; totalScore?: number; examId?: string };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
+  const duration = body.durationMinutes ?? 45;
+  const score = body.totalScore ?? (duration <= 15 ? 20 : duration <= 45 ? 50 : 100);
+  if (!Number.isFinite(duration) || duration < 1 || duration > 90 || !Number.isFinite(score) || score < 1 || score > 100) {
+    return c.json({ error: 'invalid_exam_size', message: '请选择有效的试卷规模' }, 400);
+  }
+  if ((duration > 45 || score > 50) && !authResult.sub.canUsePro) {
+    return c.json({ error: 'premium_required', message: '90 分钟期末试卷需开通星耀卡' }, 403);
+  }
   // 如果前端传入了 examId（来自 POST /api/exam 的预创建记录），直接用这个 ID
   const preCreatedId = body.examId;
   return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const send = (e: SseEvent) => streamEvent(stream, e);
     const ac = new AbortController();
     stream.onAbort(() => { ac.abort(); });
     try {
       await send({ type: 'exam_generating' });
       const exam = await generateExam(
         examModel,
-        { subject: body.subject, grade: body.grade, durationMinutes: body.durationMinutes, notes: body.notes, totalScore: body.totalScore },
+        { subject: body.subject, grade: body.grade, durationMinutes: duration, notes: body.notes, totalScore: score },
         (p) => {
           if (ac.signal.aborted) throw new DOMException('SSE stream aborted by client', 'AbortError');
           return send({ type: 'exam_progress', step: p.step, message: p.message, progress: p.progress ?? 0 });
@@ -1365,8 +1342,7 @@ app.post('/api/exam/generate', async (c) => {
 /** POST /api/exam/submit — 提交考试答案 */
 app.post('/api/exam/submit', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
   if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
@@ -1393,15 +1369,14 @@ app.post('/api/exam/submit', async (c) => {
 /** POST /api/exam/submit/stream - stream real grading progress */
 app.post('/api/exam/submit/stream', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   const body = await c.req.json() as { examId: string; answers?: Array<{ questionIndex: number; answer: any }> };
   if (!body.examId) return c.json({ error: '缺少必填字段：examId' }, 400);
   const answers = Array.isArray(body.answers) ? body.answers : [];
 
   return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const send = (e: SseEvent) => streamEvent(stream, e);
     const ac = new AbortController();
     stream.onAbort(() => { ac.abort(); });
     try {
@@ -1434,8 +1409,7 @@ app.post('/api/exam/submit/stream', async (c) => {
 /** POST /api/exam — 创建空考试记录（立即返回 examId，用于断线恢复 */
 app.post('/api/exam', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   const body = await c.req.json() as { subject: string; grade: string; durationMinutes?: number; notes?: string };
   if (!body.subject || !body.grade) return c.json({ error: '缺少必填字段：subject, grade' }, 400);
@@ -1450,8 +1424,7 @@ app.post('/api/exam', async (c) => {
 /** GET /api/exams — 当前用户的考试历史列表（概要） */
 app.get('/api/exams', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   return c.json({ exams: listExamSessions(userId) });
 });
@@ -1473,8 +1446,7 @@ app.delete('/api/exam/:examId', async (c) => {
  */
 app.get('/api/exam/:examId', async (c) => {
   const authResult = await resolveSubscription(c);
-  const gate = requirePremium(c, authResult);
-  if (gate) return gate;
+  if (!authResult) return c.json({ error: 'unauthorized' }, 401);
   const userId = authResult!.userId;
   const examId = c.req.param('examId');
   const session = getExamSession(examId, userId);
@@ -1551,16 +1523,18 @@ app.get('/api/subscription/status', async (c) => {
   try { await reconcileMembership(userId); } catch { /* Keep the last confirmed period; never extend it on failure. */ }
   const result = await resolveSubscription(c);
   if (!result) return c.json({ error: 'unauthorized' }, 401);
-  const dailyUsed = result.sub.isPremium ? null : getDailyUsage(result.userId);
+  const details = membershipDetails(db, result.userId);
   return c.json({
-    ...membershipDetails(db, result.userId),
+    ...details,
     tier: result.sub.tier,
     isPremium: result.sub.isPremium,
+    canUsePro: result.sub.canUsePro,
+    legacyComputeAccess: membershipCreditEntitlements(details).legacyAccess,
     expiresAt: result.sub.expiresAt,
     activatedAt: result.sub.activatedAt,
-    dailyLimit: result.sub.isPremium ? null : FREE_DAILY_LIMIT,
-    dailyUsed,
-    dailyRemaining: result.sub.isPremium ? null : Math.max(0, FREE_DAILY_LIMIT - (dailyUsed ?? 0)),
+    dailyLimit: null,
+    dailyUsed: null,
+    dailyRemaining: null,
     // 现金购卡通道状态：前端据此决定是否渲染「立即开通」入口
     payEnabled: isWaffoEnabled(),
     plans: listPurchasablePlans(),
@@ -1576,7 +1550,7 @@ app.get('/api/currency/status', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
   const status = getCurrencyStatus(userId);
-  return c.json({ ...status, products: CURRENCY_PRODUCT_LIST });
+  return c.json({ ...status, products: CURRENCY_PRODUCT_LIST, compute: syncUserCredits(userId) });
 });
 
 app.get('/api/currency/ledger', async (c) => {
@@ -1589,12 +1563,7 @@ app.get('/api/currency/ledger', async (c) => {
 app.post('/api/currency/claim-daily', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
-  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '尝试过于频繁，请稍后再试' }, 429);
-  const r = claimDailyLogin(userId);
-  if (!r.ok) {
-    return c.json({ error: r.error, message: '今日已领取', claimedToday: true, balance: r.balance }, 400);
-  }
-  return c.json({ ok: true, reward: r.reward, balance: r.balance, claimedToday: true });
+  return c.json({ error: 'reward_ended', message: '每日登录奖励已结束' }, 410);
 });
 
 // 用积分兑换会员（皓月卡/星耀卡）
@@ -1633,6 +1602,23 @@ app.post('/api/currency/redeem-membership', async (c) => {
 // 与兑换码/积分并列的第三条发卡路径。前端拿 checkoutUrl 后新标签页打开收银台，
 // 支付结果由 Waffo 服务端回调 /api/payment/webhook 落库并发卡。
 const WAFFO_WEB_ORIGIN = process.env.WAFFO_WEB_ORIGIN ?? 'https://boen.frostrain.tech';
+
+app.post('/api/payment/top-up', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  if (!checkRedeemRate(userId)) return c.json({ error: 'rate_limited', message: '请求过于频繁，请稍后再试' }, 429);
+  const { points, requestId } = z.object({ points: z.number().int(), requestId: z.string().uuid() }).parse(await c.req.json());
+  const result = await createTopUpCheckout(userId, requestId, points, `${WAFFO_WEB_ORIGIN.replace(/\/$/, '')}/setup?topup=1`);
+  if (result.ok === false) return c.json(result, result.error === 'invalid_points' ? 400 : result.error === 'unavailable' ? 503 : result.error === 'upstream' ? 502 : 409);
+  return c.json(result);
+});
+
+app.get('/api/payment/top-up/:requestId', async (c) => {
+  const userId = await resolveUserId(c);
+  if (!userId) return c.json({ error: 'unauthorized' }, 401);
+  const order = topUpStatus(userId, c.req.param('requestId'));
+  return order ? c.json(order) : c.json({ error: 'not_found' }, 404);
+});
 
 /** 收银台支付完成后的回跳地址（带 paid=1 供前端触发状态轮询） */
 function paymentSuccessUrl(c: Context): string {
@@ -1829,20 +1815,11 @@ app.post('/api/chat', async (c) => {
   const body = await c.req.json<ChatRequest & { conversationId?: string; subject: string }>();
   const grade = body.mode === 'weakness' && isGrade(body.practiceGrade) ? body.practiceGrade : accountGrade;
 
-  // 免费用户每日限额检查（已原子递增，无需 later 再 increment）
-  let usageInfo: { dailyLimit: number; dailyUsed: number; dailyRemaining: number } | null = null;
-  if (!result.sub.isPremium) {
-    const usage = checkUsage(userId);
-    if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话已用完，请明日再试或开通星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
-    }
-    usageInfo = { dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT - usage.remaining, dailyRemaining: usage.remaining };
-  }
-
   const owned =
     !!body.conversationId && getConversation(body.conversationId)?.userId === userId;
-  return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+  const chatProvider = body.attachments?.length ? 'default' : providerScope.getStore() ?? 'default';
+  return providerScope.run(chatProvider, () => streamSSE(c, async (stream) => {
+    const send = (e: SseEvent) => streamEvent(stream, e);
     const ac = new AbortController();
     stream.onAbort(() => { ac.abort(); });
     try {
@@ -1950,7 +1927,6 @@ app.post('/api/chat', async (c) => {
           const stepsCompleted = stepsMatch ? parseInt(stepsMatch[1]) : 0;
           const totalSteps = stepsMatch ? parseInt(stepsMatch[2]) : 0;
           const { count: updatedKps, changes: profChanges } = flushProficiencyCache(userId, body.threadId);
-          const points = awardSessionPoints(userId, profChanges, body.subject, grade, 'session', body.threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【MODE_SCORE:\s*\d+】/g, '').trim(),
@@ -1959,7 +1935,6 @@ app.post('/api/chat', async (c) => {
             totalSteps,
             updatedKps,
             proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
-            ...points,
           });
           // 从前端展示中移除评分标记
           content = content.replace(/【MODE_SCORE:\s*\d+】/g, '');
@@ -1978,23 +1953,18 @@ app.post('/api/chat', async (c) => {
       await emitReviewCompleteIfAny(last, send);
       // 等标题生成完成，确保 title_updated 在流关闭（done）之前送达前端
       if (titlePromise) await titlePromise;
-      // 发送每日用量信息（供前端更新剩余次数）
-      if (usageInfo) await send({ type: 'usage', ...usageInfo });
-      await send({ type: 'done' });
-
-      // 非阻塞：异步生成对话摘要并存储（不等待）
+      // Include the summary in this operation's usage.
       if (owned && body.conversationId && userId) {
-        generateConversationSummaryAsync(userId, body.conversationId, body.subject ?? 'math', model)
+        await generateConversationSummaryAsync(userId, body.conversationId, body.subject ?? 'math', model)
           .catch(err => console.warn('[memory] summary generation failed:', err));
       }
+      await send({ type: 'done' });
     } catch (err) {
       // SSE 异常时丢弃缓存的熟练度更新，避免陈旧数据残留
       if (userId && body.threadId) discardProficiencyCache(userId, body.threadId);
-      // 退还已扣除的免费配额（用户无结果不应扣次）
-      if (usageInfo) refundUsage(userId);
       try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[chat] SSE send 失败:', e2); }
     }
-  });
+  }));
 });
 
 // ── 探索课对话 ─────────────────────────
@@ -2017,7 +1987,7 @@ app.post('/api/explore', async (c) => {
   addMessage(threadId, 'user', `探索学习：${body.title}`);
 
   return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const send = (e: SseEvent) => streamEvent(stream, e);
     const ac = new AbortController();
     stream.onAbort(() => { ac.abort(); });
     await send({ type: 'conversation_created', conversationId: threadId, title: entry.label });
@@ -2056,7 +2026,6 @@ app.post('/api/explore', async (c) => {
             updateProficiency(userId, node.id, sessionScore, 100, 'explore');
           }
 
-          const points = awardSessionPoints(userId, profChanges, body.subject, grade, 'session', threadId, sessionScore);
           await send({
             type: 'settlement',
             summary: content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '').trim(),
@@ -2065,7 +2034,6 @@ app.post('/api/explore', async (c) => {
             totalSteps,
             updatedKps: flushedCount + (node ? 1 : 0),
             proficiencyChanges: profChanges.length > 0 ? profChanges : undefined,
-            ...points,
           });
           content = content.replace(/【EXPLORE_SCORE:\s*\d+】/g, '');
         }
@@ -2091,7 +2059,7 @@ function extractStudentAnswerText(answer: AnswerPayload): string | null {
   return null;
 }
 
-function autoCollectChatMistake(
+async function autoCollectChatMistake(
   userId: string,
   subject: string,
   grade: string,
@@ -2105,7 +2073,7 @@ function autoCollectChatMistake(
   beforeProficiencyScore?: number | null,
   /** 缓存模式下的预期熟练度分数（用于 after_score，优先于 DB 值） */
   afterExpectedScore?: number | null,
-): void {
+): Promise<void> {
   // 仅归集得分率 < 60% 的题目
   if (result.maxScore <= 0 || result.score / result.maxScore >= 0.6) return;
 
@@ -2176,10 +2144,9 @@ function autoCollectChatMistake(
 
     console.log(`[mistake] 对话错题归集：${id} (${subject}/${grade}/${mode}) ${result.score}/${result.maxScore}`);
 
-    // 异步生成标题（fire-and-forget，不阻塞主流程）
     if (chatModel) {
       const stemText = stem.slice(0, 300);
-      chatModel.invoke(
+      await chatModel.invoke(
         [new SystemMessage('你是标题生成助手，只输出纯文本，不超过10个字。'), new HumanMessage(`为以下错题生成一个精炼标题（10字以内，概括核心考点）：\n${stemText}`)],
       ).then((res) => {
         const titleText = typeof res.content === 'string' ? res.content.trim().slice(0, 32) : '';
@@ -2202,19 +2169,8 @@ app.post('/api/answer', async (c) => {
   const userId = await resolveUserId(c);
   if (!userId) return c.json({ error: 'unauthorized' }, 401);
 
-  // 免费用户每次 AI 调用都计为一次（checkUsage 内原子递增）
-  let usageDecremented = false;
-  const subInfo = userId ? await resolveSubscription(c).catch(() => null) : null;
-  if (subInfo && !subInfo.sub.isPremium) {
-    const usage = checkUsage(userId);
-    if (!usage.allowed) {
-      return c.json({ error: 'daily_limit_reached', message: '今日免费对话已用完，请明日再试或开通星月卡', dailyLimit: FREE_DAILY_LIMIT, dailyUsed: FREE_DAILY_LIMIT, dailyRemaining: 0 }, 429);
-    }
-    usageDecremented = true;
-  }
-
   return streamSSE(c, async (stream) => {
-    const send = (e: SseEvent) => stream.writeSSE({ data: JSON.stringify(e) });
+    const send = (e: SseEvent) => streamEvent(stream, e);
     const ac = new AbortController();
     stream.onAbort(() => { ac.abort(); });
     try {
@@ -2354,7 +2310,7 @@ app.post('/api/answer', async (c) => {
         const chatSubject = (state.values as any)?.subject ?? 'math';
         const chatGrade = String((state.values as any)?.grade ?? '7');
         const chatMode = ((state.values as any)?.mode as string) ?? 'qa';
-        autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore, afterExpectedScore);
+        await autoCollectChatMistake(userId, chatSubject, chatGrade, chatMode, target.name, target.args, body.answer, result, model, beforeProfScore, afterExpectedScore);
       } catch (e) { console.warn('[answer] 错题自动归集失败:', e instanceof Error ? e.message : e); }
 
       // 持久化判分结果：更新题目消息为已作答状态（含答案 + 判分），避免重载时状态分裂
@@ -2389,7 +2345,6 @@ app.post('/api/answer', async (c) => {
       await send({ type: 'done' });
     } catch (err) {
       if (userId && body.threadId) discardProficiencyCache(userId, body.threadId);
-      if (usageDecremented) refundUsage(userId);
       try { await send({ type: 'error', message: sanitizeError(err) }); } catch (e2) { console.warn('[answer-sse] SSE send 最终失败:', e2); }
     }
   });

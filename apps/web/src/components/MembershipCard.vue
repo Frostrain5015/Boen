@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { Moon, Star, Sparkles, Lock } from 'lucide-vue-next';
-import { MEMBERSHIP_PLANS } from '@boen/shared';
+import { LEGACY_MEMBERSHIP_PLANS, MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 
 interface Props {
-  type: 'monthly' | 'yearly';
+  type: MembershipPlanKey;
   expiresAt?: number | null;
   holderName?: string;
   showBack?: boolean;
@@ -30,8 +30,8 @@ const isFlipped = ref(props.showBack);
 const cardRef = ref<HTMLDivElement | null>(null);
 const rootEl = ref<HTMLDivElement | null>(null);
 
-const isMonthly = computed(() => props.type === 'monthly');
-const plan = computed(() => MEMBERSHIP_PLANS[isMonthly.value ? 0 : 1]);
+const isMonthly = computed(() => props.type === 'monthly' || props.type === 'plus');
+const plan = computed(() => [...MEMBERSHIP_PLANS, ...LEGACY_MEMBERSHIP_PLANS].find(plan => plan.key === props.type) ?? MEMBERSHIP_PLANS[0]);
 const cardName = computed(() => plan.value.name);
 const cardPrice = computed(() => `$${plan.value.amount}/${plan.value.intervalLabel}`);
 const cardOriginalPrice = computed(() => '');
@@ -162,8 +162,9 @@ defineExpose({ flip, isFlipped, playShimmer, rootEl });
             {{ cardName }}权益
           </div>
           <ul class="back-benefits" :class="fontSizes[size].desc">
-            <li><span class="benefit-dot" />DeepSeek V4 Pro 大模型</li>
-            <li><span class="benefit-dot" />全题型考试</li>
+            <li><span class="benefit-dot" />每周 {{ plan.weeklyPoints.toLocaleString('zh-CN') }} 星月积分</li>
+            <li v-if="type !== 'plus'"><span class="benefit-dot" />DeepSeek Pro</li>
+            <li><span class="benefit-dot" />AI 组卷与批改</li>
             <li><span class="benefit-dot" />错题智能归因</li>
             <li><span class="benefit-dot" />学习诊断报告</li>
           </ul>

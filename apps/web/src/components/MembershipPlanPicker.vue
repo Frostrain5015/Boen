@@ -20,12 +20,6 @@ const selected = defineModel<MembershipPlanKey>({ required: true });
         ? 'border-[var(--accent)] bg-[var(--accent-soft)]/50 shadow-xs'
         : 'border-[var(--line)] bg-[var(--paper)] hover:border-[#ded1be]'"
     >
-      <span
-        v-if="plan.key === 'yearly'"
-        class="absolute -top-2 right-2 rounded-md bg-[#f59e0b] px-1.5 py-0.5 text-[10px] font-bold text-white shadow-xs"
-      >
-        立省 16%
-      </span>
       <input v-model="selected" :value="plan.key" type="radio" name="membership-plan" class="sr-only" />
       <span class="block font-display text-sm font-bold text-[var(--ink)]">{{ plan.name }}</span>
       <div class="mt-1 flex items-baseline justify-center gap-0.5">
@@ -33,7 +27,7 @@ const selected = defineModel<MembershipPlanKey>({ required: true });
         <span class="text-xs text-[var(--ink-soft)]">/{{ plan.intervalLabel }}</span>
       </div>
       <span class="mt-0.5 block text-xs text-[var(--ink-soft)]">
-        {{ plan.key === 'yearly' ? '相当于每月 $2.50' : '支持随时取消' }}
+        每周 {{ plan.weeklyPoints.toLocaleString('zh-CN') }} 积分
       </span>
     </label>
   </fieldset>

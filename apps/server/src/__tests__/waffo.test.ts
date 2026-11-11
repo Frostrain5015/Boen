@@ -6,6 +6,7 @@ vi.mock('../db.js', async () => {
   return { default: new SQLite(':memory:') };
 });
 vi.mock('@waffo/pancake-ts', () => ({
+  TaxCategory: { SaaS: 'saas' },
   WaffoPancake: class {
     graphql = { query: mocks.query };
     checkout = { authenticated: { create: mocks.checkout } };
@@ -16,12 +17,13 @@ vi.mock('@waffo/pancake-ts', () => ({
 }));
 import db from '../db.js';
 import { initMembership, membershipDetails } from '../membership.js';
+import { creditBalance, initComputeCredits } from '../compute-credits.js';
 import { MEMBERSHIP_PLANS } from '@boen/shared';
-import { createMembershipCheckout, handleWaffoWebhook, manageSubscription } from '../waffo.js';
+import { createMembershipCheckout, createTopUpCheckout, handleWaffoWebhook, manageSubscription } from '../waffo.js';
 const now = Math.floor(Date.now() / 1000);
 const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
 let remote: { id: string; status: string; isInTrial: boolean; testMode: boolean; merchantProvidedBuyerIdentity: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; canceledAt: string | null; updatedAt: string; subscriptionProduct: { id: string }; billingPeriod: string; currency: string; priceSnapshot: { regularPhase: { subtotal: string } } };
-const products = () => MEMBERSHIP_PLANS.map(plan => ({ id: plan.key === 'monthly' ? 'product' : 'year-product', status: 'active', billingPeriod: plan.key, hasProdVersion: true, metadata: '{"trialDays":7}', prices: [{ currency: 'USD', priceInfo: { amount: String(plan.amount), trialAmount: null } }] }));
+const products = () => MEMBERSHIP_PLANS.map(plan => ({ id: plan.key === 'plus' ? 'plus-product' : 'pro-product', status: 'active', billingPeriod: 'monthly', hasProdVersion: true, metadata: '{}', prices: [{ currency: 'USD', priceInfo: { amount: String(plan.amount), trialAmount: null } }] }));
 function event(id = 'event-1', type = 'subscription.activated', extra: Record<string, unknown> = {}) {
   return JSON.stringify({ id, timestamp: iso(now), eventId: id, eventType: type, storeId: 'store', mode: 'test',
     data: { orderId: 'order', orderMerchantExternalId: 'external', merchantProvidedBuyerIdentity: 'alice', ...extra } });
@@ -30,10 +32,12 @@ const hooks = { invalidateSubscription: vi.fn() };
 beforeEach(() => {
   vi.clearAllMocks();
   Object.assign(process.env, { WAFFO_MERCHANT_ID: 'merchant', WAFFO_PRIVATE_KEY: 'key', WAFFO_STORE_ID: 'store', WAFFO_PRODUCT_MONTHLY: 'product', WAFFO_PRODUCT_YEARLY: 'year-product', WAFFO_ENVIRONMENT: 'test', WAFFO_ALLOW_TEST_CHECKOUT: 'true' });
+  Object.assign(process.env, { WAFFO_PRODUCT_PLUS: 'plus-product', WAFFO_PRODUCT_PRO: 'pro-product', WAFFO_PRODUCT_TOPUP: 'topup-product' });
   db.exec(`PRAGMA foreign_keys=OFF;`);
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all() as Array<{ name: string }>;
   for (const { name } of tables) db.exec(`DROP TABLE "${name}"`);
   initMembership(db);
+  initComputeCredits(db);
   db.exec(`CREATE TABLE subscriptions(user_id TEXT PRIMARY KEY,tier TEXT,expires_at INTEGER,activated_at INTEGER);
     CREATE TABLE payment_orders(session_id TEXT PRIMARY KEY,user_id TEXT,plan_key TEXT,product_id TEXT,currency TEXT,external_id TEXT UNIQUE,order_id TEXT,checkout_url TEXT,buyer_email TEXT,status TEXT,amount TEXT,created_at INTEGER DEFAULT(unixepoch()),updated_at INTEGER,environment TEXT DEFAULT 'test');
     CREATE TABLE waffo_webhook_events(id TEXT PRIMARY KEY,event_type TEXT,event_id TEXT,mode TEXT,order_id TEXT,raw TEXT,status TEXT DEFAULT 'received',note TEXT);
@@ -58,18 +62,18 @@ describe('Waffo integration', () => {
       } };
     });
     mocks.checkout.mockResolvedValue({ sessionId: 'new-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
-    const result = await createMembershipCheckout({ userId: 'alice', planKey: 'monthly', successUrl: 'https://boen.frostrain.tech/setup?paid=1' });
+    const result = await createMembershipCheckout({ userId: 'alice', planKey: 'plus', successUrl: 'https://boen.frostrain.tech/setup?paid=1' });
     expect(result).toMatchObject({ ok: true, sessionId: 'new-session' });
     expect(db.prepare("SELECT status FROM payment_orders WHERE session_id='session'").get()).toEqual({ status: 'canceled' });
     expect(mocks.checkout).toHaveBeenCalledTimes(1);
   });
 
-  it('creates yearly checkout and rejects switching a pending checkout to another plan', async () => {
+  it('creates a Pro monthly checkout without another trial and rejects a parallel plan', async () => {
     mocks.checkout.mockResolvedValue({ sessionId: 'year-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
-    const opts = { userId: 'bob', planKey: 'yearly', successUrl: 'https://boen.frostrain.tech/setup?paid=1' };
+    const opts = { userId: 'bob', planKey: 'pro', successUrl: 'https://boen.frostrain.tech/setup?paid=1' };
     expect((await createMembershipCheckout(opts)).ok).toBe(true);
-    expect(mocks.checkout).toHaveBeenCalledWith(expect.objectContaining({ productId: 'year-product', withTrial: true, metadata: { userId: 'bob', planKey: 'yearly' } }), expect.any(Object));
-    expect((await createMembershipCheckout({ ...opts, planKey: 'monthly' })).ok).toBe(false);
+    expect(mocks.checkout).toHaveBeenCalledWith(expect.objectContaining({ productId: 'pro-product', withTrial: false, metadata: { userId: 'bob', planKey: 'pro' } }), expect.any(Object));
+    expect((await createMembershipCheckout({ ...opts, planKey: 'plus' })).ok).toBe(false);
     expect(mocks.checkout).toHaveBeenCalledTimes(1);
   });
   it('uses the yearly period and authoritative recurring amount', async () => {
@@ -80,7 +84,7 @@ describe('Waffo integration', () => {
   it('refuses checkout if dashboard price differs from the published website', async () => {
     const changed = products(); changed[0]!.prices[0]!.priceInfo.amount = '99.99';
     mocks.query.mockResolvedValueOnce({ data: { subscriptionProducts: changed, store: { prodEnabled: true, payinEnable: true } } });
-    expect((await createMembershipCheckout({ userId: 'bob', planKey: 'monthly', successUrl: 'https://boen.frostrain.tech' })).ok).toBe(false);
+    expect((await createMembershipCheckout({ userId: 'bob', planKey: 'plus', successUrl: 'https://boen.frostrain.tech' })).ok).toBe(false);
     expect(mocks.checkout).not.toHaveBeenCalled();
   });
   it('verifies signature and store/environment before processing', async () => {
@@ -150,14 +154,34 @@ describe('Waffo integration', () => {
   });
   it('coalesces concurrent checkout and persists idempotency across failed requests', async () => {
     mocks.checkout.mockRejectedValueOnce(new Error('timeout')).mockResolvedValue({ sessionId: 'new-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
-    const opts = { userId: 'bob', planKey: 'monthly', successUrl: 'https://boen.frostrain.tech/setup?paid=1' };
+    const opts = { userId: 'bob', planKey: 'plus', successUrl: 'https://boen.frostrain.tech/setup?paid=1' };
     const first = await Promise.all([createMembershipCheckout(opts), createMembershipCheckout(opts)]);
     expect(first.every(result => !result.ok)).toBe(true);
     expect(mocks.checkout).toHaveBeenCalledTimes(1);
     expect((await createMembershipCheckout(opts)).ok).toBe(true);
     expect(mocks.checkout.mock.calls[0]?.[1]).toEqual(mocks.checkout.mock.calls[1]?.[1]);
-    expect(mocks.checkout.mock.calls[1]?.[0]).toMatchObject({ withTrial: true });
+    expect(mocks.checkout.mock.calls[1]?.[0]).toMatchObject({ withTrial: false });
     await createMembershipCheckout(opts);
     expect(mocks.checkout).toHaveBeenCalledTimes(2);
+  });
+  it('prices top-ups server-side, verifies delivery and applies each refund only once', async () => {
+    mocks.checkout.mockResolvedValue({ sessionId: 'topup-session', checkoutUrl: 'https://checkout.waffo.ai/example', expiresAt: iso(now + 3600) });
+    expect((await createTopUpCheckout('alice', 'request', 2000, 'https://boen.frostrain.tech/setup?topup=1')).ok).toBe(true);
+    expect(mocks.checkout).toHaveBeenCalledWith(expect.objectContaining({ priceSnapshot: { amount: '2.49', taxCategory: 'saas' } }), expect.any(Object));
+    const { external_id } = db.prepare('SELECT external_id FROM compute_topups').get() as { external_id: string };
+    const data = { orderId: 'credit-order', orderMerchantExternalId: external_id };
+    const order = { id: 'credit-order', status: 'completed', testMode: true, merchantProvidedBuyerIdentity: 'alice',
+      onetimeProduct: { id: 'topup-product' }, priceSnapshot: { currency: 'USD', subtotal: '2.49', total: '2.50' } };
+    mocks.query.mockResolvedValue({ data: { onetimeOrder: { ...order, payments: [{ status: 'succeeded', refunds: [] }] } } });
+    expect((await handleWaffoWebhook(event('pay-1', 'order.completed', data), 'valid', hooks)).ok).toBe(true);
+    expect((await handleWaffoWebhook(event('pay-2', 'order.completed', data), 'valid', hooks)).ok).toBe(true);
+    expect(creditBalance(db, 'alice').purchased).toBe(2000);
+    const refunds = [{ id: 'refund-1', status: 'succeeded', requestedAmountDetails: { currency: 'USD', amount: '1.25' } }];
+    mocks.query.mockResolvedValue({ data: { onetimeOrder: { ...order, payments: [{ status: 'succeeded', refunds }] } } });
+    expect((await handleWaffoWebhook(event('refund-1', 'refund.succeeded', data), 'valid', hooks)).ok).toBe(true);
+    expect((await handleWaffoWebhook(event('refund-replay', 'refund.succeeded', data), 'valid', hooks)).ok).toBe(true);
+    expect(creditBalance(db, 'alice').purchased).toBe(1000);
+    process.env.WAFFO_ENVIRONMENT = 'prod';
+    expect(creditBalance(db, 'alice').purchased).toBe(0);
   });
 });

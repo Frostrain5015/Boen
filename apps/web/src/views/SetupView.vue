@@ -21,18 +21,21 @@ const FONT_SIZE_OPTIONS = [
 ];
 
 /** 选择模型：非星月卡点 DS 弹窗，否则立即切换+保存 */
-function setProvider(val: string) {
-  if (val !== 'default' && !authStore.isPremium) {
-    toast.info('该功能为星月卡专属');
+async function setProvider(val: string) {
+  if (val !== 'default' && !authStore.canUsePro) {
+    toast.info('DeepSeek Pro 需开通星耀卡');
     return;
   }
-  modelProvider.value = val;
-  localStorage.setItem('boen_model_provider', val);
-  fetch('/api/model/switch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}` },
-    body: JSON.stringify({ provider: val }),
-  }).catch(() => {});
+  try {
+    const response = await fetch('/api/model/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}` },
+      body: JSON.stringify({ provider: val }),
+    });
+    if (!response.ok) { toast.error('模型切换失败，请重试'); return; }
+    modelProvider.value = val;
+    localStorage.setItem('boen_model_provider', val);
+  } catch { toast.error('模型切换失败，请重试'); }
 }
 
 /** 名称失焦时自动保存 */
@@ -143,9 +146,9 @@ watch(fontSize, (val) => {
                 ><span>DeepSeek V4 Flash</span></button>
                 <button @click="setProvider('deepseek-pro')"
                   class="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 py-2.5 font-display text-sm font-bold transition-all active:scale-[0.97] min-w-[130px]"
-                  :class="(modelProvider === 'deepseek-pro' ? 'border-[#E8A317] bg-[#fef3d2] text-[#b8730d]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)]') + (!authStore.isPremium ? ' opacity-40 cursor-not-allowed' : ' hover:border-[#E8A317]')"
-                  :disabled="!authStore.isPremium"
-                ><span v-if="!authStore.isPremium"><Lock class="inline h-3 w-3 mr-0.5" /></span>DeepSeek V4 Pro</button>
+                  :class="(modelProvider === 'deepseek-pro' && authStore.canUsePro ? 'border-[#E8A317] bg-[#fef3d2] text-[#b8730d]' : 'border-[var(--line)] bg-white text-[var(--ink-soft)]') + (!authStore.canUsePro ? ' opacity-40 cursor-not-allowed' : ' hover:border-[#E8A317]')"
+                  :disabled="!authStore.canUsePro"
+                ><span v-if="!authStore.canUsePro"><Lock class="inline h-3 w-3 mr-0.5" /></span>DeepSeek Pro</button>
               </div>
             </div>
 

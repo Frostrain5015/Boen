@@ -77,11 +77,11 @@ describe('membership lifecycle', () => {
     initMembership(db);
     expect(membershipDetails(db, 'alice', now).membership.accessEndsAt).toBe(now + day);
   });
-  it('keeps sandbox trial/order history separate from first production trial', () => {
+  it('keeps sandbox orders out of production and starts no new subscription trials', () => {
     applySubscription(db, row(), now);
     db.prepare('INSERT INTO payment_orders VALUES (?,?,?,?)').run('alice', 'order', 'active', 'test');
     process.env.WAFFO_ENVIRONMENT = 'prod';
-    expect(membershipDetails(db, 'alice', now).billing.trialEligible).toBe(true);
+    expect(membershipDetails(db, 'alice', now).billing.trialEligible).toBe(false);
     expect(membershipDetails(db, 'alice', now).membership.active).toBe(false);
     applySubscription(db, row({ order_id: 'production', environment: 'prod', plan_key: 'yearly', amount: '29.99', currency: 'USD' }), now);
     expect(membershipDetails(db, 'alice', now).billing).toMatchObject({ planKey: 'yearly', amount: '29.99', trialEligible: false });

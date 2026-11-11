@@ -173,7 +173,7 @@ export async function handleOAuthCallback(url: string): Promise<{ plan?: Members
   clearPkceParams();
 
   const plan = pkce.plan;
-  return { plan: plan === 'monthly' || plan === 'yearly' ? plan : undefined };
+  return { plan: plan === 'plus' || plan === 'pro' ? plan : undefined };
 }
 
 /** 获取当前用户信息 */

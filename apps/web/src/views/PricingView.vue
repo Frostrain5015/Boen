@@ -7,7 +7,7 @@ import MembershipPlanPicker from '@/components/MembershipPlanPicker.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
-const selectedPlanKey = ref<MembershipPlanKey>('monthly');
+const selectedPlanKey = ref<MembershipPlanKey>('plus');
 const selectedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === selectedPlanKey.value)!);
 const manageMembership = computed(() => auth.authenticated && auth.subscription?.billing.checkoutAllowed === false);
 const subscribeLabel = computed(() => manageMembership.value
@@ -29,27 +29,27 @@ const features = [
           <h1 class="font-display mt-4 text-4xl font-bold leading-tight sm:text-5xl">AI 学习助手</h1>
           <p class="mt-6 max-w-md text-base leading-8 text-[var(--ink-soft)]">拍照提问、专项练习，查看考试结果和学习诊断。</p>
           <div class="mt-7 flex flex-wrap gap-3"><router-link to="/" class="btn-accent inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-display text-sm font-bold">开始学习<ArrowUpRight :size="15" /></router-link><a href="#membership" class="rounded-2xl border border-[var(--line)] px-5 py-3 text-sm text-[var(--ink-soft)]">了解星月卡</a></div>
-          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">基础对话每日免费 10 次。AI 回答可能有误，请结合教材与教师指导核对。</p>
+          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">首次使用赠送 500 星月积分，14 天有效。AI 回答请结合教材和教师指导核对。</p>
         </section>
         <section id="membership" class="clay clay-glass p-5 sm:p-6" aria-label="星月卡定价">
           <MembershipCard :type="selectedPlanKey" size="lg" :show-price="false" status-label="" />
           <p class="mt-3 text-center text-xs text-[var(--ink-soft)]">翻面查看权益</p>
           <MembershipPlanPicker v-model="selectedPlanKey" :plans="MEMBERSHIP_PLANS" class="mt-6" />
           <div class="mt-6 flex items-end justify-between"><h2 class="font-display text-lg font-bold">{{ selectedPlan.name }}</h2><p><span class="font-display text-3xl font-bold">${{ selectedPlan.amount }}</span><span class="ml-1 text-sm text-[var(--ink-soft)]">USD / {{ selectedPlan.intervalLabel }}</span></p></div>
-          <ul class="my-5 space-y-2 text-sm text-[var(--ink-soft)]"><li v-for="benefit in ['DeepSeek V4 Pro 大模型', '全题型考试与错题智能归因', '学习诊断报告']" :key="benefit" class="flex items-center gap-2"><Check :size="15" class="text-[var(--accent-strong)]" />{{ benefit }}</li></ul>
+          <ul class="my-5 space-y-2 text-sm text-[var(--ink-soft)]"><li v-for="benefit in (selectedPlanKey === 'pro' ? ['皓月卡全部权益', 'DeepSeek Pro', '更长对话和完整期末试卷'] : ['Flash 对话、拍照问答', '标准组卷与批改', '错题分析与学习诊断'])" :key="benefit" class="flex items-center gap-2"><Check :size="15" class="text-[var(--accent-strong)]" />{{ benefit }}</li></ul>
           <router-link
             v-if="auth.authChecked && (!auth.authenticated || auth.subscriptionChecked || auth.subscription)"
             :to="{ name: 'setup', query: manageMembership ? {} : { plan: selectedPlanKey } }"
             class="btn-accent block rounded-2xl px-4 py-3 text-center font-display text-sm font-bold"
           >{{ subscribeLabel }}</router-link>
           <span v-else class="block rounded-2xl px-4 py-3 text-center text-sm text-[var(--ink-soft)]" role="status">正在确认登录状态…</span>
-          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">首次订阅享 7 天免费试用；结束后按 USD ${{ selectedPlan.amount }}/{{ selectedPlan.intervalLabel }} 自动续费，直至取消。年付方案按年一次收取 USD $29.99，并非每月扣款。两种方案权益相同，每个账户仅一次试用。税费以 Waffo 收银台为准。</p>
+          <p class="mt-4 text-xs leading-6 text-[var(--ink-soft)]">按月自动续费，可随时取消。周额度在北京时间周一重置，税费以收银台为准。</p>
         </section>
       </div>
       <section class="grid gap-4 md:grid-cols-3" aria-label="产品功能"><article v-for="feature in features" :key="feature.title" class="clay clay-glass p-6"><component :is="feature.icon" :size="23" class="text-[var(--accent-strong)]" /><h2 class="font-display mt-4 text-base font-bold">{{ feature.title }}</h2><p class="mt-3 text-sm leading-7 text-[var(--ink-soft)]">{{ feature.body }}</p></article></section>
       <section class="my-10 clay clay-glass p-6 sm:p-8"><h2 class="font-display text-xl font-bold"><Sparkles class="mr-2 inline h-5 w-5 text-[var(--premium-gold)]" />订阅说明</h2><div class="mt-6 grid gap-6 sm:grid-cols-2 text-sm leading-7 text-[var(--ink-soft)]">
         <div><h3 class="font-bold text-[var(--ink)]">取消与恢复续费</h3><p>在个人中心 → 会员与订阅 → 取消自动续费即可在线取消。当前试用或已付周期内仍可使用，结束后不再自动扣款；在终止前可恢复续费。</p></div>
-        <div><h3 class="font-bold text-[var(--ink)]">积分兑换</h3><p>2000 星月积分可兑换 30 天奖励会员。订阅期间暂停消耗，订阅结束后继续使用。积分不可购买、转让或提现。</p></div>
+        <div><h3 class="font-bold text-[var(--ink)]">一次性充值</h3><p>1,500 积分起，US$1.99。每增加 500 积分加 US$0.50。购买积分可跨周使用，模型权限随会员等级。</p></div>
         <div><h3 class="font-bold text-[var(--ink)]">支付与退款</h3><p>Waffo Pancake 作为 Merchant of Record 处理结账、税费及账单。重复或错误扣款、付款后未交付、重大技术故障可申请退款；不提供一般无理由退款，法定权利不受影响。详见<router-link to="/terms" class="underline">服务条款</router-link>。</p></div>
         <div><h3 class="font-bold text-[var(--ink)]">运营与联系</h3><p>由个人开发者潘涵宇（Pan Hanyu）运营，Frost Tech／寒霜科技为个人品牌，尚未注册企业主体。支持邮箱：<a class="underline break-all" href="mailto:phy55015@hotmail.com">phy55015@hotmail.com</a>。</p></div>
       </div></section>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue';
-import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
+import { CREDIT_TOP_UP, LEGACY_MEMBERSHIP_PLANS, MEMBERSHIP_PLANS, creditTopUpAmount, type MembershipPlanKey } from '@boen/shared';
 import { useRoute, useRouter } from 'vue-router';
 import { CreditCard, Sparkles, LoaderCircle, ArrowUpRight, RefreshCw } from 'lucide-vue-next';
 import { useAuthStore } from '@/stores/auth';
@@ -21,10 +21,10 @@ const dialog = ref<HTMLDialogElement | null>(null);
 const action = ref<'cancel' | 'reactivate' | 'reward'>('cancel');
 const sub = computed(() => auth.subscription);
 const billing = computed(() => sub.value?.billing);
-const selectedPlanKey = ref<MembershipPlanKey>(route.query.plan === 'yearly' ? 'yearly' : 'monthly');
+const selectedPlanKey = ref<MembershipPlanKey>(route.query.plan === 'pro' ? 'pro' : 'plus');
 const selectedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === selectedPlanKey.value)!);
 const plans = computed(() => sub.value?.plans ?? []);
-const billedPlan = computed(() => MEMBERSHIP_PLANS.find(plan => plan.key === billing.value?.planKey) ?? MEMBERSHIP_PLANS[0]);
+const billedPlan = computed(() => [...MEMBERSHIP_PLANS, ...LEGACY_MEMBERSHIP_PLANS].find(plan => plan.key === billing.value?.planKey) ?? MEMBERSHIP_PLANS[0]);
 const hasBilling = computed(() => billing.value && !['none', 'canceled'].includes(billing.value.status));
 const priceLabel = computed(() => {
   if (hasBilling.value && billing.value) {
@@ -55,7 +55,7 @@ const statusDetail = computed(() => {
 });
 const confirmTitle = computed(() => action.value === 'reward' ? '兑换 30 天奖励会员' : action.value === 'cancel' ? '取消自动续费' : '恢复自动续费');
 const confirmDetail = computed(() => action.value === 'reward'
-  ? '消耗 2000 星月积分。已有订阅或历史会员时，奖励时长保留至现有权益结束后使用。'
+  ? '消耗 2,000 历史奖励积分。已有订阅时，奖励时长保留至订阅结束后使用。'
   : action.value === 'cancel'
     ? `取消后不再自动扣款，当前权益保留至 ${date(billing.value?.currentPeriodEnd)}。付款失败且已过周期时，不会延长权益。`
     : `恢复后按 ${priceLabel.value} 自动续费，下一次扣款时间以 Waffo 账单为准。可再次取消。`);
@@ -101,18 +101,61 @@ async function execute() {
   } catch { toast.error('网络连接失败，请刷新确认操作结果'); }
   finally { busy.value = false; }
 }
-async function claim() {
-  if (busy.value) return;
+const topUpPoints = ref<number>(CREDIT_TOP_UP.minimum);
+const topUpPrice = computed(() => creditTopUpAmount(topUpPoints.value));
+let topUpRequestId: string | null = null;
+watch(topUpPoints, () => { topUpRequestId = null; });
+async function topUp() {
+  const token = getToken();
+  if (busy.value || !token || !topUpPrice.value) return;
+  topUpRequestId ??= crypto.randomUUID();
   busy.value = true;
   try {
-    const result = await auth.claimDailyLogin();
-    if (result.ok) toast.success(`+${result.reward} 星月积分`);
-    else toast.error(result.message ?? '领取未完成');
-  } finally { busy.value = false; }
+    const response = await fetch('/api/payment/top-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ points: topUpPoints.value, requestId: topUpRequestId }),
+    });
+    const result = await response.json() as { checkoutUrl?: string; message?: string; error?: string };
+    if (response.ok && result.checkoutUrl) window.location.assign(result.checkoutUrl);
+    else {
+      if (result.error === 'expired' || result.error === 'conflict') topUpRequestId = null;
+      toast.error(result.message ?? '暂时无法创建充值订单');
+    }
+  } catch { toast.error('网络连接失败，请重试'); }
+  finally { busy.value = false; }
+}
+async function confirmTopUp(requestId: string) {
+  const token = getToken();
+  if (!token) return;
+  busy.value = true;
+  try {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const response = await fetch(`/api/payment/top-up/${encodeURIComponent(requestId)}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.status === 404 || response.status === 401) break;
+      if (response.ok) {
+        const status = await response.json() as { state: string; points: number };
+        if (status.state === 'paid') {
+          await auth.fetchCurrencyStatus();
+          toast.success('星月积分已到账');
+          return;
+        }
+        if (status.state === 'refunded') break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    toast.info('充值结果待确认，请稍后刷新');
+  } catch { toast.info('充值结果待确认，请稍后刷新'); }
+  finally {
+    busy.value = false;
+    await router.replace({ path: '/setup', hash: '#credits' });
+  }
 }
 onMounted(async () => {
   window.addEventListener('focus', refresh);
   await refresh();
+  if (route.hash === '#credits') document.getElementById('credits')?.scrollIntoView();
+  if (route.query.topup === '1' && typeof route.query.requestId === 'string') await confirmTopUp(route.query.requestId);
   if (route.query.paid === '1') {
     await router.replace({ path: '/setup' });
     busy.value = true;
@@ -150,7 +193,7 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
             <div>
               <h3 class="font-display text-sm font-bold text-[var(--ink)]">开通星月卡</h3>
               <p class="text-xs text-[var(--ink-soft)] mt-0.5">
-                {{ billing?.trialEligible ? '首周免费试用，开通后可随时取消' : '解锁全科高频考点、题型诊断与 AI 辅导' }}
+                周额度在北京时间周一重置
               </p>
             </div>
             <span class="status-pill shrink-0">{{ statusLabel }}</span>
@@ -169,7 +212,6 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
             <LoaderCircle v-if="busy" :size="16" class="animate-spin" /><CreditCard v-else :size="16" />
             {{ !sub?.payEnabled ? '订阅暂未开放' : billing.trialEligible ? '开启 7 天免费试用' : `开通${selectedPlan.name}（${priceLabel}）` }}
           </button>
-          <p class="text-center text-[12px] text-[var(--ink-soft)]">两种方案享有同等权益，每个账户限试用一次</p>
           <p v-if="sub?.membership.source === 'reward'" class="text-xs leading-5 text-[var(--ink-soft)]">订阅期间暂停消耗奖励时长，订阅结束后继续使用。</p>
         </template>
         <button v-if="billing && ['trialing','active','past_due'].includes(billing.status)" class="membership-secondary w-full" :disabled="busy" @click="confirm('cancel')">{{ billing.status === 'trialing' ? '取消试用后的续费' : '取消自动续费' }}</button>
@@ -178,13 +220,36 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
         <router-link to="/pricing" class="block text-center text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors">查看详细功能、定价与退款规则 &rarr;</router-link>
       </div>
     </section>
-    <section aria-labelledby="rewards-heading" class="clay clay-glass overflow-hidden">
-      <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3"><Sparkles :size="16" class="text-[var(--premium-gold)]" /><h2 id="rewards-heading" class="font-display text-sm font-bold">积分与奖励</h2></div>
+    <section id="credits" aria-labelledby="rewards-heading" class="clay clay-glass overflow-hidden">
+      <div class="flex items-center gap-2 border-b border-[var(--line)] px-5 py-3"><Sparkles :size="16" class="text-[var(--premium-gold)]" /><h2 id="rewards-heading" class="font-display text-sm font-bold">星月积分</h2></div>
       <div class="p-5 space-y-4">
-        <div class="flex items-end justify-between gap-3"><div><p class="text-xs text-[var(--ink-soft)]">星月积分</p><p class="font-display text-3xl font-bold mt-1">{{ auth.pointsBalance.toLocaleString() }}</p></div><div class="text-right text-xs text-[var(--ink-soft)]">待用奖励时长<p class="mt-1 text-base font-semibold">{{ ((sub?.rewards.bankedSeconds ?? 0) / 86400).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) }} 天</p></div></div>
-        <button class="membership-secondary w-full" :disabled="busy || auth.pointsBalance < 2000" @click="confirm('reward')">使用 2000 积分兑换 30 天会员</button>
-        <p class="text-xs leading-5 text-[var(--ink-soft)]">奖励时长在订阅或历史会员结束后自动使用。积分不可购买或提现。</p>
-        <div class="daily-reward flex items-center justify-between gap-3 rounded-2xl p-3"><div><p class="font-display text-sm font-bold">每日登录奖励</p><p class="text-xs text-[var(--ink-soft)] mt-1">每日领取 50 积分</p></div><button class="membership-secondary shrink-0" :disabled="busy || auth.currency?.claimedToday" @click="claim">{{ auth.currency?.claimedToday ? '今日已领' : '领取' }}</button></div>
+        <div>
+          <p class="text-xs text-[var(--ink-soft)]">可用余额</p>
+          <p class="font-display text-3xl font-bold mt-1">{{ auth.pointsBalance.toLocaleString() }}</p>
+          <p v-if="sub?.legacyComputeAccess" class="mt-2 text-xs text-[var(--ink-soft)]">现有会员有效期内，继续按原约定使用 AI。</p>
+        </div>
+        <dl v-if="auth.currency?.compute" class="space-y-2 text-xs">
+          <div v-if="auth.currency.compute.welcomeExpiresAt" class="flex justify-between gap-2"><dt>试用 · {{ date(auth.currency.compute.welcomeExpiresAt) }} 到期</dt><dd>{{ auth.currency.compute.welcome }}</dd></div>
+          <div v-if="auth.currency.compute.weeklyResetsAt" class="flex justify-between gap-2"><dt>周额度 · {{ date(auth.currency.compute.weeklyResetsAt) }} 到期</dt><dd>{{ auth.currency.compute.weekly }}</dd></div>
+          <div class="flex justify-between gap-2"><dt>充值积分</dt><dd>{{ auth.currency.compute.purchased }}</dd></div>
+        </dl>
+        <div v-if="auth.currency?.compute?.topUpEnabled" class="space-y-3">
+          <fieldset class="flex flex-wrap gap-2" :disabled="busy">
+            <legend class="mb-2 text-sm font-semibold">选择充值额度</legend>
+            <button v-for="points in [1500, 2500, 5000]" :key="points" type="button" class="membership-secondary" :aria-pressed="topUpPoints === points" @click="topUpPoints = points">{{ points.toLocaleString() }}</button>
+          </fieldset>
+          <label class="flex items-center justify-between gap-3 text-sm">
+            自选积分
+            <input v-model.number="topUpPoints" type="number" class="w-28 rounded-lg border border-[var(--line)] px-2 py-1" :min="CREDIT_TOP_UP.minimum" :max="CREDIT_TOP_UP.maximum" :step="CREDIT_TOP_UP.step" :disabled="busy" />
+          </label>
+          <button class="membership-primary w-full" :disabled="busy || !topUpPrice" @click="topUp">一次性支付 US${{ topUpPrice ?? '—' }}</button>
+          <p class="text-xs text-[var(--ink-soft)]">充值积分可跨周使用。税费以收银台为准。</p>
+        </div>
+        <p v-else class="text-xs text-[var(--ink-soft)]">充值暂未开放</p>
+        <div v-if="(auth.currency?.balance ?? 0) > 0" class="border-t border-[var(--line)] pt-3 space-y-2">
+          <p class="text-xs text-[var(--ink-soft)]">历史奖励积分 {{ auth.currency?.balance.toLocaleString() }}</p>
+          <button v-if="(auth.currency?.balance ?? 0) >= 2000" class="membership-secondary w-full" :disabled="busy" @click="confirm('reward')">兑换 30 天奖励会员</button>
+        </div>
       </div>
     </section>
     <dialog ref="dialog" class="membership-dialog clay p-6" @cancel="busy && $event.preventDefault()">
@@ -203,7 +268,6 @@ onUnmounted(() => window.removeEventListener('focus', refresh));
 button:disabled { opacity: .5; cursor: not-allowed; }
 button:not(:disabled):active { transform: scale(.98); }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.daily-reward { background: var(--premium-gold-soft); }
 .membership-dialog { width: min(400px,calc(100vw - 32px)); margin: auto; color: var(--ink); border: 1px solid var(--line); background: var(--paper); }
 .membership-dialog::backdrop { background: rgba(40,35,28,.25); backdrop-filter: blur(5px); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

@@ -69,7 +69,7 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>([]);
   const currentConversationId = ref<string | null>(null);
   const reaction = ref<MascotState | null>(null);
-  const dailyLimitReached = ref(false);
+  const creditsInsufficient = ref(false);
   let reactionTimer: ReturnType<typeof setTimeout> | undefined;
 
   // ── Getters ───────────────────────────────────────────────
@@ -204,16 +204,9 @@ export const useChatStore = defineStore('chat', () => {
       }
       // 没有对应 pending（如出题失败）→ 直接追加统一 fail 工具卡片
       if (!replaced) items.value.push({ kind: 'tool_error', action: e.action, error: e.error });
-    } else if (e.type === 'usage') {
-      const authStore = useAuthStore();
-      if (authStore.subscription && !authStore.subscription.isPremium) {
-        authStore.subscription = {
-          ...authStore.subscription,
-          dailyLimit: e.dailyLimit,
-          dailyUsed: e.dailyUsed,
-          dailyRemaining: e.dailyRemaining,
-        };
-      }
+    } else if (e.type === 'credits') {
+      useAuthStore().applyCreditBalance(e.balance);
+      creditsInsufficient.value = false;
     } else if (e.type === 'settlement') {
       learningSettlement.value = { summary: e.summary, score: e.score, stepsCompleted: e.stepsCompleted, totalSteps: e.totalSteps, updatedKps: e.updatedKps, proficiencyChanges: e.proficiencyChanges, pointsEarned: e.pointsEarned, pointsCapped: e.pointsCapped };
       console.log(`[Boen 类课堂] 📊 结算 — ${e.stepsCompleted}/${e.totalSteps} 步 | ${e.score}分 | 更新${e.updatedKps}条KP | +${e.pointsEarned ?? 0}星月积分 | ${new Date().toLocaleTimeString()}`);
@@ -322,8 +315,9 @@ export const useChatStore = defineStore('chat', () => {
         toast.warning('网络连接中断，正在同步已保存的对话内容');
         if (currentConversationId.value) await selectConversation(currentConversationId.value);
         else input.value = t;
-      } else if ((err as any)?.status === 429) {
-        dailyLimitReached.value = true;
+      } else if (err instanceof Error && 'status' in err && err.status === 402) {
+        creditsInsufficient.value = true;
+        input.value = t;
         // 移除乐观添加的空助手消息
         const lastItem = items.value[items.value.length - 1];
         if (lastItem?.kind === 'assistant' && !lastItem.text) {
@@ -510,7 +504,7 @@ export const useChatStore = defineStore('chat', () => {
     conversations,
     currentConversationId,
     reaction,
-    dailyLimitReached,
+    creditsInsufficient,
     learningSettlement,
     // getters
     hasItems,

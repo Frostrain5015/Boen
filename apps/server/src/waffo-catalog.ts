@@ -1,9 +1,14 @@
 import type { WaffoPancake } from '@waffo/pancake-ts';
-import { MEMBERSHIP_PLANS } from '@boen/shared';
+import { LEGACY_MEMBERSHIP_PLANS, MEMBERSHIP_PLANS } from '@boen/shared';
 
 export function configuredPlans() {
-  return MEMBERSHIP_PLANS.map(plan => ({ ...plan, productId: process.env[plan.key === 'monthly' ? 'WAFFO_PRODUCT_MONTHLY' : 'WAFFO_PRODUCT_YEARLY'] ?? '' }))
+  return MEMBERSHIP_PLANS.map(plan => ({ ...plan, billingPeriod: 'monthly', productId: process.env[plan.key === 'plus' ? 'WAFFO_PRODUCT_PLUS' : 'WAFFO_PRODUCT_PRO'] ?? '' }))
     .filter(plan => plan.productId);
+}
+export function recognizedPlans() {
+  return [...configuredPlans(), ...LEGACY_MEMBERSHIP_PLANS.map(plan => ({
+    ...plan, billingPeriod: plan.key, productId: process.env[plan.key === 'monthly' ? 'WAFFO_PRODUCT_MONTHLY' : 'WAFFO_PRODUCT_YEARLY'] ?? '',
+  })).filter(plan => plan.productId)];
 }
 
 interface Product {
@@ -32,11 +37,11 @@ export async function verifyCatalog(client: WaffoPancake, environment: 'test' | 
   if (!plans.length) throw new Error('No configured membership products');
   for (const plan of plans) {
     const product = response.data?.subscriptionProducts.find(product => product.id === plan.productId);
-    if (!product || product.status !== 'active' || product.billingPeriod !== plan.key || (environment === 'prod' && !product.hasProdVersion)) throw new Error(`Unavailable ${plan.key} product`);
+    if (!product || product.status !== 'active' || product.billingPeriod !== plan.billingPeriod || (environment === 'prod' && !product.hasProdVersion)) throw new Error(`Unavailable ${plan.key} product`);
     const price = product.prices.find(price => price.currency === plan.currency)?.priceInfo;
     const metadata: unknown = typeof product.metadata === 'string' ? JSON.parse(product.metadata) : product.metadata;
     if (!price || Number(price.amount) !== Number(plan.amount) || (price.trialAmount != null && Number(price.trialAmount) !== 0)
-      || !metadata || typeof metadata !== 'object' || !('trialDays' in metadata) || metadata.trialDays !== plan.trialDays) {
+      || (metadata && typeof metadata === 'object' && 'trialDays' in metadata && Number(metadata.trialDays ?? 0) !== plan.trialDays)) {
       throw new Error(`Website and Waffo ${plan.key} pricing/trial mismatch`);
     }
   }

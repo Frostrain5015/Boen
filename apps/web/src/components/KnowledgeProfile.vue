@@ -57,13 +57,6 @@ const animatingNumbers = ref(false);
 const report = ref<string | null>(null);
 const reportLoading = ref(false);
 
-/** 当前学科总熟练度对应的星月积分倍率：1 + clamp(S, 0, 100) / 100 */
-const pointsMultiplier = computed(() => {
-  const S = outline.value?.overall?.weightedScore;
-  if (S == null || S < 0) return 1;
-  return 1 + Math.min(S, 100) / 100;
-});
-
 function authHeaders(): Record<string, string> {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -254,10 +247,6 @@ watch(() => useAuthStore().userProfile?.grade, (g) => {
         <div class="clay clay-glass p-5 text-center" data-tour="profile-overall" v-motion :initial="{ opacity: 0, y: 20 }" :enter="{ opacity: 1, y: 0, transition: { delay: 100 } }">
           <p class="mb-3 flex items-center justify-center gap-2 font-display text-xs font-semibold text-[var(--ink-soft)]">
             <span>综合熟练度</span>
-            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style="background: var(--premium-gold-soft); color: var(--premium-gold)">
-              <Sparkles class="h-2.5 w-2.5" />
-              {{ pointsMultiplier.toFixed(1) }}×
-            </span>
           </p>
           <div class="flex justify-center">
             <span class="inline-flex gap-1">

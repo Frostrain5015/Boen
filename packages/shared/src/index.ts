@@ -467,12 +467,33 @@ export interface ExamQualityReport {
 // ─────────────────────────────────────────────────────────────
 
 export type BillingStatus = 'none' | 'pending' | 'trialing' | 'active' | 'canceling' | 'past_due' | 'canceled';
-export type MembershipPlanKey = 'monthly' | 'yearly';
-export const MEMBERSHIP_TERMS_VERSION = '1.2';
+export type MembershipPlanKey = 'plus' | 'pro' | 'monthly' | 'yearly';
+export const MEMBERSHIP_TERMS_VERSION = '2.0';
 export const MEMBERSHIP_PLANS = [
-  { key: 'monthly', name: '皓月卡', days: 30, amount: '2.99', currency: 'USD', intervalLabel: '月', trialDays: 7 },
-  { key: 'yearly', name: '星耀卡', days: 365, amount: '29.99', currency: 'USD', intervalLabel: '年', trialDays: 7 },
+  { key: 'plus', name: '皓月卡', days: 30, amount: '2.99', currency: 'USD', intervalLabel: '月', trialDays: 0, weeklyPoints: 1000 },
+  { key: 'pro', name: '星耀卡', days: 30, amount: '9.99', currency: 'USD', intervalLabel: '月', trialDays: 0, weeklyPoints: 5000 },
 ] as const;
+export const LEGACY_MEMBERSHIP_PLANS = [
+  { key: 'monthly', name: '皓月卡', days: 30, amount: '2.99', currency: 'USD', intervalLabel: '月', trialDays: 7, weeklyPoints: 1000 },
+  { key: 'yearly', name: '星耀卡', days: 365, amount: '29.99', currency: 'USD', intervalLabel: '年', trialDays: 7, weeklyPoints: 1000 },
+] as const;
+export const WELCOME_POINTS = 500;
+export const EXAM_CREDIT_LIMIT = { standard: 500, advanced: 1800 } as const;
+export const CREDIT_TOP_UP = { minimum: 1500, maximum: 5000, step: 500, firstPriceCents: 199, stepPriceCents: 50, currency: 'USD' } as const;
+export function creditTopUpAmount(points: number): string | null {
+  const { minimum, maximum, step, firstPriceCents, stepPriceCents } = CREDIT_TOP_UP;
+  if (!Number.isInteger(points) || points < minimum || points > maximum || (points - minimum) % step) return null;
+  return ((firstPriceCents + (points - minimum) / step * stepPriceCents) / 100).toFixed(2);
+}
+export interface ComputeCredits {
+  balance: number;
+  welcome: number;
+  welcomeExpiresAt: number | null;
+  weekly: number;
+  weeklyResetsAt: number | null;
+  purchased: number;
+  topUpEnabled?: boolean;
+}
 export interface MembershipDetails {
   membership: { active: boolean; source: 'waffo' | 'legacy' | 'reward' | 'none'; accessEndsAt: number | null; legacyTier: 'monthly' | 'yearly' | null };
   billing: { status: BillingStatus; currentPeriodStart: number | null; currentPeriodEnd: number | null;
@@ -482,7 +503,9 @@ export interface MembershipDetails {
 }
 
 export interface SubscriptionStatus extends MembershipDetails {
-  tier: 'free' | 'monthly' | 'yearly';
+  tier: 'free' | MembershipPlanKey;
+  canUsePro?: boolean;
+  legacyComputeAccess?: boolean;
   isPremium: boolean;
   expiresAt: number | null;
   activatedAt: number | null;
@@ -504,6 +527,7 @@ export interface PurchasablePlan {
   currency: string;
   intervalLabel: string;
   trialDays: number;
+  weeklyPoints: number;
 }
 
 /** 星月积分（局内货币）可兑换的会员产品 */
@@ -516,6 +540,7 @@ export interface CurrencyProduct {
 
 /** 星月积分状态（/api/currency/status 返回） */
 export interface CurrencyStatus {
+  compute?: ComputeCredits;
   balance: number;
   totalEarned: number;
   totalSpent: number;
@@ -544,6 +569,7 @@ export interface TodoStep {
 }
 
 export type SseEvent =
+  | { type: 'credits'; balance: number; charged: number }
   | { type: 'token'; value: string }
   | { type: 'mode'; value: BoenMode }
   | { type: 'quiz_generating' }
@@ -558,7 +584,6 @@ export type SseEvent =
   | { type: 'exam_grading_progress'; graded: number; total: number }
   | { type: 'exam_graded'; examId: string; results: ExamResults }
   | { type: 'loading_knowledge_base' }
-  | { type: 'usage'; dailyLimit: number; dailyUsed: number; dailyRemaining: number }
   | { type: 'conversation_created'; conversationId: string; title: string }
   | { type: 'todo_plan'; steps: TodoStep[]; currentStep: number }
   | { type: 'todo_step'; action: 'plan' | 'advance' | 'exit' | 'query' | 'switch' | 'quiz'; detail: string }

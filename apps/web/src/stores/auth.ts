@@ -46,7 +46,8 @@ export const useAuthStore = defineStore('auth', () => {
   // ── Computed ──────────────────────────────────────────────
   const isPremium = computed(() => subscription.value?.isPremium ?? false);
   const dailyRemaining = computed(() => subscription.value?.dailyRemaining ?? null);
-  const pointsBalance = computed(() => currency.value?.balance ?? 0);
+  const pointsBalance = computed(() => currency.value?.compute?.balance ?? 0);
+  const canUsePro = computed(() => subscription.value?.canUsePro ?? false);
 
   // ── Actions ───────────────────────────────────────────────
 
@@ -77,11 +78,17 @@ export const useAuthStore = defineStore('auth', () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        currency.value = (await res.json()) as CurrencyStatus;
+        const status = (await res.json()) as CurrencyStatus;
+        if (getToken() === token) currency.value = status;
       }
     } catch {
       /* 静默失败 */
     }
+  }
+
+  function applyCreditBalance(balance: number) {
+    if (currency.value?.compute) currency.value.compute.balance = balance;
+    void fetchCurrencyStatus();
   }
 
   /** 结算事件回写最新余额（SSE settlement / 考试结果携带） */
@@ -314,6 +321,8 @@ export const useAuthStore = defineStore('auth', () => {
     isPremium,
     dailyRemaining,
     pointsBalance,
+    canUsePro,
+    applyCreditBalance,
     checkAuth,
     handleOAuthSuccess,
     handleOAuthError,

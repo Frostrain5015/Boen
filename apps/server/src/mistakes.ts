@@ -1,3 +1,4 @@
+import { meteredDeepSeekFetch } from './compute-meter.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
@@ -26,11 +27,10 @@ const MAX_IMAGE_MB = Number(process.env.MISTAKE_IMAGE_MAX_MB ?? process.env.ALIY
 const MAX_IMAGE_BYTES = Math.max(1, MAX_IMAGE_MB) * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-// 阿里云百炼（DashScope）多模态识别 —— 错题图片走单次 VLM 调用，直接产出结构化题目分析，
+// 错题图片由 DeepSeek Flash 识别并生成结构化题目分析，
 // 取代旧版"教育试卷 OCR 资源包 + 再调一次 LLM 抽题"的两步链路。
-const BAILIAN_BASE_URL = (process.env.BAILIAN_BASE_URL ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1').replace(/\/+$/, '');
-const BAILIAN_VL_MODEL = process.env.BAILIAN_VL_MODEL ?? 'qwen3-vl-plus';
-const BAILIAN_VL_TIMEOUT_MS = Number(process.env.BAILIAN_VL_TIMEOUT_MS ?? '180000');
+const VISION_MODEL = 'deepseek-flash';
+const VISION_TIMEOUT_MS = 180_000;
 
 type UploadedAsset = {
   bytes: Buffer;
@@ -321,8 +321,8 @@ async function recognizeAndAnalyzeWithVlm(
   grade: string,
   candidates: CandidateNode[],
 ): Promise<VlmRecognition> {
-  const apiKey = process.env.BAILIAN_API_KEY;
-  if (!apiKey) throw new Error('多模态识别未配置：请设置 BAILIAN_API_KEY');
+  const apiKey = process.env.DEEPSEEK_API_KEY ?? process.env.BOEN_API_KEY;
+  if (!apiKey) throw new Error('多模态识别未配置：请设置 DEEPSEEK_API_KEY');
 
   const imageBuf = readFileSync(filePath);
   if (imageBuf.length > MAX_IMAGE_BYTES) {
@@ -355,16 +355,17 @@ async function recognizeAndAnalyzeWithVlm(
   ].join('\n');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BAILIAN_VL_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), VISION_TIMEOUT_MS);
   let resp: Awaited<ReturnType<typeof fetch>>;
   try {
-    console.log(`[VLM] 多模态识别请求 model=${BAILIAN_VL_MODEL}, 图片 ${imageBuf.length} bytes (${mime})`);
-    resp = await fetch(`${BAILIAN_BASE_URL}/chat/completions`, {
+    console.log(`[VLM] 多模态识别请求 model=${VISION_MODEL}, 图片 ${imageBuf.length} bytes (${mime})`);
+    resp = await meteredDeepSeekFetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: BAILIAN_VL_MODEL,
+        model: VISION_MODEL,
         max_tokens: 4000,
+        thinking: { type: 'disabled' },
         temperature: 0,
         messages: [
           { role: 'system', content: system },
@@ -378,7 +379,7 @@ async function recognizeAndAnalyzeWithVlm(
     });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`多模态识别超时（>${Math.round(BAILIAN_VL_TIMEOUT_MS / 1000)}s），请重试`);
+      throw new Error(`多模态识别超时（>${Math.round(VISION_TIMEOUT_MS / 1000)}s），请重试`);
     }
     throw new Error(`多模态识别请求失败：${err instanceof Error ? err.message : String(err)}`);
   } finally {
@@ -405,8 +406,8 @@ async function recognizeAndAnalyzeWithVlm(
     .trim();
 
   return {
-    provider: `bailian:${BAILIAN_VL_MODEL}`,
-    raw: { model: BAILIAN_VL_MODEL, requestId: body?.id, usage: body?.usage, content: contentText },
+    provider: `deepseek:${VISION_MODEL}`,
+    raw: { model: VISION_MODEL, requestId: body?.id, usage: body?.usage, content: contentText },
     recognizedText,
     analyses,
   };

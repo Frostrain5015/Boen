@@ -9,7 +9,7 @@ import {
   getCurrentTaskInput,
 } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { SystemMessage, ToolMessage, isHumanMessage, isAIMessage, type AIMessage } from '@langchain/core/messages';
+import { HumanMessage, SystemMessage, ToolMessage, isHumanMessage, isAIMessage, type AIMessage, type BaseMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -69,6 +69,8 @@ export type QuestionResume = {
 };
 
 export interface BoenGraphDeps {
+  historyMessages?: number;
+  allowImages?: boolean;
   retrieveCurriculum?: (args: { grade?: string; subject?: string; query?: string }) => Promise<string>;
   lookupKnowledgePoint?: (args: { grade?: string; subject?: string; query: string; limit?: number }) => Promise<string>;
 }
@@ -436,9 +438,19 @@ export function buildBoenGraph(model: BaseChatModel, deps: BoenGraphDeps = {}, c
     } as any : undefined) : model;
 
     // 移除前几轮 agent 循环添加的 system/curriculum 消息，避免重复追加
-    const filteredMessages = state.messages.filter((m: any) =>
-      m._getType?.() !== 'system' && m._getType?.() !== '__end__'
-    );
+    let filteredMessages = (state.messages as BaseMessage[]).filter(m => !['system', '__end__'].includes(m._getType?.() ?? ''));
+    const historyLimit = deps.historyMessages;
+    if (historyLimit && filteredMessages.length > historyLimit) {
+      const start = filteredMessages.findIndex((message, index) => index >= filteredMessages.length - historyLimit && isHumanMessage(message));
+      if (start >= 0) filteredMessages = filteredMessages.slice(start);
+    }
+    if (deps.allowImages === false) filteredMessages = filteredMessages.map(message => {
+      if (!isHumanMessage(message) || !Array.isArray(message.content) || !message.content.some(part => part.type === 'image_url')) return message;
+      return new HumanMessage({
+        content: [...message.content.filter(part => part.type !== 'image_url'), { type: 'text', text: '（之前的消息含图片）' }],
+        id: message.id,
+      });
+    });
     const messages = state.curriculum
       ? [system, new SystemMessage(state.curriculum), ...filteredMessages]
       : [system, ...filteredMessages];

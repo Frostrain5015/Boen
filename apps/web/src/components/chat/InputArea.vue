@@ -4,7 +4,6 @@ import { Send, Sparkles, GraduationCap, BookOpen, Target, PenTool, Mic, ListChec
 import { useChatStore } from '@/stores/chat';
 import { useAuthStore } from '@/stores/auth';
 import { useUiStore } from '@/stores/ui';
-import DailyLimitBanner from '@/components/DailyLimitBanner.vue';
 import { useVoiceInput } from '@/composables/useVoiceInput';
 import { useImagePicker } from '@/composables/useImagePicker';
 import Mascot from '@/components/Mascot.vue';
@@ -138,7 +137,9 @@ onMounted(() => {
           </div>
         </div>
       </Teleport>
-      <DailyLimitBanner :show="chatStore.dailyLimitReached" @close="chatStore.dailyLimitReached = false" />
+      <div v-if="chatStore.creditsInsufficient" class="mb-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm" role="status">
+        星月积分不足。<router-link to="/setup#credits" class="font-semibold underline">查看余额与充值</router-link>
+      </div>
       <div class="relative">
         <!-- 吉祥物踩在输入框右上角 -->
         <Transition name="mascot-pop">
@@ -151,7 +152,7 @@ onMounted(() => {
             <Mascot :size="58" :float="true" :limbs="true" :state="chatStore.mascotState" :animated="true" />
           </div>
         </Transition>
-        <div class="clay clay-glass flex items-end gap-2 p-2" data-tour="input" :class="chatStore.dailyLimitReached ? 'opacity-50 pointer-events-none' : ''">
+        <div class="clay clay-glass flex items-end gap-2 p-2" data-tour="input">
           <!-- 课堂进度 todo 按钮（常驻显示；不在课堂时无角标、面板显示空态） -->
           <button
             ref="todoBtnRef"
@@ -165,27 +166,6 @@ onMounted(() => {
             <!-- 进度角标：当前所处阶段号 / 总步数（仅课堂中显示） -->
             <span v-if="uiStore.hasTodoList" class="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-[var(--accent)] px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">{{ uiStore.todoProgress.current }}/{{ uiStore.todoProgress.total }}</span>
           </button>
-          <!-- 免费用户用量环 -->
-          <div
-            v-if="authStore.authenticated && !authStore.isPremium"
-            class="relative flex h-9 w-9 shrink-0 items-center justify-center self-center"
-            :title="`今日剩余 ${authStore.dailyRemaining ?? 0} 次`"
-          >
-            <svg class="h-9 w-9 -rotate-90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="15" fill="none" stroke="var(--line)" stroke-width="3" />
-              <circle
-                cx="18" cy="18" r="15" fill="none"
-                :stroke="(authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--accent)'"
-                stroke-width="3" stroke-linecap="round"
-                :stroke-dasharray="2 * Math.PI * 15"
-                :stroke-dashoffset="2 * Math.PI * 15 * (1 - ((authStore.dailyRemaining ?? 10) / 10))"
-                class="transition-all duration-500"
-              />
-            </svg>
-            <span class="absolute text-[10px] font-bold" :style="{ color: (authStore.dailyRemaining ?? 10) <= 3 ? 'var(--error)' : 'var(--ink-soft)' }">
-              {{ authStore.dailyRemaining ?? 10 }}
-            </span>
-          </div>
           <textarea
             :ref="setInputEl"
             v-model="chatStore.input"

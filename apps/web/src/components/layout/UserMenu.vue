@@ -54,9 +54,9 @@ onUnmounted(() => {
       </div>
       <!-- 卡片状态 -->
       <router-link v-if="authStore.isPremium" to="/setup" class="flex items-center gap-1.5 px-4 py-2 transition-colors hover:bg-[var(--premium-gold-soft)] rounded-lg" @click="uiStore.showUserMenu = false">
-        <span :class="authStore.subscription?.tier === 'yearly' ? 'badge-yearly' : 'badge-monthly'">
-          <component :is="authStore.subscription?.tier === 'yearly' ? Star : Moon" class="h-3 w-3" />
-          {{ authStore.subscription?.tier === 'yearly' ? '星耀卡' : '皓月卡' }}
+        <span :class="['yearly', 'pro'].includes(authStore.subscription?.tier ?? '') ? 'badge-yearly' : 'badge-monthly'">
+          <component :is="['yearly', 'pro'].includes(authStore.subscription?.tier ?? '') ? Star : Moon" class="h-3 w-3" />
+          {{ ['yearly', 'pro'].includes(authStore.subscription?.tier ?? '') ? '星耀卡' : '皓月卡' }}
         </span>
         <span v-if="authStore.subscription?.expiresAt" class="text-xs" style="color: var(--ink-soft)">
           · 到期 {{ new Date(authStore.subscription.expiresAt * 1000).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) }}
@@ -64,7 +64,7 @@ onUnmounted(() => {
       </router-link>
       <div v-else class="flex items-center gap-1.5 px-4 py-2">
         <span class="badge-free">
-          <MessageSquare class="h-3 w-3" /> 今日剩余 {{ authStore.dailyRemaining ?? 0 }} 次
+          <MessageSquare class="h-3 w-3" /> {{ authStore.pointsBalance }} 星月积分
         </span>
       </div>
       <div class="border-t border-[var(--line)]">

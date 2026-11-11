@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { MembershipDetails, BillingStatus } from '@boen/shared';
-import { MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
+import { LEGACY_MEMBERSHIP_PLANS, MEMBERSHIP_PLANS, type MembershipPlanKey } from '@boen/shared';
 
 export function initMembership(db: Database.Database): void {
   db.exec(`
@@ -144,12 +144,19 @@ export function membershipDetails(db: Database.Database, userId: string, now = n
         renewsAt: sub && ['active','trialing'].includes(sub.status) ? sub.period_end : null,
         cancelAtPeriodEnd: sub?.status === 'canceling', planKey: sub?.plan_key ?? 'monthly',
         amount: sub?.amount ?? MEMBERSHIP_PLANS[0].amount, currency: sub?.currency ?? 'USD',
-        trialEligible: trialEligible(db, userId),
+        trialEligible: false,
         checkoutAllowed: !legacy && (!sub || (sub.status === 'canceled' && sub.period_end <= now)),
         portalUrl: process.env.WAFFO_PORTAL_URL || 'https://pancake.waffo.ai/consumer/portal/login' },
       rewards: { bankedSeconds: rewards.balance_seconds, activeUntil: rewards.expires_at },
     };
   })();
+}
+
+export function membershipCreditEntitlements(details: MembershipDetails) {
+  if (!details.membership.active) return { weekly: 0, canUsePro: false, legacyAccess: false };
+  const plan = details.membership.source === 'waffo' ? details.billing.planKey : null;
+  const legacyAccess = details.membership.source === 'legacy' || plan === 'monthly' || plan === 'yearly';
+  return { weekly: legacyAccess ? 0 : plan === 'pro' ? 5000 : 1000, canUsePro: plan !== 'plus', legacyAccess };
 }
 
 export function applySubscription(db: Database.Database, row: SubscriptionRow, now = nowSeconds()): boolean {
@@ -160,7 +167,7 @@ export function applySubscription(db: Database.Database, row: SubscriptionRow, n
     if (prior?.event_id === row.event_id) return false;
     // A canceled order cannot be resurrected by a delayed lifecycle notification.
     if (prior?.status === 'canceled' && row.status !== 'canceled') return false;
-    const plan = MEMBERSHIP_PLANS.find(plan => plan.key === row.plan_key) ?? MEMBERSHIP_PLANS[0];
+    const plan = [...MEMBERSHIP_PLANS, ...LEGACY_MEMBERSHIP_PLANS].find(plan => plan.key === row.plan_key) ?? LEGACY_MEMBERSHIP_PLANS[0];
     db.prepare(`INSERT INTO waffo_subscriptions(order_id,user_id,environment,status,period_start,period_end,canceled_at,event_at,event_id,trial_used,plan_key,amount,currency)
       VALUES (@order_id,@user_id,@environment,@status,@period_start,@period_end,@canceled_at,@event_at,@event_id,@trial_used,@plan_key,@amount,@currency)
       ON CONFLICT(order_id) DO UPDATE SET status=excluded.status,period_start=excluded.period_start,

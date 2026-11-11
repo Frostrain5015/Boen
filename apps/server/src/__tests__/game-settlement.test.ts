@@ -28,11 +28,11 @@ describe('game settlement', () => {
     expect(finishGameSession({ ...input, answers: [...answers].reverse() })).toBeNull();
     const settled = finishGameSession({ ...input });
     expect(settled?.correctCount).toBe(5);
-    expect(settled?.points).toBeGreaterThan(0);
+    expect(settled?.points).toBe(0);
     expect(getStageProgress('alice', 'math').stage).toBe(2);
     expect(finishGameSession({ ...input })).toEqual(settled);
     expect(getGameStats('alice').games).toBe(1);
-    expect(db.prepare("SELECT COUNT(*) AS n FROM currency_ledger WHERE user_id='alice' AND reason='game'").get()).toEqual({ n: 1 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM currency_ledger WHERE user_id='alice' AND reason='game'").get()).toEqual({ n: 0 });
   });
 
   it('records wrong answers and reserves the daily bonus for a completed challenge', () => {

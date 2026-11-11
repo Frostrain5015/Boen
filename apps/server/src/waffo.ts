@@ -1,23 +1,26 @@
 import { randomUUID } from 'node:crypto';
-import { WaffoPancake, verifyWebhook, type WebhookEvent, type WebhookEventData } from '@waffo/pancake-ts';
-import { MEMBERSHIP_TERMS_VERSION, type BillingStatus, type MembershipPlanKey } from '@boen/shared';
-import { configuredPlans, verifyCatalog } from './waffo-catalog.js';
+import { TaxCategory, WaffoPancake, verifyWebhook, type WebhookEvent, type WebhookEventData } from '@waffo/pancake-ts';
+import { CREDIT_TOP_UP, MEMBERSHIP_TERMS_VERSION, creditTopUpAmount, type BillingStatus, type MembershipPlanKey } from '@boen/shared';
+import { configuredPlans, recognizedPlans, verifyCatalog } from './waffo-catalog.js';
 import db from './db.js';
-import { applySubscription, billingEnvironment, currentSubscription, membershipDetails, nowSeconds, trialEligible } from './membership.js';
+import { applySubscription, billingEnvironment, currentSubscription, membershipDetails, nowSeconds } from './membership.js';
+import { grantCredit } from './compute-credits.js';
 
 // Lazy reads: ESM imports run before dotenv initialization.
 function cfg() {
   return { merchantId: process.env.WAFFO_MERCHANT_ID ?? '', privateKey: process.env.WAFFO_PRIVATE_KEY ?? '',
-    storeId: process.env.WAFFO_STORE_ID ?? '', productId: process.env.WAFFO_PRODUCT_MONTHLY ?? '',
+    storeId: process.env.WAFFO_STORE_ID ?? '',
     environment: billingEnvironment() as 'test' | 'prod' };
 }
 export function getClient(): WaffoPancake { return new WaffoPancake(cfg()); }
-export function isWaffoEnabled(): boolean {
+function checkoutConfigured(): boolean {
   const c = cfg();
-  return Boolean(c.merchantId && c.privateKey && c.storeId && c.productId)
+  return Boolean(c.merchantId && c.privateKey && c.storeId)
     && (c.environment === 'prod' || process.env.WAFFO_ALLOW_TEST_CHECKOUT === 'true');
 }
-export function listPurchasablePlans() { return configuredPlans().map(({ productId: _id, ...plan }) => plan); }
+export function isWaffoEnabled(): boolean { return checkoutConfigured() && configuredPlans().length > 0; }
+export function isTopUpEnabled(): boolean { return checkoutConfigured() && Boolean(process.env.WAFFO_PRODUCT_TOPUP); }
+export function listPurchasablePlans() { return configuredPlans().map(({ productId: _id, billingPeriod: _period, ...plan }) => plan); }
 type Failure = { ok: false; error: string; message: string };
 export type CheckoutResult = { ok: true; sessionId: string; checkoutUrl: string; expiresAt: string } | Failure;
 interface Attempt { external_id: string; environment: string; plan_key: MembershipPlanKey; session_id: string | null; checkout_url: string | null; expires_at: number; state: string; with_trial: number; created_at: number }
@@ -49,7 +52,7 @@ async function createCheckout(opts: { userId: string; planKey: string; buyerEmai
     }
     if (!row) {
       db.prepare(`INSERT INTO payment_checkout_attempts(user_id,external_id,environment,expires_at,state,with_trial,plan_key)
-        VALUES (?,?,?,?,'creating',?,?)`).run(opts.userId, randomUUID(), c.environment, now + 86400, trialEligible(db, opts.userId) ? 1 : 0, plan.key);
+        VALUES (?,?,?,?,'creating',0,?)`).run(opts.userId, randomUUID(), c.environment, now + 86400, plan.key);
       row = db.prepare('SELECT * FROM payment_checkout_attempts WHERE user_id=?').get(opts.userId) as Attempt;
     }
     db.prepare('INSERT OR IGNORE INTO payment_consents(external_id,user_id,terms_version) VALUES (?,?,?)').run(row.external_id, opts.userId, MEMBERSHIP_TERMS_VERSION);
@@ -99,7 +102,7 @@ async function remoteSubscription(orderId: string): Promise<RemoteSubscription> 
     variables: { id: orderId },
   });
   const row = result.data?.subscriptionOrder;
-  if (result.errors?.length || !row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || !configuredPlans().some(plan => plan.productId === row.subscriptionProduct.id && plan.key === row.billingPeriod)) throw new Error('Subscription unavailable or product/environment mismatch');
+  if (result.errors?.length || !row || row.id !== orderId || row.testMode !== (cfg().environment === 'test') || !recognizedPlans().some(plan => plan.productId === row.subscriptionProduct.id && plan.billingPeriod === row.billingPeriod)) throw new Error('Subscription unavailable or product/environment mismatch');
   return row;
 }
 const orderInflight = new Map<string, Promise<unknown>>();
@@ -126,7 +129,7 @@ async function refreshOrder(userId: string, orderId: string, eventId: string): P
   if (start == null || end == null) throw new Error('Subscription has no authoritative billing period');
   const eventAt = Date.parse(remote.updatedAt);
   if (!Number.isFinite(eventAt)) throw new Error('Missing order version');
-  const plan = configuredPlans().find(plan => plan.productId === remote.subscriptionProduct.id)!;
+  const plan = recognizedPlans().find(plan => plan.productId === remote.subscriptionProduct.id)!;
   const amount = remote.priceSnapshot?.regularPhase.subtotal;
   if (!amount || !Number.isFinite(Number(amount)) || Number(amount) < 0 || !remote.currency) throw new Error('Missing authoritative recurring price');
   const changed = applySubscription(db, { order_id: orderId, user_id: userId, environment: cfg().environment,
@@ -172,6 +175,104 @@ export async function reconcileMembership(userId: string, force = false): Promis
 }
 export interface WebhookHooks { invalidateSubscription: (userId: string) => void }
 export interface WebhookOutcome { ok: boolean; reason?: string; detail?: Record<string, unknown> }
+
+interface TopUp {
+  external_id: string; user_id: string; product_id: string; points: number; amount: string; order_id: string | null;
+  session_id: string | null; checkout_url: string | null; expires_at: string | null; state: string;
+  refunded_cents: number; created_at: number; environment: string;
+}
+export async function createTopUpCheckout(userId: string, requestId: string, points: number, successUrl: string): Promise<CheckoutResult> {
+  const amount = creditTopUpAmount(points);
+  if (amount === null) return { ok: false, error: 'invalid_points', message: '请选择有效的积分数量' };
+  const productId = process.env.WAFFO_PRODUCT_TOPUP;
+  if (!productId || !isTopUpEnabled()) return { ok: false, error: 'unavailable', message: '充值暂未开放' };
+  const { environment } = cfg();
+  const topUp = db.transaction(() => {
+    db.prepare(`INSERT OR IGNORE INTO compute_topups(external_id,user_id,request_id,environment,product_id,points,amount)
+      VALUES (?,?,?,?,?,?,?)`).run(randomUUID(), userId, requestId, environment, productId, points, amount);
+    return db.prepare('SELECT * FROM compute_topups WHERE user_id=? AND environment=? AND request_id=?').get(userId, environment, requestId) as TopUp;
+  }).immediate();
+  if (topUp.points !== points || topUp.state !== 'pending') {
+    return { ok: false, error: 'conflict', message: '此充值申请已处理，请刷新积分余额' };
+  }
+  if (topUp.session_id && topUp.checkout_url && topUp.expires_at) {
+    if (Date.parse(topUp.expires_at) <= Date.now()) return { ok: false, error: 'expired', message: '支付链接已过期，请重新发起充值' };
+    return { ok: true, sessionId: topUp.session_id, checkoutUrl: topUp.checkout_url, expiresAt: topUp.expires_at };
+  }
+  if (topUp.created_at < nowSeconds() - 23 * 3600) return { ok: false, error: 'expired', message: '支付申请已过期，请重新发起充值' };
+  try {
+    const result = await getClient().checkout.authenticated.create({
+      productId: topUp.product_id, currency: CREDIT_TOP_UP.currency, buyerIdentity: userId,
+      successUrl: `${successUrl}&requestId=${encodeURIComponent(requestId)}`, language: 'zh-Hans', orderMerchantExternalId: topUp.external_id,
+      priceSnapshot: { amount: topUp.amount, taxCategory: TaxCategory.SaaS },
+      metadata: { kind: 'boen_compute', points: String(points) },
+    }, { idempotencyKey: `boen-topup-${topUp.external_id}` });
+    db.prepare('UPDATE compute_topups SET session_id=?,checkout_url=?,expires_at=? WHERE external_id=?')
+      .run(result.sessionId, result.checkoutUrl, result.expiresAt, topUp.external_id);
+    return { ok: true, sessionId: result.sessionId, checkoutUrl: result.checkoutUrl, expiresAt: result.expiresAt };
+  } catch {
+    return { ok: false, error: 'upstream', message: '暂时无法打开充值收银台，请重试同一笔申请' };
+  }
+}
+
+export function topUpStatus(userId: string, requestId: string) {
+  return db.prepare('SELECT state,points FROM compute_topups WHERE user_id=? AND environment=? AND request_id=?')
+    .get(userId, cfg().environment, requestId) as { state: string; points: number } | undefined;
+}
+
+function cents(value: string) {
+  if (!/^\d+(\.\d{1,2})?$/.test(value)) throw new Error('Invalid payment amount');
+  const [whole, fraction = ''] = value.split('.');
+  const result = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  if (!Number.isSafeInteger(result)) throw new Error('Invalid payment amount');
+  return result;
+}
+
+export function applyTopUpPayment(topUp: TopUp, orderId: string, subtotal: string, total: string, refunded: number) {
+  const totalCents = cents(total);
+  if (cents(subtotal) !== cents(topUp.amount) || totalCents < cents(subtotal) || (topUp.order_id && topUp.order_id !== orderId)) throw new Error('Top-up amount or order mismatch');
+  db.transaction(() => {
+    const current = db.prepare('SELECT order_id,refunded_cents FROM compute_topups WHERE external_id=?').get(topUp.external_id) as Pick<TopUp, 'order_id' | 'refunded_cents'>;
+    if (current.order_id && current.order_id !== orderId) throw new Error('Top-up order already bound');
+    const refundCents = Math.min(totalCents, Math.max(refunded, current.refunded_cents));
+    const revoked = (amount: number) => Math.floor(topUp.points * amount / totalCents);
+    const creditRef = `purchase:${topUp.environment}:${topUp.external_id}`;
+    grantCredit(db, topUp.user_id, creditRef, 'purchase', topUp.points, null);
+    db.prepare('UPDATE compute_credit_grants SET remaining=MAX(0,remaining-?) WHERE user_id=? AND ref=?')
+      .run(revoked(refundCents) - revoked(current.refunded_cents), topUp.user_id, creditRef);
+    db.prepare('UPDATE compute_topups SET order_id=?,refunded_cents=?,state=? WHERE external_id=?')
+      .run(orderId, refundCents, refundCents === totalCents ? 'refunded' : 'paid', topUp.external_id);
+  }).immediate();
+}
+
+interface RemoteTopUp {
+  id: string; status: string; testMode: boolean; merchantProvidedBuyerIdentity: string;
+  onetimeProduct: { id: string }; priceSnapshot: { currency: string; subtotal: string; total: string };
+  payments: Array<{ status: string; refunds: Array<{ id: string; status: string; requestedAmountDetails: { currency: string; amount: string } }> }>;
+}
+async function reconcileTopUp(topUp: TopUp, orderId: string, refundEvent: boolean) {
+  const response = await getClient().graphql.query<{ onetimeOrder: RemoteTopUp | null }>({
+    query: `query($id:ID!) { onetimeOrder(id:$id) { id status testMode merchantProvidedBuyerIdentity
+      onetimeProduct { id } priceSnapshot { currency subtotal total }
+      payments { status refunds { id status requestedAmountDetails { currency amount } } } } }`,
+    variables: { id: orderId },
+  });
+  const order = response.data?.onetimeOrder;
+  if (response.errors?.length || !order || order.id !== orderId || order.testMode !== (cfg().environment === 'test')
+    || order.merchantProvidedBuyerIdentity !== topUp.user_id || order.onetimeProduct.id !== topUp.product_id
+    || order.priceSnapshot.currency !== CREDIT_TOP_UP.currency || !order.payments.some(p => p.status === 'succeeded')) {
+    throw new Error('Top-up payment could not be verified');
+  }
+  const refunds = new Map<string, number>();
+  for (const payment of order.payments) for (const refund of payment.refunds) {
+    if (refund.status !== 'succeeded') continue;
+    if (refund.requestedAmountDetails.currency !== CREDIT_TOP_UP.currency) throw new Error('Top-up refund currency mismatch');
+    refunds.set(refund.id, cents(refund.requestedAmountDetails.amount));
+  }
+  if (refundEvent && !refunds.size) throw new Error('Top-up refund has not settled');
+  applyTopUpPayment(topUp, orderId, order.priceSnapshot.subtotal, order.priceSnapshot.total, [...refunds.values()].reduce((total, refund) => total + refund, 0));
+}
+
 export async function handleWaffoWebhook(rawBody: string, signature: string | null, hooks: WebhookHooks): Promise<WebhookOutcome> {
   let event: WebhookEvent<WebhookEventData>;
   try { event = verifyWebhook<WebhookEventData>(rawBody, signature, { environment: cfg().environment }); }
@@ -183,7 +284,11 @@ export async function handleWaffoWebhook(rawBody: string, signature: string | nu
       if (seen?.status === 'processed') return { ok: true, reason: 'duplicate' };
       db.prepare(`INSERT OR IGNORE INTO waffo_webhook_events(id,event_type,event_id,mode,order_id,raw) VALUES (?,?,?,?,?,?)`)
         .run(event.id, event.eventType, event.eventId, event.mode, event.data.orderId, rawBody);
-      if ((event.eventType.startsWith('subscription.') && event.eventType !== 'subscription.payment_succeeded') || event.eventType === 'refund.succeeded') {
+      const topUp = db.prepare(`SELECT * FROM compute_topups WHERE environment=? AND (external_id=? OR order_id=?)`)
+        .get(cfg().environment, event.data.orderMerchantExternalId ?? '', event.data.orderId) as TopUp | undefined;
+      if (topUp && (event.eventType === 'order.completed' || event.eventType === 'refund.succeeded')) {
+        await reconcileTopUp(topUp, event.data.orderId, event.eventType === 'refund.succeeded');
+      } else if ((event.eventType.startsWith('subscription.') && event.eventType !== 'subscription.payment_succeeded') || event.eventType === 'refund.succeeded') {
         const data = event.data;
         const order = db.prepare(`SELECT user_id,session_id FROM payment_orders WHERE environment=? AND (external_id=? OR order_id=?) ORDER BY CASE WHEN external_id=? THEN 0 ELSE 1 END LIMIT 1`)
           .get(cfg().environment, data.orderMerchantExternalId ?? '', data.orderId, data.orderMerchantExternalId ?? '') as { user_id: string; session_id: string } | undefined;

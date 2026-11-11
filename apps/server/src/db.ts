@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { DATA_DIR } from './paths.js';
 import { initMembership } from './membership.js';
+import { initComputeCredits } from './compute-credits.js';
 import { initLearningProfiles } from './learning-profile.js';
 
 const db = new Database(join(DATA_DIR, 'boen.db'));
@@ -683,4 +684,5 @@ db.exec(`
 `);
 
 initMembership(db);
+initComputeCredits(db);
 export default db;

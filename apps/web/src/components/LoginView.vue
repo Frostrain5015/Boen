@@ -30,7 +30,7 @@ async function handleLogin() {
   isLoading.value = true;
   try {
     const plan = route.name === 'setup' ? route.query.plan : undefined;
-    await loginWithFrostId(plan === 'monthly' || plan === 'yearly' ? plan : undefined);
+    await loginWithFrostId(plan === 'plus' || plan === 'pro' ? plan : undefined);
   } catch {
     loginError.value = '无法打开登录页面，请重试';
     isLoading.value = false;
